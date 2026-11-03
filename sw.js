@@ -1,5 +1,5 @@
 /* Growth Gusto service worker: offline shell. Network-first for pages/js/css (updates arrive at once), cache fallback offline. Bump VERSION to drop old caches. */
-const VERSION = "gg-v1";
+const VERSION = "gg-v2";
 const SHELL = [
   "./", "./index.html", "./manifest.webmanifest",
   "./css/base.css", "./css/compte.css", "./css/home.css", "./css/releve.css", "./css/labels.css", "./css/reception.css", "./css/stock.css", "./css/tickets.css", "./css/registre.css", "./css/notes.css", "./css/menage.css",
