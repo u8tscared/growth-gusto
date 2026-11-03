@@ -173,3 +173,12 @@
 .hm-cx{display:inline-flex;margin-top:4px;font-size:11px;padding:2px 8px}
 /* a reception in progress is the first thing to resume: the to-do list (its first row) moves right under the hero */
 .hm-grid.rec .hm-todo{order:1}
+/* install card: under the relevé hero, never above it */
+.hm-inst{order:1;min-width:0}
+.hm-inst > .inst{margin:0}
+/* stat tiles: 2 × 2 when the right column is too narrow for 4 (iPad landscape, small laptops) */
+@media (min-width:960px) and (max-width:1299px){
+  .hm-stats{grid-template-columns:1fr 1fr}
+  .hm-stat .sv{font-size:26px}
+}
+@media (min-width:960px){.hm-inst > .inst{flex-direction:column;align-items:stretch}.hm-inst .inst-steps{flex-direction:row;flex-wrap:wrap}.hm-inst .inst-steps li{flex:1 1 220px}}

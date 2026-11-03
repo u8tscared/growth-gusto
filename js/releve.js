@@ -175,9 +175,11 @@ VIEWS.frigos = {
       <div class="glass pad st" style="--i:8"><div class="row"><span class="lbl">Tous les produits en frigo</span><span class="sub">${lots.length}</span></div>${lotList(lots.sort((a, b) => (dlcOf(a) || "9").localeCompare(dlcOf(b) || "9")).slice(0, 30), true)}</div></div>`;
   },
 };
+/* "6 pièces", "3 cartons" — abbreviations (kg, L, g) stay as they are */
+function relUnit(q, u) { u = u || ""; return q > 1 && /^[a-zà-ÿ]{4,}$/i.test(u) && !/[sx]$/.test(u) ? u + "s" : u; }
 function lotList(lots, showFridge) {
   if (!lots.length) return `<div class="empty" style="padding:16px 0 4px">Aucun produit. Ils arrivent ici à chaque réception, ou en scannant une étiquette.</div>`;
-  return `<div style="margin-top:4px">${lots.map((l, i) => `<div class="li tap" data-act="lot" data-id="${l.id}" role="button" tabindex="0" aria-label="${esc(l.name)}${dlcOf(l) ? ` · DLC ${shortDate(dlcOf(l))}` : ""}"><span class="rank ${(daysUntil(dlcOf(l)) ?? 9) <= 1 ? "hot" : ""}">${i + 1}</span><div class="tx"><b>${esc(l.name)}${l.qty ? ` · ${fmt(num(l.qty), num(l.qty) % 1 ? 2 : 0)} ${esc(l.unit || "")}` : ""}</b><em>${l.status === "opened" ? `Ouvert le ${shortDate(dayKey(new Date(l.openedAt)))} par ${esc(firstName(nameOf(l.openedBy)))}` : `Entré le ${shortDate(dayKey(new Date(l.createdAt)))}`}${showFridge ? ` · ${esc(fridgeName(l.fridgeId))}` : ""}${l.lot ? ` · lot ${esc(l.lot)}` : ""}</em></div>${dlcPill(dlcOf(l))}</div>`).join("")}</div>`;
+  return `<div style="margin-top:4px">${lots.map((l, i) => `<div class="li tap" data-act="lot" data-id="${l.id}" role="button" tabindex="0" aria-label="${esc(l.name)}${dlcOf(l) ? ` · DLC ${shortDate(dlcOf(l))}` : ""}"><span class="rank ${(daysUntil(dlcOf(l)) ?? 9) <= 1 ? "hot" : ""}">${i + 1}</span><div class="tx"><b>${esc(l.name)}${l.qty ? ` · ${fmt(num(l.qty), num(l.qty) % 1 ? 2 : 0)} ${esc(relUnit(num(l.qty), l.unit))}` : ""}</b><em>${l.status === "opened" ? `Ouvert le ${shortDate(dayKey(new Date(l.openedAt)))} par ${esc(firstName(nameOf(l.openedBy)))}` : `Entré le ${shortDate(dayKey(new Date(l.createdAt)))}`}${showFridge ? ` · ${esc(fridgeName(l.fridgeId))}` : ""}${l.lot ? ` · lot ${esc(l.lot)}` : ""}</em></div>${dlcPill(dlcOf(l))}</div>`).join("")}</div>`;
 }
 
 /* ───────────────────────── Frigo detail ───────────────────────── */

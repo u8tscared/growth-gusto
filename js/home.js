@@ -12,7 +12,13 @@ function homeChoresDue() {
   return S.chores.filter((c) => { const last = S.choreLogs.find((l) => l.choreId === c.id); if (!last) return true; if (c.freq === "jour") return last.day !== dayKey(); return now - last.at > (span[c.freq] || 0) * 864e5 - 36e5; });
 }
 function homeChoreStats() {
-  const due = homeChoresDue(); const dueIds = new Set(due.map((c) => c.id)); let doneIds;
+  const due = homeChoresDue();
+  if (typeof menDayStats === "function") {
+    try {
+      const m = menDayStats();
+      if (m && m.total != null && m.done != null) { const total = +m.total || 0, done = Math.min(+m.done || 0, total); return { due, done, total, pct: m.pct != null ? Math.round(m.pct) : total ? Math.round((done / total) * 100) : null }; }
+    } catch (e) {}
+  } const dueIds = new Set(due.map((c) => c.id)); let doneIds;
   if (typeof menToday === "function") {
     // same source as menage: today's moments + this week's / month's items, so a weekly task done on Monday still counts
     try { const { groups, week } = menToday(); doneIds = new Set([...groups.ouverture, ...groups.midi, ...groups.fermeture, ...week].filter((o) => o.st === "done" || o.st === "late").map((o) => o.c.id)); } catch (e) {}
@@ -163,11 +169,13 @@ VIEWS.home = {
     </section>`;
 
     const stepsCard = homeStepsCard(fresh ? 3 : 5);
+    const inst = typeof installHint === "function" ? installHint() : ""; let bn; { const r = S.route; S.route = "home-noinst"; try { bn = banner(); } finally { S.route = r; } } /* banner() without its install card: it goes under the hero */
+    const instCard = inst ? `<div class="hm-inst">${inst}</div>` : "";
     return `<div class="inner hm">
       <header class="row st hm-head" style="--i:0"><div style="min-width:0"><button class="hm-date" data-act="restoSwitch"><span>${DAYS[now.getDay()].replace(/^./, (c) => c.toUpperCase())} ${now.getDate()} ${MONTHS[now.getMonth()]} · ${esc(S.resto.name)}</span>${ico("down")}</button><div class="title">${greet}${S.me.name ? " " + esc(firstName(S.me.name)) : ""}</div></div><button class="iconbtn" ${typeof ACT.whoami === "function" ? `data-act="whoami" aria-label="Qui êtes-vous ? Changer d'utilisateur"` : `data-go="reglages" aria-label="Réglages"`} style="padding:0">${avatar(S.me.id)}</button></header>
-      ${banner()}
+      ${bn}
       <div class="hm-grid ${fresh ? "fresh" : ""} ${recNow ? "rec" : ""}">
-        <div class="hm-col hm-l">${hero}${fresh && !recNow ? stepsCard : ""}${todoCard}${fresh && !recNow ? "" : stepsCard}</div>
+        <div class="hm-col hm-l">${hero}${instCard}${fresh && !recNow ? stepsCard : ""}${todoCard}${fresh && !recNow ? "" : stepsCard}</div>
         <div class="hm-col hm-r">${qa}${stats}${homeFeed(6)}</div>
       </div></div>`;
   },

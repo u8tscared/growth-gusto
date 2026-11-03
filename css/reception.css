@@ -249,3 +249,46 @@ body.rec-kb .rec-cta .btn{height:46px}
 .rec-fix{align-self:flex-start;height:44px;margin:-4px 0 -6px -8px}
 .rec-fix .ico{width:15px;height:15px}
 .rec-undo{all:unset;cursor:pointer;margin-left:6px;padding:10px 12px;margin-block:-10px;font-weight:800;color:#B9A6FF}
+
+/* done: one compact bar, the label list stays visible */
+.rec-cta.done2{grid-template-columns:1fr 1fr}
+.rec-cta.done2 .btn{height:52px;gap:8px;font-size:14.5px}
+.rec-cta.done2 .btn span:not(.rec-n){overflow:hidden;text-overflow:ellipsis}
+.rec-cta.done2 .rec-n{background:rgba(255,255,255,.25)}
+.rec-donev .rec-hero{padding:6px 0 0}
+.rec-donev .rec-seal{width:96px;height:96px;margin-bottom:6px}
+.rec-donev .rec-seal svg{width:44px;height:44px}
+.rec-donev .rec-tiles > div{padding:10px 8px}
+.rec-donev .rec-tiles b{font-size:26px}
+
+/* product card: one column on phones, two on wide screens */
+.rec-cgrid,.rec-ccol{display:contents}
+
+/* desktop: use the width (P1-4) */
+@media (min-width:960px){
+  .inner.narrow.rec{max-width:1040px}
+  .rec-sups{grid-template-columns:repeat(4,minmax(0,1fr))}
+  .rec-s1 .rec-new{flex-direction:row;align-items:flex-end}
+  .rec-s1 .rec-new .field{flex:1;min-width:0}
+  .rec-cgrid{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:22px;align-items:start}
+  .rec-ccol{display:flex;flex-direction:column;gap:22px;min-width:0}
+  .rec-lines{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+  .rec-ctls{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;align-items:start}
+  .rec-s3 .rec-sum{flex-direction:row;align-items:center;flex-wrap:wrap;gap:14px 20px}
+  .rec-s3 .rec-sum-h{flex:1 1 220px}
+  .rec-s3 .rec-stats{flex:2 1 360px}
+  .rec-s3 .rec-sum .field{flex:1 1 100%}
+  .rec-cta{max-width:640px;width:100%;margin-left:auto;margin-right:auto;box-sizing:border-box}
+  .rec-cta.done2{max-width:560px}
+  .rec-donev .rec-stage{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr);gap:14px 22px;align-items:start}
+  .rec-donev .rec-stage > .rec-hero{grid-column:1;padding-top:24px}
+  .rec-donev .rec-stage > .rec-tiles{grid-column:1}
+  .rec-donev .rec-stage > .glass{grid-column:2;grid-row:1 / span 3}
+  .rec-donev .rec-stage > .rec-refl{grid-column:1;grid-row:auto}
+  .rec-hlist{padding:4px 10px}
+}
+@media (min-width:1500px){.inner.narrow.rec{max-width:1160px}}
+@media (max-width:959px){.rec-cta.done2{grid-template-columns:1.25fr 1fr}.rec-cta.done2 .btn.soft{padding:0 10px}}
+@media (max-width:420px){.rec-cta.done2 .btn.soft .ico{display:none}}
+@media (max-width:959px){.rec-cta.done2{grid-template-columns:1fr 1fr}.rec-cta.done2 .btn{padding:0 10px;font-size:14px}}
+@media (max-width:420px){.rec-cta.done2 .btn .ico{display:none}}

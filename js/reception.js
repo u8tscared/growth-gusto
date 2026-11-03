@@ -60,6 +60,16 @@ function recBlank() {
   const R = S.rec || {};
   return { name: "", qty: "", unit: R.lastUnit || "kg", temp: "", tmax: 4, type: "frais", dlc: "", lot: "", fridgeId: recFridgeFor(4, R.lastFridge), photoId: "", photoUrl: "", photoData: "", sanitary: "", peche: "", ocr: null, decision: "", reason: "", memo: null };
 }
+/* « 6 pièces », « 2 cartons », « 1,5 kg », « 3 L » */
+function recQtyTx(qty, unit) {
+  const q = String(qty ?? "").trim(); if (!q) return ""; const n = num(q); const u = String(unit || "").trim();
+  const qs = n != null ? String(+n.toFixed(3)).replace(".", ",") : q;
+  const pl = n != null && Math.abs(n) >= 2 && u.length > 2 && !/[sxz]$/i.test(u) && !/^(kg|g|l|cl|ml)$/i.test(u);
+  return `${esc(qs)}${u ? ` ${esc(u)}${pl ? "s" : ""}` : ""}`;
+}
+/* « BL-4501 », « bl 4501 », « BL n°4501 » → « 4501 » (the label already says BL) */
+const recBl = (bl) => String(bl || "").trim().replace(/^B\.?L\.?(?=[\s:°.\-#]|\d|$)[\s:°n.\-#]*/i, "");
+const recFrIco = (f) => (typeof relTypeOf === "function" ? ico(relTypeOf(f).ic) : ico(f.max <= -15 ? "snow" : "fridge"));
 const recNorm = (s) => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
 const recTypeOf = (L) => L.type || (L.tmax == null ? "sec" : L.tmax <= -15 ? "surg" : L.tmax <= 2 ? "ultra" : "frais");
 const recCold = (L) => recTypeOf(L) !== "sec";
@@ -181,7 +191,7 @@ function recStep1() {
       ${tiles}
       <div class="glass pad rec-new">
         <label class="field"><span>${sups.length ? "Nouveau fournisseur" : "Fournisseur"}</span><input class="input" id="recSupIn" data-bind="rec.supplier" data-recsup="1" value="${known ? "" : esc(R.supplier)}" placeholder="Ex. Marée Atlantique" autocomplete="off" autocapitalize="words" enterkeyhint="go"></label>
-        <label class="field"><span>N° de bon de livraison <i class="rec-opt">facultatif</i></span><input class="input mono" data-bind="rec.bl" value="${esc(R.bl)}" placeholder="BL-0000" autocomplete="off" enterkeyhint="done"></label>
+        <label class="field"><span>N° de bon de livraison <i class="rec-opt">facultatif</i></span><input class="input mono" data-bind="rec.bl" value="${esc(R.bl)}" placeholder="Ex. 4501" autocomplete="off" enterkeyhint="done"></label>
       </div>`,
     cta: `<div class="ctabar rec-cta one" id="recSupCta" ${sups.length && !sup ? "hidden" : ""}><button class="btn acc block" data-act="recSupGo" id="recSupGo" ${sup ? "" : `data-off="1"`}>${sup ? `Continuer avec ${esc(sup)}` : "Continuer"}${ico("chev")}</button></div>`,
   };
@@ -193,7 +203,7 @@ function recStep2() {
   const rows = R.lines.map((L, i) => (i === R.edit ? recCard(R.cur, i) : recRow(L, i))).join("");
   const fresh = R.edit < 0 ? recCard(R.cur, -1) : "";
   const n = R.lines.length;
-  const supBar = `<button class="rec-supbar" data-act="recGo" data-v="1">${recAv(R.supplier)}<span class="tx"><b>${esc(R.supplier)}</b><em>${R.bl ? `BL ${esc(R.bl)} · ` : ""}${n ? `${n} produit${n > 1 ? "s" : ""} noté${n > 1 ? "s" : ""}` : "Un produit à la fois"}</em></span><span class="pill neu">Changer</span></button>`;
+  const supBar = `<button class="rec-supbar" data-act="recGo" data-v="1">${recAv(R.supplier)}<span class="tx"><b>${esc(R.supplier)}</b><em>${recBl(R.bl) ? `BL ${esc(recBl(R.bl))} · ` : ""}${n ? `${n} produit${n > 1 ? "s" : ""} noté${n > 1 ? "s" : ""}` : "Un produit à la fois"}</em></span><span class="pill neu">Changer</span></button>`;
   return {
     top: recTop("Réception"),
     main: `${supBar}${n ? `<div class="rec-lines">${rows}</div>` : ""}${fresh}`,
@@ -206,7 +216,7 @@ function recRow(L, i) {
   const t = num(L.temp); const st = recTempState(L); const R = recState();
   return `<button class="rec-row ${R.justAdded === i ? "pop" : ""} ${recOk(L) ? "" : "warn"}" data-act="recEdit" data-i="${i}" aria-label="Modifier ${esc(L.name)}">
     ${L.photoUrl ? `<span class="th"><img src="${esc(L.photoUrl)}" alt=""></span>` : `<span class="th n mono">${i + 1}</span>`}
-    <span class="tx"><b>${esc(L.name)}</b><em>${L.qty ? `${esc(L.qty)} ${esc(L.unit)} · ` : ""}${esc(fridgeName(L.fridgeId))}${L.dlc ? ` · DLC ${shortDate(L.dlc)}` : ""}</em></span>
+    <span class="tx"><b>${esc(L.name)}</b><em>${L.qty ? `${recQtyTx(L.qty, L.unit)} · ` : ""}${esc(fridgeName(L.fridgeId))}${L.dlc ? ` · DLC ${shortDate(L.dlc)}` : ""}</em></span>
     <span class="t mono ${st}">${recCold(L) ? (t == null ? "–°" : fmt(t) + "°") : "sec"}</span>${ico("edit", "ed")}</button>`;
 }
 function recCard(L, i) {
@@ -223,6 +233,7 @@ function recCard(L, i) {
       <div class="rec-sugs" id="recSugs">${L.memo ? "" : recSugsHtml(recSuggest(L.name))}</div>
       ${memo}
     </div>
+    <div class="rec-cgrid"><div class="rec-ccol">
     <div class="rec-f"><span class="lbl">Quantité</span><div class="rec-qty"><input class="input mono" id="recQty" data-bind="rec.cur.qty" value="${esc(L.qty)}" inputmode="decimal" placeholder="0" enterkeyhint="done" aria-label="Quantité"><div class="rec-units">${units.map((u) => `<button class="chip ${L.unit === u ? "on" : ""}" data-act="recUnit" data-v="${esc(u)}">${esc(u)}</button>`).join("")}</div></div></div>
     <div class="rec-f rec-temp ${st}" id="recTemp">
       <div class="row"><span class="lbl">Température à cœur</span>${recCold(L) ? `<span class="pill ${st === "bad" ? "bad" : st === "ok" ? "ok" : "neu"}" id="recTmax">seuil ${fmt(L.tmax, 0)} °C</span>` : ""}</div>
@@ -232,17 +243,17 @@ function recCard(L, i) {
         <button class="step" data-rst="1" aria-label="Plus 0,1 degré">${ico("plus")}</button></div>
         <div class="rec-tst" id="recTst">${recTstHtml(L)}</div>
         <div class="chips rec-qt" id="recQt">${recQuick(L)}</div>` : `<p class="note rec-dry">Produit sec : pas de température à relever.</p>`}
-    </div>
+    </div></div><div class="rec-ccol">
     <div class="rec-f" id="recDlc"><div class="row"><span class="lbl">DLC${recNeedDlc(L) ? "" : ` <i class="rec-opt">facultatif</i>`}</span><span class="sub mono" id="recDlcTx">${L.dlc ? `${shortDate(L.dlc)} · ${dd < 0 ? "dépassée" : dd === 0 ? "aujourd'hui" : dd === 1 ? "demain" : `dans ${dd} j`}` : "à choisir"}</span></div>
       <div class="rec-dlc">${REC_DLC.map((d) => { const k = addDays(today, d); return `<button class="chip ${L.dlc === k ? "on" : ""}" data-act="recDlc" data-v="${k}">J+${d}</button>`; }).join("")}<label class="chip ${dlcCustom ? "on" : ""} rec-date" title="Autre date">${ico("recCal")}${dlcCustom ? `<span class="mono">${shortDate(L.dlc)}</span>` : ""}<input type="date" data-bind="rec.cur.dlc" data-rer="1" value="${esc(L.dlc)}" aria-label="Choisir la date de DLC"></label></div></div>
-    <div class="rec-f"><span class="lbl">Ranger dans</span>${ty === "surg" && S.fridges.length && !S.fridges.some((f) => f.max <= -15) ? `<p class="note rec-dry">Aucun congélateur dans Frigos : choisissez où le ranger.</p>` : ""}<div class="chips rec-fr">${S.fridges.map((f) => `<button class="chip ${L.fridgeId === f.id ? "on" : ""}" data-act="recFr" data-v="${f.id}">${ico("snow")}${esc(f.name)}</button>`).join("") || `<span class="note">Aucun frigo : ajoutez-en dans Frigos.</span>`}</div></div>
+    <div class="rec-f"><span class="lbl">Ranger dans</span>${ty === "surg" && S.fridges.length && !S.fridges.some((f) => f.max <= -15) ? `<p class="note rec-dry">Aucun congélateur dans Frigos : choisissez où le ranger.</p>` : ""}<div class="chips rec-fr">${S.fridges.map((f) => `<button class="chip ${L.fridgeId === f.id ? "on" : ""}" data-act="recFr" data-v="${f.id}">${recFrIco(f)}${esc(f.name)}</button>`).join("") || `<span class="note">Aucun frigo : ajoutez-en dans Frigos.</span>`}</div></div>
     <div class="rec-f rec-proof">
       ${L.photoUrl ? `<div class="rec-ph has"><span class="th ${L.ocr === "busy" ? "scan" : ""}"><img src="${esc(L.photoUrl)}" alt="Étiquette sanitaire"></span><span class="tx"><b>Photo prise</b><em>${L.ocr === "busy" ? "Lecture de l'étiquette…" : L.ocr === "fail" ? "Lecture impossible, la photo reste en preuve." : "Preuve gardée au registre."}</em></span><button class="iconbtn rec-x" data-act="recPhoto" aria-label="Reprendre la photo">${ico("camera")}</button><button class="iconbtn rec-x" data-act="recPhotoRm" aria-label="Retirer la photo">${ico("x")}</button></div>`
         : `<button class="rec-ph" data-act="recPhoto"><span class="ic">${ico("camera")}</span><span class="tx"><b>Photo de l'étiquette</b><em>${S.cap.sample ? "Lot et DLC lus automatiquement" : "Facultatif · preuve sanitaire"}</em></span>${ico("chev")}</button>`}
       ${L.ocr && typeof L.ocr === "object" ? `<div class="ocr">${Object.entries(L.ocr).filter(([, v]) => v).map(([k, v], j) => `<span style="--i:${j}">${esc(k)} : ${esc(v)}</span>`).join("")}</div>` : ""}
       <label class="rec-lot"><span class="lbl">N° de lot</span><input class="input mono" data-bind="rec.cur.lot" value="${esc(L.lot)}" placeholder="facultatif" autocomplete="off" enterkeyhint="done"></label>
     </div>
-  </div>`;
+  </div></div></div>`;
 }
 function recSugsHtml(sug) {
   if (!sug.list.length) return "";
@@ -267,7 +278,7 @@ function recStep3() {
   const head = `<div class="glass pad rec-sum">
       <div class="rec-sum-h">${recAv(R.supplier)}<div><b class="h3">${esc(R.supplier)}</b><div class="sub">${R.lines.length} produit${R.lines.length > 1 ? "s" : ""} · ${hm(Date.now())}</div></div></div>
       <div class="rec-stats"><span class="ok"><b class="mono">${good}</b>conforme${good > 1 ? "s" : ""}</span><span class="${bad.length ? "bad" : ""}"><b class="mono">${bad.length}</b>non conforme${bad.length > 1 ? "s" : ""}</span><span><b class="mono">${kept}</b>à ranger</span></div>
-      <label class="field"><span>N° de bon de livraison <i class="rec-opt">facultatif</i></span><input class="input mono" data-bind="rec.bl" value="${esc(R.bl)}" placeholder="BL-0000" autocomplete="off" enterkeyhint="done"></label>
+      <label class="field"><span>N° de bon de livraison <i class="rec-opt">facultatif</i></span><input class="input mono" data-bind="rec.bl" value="${esc(R.bl)}" placeholder="Ex. 4501" autocomplete="off" enterkeyhint="done"></label>
     </div>`;
   const order = R.lines.map((L, i) => [L, i]).sort((a, b) => recOk(a[0]) - recOk(b[0]));
   const undecided = bad.filter((L) => !L.decision).length;
@@ -281,7 +292,7 @@ function recCtl(L, i) {
   const R = recState(); const iss = recIssues(L); const ok = !iss.length; const t = num(L.temp);
   const d = L.decision || (ok ? "ok" : "");
   const open = !ok || R.ctlOpen === i || d === "refuse";
-  const meta = `${L.qty ? `${esc(L.qty)} ${esc(L.unit)} · ` : ""}${recCold(L) ? (t == null ? "– °C" : fmt(t) + " °C") : "sec"} · DLC ${L.dlc ? shortDate(L.dlc) : "–"} · ${esc(fridgeName(L.fridgeId))}`;
+  const meta = `${L.qty ? `${recQtyTx(L.qty, L.unit)} · ` : ""}${recCold(L) ? (t == null ? "– °C" : fmt(t) + " °C") : "sec"} · DLC ${L.dlc ? shortDate(L.dlc) : "–"} · ${esc(fridgeName(L.fridgeId))}`;
   const expired = iss.some((x) => x.k === "dlc"); /* a past DLC can't enter the kitchen: fix the entry or refuse */
   const opts = ok ? [["ok", "Accepter"], ["refuse", "Refuser"]] : expired ? [["fix", "Corriger la DLC"], ["refuse", "Refuser"]] : [["reserve", "Accepter avec réserve"], ["refuse", "Refuser"]];
   const di = opts.findIndex((o) => o[0] === d);
@@ -317,7 +328,7 @@ function recDoneView(anim) {
       ${lots.length ? `<div class="glass pad"><div class="row"><span class="lbl">Étiquettes QR à coller</span><span class="pill acc">${lots.length}</span></div>${lotList(lots, true)}</div>` : ""}
       ${ref.length ? `<div class="glass pad rec-refl"><span class="lbl">Repart avec le livreur</span>${ref.map((L) => `<div class="li"><span class="ic bad">${ico("x")}</span><div class="tx"><b>${esc(L.name)}</b><em>${esc(L.reason || "Refusé")}</em></div></div>`).join("")}</div>` : ""}
     </div>
-    <div class="ctabar rec-cta col">${lots.length ? `<button class="btn acc block" data-act="recLabels">${ico("printer")}Afficher les étiquettes</button>` : ""}<button class="btn soft block" data-act="recAgain">${ico("truck")}Nouvelle réception</button></div>
+    <div class="ctabar rec-cta ${lots.length ? "done2" : "one"}"><button class="btn soft" data-act="recAgain">${ico("truck")}<span>Nouvelle réception</span></button>${lots.length ? `<button class="btn acc" data-act="recLabels">${ico("printer")}<span>Étiquettes</span><span class="rec-n mono">${lots.length}</span></button>` : ""}</div>
   </div>`;
 }
 
@@ -329,14 +340,14 @@ function recHistView(anim) {
   return `<div class="inner narrow rec">${recTop("Historique", `<span class="pill acc">${list.length}</span>`)}
     <div class="rec-stage ${anim}">${groups.length ? groups.map((g) => `<div class="rec-day"><span class="lbl">${dayLbl(g.k)}</span><div class="glass rec-hlist">${g.items.map((r) => {
       const ls = r.lines || []; const nref = ls.filter((L) => L.refused).length; const nres = ls.filter((L) => !L.refused && (L.reserve || L.ok === false)).length; const ph = ls.some((L) => L.photoUrl);
-      return `<button class="rec-h" data-act="recHistOpen" data-id="${r.id}">${recAv(r.supplier)}<span class="tx"><b>${esc(r.supplier || "Livraison")}</b><em>${hm(r.at)} · ${ls.length} produit${ls.length > 1 ? "s" : ""}${r.bl ? ` · BL ${esc(r.bl)}` : ""} · ${esc(firstName(nameOf(r.uid)))}</em></span>${ph ? ico("camera", "phi") : ""}${nref ? `<span class="pill bad">${nref} refusé${nref > 1 ? "s" : ""}</span>` : nres ? `<span class="pill warn">${nres} réserve${nres > 1 ? "s" : ""}</span>` : `<span class="pill ok">Conforme</span>`}${ico("chev", "chv")}</button>`;
+      return `<button class="rec-h" data-act="recHistOpen" data-id="${r.id}">${recAv(r.supplier)}<span class="tx"><b>${esc(r.supplier || "Livraison")}</b><em>${hm(r.at)} · ${ls.length} produit${ls.length > 1 ? "s" : ""}${recBl(r.bl) ? ` · BL ${esc(recBl(r.bl))}` : ""} · ${esc(firstName(nameOf(r.uid)))}</em></span>${ph ? ico("camera", "phi") : ""}${nref ? `<span class="pill bad">${nref} refusé${nref > 1 ? "s" : ""}</span>` : nres ? `<span class="pill warn">${nres} réserve${nres > 1 ? "s" : ""}</span>` : `<span class="pill ok">Conforme</span>`}${ico("chev", "chv")}</button>`;
     }).join("")}</div></div>`).join("") : `<div class="glass empty"><span class="ic">${ico("truck")}</span><b>Aucune réception</b>Les livraisons validées apparaîtront ici.</div>`}</div></div>`;
 }
 function recHistSheet(r) {
   const ls = r.lines || []; const lots = S.lots.filter((l) => l.receptionId === r.id); const d = new Date(r.at);
-  openSheet(`<div class="rec-hs-h">${recAv(r.supplier)}<div><div class="h2" style="font-size:20px">${esc(r.supplier || "Livraison")}</div><div class="sub">${DAYS[d.getDay()]} ${shortDate(dayKey(d))} à ${hm(r.at)} · ${esc(nameOf(r.uid))}${r.bl ? ` · BL ${esc(r.bl)}` : ""}</div></div></div>
+  openSheet(`<div class="rec-hs-h">${recAv(r.supplier)}<div><div class="h2" style="font-size:20px">${esc(r.supplier || "Livraison")}</div><div class="sub">${DAYS[d.getDay()]} ${shortDate(dayKey(d))} à ${hm(r.at)} · ${esc(nameOf(r.uid))}${recBl(r.bl) ? ` · BL ${esc(recBl(r.bl))}` : ""}</div></div></div>
     <div class="rec-hs">${ls.map((L) => { const t = L.temp; const hot = t != null && L.tmax != null && t > L.tmax; const state = L.refused ? "bad" : L.ok === false || L.reserve ? "warn" : "ok";
-      return `<div class="li"><span class="ic ${state}">${ico(L.refused ? "x" : state === "warn" ? "alert" : "check")}</span><div class="tx"><b>${esc(L.name)}${L.qty ? ` · ${esc(L.qty)} ${esc(L.unit || "")}` : ""}</b><em><span class="mono" style="color:${hot ? "var(--bad)" : "inherit"}">${t != null ? `${fmt(t)} °C` : L.type === "sec" || L.tmax == null ? "sec" : "– °C"}</span> · DLC ${L.dlc ? shortDate(L.dlc) : "–"}${L.refused ? "" : ` · ${esc(fridgeName(L.fridgeId))}`}${L.lot ? ` · lot ${esc(L.lot)}` : ""}</em>${L.refused || L.reason ? `<em style="color:${L.refused ? "var(--bad)" : "var(--warn)"};font-weight:700">${L.refused ? "Refusé" : "Réserve"}${L.reason ? ` : ${esc(L.reason)}` : ""}</em>` : ""}</div>${L.photoUrl ? `<a class="thumb" style="width:46px;height:46px;border-radius:12px" href="${esc(L.photoUrl)}" target="_blank" rel="noopener"><img src="${esc(L.photoUrl)}" alt="Étiquette"></a>` : ""}</div>`; }).join("")}</div>
+      return `<div class="li"><span class="ic ${state}">${ico(L.refused ? "x" : state === "warn" ? "alert" : "check")}</span><div class="tx"><b>${esc(L.name)}${L.qty ? ` · ${recQtyTx(L.qty, L.unit)}` : ""}</b><em><span class="mono" style="color:${hot ? "var(--bad)" : "inherit"}">${t != null ? `${fmt(t)} °C` : L.type === "sec" || L.tmax == null ? "sec" : "– °C"}</span> · DLC ${L.dlc ? shortDate(L.dlc) : "–"}${L.refused ? "" : ` · ${esc(fridgeName(L.fridgeId))}`}${L.lot ? ` · lot ${esc(L.lot)}` : ""}</em>${L.refused || L.reason ? `<em style="color:${L.refused ? "var(--bad)" : "var(--warn)"};font-weight:700">${L.refused ? "Refusé" : "Réserve"}${L.reason ? ` : ${esc(L.reason)}` : ""}</em>` : ""}</div>${L.photoUrl ? `<a class="thumb" style="width:46px;height:46px;border-radius:12px" href="${esc(L.photoUrl)}" target="_blank" rel="noopener"><img src="${esc(L.photoUrl)}" alt="Étiquette"></a>` : ""}</div>`; }).join("")}</div>
     ${lots.length ? `<button class="btn acc block" data-act="recHistLabels" data-id="${r.id}">${ico("printer")}Étiquettes (${lots.length})</button>` : ""}
     <button class="btn soft block" data-act="sheetClose">Fermer</button>`);
 }
@@ -374,7 +385,7 @@ document.addEventListener("click", () => { if (S.rec && S.route === "reception")
 document.addEventListener("input", (e) => {
   const el = e.target; if (!S.rec || S.route !== "reception") return; recDraftSave();
   if (el.dataset.recname) { S.rec.cur.memo = null; const s = $("#recSugs"); if (s) s.innerHTML = recSugsHtml(recSuggest(el.value)); const m = $(".rec-memo"); m && m.remove(); }
-  else if (el.dataset.rect) { recTFit(el); recPaintTemp(); }
+  else if (el.dataset.rect) { if (el.value.includes(".")) { const c = el.selectionStart; el.value = el.value.replace(/\./g, ","); S.rec.cur.temp = el.value; try { el.setSelectionRange(c, c); } catch (x) {} } recTFit(el); recPaintTemp(); }
   else if (el.dataset.recsup) { const b = $("#recSupGo"); const v = el.value.trim(); if (b) { b.innerHTML = `${v ? `Continuer avec ${esc(v)}` : "Continuer"}${ico("chev")}`; v ? b.removeAttribute("data-off") : b.setAttribute("data-off", "1"); } const cb = $("#recSupCta"); if (cb) cb.hidden = !v && !!$(".rec-sup"); $$(".rec-sup.on").forEach((x) => x.classList.remove("on")); }
 });
 /* typed a frozen reading (≤ −12 °C) on a chilled type: it is a frozen product, switch the type so the threshold is right */
@@ -534,11 +545,13 @@ Object.assign(ACT, {
     if (und >= 0) { recNudge(`[data-ctl="${und}"]`, `${R.lines[und].name} : à décider.`); return; }
     if (R.saving) return; R.saving = true; a.setAttribute("disabled", "");
     const now = Date.now();
-    const lines = R.lines.map((L) => { const refused = L.decision === "refuse"; const reserve = L.decision === "reserve"; return {
+    const lines = R.lines.map((L) => { const refused = L.decision === "refuse"; const reserve = L.decision === "reserve"; const out = {
       name: L.name, qty: L.qty, unit: L.unit, temp: recCold(L) ? num(L.temp) : null, tmax: recCold(L) ? L.tmax : null, type: recTypeOf(L), dlc: L.dlc, lot: L.lot, fridgeId: L.fridgeId,
       photoId: L.photoId || "", photoUrl: L.photoId ? L.photoUrl : L.photoData || "", sanitary: L.sanitary || "", peche: L.peche || "",
-      ok: recOk(L), refused, reserve, reason: refused || reserve ? String(L.reason || "").trim() : "" }; });
-    const rid = await safe(DB.add("receptions", { supplier: R.supplier, bl: R.bl, at: now, uid: S.me.id, lines })).catch(() => null);
+      ok: recOk(L), refused, reserve, reason: refused || reserve ? String(L.reason || "").trim() : "" };
+      const p = S.products.find((x) => recNorm(x.name) === recNorm(L.name)); out.productId = p ? p.id : ""; if (!p) out.newProduct = L.name;
+      return out; });
+    const rid = await safe(DB.add("receptions", { supplier: R.supplier, bl: recBl(R.bl), at: now, uid: S.me.id, lines })).catch(() => null);
     if (!rid) { R.saving = false; a.removeAttribute("disabled"); return; }
     const ids = [];
     for (const [i, L] of lines.entries()) {
@@ -546,6 +559,7 @@ Object.assign(ACT, {
       const p = S.products.find((x) => recNorm(x.name) === recNorm(L.name));
       const lot = { name: L.name, productId: p?.id || "", qty: L.qty, unit: L.unit, lot: L.lot, dlc: L.dlc, supplier: R.supplier, receptionId: rid, fridgeId: L.fridgeId, status: "in", receivedTemp: L.temp, code: "GG-" + rid6(), photoId: L.photoId, photoUrl: L.photoId ? L.photoUrl : "", createdAt: now + i, uid: S.me.id };
       if (L.reserve) lot.reserve = L.reason || "Avec réserve";
+      if (!p) lot.newProduct = L.name;
       const id = await DB.add("lots", lot).catch(() => null); if (id) ids.push(id);
     }
     const refused = lines.filter((L) => L.refused); const nres = lines.filter((L) => L.reserve).length;

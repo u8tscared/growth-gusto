@@ -102,7 +102,7 @@ VIEWS.tickets = {
     const topCard = `<div class="glass pad st" style="--i:4"><div class="row"><span class="lbl">Plats les plus vendus · 14 jours</span></div>${top.length ? top.map((d, i) => `<div class="li tk-top"><span class="rank ${i === 0 ? "hot" : ""}">${i + 1}</span><div class="tx"><b>${esc(d.name)}</b><i class="tk-bar"><i style="width:${Math.max(4, (d.q / top[0].q) * 100)}%"></i></i></div><span class="mono" style="font-weight:700">${tkN(d.q)}</span></div>`).join("") : `<div class="empty" style="padding:14px 0 4px">Les plats vendus apparaîtront ici.</div>`}</div>`;
 
     const hist = [...S.tickets].sort((a, b) => (b.date || "").localeCompare(a.date || "") || (b.at || 0) - (a.at || 0));
-    const histCard = `<div class="glass pad st" style="--i:5"><div class="row"><span class="lbl">Historique</span><span class="sub">${S.tickets.length ? tkPl(S.tickets.length, "ticket") : ""}</span></div>${hist.map((t) => `<div class="li tap" data-act="ticket" data-id="${t.id}"><span class="ic">${ico("receipt")}</span><div class="tx"><b>${t.date ? tkDayLabel(t.date) : "Date inconnue"}</b><em>${tkCount([t])} · ${esc(firstName(nameOf(t.uid)))}</em></div>${tkPhotos(t).length || (t.photoIds || []).length ? `<span class="tk-cam" aria-label="Photo jointe">${ico("camera")}</span>` : ""}<span class="mono tk-nw" style="font-weight:700">${t.total != null ? tkEur(t.total) : "–"}</span></div>`).join("") || `<div class="empty" style="padding:16px 0 4px">Aucun ticket enregistré.</div>`}</div>`;
+    const histCard = `<div class="glass pad st" style="--i:5"><div class="row"><span class="lbl">Historique</span><span class="sub">${S.tickets.length ? tkPl(S.tickets.length, "ticket") : ""}</span></div>${hist.map((t) => `<div class="li tap" data-act="ticket" data-id="${t.id}" role="button" tabindex="0"><span class="ic">${ico("receipt")}</span><div class="tx"><b>${t.date ? tkDayLabel(t.date) : "Date inconnue"}</b><em>${tkCount([t])} · ${esc(firstName(nameOf(t.uid)))}</em></div>${tkPhotos(t).length || (t.photoIds || []).length ? `<span class="tk-cam" aria-label="Photo jointe">${ico("camera")}</span>` : ""}<span class="mono tk-nw" style="font-weight:700">${t.total != null ? tkEur(t.total) : "–"}</span></div>`).join("") || `<div class="empty" style="padding:16px 0 4px">Aucun ticket enregistré.</div>`}</div>`;
 
     return `<div class="inner">${topBar("Tickets de caisse")}<div class="cols"><div>${todayCard}${chart}${cons}</div><div>${topCard}${histCard}</div></div></div>`;
   },
@@ -128,11 +128,17 @@ function tkDrawChart(v) {
     const x = i * band + (band - bw) / 2, val = vals[i], h = val > 0 ? Math.max(4, (val / max) * ch) : 0, y = top + ch - h, r = Math.min(4, bw / 2, h);
     const lab = "DLMMJVS"[parseDay(d).getDay()];
     const mark = h ? `<path class="tk-b ${d === sel ? "on" : ""}" d="M${x},${top + ch} V${y + r} Q${x},${y} ${x + r},${y} H${x + bw - r} Q${x + bw},${y} ${x + bw},${y + r} V${top + ch} Z"/>` : by[d] ? `<rect class="tk-b0 has" x="${x}" y="${top + ch - 3}" width="${bw}" height="3" rx="1.5"/>` : `<rect class="tk-b0" x="${x + bw / 2 - 2}" y="${top + ch - 4}" width="4" height="4" rx="2"/>`;
-    return `${mark}<text class="tk-x ${d === sel ? "on" : ""} ${d === today ? "td" : ""}" x="${x + bw / 2}" y="${H - 8}" text-anchor="middle">${lab}</text><rect class="tk-hit" data-act="tkDay" data-v="${d}" x="${i * band}" y="0" width="${band}" height="${H}"><title>${tkCap(tkDayLabel(d, true))} : ${by[d]?.has ? tkEur(by[d].total) : "–"}</title></rect>`;
+    return `${mark}<text class="tk-x ${d === sel ? "on" : ""} ${d === today ? "td" : ""}" x="${x + bw / 2}" y="${H - 8}" text-anchor="middle">${lab}</text><rect class="tk-hit" data-act="tkDay" data-v="${d}" tabindex="0" role="button" aria-label="${tkCap(tkDayLabel(d, true))}" x="${i * band}" y="0" width="${band}" height="${H}"><title>${tkCap(tkDayLabel(d, true))} : ${by[d]?.has ? tkEur(by[d].total) : "–"}</title></rect>`;
   }).join("");
   el.innerHTML = `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="Chiffre d'affaires des 14 derniers jours">${any ? `<line class="tk-grid" x1="0" x2="${W}" y1="${top}" y2="${top}"/>` : ""}${any ? `<text class="tk-y" x="${W}" y="${top - 5}" text-anchor="end">${tkEur(max, 0)}</text>` : ""}<line class="tk-base" x1="0" x2="${W}" y1="${top + ch}" y2="${top + ch}"/>${bars}</svg>`;
   const rd = $("#tkRead", v);
-  $$(".tk-hit", el).forEach((h) => { h.addEventListener("mouseenter", () => { rd.innerHTML = tkReadout(h.dataset.v, by); }); h.addEventListener("mouseleave", () => { rd.innerHTML = tkReadout(S.ui.tkDay, by); }); });
+  $$(".tk-hit", el).forEach((h) => {
+    const show = () => { rd.innerHTML = tkReadout(h.dataset.v, by); }; const back = () => { rd.innerHTML = tkReadout(S.ui.tkDay, by); };
+    h.addEventListener("mouseenter", show); h.addEventListener("mouseleave", back); h.addEventListener("focus", show); h.addEventListener("blur", back);
+    /* SVG has no .click(): handle Enter/Space here, before core's [role=button] handler */
+    h.addEventListener("keydown", (e) => { if (e.key !== "Enter" && e.key !== " ") return; e.preventDefault(); e.stopPropagation(); S.ui.tkFocus = h.dataset.v; ACT.tkDay(h, null, h.dataset.v); });
+  });
+  if (S.ui.tkFocus) { const f = el.querySelector(`.tk-hit[data-v="${S.ui.tkFocus}"]`); S.ui.tkFocus = null; if (f) f.focus({ preventScroll: true }); }
 }
 
 /* ───────── saisie ───────── */
@@ -146,6 +152,7 @@ VIEWS.tzEdit = {
     const busy = T.busy ? `<div class="glass pad st" style="--i:1;display:flex;flex-direction:column;gap:10px"><div class="thumbs">${T.pics.map((p) => `<span class="thumb scan"><img src="${esc(p.src)}" alt=""></span>`).join("")}</div><span class="note">Lecture du ticket… cela prend quelques secondes.</span></div>` : "";
     return `<div class="inner narrow tk-edit">${topBar(T.id ? "Modifier le ticket" : "Nouveau ticket Z", { right: T.id ? `<button class="iconbtn" data-act="tzDel" aria-label="Supprimer" style="color:var(--bad)">${ico("trash")}</button>` : "" })}
       ${busy}${T.err ? `<div class="banner st" style="--i:1">${ico("alert")}<span>${esc(T.err)}</span></div>` : ""}
+      <div class="tk-ed-grid"><div class="tk-ed-l">
       <div class="glass pad st" style="--i:1;display:flex;flex-direction:column;gap:10px"><span class="lbl">Date du ticket</span>
         <div class="tk-dates"><button class="chip ${T.date === dayKey() ? "on" : ""}" data-act="tzDate" data-v="${dayKey()}">Aujourd'hui</button><button class="chip ${T.date === addDays(dayKey(), -1) ? "on" : ""}" data-act="tzDate" data-v="${addDays(dayKey(), -1)}">Hier</button><input class="input mono" type="date" data-bind="tz.date" data-rer="1" value="${esc(T.date)}" max="${dayKey()}" aria-label="Autre date"></div>
         ${dup ? `<div class="banner tk-dup">${ico("alert")}<span style="flex:1">Un ticket existe déjà pour ${tkDupLabel(T.date)}.</span><button class="btn soft sm" data-act="tzOpen" data-id="${dup.id}">Ouvrir</button></div>` : ""}</div>
@@ -154,6 +161,7 @@ VIEWS.tzEdit = {
         <div class="tk-search"><span class="tk-sico">${ico("search")}</span><input class="input" id="tzQ" placeholder="Ajouter un plat…" autocomplete="off" enterkeyhint="done" value="${esc(S.ui.tzQ || "")}"></div>
         <div id="tzSug" class="tk-sug">${tkSugHtml()}</div>
         <div class="tk-lines">${T.lines.map((l, i) => tkLineHtml(l, i)).join("") || `<div class="empty" style="padding:8px 0 4px;font-size:13px">${tkDishes().length ? "Touchez un plat ci-dessus, ou tapez son nom." : "Tapez le nom d'un plat vendu, puis touchez « Ajouter »."}</div>`}</div></div>
+      </div><div class="tk-ed-r">
 
       <div class="glass pad st" style="--i:3;display:flex;flex-direction:column;gap:8px"><label class="tk-cal"><span class="lbl">Chiffre d'affaires TTC</span><div class="tk-ca"><input class="input mono" id="tzTotal" inputmode="decimal" autocomplete="off" data-bind="tz.total" value="${esc(T.total ?? "")}" placeholder="0,00"><b>€</b></div></label>
         ${lineSum > 0 && tkNum(T.total) !== Math.round(lineSum * 100) / 100 ? `<button class="btn ghost sm" data-act="tzUseSum" data-v="${lineSum}" style="align-self:flex-start">Utiliser la somme des lignes : ${tkEur(lineSum)}</button>` : ""}</div>
@@ -164,7 +172,7 @@ VIEWS.tzEdit = {
 
       ${C.rows.length ? `<div class="glass pad st" style="--i:5;display:flex;flex-direction:column;gap:6px"><div class="hstack"><span class="ic">${ico("pot")}</span><div><b class="h3">Ce que ce ticket consomme</b><div class="sub">Selon vos fiches recettes</div></div></div><div class="tk-cons">${C.rows.map((r) => `<div class="li"><div class="tx"><b>${esc(r.name)}</b><em>${esc(r.from.join(", "))}</em></div><span class="mono tk-q">${tkQty(r.v, r.base)}</span></div>`).join("")}</div></div>` : ""}
 
-      <div class="ctabar"><button class="btn acc block" data-act="tzSave" ${T.busy ? "disabled" : ""}>${ico("check")}<span id="tzCta">${tkCtaLabel(n)}</span></button></div></div>`;
+      <div class="ctabar"><button class="btn acc block" data-act="tzSave" ${T.busy ? "disabled" : ""}>${ico("check")}<span id="tzCta">${tkCtaLabel(n)}</span></button></div></div></div></div>`;
   },
   after(v) {
     setTimeout(() => { if (S.route === "tzEdit") $("#tabbar").classList.add("hide"); }, 0);
@@ -172,7 +180,7 @@ VIEWS.tzEdit = {
     q.addEventListener("input", () => { S.ui.tzQ = q.value; $("#tzSug", v).innerHTML = tkSugHtml(); });
     q.addEventListener("keydown", (e) => { if (e.key !== "Enter") return; e.preventDefault(); const f = $("#tzSug [data-act=tzAdd]", v); if (f && q.value.trim()) f.click(); else q.blur(); });
     if (S.ui.tzFocus) { S.ui.tzFocus = false; q.focus({ preventScroll: true }); }
-    $$("[data-qi]", v).forEach((inp) => { tkFitQ(inp); inp.addEventListener("input", () => { const i = +inp.dataset.qi; let q = num(inp.value); if (q != null && q > TK_MAXQ) { inp.value = String(TK_MAXQ); S.tz.lines[i].quantite = inp.value; buzz(8); toast(`${tkN(TK_MAXQ)} au maximum par plat`, "err"); } tkFitQ(inp); tkLive(v); }); inp.addEventListener("focus", () => inp.select()); });
+    $$("[data-qi]", v).forEach((inp) => { tkFitQ(inp); inp.addEventListener("input", () => { const i = +inp.dataset.qi; if (S.tz.lines[i]) S.tz.lines[i].quantite = inp.value; let q = num(inp.value); if (q != null && q > TK_MAXQ) { inp.value = String(TK_MAXQ); S.tz.lines[i].quantite = inp.value; buzz(8); toast(`${tkN(TK_MAXQ)} au maximum par plat`, "err"); } tkFitQ(inp); tkLive(v); }); inp.addEventListener("focus", () => inp.select()); });
     const tot = $("#tzTotal", v); tot.addEventListener("blur", () => { if (!S.tz) return; const x = tkNum(tot.value); if (x != null && x >= 0) { tot.value = x.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); S.tz.total = tot.value; } });
     if (S.ui.tzBump != null) { const b = $(`[data-qi="${S.ui.tzBump}"]`, v); S.ui.tzBump = null; if (b) { b.classList.remove("bump"); void b.offsetWidth; b.classList.add("bump"); } }
   },

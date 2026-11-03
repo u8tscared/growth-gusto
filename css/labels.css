@@ -210,3 +210,15 @@
 .lb-back .lb-bk{min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
 .lb-back{display:inline-flex;max-width:calc(100% + 10px)}
 .lb-tag .n.n3{font-size:calc(2.1 * var(--mm));-webkit-line-clamp:3;line-height:1.1}
+
+/* desktop: use the width (P1-4) */
+.lb-pgrid,.lb-pcol{display:contents}
+@media (min-width:960px){
+  /* scanner: camera left (stays in view), code entry + lists right */
+  .inner.narrow.lb-scan{max-width:1120px;display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:18px;align-items:start}
+  .lb-scan .lb-stage{position:sticky;top:14px;height:min(calc(100vh - 56px),620px)}
+  /* imprimante: choose on the left, set up + preview on the right */
+  .inner.narrow.lb-print{max-width:1080px}
+  .lb-pgrid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px;align-items:start}
+  .lb-pcol{display:flex;flex-direction:column;gap:14px;min-width:0}
+}
