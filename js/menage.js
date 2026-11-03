@@ -30,8 +30,9 @@ const menDow = (k) => parseDay(k).getDay();
 const menWeekStart = (k) => addDays(k, -((menDow(k) + 6) % 7));
 const menMonthEnd = (k) => { const d = parseDay(k); return dayKey(new Date(d.getFullYear(), d.getMonth() + 1, 0)); };
 const menDim = (k) => +menMonthEnd(k).slice(8);
-const M = { busy: {}, tab: "jour", wk: 0, sel: null, open: {}, just: null, justAt: 0, ring: 0, logs: null, logsRid: null, names: [], signer: "" };
-try { M.signer = localStorage.getItem("gg-men-signer") || ""; M.names = JSON.parse(localStorage.getItem("gg-men-names") || "[]"); } catch (e) {}
+const M = { busy: {}, tab: "jour", wk: 0, sel: null, open: {}, just: null, justAt: 0, ring: 0, logs: null, logsRid: null, names: [] };
+// the old free-text signer override (gg-men-signer) signed logs with someone else's name: dropped, the signer is always S.me
+try { localStorage.removeItem("gg-men-signer"); M.names = JSON.parse(localStorage.getItem("gg-men-names") || "[]"); } catch (e) {}
 const menSaveNames = () => { try { localStorage.setItem("gg-men-names", JSON.stringify(M.names)); } catch (e) {} };
 
 /* ── data ── */
@@ -45,7 +46,9 @@ function menLogsOf(cid) { // logs of one chore, oldest first (cached per log sna
   const L = menLogs(); if (menIdx.src !== L || menIdx.n !== L.length) { const m = new Map(); for (let i = L.length - 1; i >= 0; i--) { const l = L[i]; if (!m.has(l.choreId)) m.set(l.choreId, []); m.get(l.choreId).push(l); } menIdx = { src: L, n: L.length, map: m }; }
   return menIdx.map.get(cid) || [];
 }
-const menSigner = () => M.signer || S.me.name || "";
+/* HACCP: a check is signed by the person switched in (« Qui êtes-vous ? »), so a log's `by` and `uid` always name the same person.
+   Read at the moment of the check, never cached: a user switch changes the signer at once. */
+const menSigner = () => (S.me && S.me.name) || "";
 function menNames() {
   const set = new Set(); const add = (n) => { n = (n || "").trim(); if (n) set.add(n); };
   add(S.me.name); S.members.forEach((m) => add(m.name || S.profiles[m.id]?.name)); M.names.forEach(add); S.chores.forEach((c) => add(c.who)); menLogs().slice(0, 300).forEach((l) => add(l.by));
@@ -120,6 +123,14 @@ function menToday() {
   const rank = { overdue: 0, todo: 1, upcoming: 2, missed: 3, late: 4, done: 4 };
   week.sort((a, b) => rank[a.st] - rank[b.st] || (a.day < b.day ? -1 : 1));
   return { groups, week };
+}
+/* Single source of truth for « today's cleaning »: exactly what the Today tab lists (today's moments + this week's / month's
+   items that are open or already done this period; items only planned later in the week are not counted yet).
+   Global used by home and the report: menDayStats() -> { done, total, late, pct } */
+function menDayStats() {
+  const { groups, week } = menToday(); const L = [...groups.ouverture, ...groups.midi, ...groups.fermeture, ...week].filter((o) => o.st !== "upcoming" && o.st !== "missed");
+  const done = L.filter(menIsDone).length; const late = L.filter((o) => o.st === "overdue").length;
+  return { done, total: L.length, late, pct: L.length ? Math.round((done / L.length) * 100) : null };
 }
 function menDueToday() { const { groups, week } = menToday(); const set = new Set(); [...groups.ouverture, ...groups.midi, ...groups.fermeture, ...week].forEach((o) => { if (o.st === "todo" || o.st === "overdue") set.add(o.c.id); }); return S.chores.filter((c) => set.has(c.id)); }
 // Global used by home's « À traiter »: array of chore docs still due now (today's + this week's open ones).
@@ -201,15 +212,16 @@ function menEmpty() {
 /* today */
 function menTodayView() {
   const { groups, week } = menToday(); const all = [...groups.ouverture, ...groups.midi, ...groups.fermeture];
-  const ok = all.filter(menIsDone).length; const pct = all.length ? Math.round((ok / all.length) * 100) : 100;
-  const late = [...all, ...week].filter((o) => o.st === "overdue").length; const left = all.length - ok;
+  const ds = menDayStats(); const ok = ds.done, tot = ds.total; const pct = ds.pct ?? 100; const late = ds.late; const left = tot - ok;
   const h = new Date().getHours(); const cur = h < 11 ? "ouverture" : h < 17 ? "midi" : "fermeture";
-  const nextG = MEN_MO.find((g) => groups[g].some((o) => !menIsDone(o)));
+  // what the hero names: the moment we are in if it still has work, else « en retard » when earlier moments slipped
+  const curOpen = groups[cur].some((o) => !menIsDone(o)); const nextG = MEN_MO.find((g) => groups[g].some((o) => !menIsDone(o)));
+  const hWhen = !left ? "" : curOpen ? ` · maintenant : ${MEN_MOMENTS[cur].s}` : late ? " · en retard" : nextG && MEN_MO.indexOf(nextG) > MEN_MO.indexOf(cur) ? ` · prochain : ${MEN_MOMENTS[nextG].s}` : week.some((o) => !menIsDone(o) && o.st !== "upcoming") ? " · cette semaine" : "";
   const signer = menSigner();
   const hero = `<div class="hero men-hero st" style="--i:2"><div class="in">
-      <div class="ring">${menRing(pct, 108, 9, "menRingBar")}<div class="num"><div><b id="menRingPct">${M.ring}</b><b style="font-size:16px">%</b><small>${ok} / ${all.length}</small></div></div></div>
-      <div class="meta"><b>${menCap(menLongDay(dayKey()))}</b><span>${!all.length ? "Rien de prévu aujourd'hui" : left ? `${left} tâche${left > 1 ? "s" : ""} à faire${nextG ? ` · ${MEN_MOMENTS[nextG].s}` : ""}` : "Ménage du jour terminé"}</span>
-      <div class="men-hx">${late ? `<span class="nx men-late">${ico("alert")}${late} en retard</span>` : ""}<button class="nx men-signer" data-act="menSigner" aria-label="Changer la personne qui signe">${ico("menUser")}${signer ? `Signé ${esc(firstName(signer))}` : "Qui signe ?"}${ico("down")}</button></div></div>
+      <div class="ring">${menRing(pct, 108, 9, "menRingBar")}<div class="num"><div><b id="menRingPct">${M.ring}</b><b style="font-size:16px">%</b><small>${ok} / ${tot}</small></div></div></div>
+      <div class="meta"><b>${menCap(menLongDay(dayKey()))}</b><span>${!tot ? "Rien de prévu aujourd'hui" : left ? `${left} tâche${left > 1 ? "s" : ""} à faire${hWhen}` : "Ménage du jour terminé"}</span>
+      <div class="men-hx">${late ? `<span class="nx men-late">${ico("alert")}${late} en retard</span>` : ""}<button class="nx men-signer" data-act="menSigner" aria-label="Changer d'utilisateur : les tâches cochées sont signées par la personne connectée">${ico("menUser")}${signer ? `Signé ${esc(firstName(signer))}` : "Qui signe ?"}${ico("down")}</button></div></div>
     </div></div>`;
   let i = 3;
   const sec = (g, title, hint, icn, L, showDay) => {
@@ -304,10 +316,10 @@ function menEditorHtml() {
     <div class="field"><span>Responsable <i class="men-opt">facultatif</i></span><div class="chips men-wrap"><button class="chip ${!d.who ? "on" : ""}" data-act="menEdSet" data-id="who" data-v="">Toute l'équipe</button>${d.who ? `<button class="chip on" data-act="menEdSet" data-id="who" data-v="${esc(d.who)}">${esc(d.who)}</button>` : ""}${names.map((n) => `<button class="chip" data-act="menEdSet" data-id="who" data-v="${esc(n)}">${esc(n)}</button>`).join("")}${d._whoIn ? "" : `<button class="chip" data-act="menEdWho">${ico("plus")}Autre</button>`}</div>
       ${d._whoIn ? `<div class="hstack"><input class="input" id="menWhoIn" placeholder="Prénom" autocomplete="off" style="flex:1"><button class="btn acc sm" style="height:50px" data-act="menEdWhoOk">Ajouter</button></div>` : ""}</div>
     <button class="men-sw ${d.photo ? "on" : ""}" data-act="menEdPhoto" role="switch" aria-checked="${!!d.photo}"><span class="ic">${ico("camera")}</span><span class="tx"><b>Photo obligatoire</b><em>Une photo de preuve est demandée au pointage</em></span><i></i></button>
-    <button class="btn acc block" data-act="menSave">${ico("check")}Enregistrer</button>
-    ${d._id ? `<button class="btn ghost block" style="color:var(--bad)" data-act="menDel" data-id="${d._id}">${ico("trash")}Supprimer la tâche</button>` : ""}`;
+    ${d._id ? `<button class="btn ghost block" style="color:var(--bad)" data-act="menDel" data-id="${d._id}">${ico("trash")}Supprimer la tâche</button>` : ""}
+    <div class="men-sfoot"><button class="btn acc block" data-act="menSave">${ico("check")}Enregistrer</button></div>`;
 }
-const menEdRedraw = (focus) => { const sh = $("#sheet"); const st = sh.scrollTop; $("#sheetBody").innerHTML = menEditorHtml(); sh.scrollTop = st; if (focus) $(focus)?.focus(); };
+const menEdRedraw = (focus) => { const b = $("#sheetBody"); const st = b.scrollTop; b.innerHTML = menEditorHtml(); b.scrollTop = st; if (focus) $(focus)?.focus(); };
 
 function menLogSheet(l) {
   const c = S.chores.find((x) => x.id === l.choreId); const today = l.day === dayKey();
@@ -316,8 +328,14 @@ function menLogSheet(l) {
     ${c?.notes ? `<div class="note men-meth">${ico("menDrop")}${esc(c.notes)}</div>` : ""}
     <div class="grid2">${c ? `<button class="btn soft" data-act="menHist" data-id="${c.id}">${ico("menHist")}Historique</button>` : `<button class="btn soft" data-act="sheetClose">Fermer</button>`}${today ? `<button class="btn danger" data-act="menUnlog" data-id="${l.id}">${ico("menUndo")}Annuler</button>` : `<button class="btn soft" data-act="sheetClose">Fermer</button>`}</div>`;
 }
+/* the history sheet's primary action: check the task now when it is open today / this week */
+function menHistDo(c) {
+  const { groups, week } = menToday(); const L = [...groups.ouverture, ...groups.midi, ...groups.fermeture, ...week].filter((o) => o.c.id === c.id && (o.st === "overdue" || o.st === "todo"));
+  const o = L.find((x) => x.st === "overdue") || L[0]; if (!o) return "";
+  return `<button class="btn acc block" data-act="menHistOk" data-v="${menKey(o)}">${ico("check")}Marquer comme fait${o.slot ? ` · ${menSlotTx(o.slot).toLowerCase()}` : ""}</button>`;
+}
 function menHistSheet(c) {
-  c = menNorm(c); const t = dayKey(); const logs = menLogsOf(c.id).slice().reverse();
+  c = menNorm(c); const t = dayKey(); const logs = menLogsOf(c.id).slice().reverse(); const doBtn = menHistDo(c);
   const k30 = addDays(t, -29); const cp = menCompliance(k30 < menStart(c) ? menStart(c) : k30, t, (x) => x.id === c.id);
   const c0 = addDays(menWeekStart(t), -21); const cells = [];
   for (let k = c0, n = 0; n < 28; k = addDays(k, 1), n++) { const os = menOccOn(c, k); os.forEach((o) => menState(o)); const st = !os.length ? "" : os.some((o) => o.st === "missed") ? "missed" : os.every(menIsDone) ? (os.some((o) => o.st === "late") ? "late" : "done") : os.some((o) => o.st === "overdue") ? "overdue" : os.some(menIsDone) ? "part" : os[0].st; cells.push({ k, st }); }
@@ -327,7 +345,7 @@ function menHistSheet(c) {
     <div class="men-hstat"><div class="men-hs"><span class="lbl">30 derniers jours</span><b class="mono ${menPctCls(cp.pct)}">${cp.pct != null ? cp.pct + "%" : "–"}</b><em>${cp.tot ? `${cp.done}/${cp.tot} fait${cp.missed.length ? ` · ${cp.missed.length} oubli${cp.missed.length > 1 ? "s" : ""}` : ""}` : "Pas encore de données"}</em></div>
       <div class="men-cal" aria-label="4 dernières semaines">${MEN_DOW.map((d) => `<span>${d[0]}</span>`).join("")}${cells.map((x) => `<i class="${x.st} ${x.k === t ? "t" : ""} ${x.k > t ? "fut" : ""}" title="${shortDate(x.k)}"></i>`).join("")}</div></div>
     <div><span class="lbl">Derniers pointages</span>${logs.length ? `<div class="men-hl">${logs.slice(0, 8).map((l) => `<div class="li tap" data-act="menLog" data-id="${l.id}" role="button" tabindex="0"><span class="men-mk done sm">${menCheckSvg}</span><div class="tx"><b>${esc(l.by || nameOf(l.uid))}</b><em>${menCap(menLongDay(l.day))} · ${hm(l.at)}${l.slot ? ` · ${l.slot}` : ""}</em></div>${menHasPic(l) ? `<span class="men-ph">${menImg(l)}</span>` : ""}</div>`).join("")}</div>` : `<div class="empty" style="padding:14px 0 4px">Jamais pointée pour l'instant.</div>`}</div>
-    <button class="btn soft block" data-act="menEdit" data-id="${c.id}">${ico("edit")}Modifier la tâche</button>`;
+    <div class="men-sfoot">${doBtn}<button class="btn ${doBtn ? "soft" : "acc"} block" data-act="menEdit" data-id="${c.id}">${ico("edit")}Modifier la tâche</button></div>`;
 }
 
 /* ── photo proof: stored by core's upload() (IndexedDB on the device, or the asset store), the log keeps the id.
@@ -374,7 +392,7 @@ Object.assign(ACT, {
     if (!v || Date.now() - (M.busy[v] || 0) < 1500) return; // double tap (the photo picker may never answer if cancelled: time-boxed, not a lock)
     const [cid, day, slot] = v.split("|"); const raw = S.chores.find((x) => x.id === cid); if (!raw) return; const c = menNorm(raw);
     const occ = menOccOn(c, day).find((o) => o.slot === (slot || "")); if (occ && menLogFor(occ)) return; // already checked
-    if (!menSigner()) { M.pending = v; ACT.menSigner(); return; }
+    if (!menSigner()) { toast("Choisissez d'abord qui signe"); ACT.menSigner(); return; }
     M.busy[v] = Date.now();
     try { await menDoIt(a, v, c, slot); } finally { delete M.busy[v]; }
   },
@@ -389,14 +407,9 @@ Object.assign(ACT, {
   menHist: (a, id) => { const c = S.chores.find((x) => x.id === id); if (!c) return; SFX.tap(); openSheet(menHistSheet(c)); },
   menPhotoAdd: async (a, id) => { const ph = await menPhoto(); if (!ph) return; await safe(DB.update("choreLogs", id, ph)).catch(() => {}); SFX.ok(); toast("Photo ajoutée"); const l = menLogs().find((x) => x.id === id); if ($("#sheet").classList.contains("open") && l) $("#sheetBody").innerHTML = menLogSheet(l); },
 
-  menSigner: () => {
-    const names = menNames(); const cur = menSigner();
-    openSheet(`<div class="h2" style="font-size:20px">Qui fait le ménage ?</div><p class="sub" style="margin:-6px 0 0">Les tâches cochées sur cet appareil sont signées avec ce prénom.</p>
-      <div class="men-names">${names.map((n) => `<button class="men-name ${n === cur ? "on" : ""}" data-act="menSignerSet" data-v="${esc(n)}"><span class="ava" style="background:${colorFor(n)}">${esc(initials(n))}</span><span>${esc(n)}</span>${n === cur ? ico("check") : ""}</button>`).join("")}</div>
-      <div class="hstack"><input class="input" id="menNewName" placeholder="Ajouter un prénom" autocomplete="off" style="flex:1"><button class="btn acc" style="height:50px" data-act="menSignerNew">Ajouter</button></div>`);
-  },
-  menSignerSet: (a, id, v) => { M.signer = v; try { localStorage.setItem("gg-men-signer", v); } catch (e) {} closeSheet(true); SFX.ok(); toast(`Les pointages seront signés ${firstName(v)}`); rerender(); if (M.pending) { const p = M.pending; M.pending = null; const el = $(`[data-act=menDo][data-v="${p}"]`); if (el) ACT.menDo(el, null, p); } },
-  menSignerNew: () => { const inp = $("#menNewName"); const n = (inp.value || "").trim(); if (!n) { SFX.err(); inp.classList.remove("shake"); void inp.offsetWidth; inp.classList.add("shake"); return; } if (!M.names.includes(n)) { M.names.push(n); menSaveNames(); } ACT.menSignerSet(null, null, n); },
+  // the signer chip = the user switcher (with its codes): whoever is switched in signs, nobody can sign for someone else
+  menSigner: () => { SFX.tap(); if (typeof ACT.whoami === "function") return ACT.whoami(); if (typeof ACT.meRename === "function") return ACT.meRename(); go("reglages"); },
+  menHistOk: async (a, id, v) => { closeSheet(true); await ACT.menDo(a, null, v); },
 
   menEdit: (a, id) => {
     const c = id ? S.chores.find((x) => x.id === id) : null; const n = c ? menNorm(c) : null;

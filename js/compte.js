@@ -51,6 +51,16 @@ function ccOnMembers(rows) {
 const ccAttach0 = attachResto;
 attachResto = function () { ccAttach0(); if (ccLocalMode() && S.rid && !(DB.listeners[DB.path("members")] || []).includes(ccOnMembers)) DB.watch("members", {}, ccOnMembers); };
 
+/* core's sidebar footer reads « Réglages » with a sliders icon, but in local mode a tap opens « Qui êtes-vous ? » (capture
+   listener below): relabel it after each chrome render so label, icon and action match. */
+const ccChrome0 = renderChrome;
+renderChrome = function () {
+  ccChrome0.apply(this, arguments);
+  const me = document.querySelector("#side .me"); if (!me || !ccLocalMode() || !S.resto) return;
+  me.title = "Changer d'utilisateur"; me.setAttribute("aria-label", `${S.me.name || "Vous"} · changer d'utilisateur`);
+  const ic = me.lastElementChild; if (ic && ic.classList.contains("ico")) ic.outerHTML = ico("swap");
+  const em = me.querySelector("em"); if (em && !em.querySelector(".cc-swtx")) em.insertAdjacentHTML("beforeend", `<span class="cc-swtx"> · Changer</span>`);
+};
 function ccBecome(m, silent) {
   if (!m) return;
   S.me = { id: m.id, name: m.name || "", color: m.color || undefined };
@@ -217,14 +227,14 @@ VIEWS.equipe = {
     const canManage = myRole() === "gerant"; const ms = ccMembers(); const local = ccLocalMode();
     const ev = S.events.slice(0, 8);
     const row = (x) => { const mine = S.events.filter((e) => e.uid === x.id); const last = mine[0]; return `<div class="li tap cc-mrow" data-act="ccMember" data-id="${x.id}">${ccAva(x, 44)}<div class="tx"><b><span class="cc-nm">${esc(x.name || nameOf(x.id))}</span>${x.id === S.me.id ? `<span class="cc-you">vous</span>` : ""}${x.pinH ? ` <span class="cc-lk" title="Protégé par un code">${ico("lock")}</span>` : ""}</b><em>${mine.length ? `${mine.length} action${mine.length > 1 ? "s" : ""} · ${ccAgo(last.at)}` : "Aucune action"}</em></div><span class="pill ${x.role === "gerant" ? "acc" : x.role === "chef" ? "warn" : "neu"}">${ROLES[x.role] || "Équipe"}</span>${ico("chev")}</div>`; };
-    return `<div class="inner narrow">${topBar("Équipe", { right: canManage && local ? `<button class="btn acc sm" data-act="ccMemberNew">${ico("plus")}Ajouter</button>` : "" })}
+    return `<div class="inner cc-wide">${topBar("Équipe", { right: canManage && local ? `<button class="btn acc sm" data-act="ccMemberNew">${ico("plus")}Ajouter</button>` : "" })}
       ${local ? `<div class="cc-hero st" style="--i:1"><span class="cc-hero-ic">${ico("users")}</span><div style="flex:1;min-width:0"><b>Qui signe ?</b><span>Chacun signe à son nom.</span></div><button class="btn sm cc-hero-btn" data-act="whoami">${ico("swap")}Changer</button></div>` : ""}
-      <div class="glass pad st" style="--i:2"><div class="row" style="margin-bottom:2px"><span class="lbl">${ms.length} personne${ms.length > 1 ? "s" : ""}</span>${!canManage ? `<span class="note">Seul un gérant peut modifier l'équipe</span>` : ""}</div>
+      <div class="cc-cols"><div class="cc-col"><div class="glass pad st" style="--i:2"><div class="row" style="margin-bottom:2px"><span class="lbl">${ms.length} personne${ms.length > 1 ? "s" : ""}</span>${!canManage ? `<span class="note">Seul un gérant peut modifier l'équipe</span>` : ""}</div>
         ${ms.length ? ms.map(row).join("") : `<div class="empty">Personne pour l'instant.</div>`}
         ${canManage && local ? `<button class="li tap cc-addrow" data-act="ccMemberNew"><span class="cc-ava plus" style="--s:44px">${ico("plus")}</span><div class="tx"><b>Ajouter un équipier</b><em>Prénom, rôle, couleur et code facultatif</em></div></button>` : ""}</div>
-      <div class="glass pad st" style="--i:3"><div class="row"><span class="lbl">Qui a fait quoi</span><button class="btn ghost sm" data-go="registre">Registre${ico("chev")}</button></div>
-        ${ev.length ? ev.map((e) => `<div class="li">${avatar(e.uid)}<div class="tx"><b style="white-space:normal">${esc(said(e.uid, e.text))}</b><em>${when(e.at)}</em></div></div>`).join("") : `<div class="empty" style="padding:16px 0 6px">Les actions de chacun apparaîtront ici.</div>`}</div>
-      <p class="note st" style="--i:4">Gérant : gère l'équipe et les réglages. Chef et Équipe : relevés, réceptions, étiquettes et ménage. Un code à 4 chiffres protège chaque profil.</p></div>`;
+      <p class="note st" style="--i:4">Gérant : gère l'équipe et les réglages. Chef et Équipe : relevés, réceptions, étiquettes et ménage. Un code à 4 chiffres protège chaque profil.</p></div>
+      <div class="cc-col"><div class="glass pad st" style="--i:3"><div class="row"><span class="lbl">Qui a fait quoi</span><button class="btn ghost sm" data-go="registre">Registre${ico("chev")}</button></div>
+        ${ev.length ? ev.map((e) => `<div class="li">${avatar(e.uid)}<div class="tx"><b style="white-space:normal">${esc(said(e.uid, e.text))}</b><em>${when(e.at)}</em></div></div>`).join("") : `<div class="empty" style="padding:16px 0 6px">Les actions de chacun apparaîtront ici.</div>`}</div></div></div></div>`;
   },
 };
 
@@ -261,8 +271,9 @@ VIEWS.reglages = {
   render() {
     const me = ccMember(S.me.id) || { id: S.me.id, name: S.me.name, color: S.me.color }; const local = ccLocalMode(); const al = ccAutoLock(); const lb = +(ccLS.raw("gg-lastbackup") || 0);
     const gerant = myRole() === "gerant";
-    return `<div class="inner narrow">${topBar("Réglages")}
+    return `<div class="inner cc-wide">${topBar("Réglages")}
       <div class="cc-hero st" style="--i:1">${ccAva(me, 52)}<div style="flex:1;min-width:0"><b>${esc(S.me.name || "Vous")}</b><span>${ROLES[myRole()]} · ${esc(S.resto?.name || "")}</span></div>${local ? `<button class="btn sm cc-hero-btn" data-act="whoami">${ico("swap")}Changer</button>` : ""}</div>
+      <div class="cc-cols"><div class="cc-col">
       <div class="lbl st cc-sec" style="--i:2">Restaurant</div>
       <div class="glass pad st" style="--i:2">
         <div class="li tap" data-act="${local && ccMember(S.me.id) ? "ccMemberEdit" : "meRename"}" data-id="${S.me.id}"><span class="ic">${ico("users")}</span><div class="tx"><b>Mon profil</b><em>${esc(S.me.name || "À renseigner, il signe vos relevés")}</em></div>${ico("chev")}</div>
@@ -270,20 +281,22 @@ VIEWS.reglages = {
         <div class="li tap" data-act="restoSwitch"><span class="ic">${ico("store")}</span><div class="tx"><b>Établissements</b><em>${S.restos.length} · changer ou en ajouter un</em></div>${ico("chev")}</div>
         <div class="li tap" data-go="equipe"><span class="ic">${ico("users")}</span><div class="tx"><b>Équipe</b><em>${S.members.length} personne${S.members.length > 1 ? "s" : ""}</em></div>${ico("chev")}</div>
         <div class="li tap" data-go="imprimante"><span class="ic">${ico("printer")}</span><div class="tx"><b>Imprimante</b><em>${esc(S.resto?.printer || "À choisir")}</em></div>${ico("chev")}</div>
-      </div>
+      </div></div><div class="cc-col">
       <div class="lbl st cc-sec" style="--i:3">Cet appareil</div>
       <div class="glass pad st" style="--i:3">
         <div class="li tap" data-act="sound" role="switch" aria-checked="${SFX.on}"><span class="ic">${ico("sound")}</span><div class="tx"><b>Sons</b><em>${SFX.on ? "Activés" : "Coupés"}</em></div>${ccSw(SFX.on)}</div>
         <div class="li tap" data-act="ccHaptics" role="switch" aria-checked="${ccHaptics()}"><span class="ic">${ico("vibe")}</span><div class="tx"><b>Vibrations</b><em>${ccVib0 ? (ccHaptics() ? "Activées" : "Coupées") : "Non prises en charge sur cet appareil"}</em></div>${ccSw(ccHaptics())}</div>
-        ${local ? `<div class="li tap" data-act="ccAutoLockSheet"><span class="ic">${ico("lock")}</span><div class="tx"><b>Verrouillage automatique</b><em>${al ? `« Qui êtes-vous ? » après ${al} min sans activité` : "Désactivé"}</em></div><span class="pill ${al ? "acc" : "neu"}">${al ? al + " min" : "Non"}</span></div>` : ""}
+        ${local ? `<div class="li tap" data-act="ccAutoLockSheet"><span class="ic">${ico("lock")}</span><div class="tx"><b>Verrouillage automatique</b><em>${al ? `« Qui êtes-vous ? » après ${al} min sans activité` : "Idéal pour un téléphone partagé"}</em></div><span class="pill ${al ? "acc" : "neu"}">${al ? al + " min" : "Désactivé"}</span></div>` : ""}
       </div>
       ${local ? `<div class="lbl st cc-sec" style="--i:4">Données</div>
       <div class="glass pad st cc-data" style="--i:4">
         <div class="cc-datahead"><span class="ic">${ico("db")}</span><div style="flex:1;min-width:0"><b>Vos données sont sur cet appareil</b><span>${ccBytes()} · dernière sauvegarde : ${lb ? when(lb) : "jamais"}</span></div></div>
         ${!lb || Date.now() - lb > 7 * 864e5 ? `<div class="banner" style="margin-top:12px">${ico("alert")}<span>Sauvegardez chaque semaine : si le téléphone est perdu ou vidé, le fichier permet de tout récupérer.</span></div>` : ""}
-        <div class="grid2 cc-g2" style="margin-top:12px"><button class="btn acc" data-act="ccExport">${ico("download")}Sauvegarder</button><button class="btn soft" data-act="ccImport">${ico("upload")}Restaurer</button></div>
+        <div class="grid2 cc-g2" style="margin-top:12px">${gerant ? `<button class="btn acc" data-act="ccExport">${ico("download")}Sauvegarder</button><button class="btn soft" data-act="ccImport">${ico("upload")}Restaurer</button>` : `<button class="btn acc" data-act="ccExport" style="grid-column:1/-1">${ico("download")}Sauvegarder</button>`}</div>
+        ${gerant ? "" : `<p class="note" style="margin:8px 2px 0">Seul un gérant peut restaurer une sauvegarde.</p>`}
       </div>
       ${gerant ? `<div class="glass pad st" style="--i:5"><div class="li tap" data-act="ccReset"><span class="ic bad">${ico("trash")}</span><div class="tx"><b style="color:var(--bad)">Tout effacer</b><em>Vide cet appareil, définitivement</em></div>${ico("chev")}</div></div>` : ""}` : ""}
+      </div></div>
       <div class="cc-about st" style="--i:6">${appIcon(40)}<div><b>Growth Gusto</b><span>Version 1.0 · novembre 2026</span></div></div></div>`;
   },
 };
@@ -451,7 +464,7 @@ Object.assign(ACT, {
     const ok = await ccSaveFile(`growth-gusto-sauvegarde-${dayKey()}.json`, new Blob([JSON.stringify(payload)], { type: "application/json" }));
     if (ok) { try { localStorage.setItem("gg-lastbackup", String(Date.now())); } catch (e) {} SFX.done(); buzz([8, 30, 8]); toast(`Sauvegarde prête · ${st.readings} relevé${st.readings > 1 ? "s" : ""}`); if (S.route === "reglages" && !$("#sheet").classList.contains("open")) rerender(); }
   },
-  ccImport: () => { $("#ccImportPick").click(); },
+  ccImport: () => { if (S.resto && myRole() !== "gerant") { SFX.err(); toast("Seul un gérant peut restaurer une sauvegarde", "err"); return; } $("#ccImportPick").click(); },
   ccImportOk: () => {
     const I = S.ui.ccImport; if (!I) return; S.ui.ccImport = null;
     Object.keys(DB.local).forEach((k) => delete DB.local[k]); Object.assign(DB.local, JSON.parse(JSON.stringify(I.data)));
