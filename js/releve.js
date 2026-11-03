@@ -36,7 +36,15 @@ const relShort = (s, n = 18) => (s.length > n ? s.slice(0, n - 1) + "…" : s);
 /* tap guard: a button runs its action once, even on a double tap */
 function relOnce(a, ms = 900) { if (!a || a.tagName !== "BUTTON") return true; if (a.dataset.busy) return false; a.dataset.busy = "1"; setTimeout(() => { delete a.dataset.busy; }, ms); return true; }
 /* values the cook really set (stepper, slider), as opposed to the pre-filled suggestion */
-const relTouched = () => (S.ui.relTouched ||= new Set());
+/* scoped to the current round (day + créneau): a value set at noon never counts as measured in the evening */
+function relTouched() {
+  const k = dayKey() + "|" + S.slot;
+  if (S.ui.relTouchedK !== k || !S.ui.relTouched) {
+    if (S.ui.relTouchedK && S.ui.relTouchedK !== k) S.fridges.forEach((f) => { delete S.temp[f.id]; });
+    S.ui.relTouchedK = k; S.ui.relTouched = new Set();
+  }
+  return S.ui.relTouched;
+}
 const relIn = (f, t) => t >= f.min && t <= f.max;
 const relSlotName = (s) => (s === "soir" ? "soir" : "midi");
 const relSlotCap = (s) => (s === "soir" ? "Soir" : "Midi");
@@ -51,10 +59,12 @@ function relDayLabel(k) {
   const d = daysUntil(k); if (d === 0) return "Aujourd'hui"; if (d === -1) return "Hier";
   const dt = parseDay(k); return `${DAYS[dt.getDay()].replace(/^./, (c) => c.toUpperCase())} ${dt.getDate()} ${MONTHS[dt.getMonth()]}`;
 }
+/* starting value of the stepper. Only a value set this round is a measurement; otherwise start from the last
+   in-range reading or the type's target, never from a bad value (no « Valider 7,3 °C » waiting to be tapped) */
 function relSuggest(f) {
-  if (S.temp[f.id] != null) return S.temp[f.id];
+  if (relTouched().has(f.id) && S.temp[f.id] != null) return S.temp[f.id];
   const last = S.readings.find((x) => x.fridgeId === f.id);
-  if (last) return last.value;
+  if (last && relIn(f, last.value)) return last.value;
   const ty = relTypeOf(f); return relIn(f, ty.t) ? ty.t : Math.round(((f.min + f.max) / 2) * 10) / 10;
 }
 /* key is a fridge id (new reading) or "e-<readingId>" (correction) */
@@ -71,10 +81,17 @@ function relScale(f) {
   const bg = `linear-gradient(90deg,#7DB9FF 0%,#2FB985 ${Math.max(0, a - 4)}%,#2FB985 ${b}%,#F0A43A ${Math.min(100, b + 10)}%,#E14560 100%)`;
   return { lo, hi, pos, bg };
 }
-/* can this pending fridge be signed by « Tout est conforme » ? only with a value someone actually read */
+/* can this pending fridge be signed by « Tout est conforme » ? only with a value set this round (stepper or slider):
+   a previous reading is never re-signed as today's measurement */
 function relBulkOk(f) {
-  const known = relTouched().has(f.id) || S.readings.some((x) => x.fridgeId === f.id);
-  return known && relIn(f, relSuggest(f));
+  return relTouched().has(f.id) && S.temp[f.id] != null && relIn(f, S.temp[f.id]);
+}
+/* « Tout est conforme » appears once two fridges have a measured, in-range value for this round */
+function relAllBtn(pending) { return pending.filter(relBulkOk).length >= 2 ? `<button class="btn soft block rel-all" data-act="relAll">${ico("sparkle")}Tout est conforme</button>` : ""; }
+function relSyncAll() {
+  const w = $("#viewport .view:not(.leave) #relAllW"); if (!w) return;
+  const rs = readingsFor(dayKey(), S.slot); const html = relAllBtn(S.fridges.filter((f) => !rs.find((r) => r.fridgeId === f.id)));
+  if (!!w.firstElementChild !== !!html) { w.innerHTML = html; if (html) w.firstElementChild.classList.add("rel-pop"); }
 }
 function relState(f, t) {
   if (!relIn(f, t)) return `<span class="rel-st bad">${ico("alert")}${t > f.max ? "Trop chaud" : "Trop froid"} · ${relRange(f)}</span>`;
@@ -108,7 +125,7 @@ VIEWS.releve = {
       const r = rs.find((x) => x.fridgeId === f.id);
       if (r) {
         const drew = just.has(f.id);
-        return `<div class="glass fr done st ${drew ? "rel-in" : ""}" style="--i:${i + 3}" data-fr="${f.id}" data-act="relEdit" data-id="${r.id}" role="button" tabindex="0" aria-label="Modifier le relevé ${esc(f.name)}"><div class="head"><span class="ic ${r.ok ? "ok" : "bad"}">${relIco(f)}</span><div style="flex:1;min-width:0"><div class="rel-nm"><b class="h3 rel-ell">${esc(f.name)}</b>${relFixedPill(r)}</div><div class="who">${avatar(r.uid, true)}<span class="rel-ell">${esc(firstName(nameOf(r.uid)))} · ${hm(r.at)}${r.ok ? "" : ` · <span style="color:var(--bad)">${esc(r.action || "hors seuil")}</span>`}</span></div></div><span class="t" style="color:${r.ok ? "var(--ok)" : "var(--bad)"}">${fmt(r.value)}°</span>${r.ok ? `<span class="check ${drew ? "draw" : ""}"><svg viewBox="0 0 24 24"><path d="M6 12.5l4 4 8-9"/></svg></span>` : `<span class="check ${drew ? "draw" : ""}" style="background:var(--bad);box-shadow:0 6px 14px -6px rgba(212,42,72,.6)">${ico("alert").replace('class="ico ', 'style="width:15px;height:15px;color:#fff" class="ico ')}</span>`}</div></div>`;
+        return `<div class="glass fr done st ${drew ? "rel-in" : ""}" style="--i:${i + 3}" data-fr="${f.id}" data-act="relEdit" data-id="${r.id}" role="button" tabindex="0" aria-label="Modifier le relevé ${esc(f.name)}"><div class="head"><span class="ic ${r.ok ? "ok" : "bad"}">${relIco(f)}</span><div style="flex:1;min-width:0"><div class="rel-nm"><b class="h3 rel-ell">${esc(f.name)}</b>${relFixedPill(r)}</div><div class="who">${avatar(r.uid, true)}<span class="rel-ell">${esc(firstName(nameOf(r.uid)))} · ${hm(r.at)}${r.ok ? "" : ` · <span style="color:var(--bad)">${esc(r.action || "hors seuil")}</span>`}</span>${relFixedPill(r).replace('rel-fx"', 'rel-fx rel-fx-m"')}</div></div><span class="t" style="color:${r.ok ? "var(--ok)" : "var(--bad)"}">${fmt(r.value)}°</span>${r.ok ? `<span class="check ${drew ? "draw" : ""}"><svg viewBox="0 0 24 24"><path d="M6 12.5l4 4 8-9"/></svg></span>` : `<span class="check ${drew ? "draw" : ""}" style="background:var(--bad);box-shadow:0 6px 14px -6px rgba(212,42,72,.6)">${ico("alert").replace('class="ico ', 'style="width:15px;height:15px;color:#fff" class="ico ')}</span>`}</div></div>`;
       }
       const last = S.readings.find((x) => x.fridgeId === f.id);
       const t = relSuggest(f); S.temp[f.id] = t; const isOpen = S.open === f.id;
@@ -121,18 +138,18 @@ VIEWS.releve = {
     const celeb = S.ui.relCeleb; S.ui.relCeleb = false;
     const sum = full
       ? `<div class="glass pad rel-sum full st ${celeb ? "celeb" : ""}" style="--i:2"><div class="rel-sumrow">${relRing(done, exp)}<div class="rel-sumtx"><b class="h3">Relevé du ${relSlotName(slot)} terminé</b><div class="sub">${exp} frigo${exp > 1 ? "s" : ""} signé${exp > 1 ? "s" : ""}${rs.some((r) => !r.ok) ? ` · <span style="color:var(--bad)">${rs.filter((r) => !r.ok).length} hors seuil</span>` : ", tout est conforme"}. Touchez un frigo pour le corriger.</div></div></div>${slot === "midi" && readingsFor(day, "soir").length < exp ? `<button class="btn soft block" data-act="slot" data-v="soir">Passer au relevé du soir${ico("chev")}</button>` : ""}</div>`
-      : `<div class="glass pad rel-sum st" style="--i:2"><div class="rel-sumrow">${relRing(done, exp)}<div class="rel-sumtx"><b class="h3">${done ? `${done} relevé${done > 1 ? "s" : ""} sur ${exp}` : `${exp} frigo${exp > 1 ? "s" : ""} à relever`}</b><div class="sub rel-ell">Reste : ${pending.map((f) => esc(f.name)).join(", ")}</div></div></div>${pending.filter(relBulkOk).length >= 2 ? `<button class="btn soft block rel-all" data-act="relAll">${ico("sparkle")}Tout est conforme</button>` : ""}</div>`;
-    return `<div class="inner narrow">${topBar("Relevé des frigos")}
+      : `<div class="glass pad rel-sum st" style="--i:2"><div class="rel-sumrow">${relRing(done, exp)}<div class="rel-sumtx"><b class="h3">${done ? `${done} relevé${done > 1 ? "s" : ""} sur ${exp}` : `${exp} frigo${exp > 1 ? "s" : ""} à relever`}</b><div class="sub rel-ell">Reste : ${pending.map((f) => esc(f.name)).join(", ")}</div></div></div><div id="relAllW" class="rel-allw">${relAllBtn(pending)}</div></div>`;
+    return `<div class="inner rel-page">${topBar("Relevé des frigos")}
       <div class="seg st" style="--i:1" id="slotSeg"><span class="knob" style="width:calc(50% - 4px);transform:translateX(${slot === "soir" ? "100%" : "0"})"></span><button class="${slot === "midi" ? "on" : ""}" data-act="slot" data-v="midi">Midi</button><button class="${slot === "soir" ? "on" : ""}" data-act="slot" data-v="soir">Soir</button></div>
       ${sum}
-      ${cards}
+      <div class="rel-grid">${cards}</div>
       <p class="note st" style="--i:9;text-align:center">Chaque relevé est daté et signé par la personne connectée. Une correction garde l'ancienne valeur dans le registre.</p></div>`;
   },
   after(v) {
     S.ui.relJust = null;
     const ring = $("#relRing", v); const to = S.ui.relRingTo;
     if (ring && to != null) { requestAnimationFrame(() => requestAnimationFrame(() => { ring.style.strokeDashoffset = S.ui.relRingC * (1 - to); })); S.ui.relRingPrev = to; }
-    if (S.ui.relScroll) { const el = $(`.fr[data-fr="${S.ui.relScroll}"]`, v); S.ui.relScroll = null; el && setTimeout(() => el.scrollIntoView({ behavior: "smooth", block: "nearest" }), 30); }
+    if (S.ui.relScroll) { const el = $(`.fr[data-fr="${S.ui.relScroll}"]`, v); S.ui.relScroll = null; el && setTimeout(() => relScrollToCard(v, el, null, 0), 30); }
   },
 };
 
@@ -145,7 +162,7 @@ VIEWS.frigos = {
       const ok = last ? relIn(f, last.value) : null; const late = last && Date.now() - last.at > 864e5;
       const st = ok == null ? "none" : !ok ? "bad" : late ? "late" : "ok";
       const stTx = { none: "Jamais relevé", bad: "Hors seuil", late: "En retard", ok: "Conforme" }[st];
-      return `<div class="glass pad st rel-fcard" style="--i:${Math.min(i + 1, 12)}" data-go="frigo" data-id="${f.id}" role="button" tabindex="0" aria-label="${esc(f.name)} · ${stTx}"><div class="row"><div class="hstack" style="min-width:0"><span class="ic ${st === "bad" ? "bad" : ""}">${relIco(f)}</span><div style="min-width:0"><b class="h3 rel-ell" style="display:block">${esc(f.name)}</b><div class="rel-meta"><span class="rel-dot ${st}"></span><span>${stTx}</span><span class="rel-sep">·</span><span class="rel-ell">${fl.length ? `${fl.length} produit${fl.length > 1 ? "s" : ""}` : relRange(f)}</span></div></div></div>${last ? `<div style="text-align:right;flex:none"><div class="mono rel-ft" style="color:${ok === false ? "var(--bad)" : "inherit"}">${fmt(last.value)}°</div><div class="sub" style="font-size:11.5px">${relAgo(last.at)}</div></div>` : ""}</div>${fl[0] ? `<div class="rel-next"><span class="rel-ell">Prochaine DLC · <b>${esc(fl[0].name)}</b></span>${dlcPill(dlcOf(fl[0]))}</div>` : ""}</div>`;
+      return `<div class="glass pad st rel-fcard" style="--i:${Math.min(i + 1, 12)}" data-go="frigo" data-id="${f.id}" role="button" tabindex="0" aria-label="${esc(f.name)} · ${stTx}"><div class="row"><div class="hstack" style="min-width:0"><span class="ic ${st === "bad" ? "bad" : ""}">${relIco(f)}</span><div style="min-width:0"><b class="h3 rel-ell" style="display:block">${esc(f.name)}</b><div class="rel-meta"><span class="rel-dot ${st}"></span><span>${stTx}</span><span class="rel-sep">·</span><span class="rel-ell">${fl.length ? `${fl.length} produit${fl.length > 1 ? "s" : ""}` : relRange(f)}</span></div></div></div>${last ? `<div style="text-align:right;flex:none"><div class="mono rel-ft" style="color:${ok === false ? "var(--bad)" : "inherit"}">${fmt(last.value)}°</div><div class="sub" style="font-size:11.5px">${relAgo(last.at)}</div></div>` : ""}</div>${fl[0] ? `<div class="rel-next"><span class="rel-ell">Prochaine DLC · <b>${esc(fl[0].name)}</b></span>${dlcPill(dlcOf(fl[0]))}</div>` : `<div class="rel-next none"><span class="rel-ell">Aucun produit rangé</span></div>`}</div>`;
     };
     const groups = []; S.fridges.forEach((f) => { const ty = relTypeOf(f); let g = groups.find((x) => x.ty.k === ty.k); if (!g) groups.push((g = { ty, fs: [] })); g.fs.push(f); });
     let n = 0;
@@ -160,7 +177,7 @@ VIEWS.frigos = {
 };
 function lotList(lots, showFridge) {
   if (!lots.length) return `<div class="empty" style="padding:16px 0 4px">Aucun produit. Ils arrivent ici à chaque réception, ou en scannant une étiquette.</div>`;
-  return `<div style="margin-top:4px">${lots.map((l, i) => `<div class="li tap" data-act="lot" data-id="${l.id}"><span class="rank ${(daysUntil(dlcOf(l)) ?? 9) <= 1 ? "hot" : ""}">${i + 1}</span><div class="tx"><b>${esc(l.name)}${l.qty ? ` · ${fmt(num(l.qty), num(l.qty) % 1 ? 2 : 0)} ${esc(l.unit || "")}` : ""}</b><em>${l.status === "opened" ? `Ouvert le ${shortDate(dayKey(new Date(l.openedAt)))} par ${esc(firstName(nameOf(l.openedBy)))}` : `Entré le ${shortDate(dayKey(new Date(l.createdAt)))}`}${showFridge ? ` · ${esc(fridgeName(l.fridgeId))}` : ""}${l.lot ? ` · lot ${esc(l.lot)}` : ""}</em></div>${dlcPill(dlcOf(l))}</div>`).join("")}</div>`;
+  return `<div style="margin-top:4px">${lots.map((l, i) => `<div class="li tap" data-act="lot" data-id="${l.id}" role="button" tabindex="0" aria-label="${esc(l.name)}${dlcOf(l) ? ` · DLC ${shortDate(dlcOf(l))}` : ""}"><span class="rank ${(daysUntil(dlcOf(l)) ?? 9) <= 1 ? "hot" : ""}">${i + 1}</span><div class="tx"><b>${esc(l.name)}${l.qty ? ` · ${fmt(num(l.qty), num(l.qty) % 1 ? 2 : 0)} ${esc(l.unit || "")}` : ""}</b><em>${l.status === "opened" ? `Ouvert le ${shortDate(dayKey(new Date(l.openedAt)))} par ${esc(firstName(nameOf(l.openedBy)))}` : `Entré le ${shortDate(dayKey(new Date(l.createdAt)))}`}${showFridge ? ` · ${esc(fridgeName(l.fridgeId))}` : ""}${l.lot ? ` · lot ${esc(l.lot)}` : ""}</em></div>${dlcPill(dlcOf(l))}</div>`).join("")}</div>`;
 }
 
 /* ───────────────────────── Frigo detail ───────────────────────── */
@@ -248,6 +265,7 @@ function setTemp(id, t) {
   const st = $("#ts-" + id); if (st) st.innerHTML = relState(f, t);
   const k = $("#tk-" + id); if (k) { const lo = +k.dataset.lo, hi = +k.dataset.hi; k.style.left = Math.max(0, Math.min(100, ((t - lo) / (hi - lo)) * 100)) + "%"; }
   $$(`[data-tlv="${id}"]`).forEach((b) => { b.textContent = `${b.dataset.pre} ${fmt(t)} °C`; });
+  if (S.route === "releve") relSyncAll();
   SFX.tick(); buzz(4);
 }
 document.addEventListener("pointerdown", (e) => {
@@ -318,13 +336,31 @@ function relAdvance(doneId) {
   let shrinkBy = 0; if (cur) { const d = $(".dial", cur); shrinkBy = d ? d.offsetHeight : 0; cur.classList.remove("open"); cur.classList.add("sealing"); }
   if (nx) {
     nx.classList.add("open");
-    const vr = view.getBoundingClientRect(), nr = nx.getBoundingClientRect();
-    const above = cur && cur.compareDocumentPosition(nx) & Node.DOCUMENT_POSITION_FOLLOWING;
-    const rel = nr.top - vr.top - (above ? shrinkBy : 0);
-    if (rel < 80 || rel + 430 > vr.height - 90) view.scrollTo({ top: Math.max(0, view.scrollTop + rel - 96), behavior: "smooth" });
+    relScrollToCard(view, nx, cur, shrinkBy);
   }
   clearTimeout(relAdvance._t);
   relAdvance._t = setTimeout(() => { VIEWS.releve.live = true; S.ui.relScroll = next ? next.id : null; if (S.route === "releve") rerender(); }, 560);
+}
+
+/* bring the next card (stepper + Valider) fully into the clear band: below the top bar, above the tab bar and the
+   undo toast that sits right on top of it. Positions are predicted from the layout the cards are animating to. */
+function relScrollToCard(view, nx, cur, shrinkBy) {
+  const vr = view.getBoundingClientRect(), nr = nx.getBoundingClientRect();
+  const curR = cur && cur.getBoundingClientRect();
+  /* the collapsing card only moves the next one up when it sits in an earlier row (one column on phone, two on desktop) */
+  const lift = curR && curR.top < nr.top - 4 ? shrinkBy : 0;
+  const head = $(".head", nx), inner = $(".dial > div", nx);
+  const h = (head ? head.offsetHeight : 60) + (inner ? inner.scrollHeight : 360) + 28;
+  const H = window.innerHeight; let bottom = Math.min(vr.bottom, H);
+  const tb = $("#tabbar"); if (tb && !tb.classList.contains("hide") && getComputedStyle(tb).display !== "none") bottom = Math.min(bottom, tb.getBoundingClientRect().top);
+  const t = $("#toast"); const toastH = t ? Math.max(t.offsetHeight || 0, 56) : 56;
+  bottom -= toastH + 22; /* the undo toast is shown right after this call */
+  const tp = $(".top", view); const topEdge = Math.max(vr.top, tp && getComputedStyle(tp).position === "sticky" ? tp.getBoundingClientRect().bottom : vr.top) + 12;
+  const top = nr.top - lift, end = top + h;
+  let dy = 0;
+  if (end > bottom) dy = end - bottom; /* lift it above the toast */
+  if (top - dy < topEdge) dy = top - topEdge; /* but never past its own header */
+  if (Math.abs(dy) > 4) view.scrollTo({ top: Math.max(0, view.scrollTop + dy), behavior: "smooth" });
 }
 
 Object.assign(ACT, {
@@ -366,9 +402,9 @@ Object.assign(ACT, {
     const rs = readingsFor(dayKey(), S.slot); const pend = S.fridges.filter((f) => !rs.find((r) => r.fridgeId === f.id));
     const okL = pend.filter(relBulkOk), badL = pend.filter((f) => !relBulkOk(f));
     SFX.tap();
-    openSheet(`<div><div class="h2" style="font-size:21px">Tout est conforme ?</div><p class="sub" style="margin:4px 0 0">Vérifiez chaque thermomètre : ${okL.length > 1 ? "ces relevés seront signés" : "ce relevé sera signé"} à votre nom pour le ${S.slot}.</p></div>
+    openSheet(`<div><div class="h2" style="font-size:21px">Tout est conforme ?</div><p class="sub" style="margin:4px 0 0">Seules les températures réglées pour ce relevé ${okL.length > 1 ? "seront signées" : "sera signée"} à votre nom pour le ${S.slot}.</p></div>
       <div class="rel-bulk">${okL.map((f) => `<div class="li"><span class="ic ok">${relIco(f)}</span><div class="tx"><b class="rel-ell">${esc(f.name)}</b><em>Seuil ${relRange(f)}</em></div><span class="mono rel-v">${fmt(relSuggest(f))}°</span></div>`).join("")}
-      ${badL.map((f) => { const never = !relTouched().has(f.id) && !S.readings.some((x) => x.fridgeId === f.id); return `<div class="li rel-skip"><span class="ic">${relIco(f)}</span><div class="tx"><b class="rel-ell">${esc(f.name)}</b><em>${never ? "Jamais relevé : à mesurer à la main" : `<span style="color:var(--bad)">Dernière valeur hors seuil : à mesurer</span>`}</em></div><span class="mono rel-v" style="color:var(--faint)">–</span></div>`; }).join("")}</div>
+      ${badL.map((f) => { const set = relTouched().has(f.id); return `<div class="li rel-skip"><span class="ic">${relIco(f)}</span><div class="tx"><b class="rel-ell">${esc(f.name)}</b><em>${set ? `<span style="color:var(--bad)">Hors seuil : à valider à part</span>` : "Pas encore mesuré : réglez sa température"}</em></div><span class="mono rel-v" style="color:var(--faint)">${set ? fmt(S.temp[f.id]) + "°" : "–"}</span></div>`; }).join("")}</div>
       ${okL.length ? `<button class="btn acc block" data-act="relAllOk">${ico("check")}Valider ${okL.length} relevé${okL.length > 1 ? "s" : ""}</button>` : `<p class="note">Aucun frigo ne peut être validé d'un coup.</p>`}<button class="btn ghost block" data-act="sheetClose">Annuler</button>`);
   },
   relAllOk: async (a) => {
@@ -383,6 +419,7 @@ Object.assign(ACT, {
     finally { VIEWS.releve.live = true; }
     await logEvent("reading", `a validé ${list.length} relevé${list.length > 1 ? "s" : ""} conforme${list.length > 1 ? "s" : ""} (${slot}) : ${list.map((f, i) => `${f.name} ${fmt(vals[i])} °C`).join(", ")}`);
     closeSheet(true); S.open = null; S.ui.relJust = new Set(list.map((f) => f.id));
+    { const left = S.fridges.find((f) => !list.includes(f) && !rs.find((r) => r.fridgeId === f.id)); S.ui.relScroll = left ? left.id : null; }
     if (relSlotComplete(day, slot)) { relCelebrate(); relSetUndo({ kind: "add", ids }, `Relevé du ${slot} terminé`); }
     else { SFX.ok(); buzz(12); relSetUndo({ kind: "add", ids }, `${list.length} relevé${list.length > 1 ? "s" : ""} validé${list.length > 1 ? "s" : ""}`); }
     rerender();
