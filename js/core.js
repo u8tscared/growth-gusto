@@ -306,7 +306,7 @@ function renderChrome() {
   tb.dataset.on = on;
   const idx = TABS.findIndex((t) => t[0] === on); const ind = $("#ind");
   if (ind) { ind.style.opacity = on === "scan" ? 0 : 1; ind.style.transform = `translateX(calc(${idx} * (100% + 12px)))`; }
-  tb.classList.toggle("hide", ["onboarding", "reception", "note"].includes(S.route) || !S.resto);
+  tb.classList.toggle("hide", ["onboarding", "reception", "note", "tzEdit"].includes(S.route) || !!(VIEWS[S.route] && VIEWS[S.route].hideTabs) || !S.resto);
   const sd = $("#side"); if (sd) sd.classList.toggle("off", !S.resto || S.route === "onboarding");
 }
 
