@@ -74,6 +74,9 @@ const IC = {
   wifi: ["M12 20h.01", "M2 8.82a15 15 0 0 1 20 0", "M5 12.86a10 10 0 0 1 14 0", "M8.5 16.43a5 5 0 0 1 7 0"],
   bt: ["m7 7 10 10-5 5V2l5 5L7 17"],
   logout: ["M16 17l5-5-5-5", "M21 12H9"],
+  share: ["M12 3v12", "m8 7 4-4 4 4", "M8 11H7a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2h-1"],
+  addsq: ["r:3,3,18,18,5", "M12 8v8", "M8 12h8"],
+  dots: ["M12 5h.01", "M12 12h.01", "M12 19h.01"],
 };
 function ico(name, cls = "") {
   const parts = (IC[name] || []).map((p) => {
@@ -115,15 +118,16 @@ const SFX = {
     const g = c.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(v, t + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + d);
     s.connect(f).connect(g).connect(c.destination); s.start(t); s.stop(t + d);
   },
-  tap() { this.tone(2400, 0.025, "triangle", 0.018); },
-  tick() { this.tone(3200, 0.012, "square", 0.01); },
-  ok() { this.tone(784, 0.11, "sine", 0.06); this.tone(1175, 0.18, "sine", 0.05, 0.075); },
-  done() { [659, 880, 1109, 1319].forEach((f, i) => this.tone(f, 0.22, "sine", 0.045, i * 0.07)); this.tone(2637, 0.5, "sine", 0.012, 0.3); },
-  scan() { this.tone(1900, 0.06, "square", 0.028); this.tone(2850, 0.08, "square", 0.022, 0.065); },
-  err() { this.tone(330, 0.12, "triangle", 0.06, 0, 240); this.tone(240, 0.16, "triangle", 0.05, 0.11, 180); },
-  sheet() { this.noise(0.22, 0.022, 600, 2600); },
-  close() { this.noise(0.18, 0.016, 2400, 500); },
-  print() { for (let i = 0; i < 9; i++) this.tone(140 + (i % 2) * 30, 0.09, "sawtooth", 0.012, i * 0.16); this.noise(1.4, 0.008, 3000, 1800); this.tone(1568, 0.12, "sine", 0.04, 1.55); },
+  /* volumes kept low on purpose: a kitchen app should feel, not shout. Mute lives in Réglages (ACT.sound). */
+  tap() { this.tone(2200, 0.022, "triangle", 0.011); },
+  tick() { this.tone(3000, 0.01, "triangle", 0.007); },
+  ok() { this.tone(784, 0.1, "sine", 0.038); this.tone(1175, 0.16, "sine", 0.03, 0.07); },
+  done() { [659, 880, 1109, 1319].forEach((f, i) => this.tone(f, 0.2, "sine", 0.028, i * 0.07)); this.tone(2637, 0.45, "sine", 0.007, 0.3); },
+  scan() { this.tone(1900, 0.05, "triangle", 0.03); this.tone(2850, 0.07, "triangle", 0.024, 0.06); },
+  err() { this.tone(330, 0.12, "triangle", 0.04, 0, 240); this.tone(240, 0.15, "triangle", 0.034, 0.11, 180); },
+  sheet() { this.noise(0.2, 0.012, 700, 2400); },
+  close() { this.noise(0.16, 0.009, 2200, 600); },
+  print() { for (let i = 0; i < 9; i++) this.tone(140 + (i % 2) * 30, 0.09, "triangle", 0.01, i * 0.16); this.noise(1.4, 0.005, 3000, 1800); this.tone(1568, 0.12, "sine", 0.028, 1.55); },
 };
 const buzz = (p = 8) => { try { navigator.vibrate && navigator.vibrate(p); } catch (e) {} };
 
@@ -216,7 +220,9 @@ async function boot() {
   const C = window.claude;
   const use = async (n) => { try { return C && C.use ? await C.use(n) : null; } catch (e) { return null; } };
   const [db, user, sample, assets, downloads] = await Promise.all([use("db"), use("user"), use("sample"), use("assets"), use("downloads")]);
-  S.cap = { db, user, sample, assets, downloads };
+  S.cap = { db, user, sample, assets, downloads: downloads || LOCAL_DOWNLOADS };
+  registerSW(); PHOTOS.persist();
+  if (!assets) await Promise.race([PHOTOS.warm(), new Promise((r) => setTimeout(r, 1500))]);
   if (user) {
     try { const me = await user.me(); const id = await user.id(); S.me = { id: id || me.id || "anon", name: me.name || "", avatarUrl: me.avatarUrl, color: me.color }; S.isOwner = !!me.isOwner; S.profiles[S.me.id] = { ...S.me }; } catch (e) {}
   }
@@ -288,14 +294,16 @@ function renderChrome() {
   const pend = S.fridges.length * 2 - todayStats().done;
   side.innerHTML = `<div class="brand"><span style="width:30px;height:30px;display:block">${logoMark()}</span>Growth Gusto</div>
     ${S.resto ? `<button class="nav" data-act="restoSwitch" style="background:var(--glass-2);margin-bottom:10px"><span style="width:28px;height:28px;flex:none;border-radius:9px;display:grid;place-items:center;background:linear-gradient(135deg,#7A4DFF,#4A1FE6);color:#fff;font-size:11px;font-weight:800">${esc(initials(S.resto.name))}</span><span style="flex:1;min-width:0;text-align:left"><b style="display:block;color:var(--ink);font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(S.resto.name)}</b><span style="font-size:11.5px">${S.restos.length} établissement${S.restos.length > 1 ? "s" : ""}</span></span>${ico("down")}</button>` : ""}
-    ${NAV.map(([r, i, t]) => r === "sep" ? `<div class="sep">${t}</div>` : `<button class="nav ${navOn === r ? "on" : ""}" data-go="${r}">${ico(i)}${t}${r === "home" && urgentCount() ? `<span class="count">${urgentCount()}</span>` : ""}${r === "releve" && pend > 0 && S.fridges.length ? `<span class="count" style="background:var(--warn)">${pend}</span>` : ""}</button>`).join("")}
-    <div class="me" style="margin-top:16px">${avatar(S.me.id)}<div style="min-width:0"><b>${esc(S.me.name || "Vous")}</b><em>${ROLES[myRole()]}${DB.mode === "local" ? " · mode démo" : ""}</em></div></div>`;
+    <div class="navs">${NAV.map(([r, i, t]) => r === "sep" ? `<div class="sep">${t}</div>` : `<button class="nav ${navOn === r ? "on" : ""}" data-go="${r}">${ico(i)}<span class="nt">${t}</span>${r === "home" && urgentCount() ? `<span class="count">${urgentCount()}</span>` : ""}${r === "releve" && pend > 0 && S.fridges.length ? `<span class="count" style="background:var(--warn)">${pend}</span>` : ""}</button>`).join("")}</div>
+    <div class="me" data-go="reglages" role="button" tabindex="0" title="Réglages">${avatar(S.me.id)}<div style="min-width:0;flex:1"><b>${esc(S.me.name || "Vous")}</b><em>${ROLES[myRole()]}</em></div>${ico("sliders")}</div>`;
+  const sv = $(".navs", side); if (sv) { sv.scrollTop = side._st || 0; sv.addEventListener("scroll", () => { side._st = sv.scrollTop; }, { passive: true }); }
   const tb = $("#tabbar"); const on = TAB_OF[S.route] || "more";
   if (!tb.dataset.built) {
     tb.dataset.built = 1;
     tb.innerHTML = `<span class="ind" id="ind"></span>` + TABS.map(([r, i, t]) => `<button class="tab" data-tab="${r}" aria-label="${t || "Scanner"}">${r === "scan" ? `<span class="fab">${ico("scan")}</span>` : `${ico(i)}${t}`}</button>`).join("");
   }
-  $$(".tab", tb).forEach((b) => b.classList.toggle("on", b.dataset.tab === on));
+  $$(".tab", tb).forEach((b) => { const was = b.classList.contains("on"), now = b.dataset.tab === on; b.classList.toggle("on", now); if (now && !was && tb.dataset.on) { b.classList.remove("pop"); void b.offsetWidth; b.classList.add("pop"); } });
+  tb.dataset.on = on;
   const idx = TABS.findIndex((t) => t[0] === on); const ind = $("#ind");
   if (ind) { ind.style.opacity = on === "scan" ? 0 : 1; ind.style.transform = `translateX(calc(${idx} * (100% + 12px)))`; }
   tb.classList.toggle("hide", ["onboarding", "reception", "note"].includes(S.route) || !S.resto);
@@ -330,18 +338,66 @@ document.addEventListener("focusout", () => { if (pendingRefresh) { pendingRefre
 function renderRoute() {
   const V = VIEWS[S.route] || VIEWS.home;
   if (S.route !== "onboarding" && !S.resto) return VIEWS.onboarding.render();
-  return V.render(S.params);
+  return photoFix(V.render(S.params));
 }
 function afterRender(v) { const V = VIEWS[S.route]; V && V.after && V.after(v); }
 const topBar = (title, opts = {}) => `<div class="top st" style="--i:0">${opts.noBack ? "" : `<button class="iconbtn" data-act="back" aria-label="Retour">${ico("back")}</button>`}<span class="h2">${title}</span>${opts.right || ""}</div>`;
-const banner = () => (DB.mode === "local" ? `<div class="banner st" style="--i:0">${ico("alert")}<span>Mode démo : les données restent sur cet appareil. Connectez-vous à claude.ai pour les partager avec l'équipe.</span></div>` : S.slow ? `<div class="banner st">${ico("clock")}<span>Connexion lente : les données affichées peuvent ne pas être à jour.</span></div>` : "");
+/* banner(): nothing in the standalone build except, on Accueil, the one-time « Installer l'app » card. */
+const banner = () => (S.slow && DB.mode === "db" ? `<div class="banner st">${ico("clock")}<span>Connexion lente : les données affichées peuvent ne pas être à jour.</span></div>` : "") + (S.route === "home" ? installHint() : "");
 
 /* ───────────────────────── views ───────────────────────── */
 const VIEWS = {};
 
 /* ───────────────────────── sheets ───────────────────────── */
-function openSheet(html, after) { $("#sheetBody").innerHTML = html; $("#scrim").classList.add("on"); $("#sheet").classList.add("open"); SFX.sheet(); after && after($("#sheetBody")); }
-function closeSheet(silent) { if (!$("#sheet").classList.contains("open")) return; $("#scrim").classList.remove("on"); $("#sheet").classList.remove("open"); if (!silent) SFX.close(); }
+function openSheet(html, after) {
+  const b = $("#sheetBody"), sh = $("#sheet"); const was = sh.classList.contains("open");
+  b.innerHTML = photoFix(html); if (!was) b.scrollTop = 0; sh.style.transform = ""; $("#scrim").style.opacity = "";
+  $("#scrim").classList.add("on"); sh.classList.add("open"); if (!was) { SFX.sheet(); buzz(4); }
+  after && after(b);
+}
+function closeSheet(silent) {
+  const sh = $("#sheet"); if (!sh.classList.contains("open")) return;
+  sh.classList.remove("open", "drag"); sh.style.transform = ""; $("#scrim").style.opacity = ""; $("#scrim").classList.remove("on");
+  if (document.activeElement && sh.contains(document.activeElement)) document.activeElement.blur();
+  if (!silent) SFX.close();
+}
+/* drag-to-dismiss on touch phones: pull the grab handle, or pull down while the sheet body is scrolled to the top */
+(function sheetDrag() {
+  const sh = $("#sheet"), scrim = $("#scrim"), body = $("#sheetBody");
+  let y0 = null, x0 = 0, dy = 0, drag = false, lastY = 0, lastT = 0, vel = 0;
+  const phone = () => window.matchMedia("(max-width:959px)").matches;
+  sh.addEventListener("touchstart", (e) => {
+    y0 = null; if (!sh.classList.contains("open") || e.touches.length > 1 || !phone()) return;
+    const onGrab = !!e.target.closest(".grab");
+    if (!onGrab && (body.scrollTop > 0 || e.target.closest("input,textarea,select,canvas,video,[data-nodrag]"))) return;
+    y0 = lastY = e.touches[0].clientY; x0 = e.touches[0].clientX; lastT = performance.now(); dy = 0; vel = 0; drag = false;
+  }, { passive: true });
+  sh.addEventListener("touchmove", (e) => {
+    if (y0 == null) return; const y = e.touches[0].clientY, d = y - y0, dx = Math.abs(e.touches[0].clientX - x0);
+    if (!drag) {
+      if (d > 8 && d > dx) { drag = true; sh.classList.add("drag"); y0 = y - 1; }
+      else { if (d < -6 || dx > 12) y0 = null; return; }
+    }
+    e.preventDefault();
+    const raw = y - y0; dy = raw > 0 ? raw : -Math.sqrt(-raw) * 2; /* rubber band when pulled upward */
+    const now = performance.now(); vel = (y - lastY) / Math.max(1, now - lastT); lastY = y; lastT = now;
+    sh.style.transform = `translateY(${dy}px)`;
+    scrim.style.opacity = String(Math.max(0.15, 1 - Math.max(0, dy) / (sh.offsetHeight * 1.1)));
+  }, { passive: false });
+  const end = () => {
+    if (y0 == null) return; y0 = null; if (!drag) return; drag = false; sh.classList.remove("drag");
+    if (dy > Math.min(150, sh.offsetHeight * 0.32) || (vel > 0.55 && dy > 24)) { buzz(6); closeSheet(); }
+    else { sh.style.transform = ""; scrim.style.opacity = ""; }
+  };
+  sh.addEventListener("touchend", end); sh.addEventListener("touchcancel", end);
+})();
+/* on-screen keyboard (iOS): lift the sheet above it and keep the focused field visible */
+(function kbLift() {
+  const vv = window.visualViewport; if (!vv) return;
+  const upd = () => { const kb = Math.max(0, window.innerHeight - vv.height - vv.offsetTop); const on = kb > 80; document.documentElement.style.setProperty("--kb", (on ? kb : 0) + "px"); document.documentElement.classList.toggle("kb", on); };
+  vv.addEventListener("resize", upd); vv.addEventListener("scroll", upd);
+  document.addEventListener("focusin", (e) => { const t = e.target; if (t.matches && t.matches("input,textarea,select") && t.closest("#sheet")) setTimeout(() => { try { t.scrollIntoView({ block: "nearest", behavior: "smooth" }); } catch (x) {} }, 320); });
+})();
 $("#scrim").addEventListener("click", () => closeSheet());
 document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeSheet(); });
 
@@ -358,7 +414,170 @@ async function shrink(file, max = 1600, q = 0.85) {
   const k = Math.min(1, max / Math.max(img.width, img.height)); const c = document.createElement("canvas"); c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
   c.getContext("2d").drawImage(img, 0, 0, c.width, c.height); const blob = await new Promise((r) => c.toBlob(r, "image/jpeg", q)); return { blob, canvas: c };
 }
-async function upload(blob) { if (!S.cap.assets) return { id: "", url: URL.createObjectURL(blob) }; try { const r = await S.cap.assets.upload(blob); return { id: r.id, url: r.url }; } catch (e) { console.warn(e); return { id: "", url: URL.createObjectURL(blob) }; } }
+/* upload(blob) → {id, url}. With the Claude runtime: assets capability. Standalone: compressed JPEG kept on the device (IndexedDB). */
+async function upload(blob) {
+  if (S.cap.assets) { try { const r = await S.cap.assets.upload(blob); return { id: r.id, url: r.url }; } catch (e) { console.warn(e); return { id: "", url: URL.createObjectURL(blob) }; } }
+  try { return await PHOTOS.save(blob); } catch (e) { console.warn("photo", e); return { id: "", url: URL.createObjectURL(blob) }; }
+}
+
+/* ───────────────────────── standalone: on-device photo store ─────────────────────────
+   Photos live in IndexedDB "gg-photos" as compressed JPEG (≤1280px, q .72), ids "loc-…".
+   Object URLs die on reload, so: every URL handed out is remembered (url → id, localStorage "gg-photo-map"),
+   blobs are re-opened at boot (warm), and any stale blob: URL in rendered HTML is swapped for the live one.
+   photoUrl(id) gives a usable URL for an id (or a URL) synchronously; <img data-photo="id"> also resolves. */
+const PHOTOS = {
+  _db: null, urls: {}, live: {}, missing: {},
+  map: (() => { try { return JSON.parse(localStorage.getItem("gg-photo-map") || "{}"); } catch (e) { return {}; } })(),
+  isLocal: (id) => typeof id === "string" && id.startsWith("loc-"),
+  saveMap: debounce(() => { try { localStorage.setItem("gg-photo-map", JSON.stringify(PHOTOS.map)); } catch (e) {} }, 200),
+  open() {
+    if (this._db) return this._db;
+    this._db = new Promise((res, rej) => {
+      if (!window.indexedDB) return rej(new Error("no indexedDB"));
+      const r = indexedDB.open("gg-photos", 1);
+      r.onupgradeneeded = () => { if (!r.result.objectStoreNames.contains("photos")) r.result.createObjectStore("photos"); };
+      r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); r.onblocked = () => rej(new Error("indexedDB blocked"));
+    });
+    this._db.catch(() => { this._db = null; });
+    return this._db;
+  },
+  async tx(mode, fn) {
+    const db = await this.open();
+    return new Promise((res, rej) => {
+      const t = db.transaction("photos", mode); const r = fn(t.objectStore("photos")); let out;
+      if (r) r.onsuccess = () => { out = r.result; };
+      t.oncomplete = () => res(out); t.onerror = () => rej(t.error); t.onabort = () => rej(t.error || new Error("aborted"));
+    });
+  },
+  async compress(blob) {
+    if (blob.type && !/^image\//.test(blob.type)) return blob;
+    try { const { blob: b } = await shrink(blob, 1280, 0.72); return b || blob; } catch (e) { return blob; }
+  },
+  toBlob: (rec) => (!rec ? null : rec.blob instanceof Blob ? rec.blob : rec.buf ? new Blob([rec.buf], { type: rec.type || "image/jpeg" }) : null),
+  remember(id, url, persist) { this.urls[id] = url; this.live[url] = id; if (persist) { this.map[url] = id; this.saveMap(); } },
+  async save(blob) {
+    const b = await this.compress(blob);
+    const id = "loc-" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+    const meta = { type: b.type || "image/jpeg", at: Date.now(), size: b.size };
+    try { await this.tx("readwrite", (st) => st.put({ ...meta, blob: b }, id)); }
+    catch (e) { await this.tx("readwrite", (st) => st.put({ ...meta, buf: null }, id)).catch(() => {}); const buf = await b.arrayBuffer(); await this.tx("readwrite", (st) => st.put({ ...meta, buf }, id)); } /* old Safari: no Blob in IDB */
+    const url = URL.createObjectURL(b); this.remember(id, url, true); delete this.missing[id];
+    return { id, url };
+  },
+  async get(id) { return this.toBlob(await this.tx("readonly", (st) => st.get(id))); },
+  /* re-open every stored photo as an object URL (file-backed blobs: cheap) so rendering stays synchronous */
+  async warm() {
+    if (!window.indexedDB) return;
+    try {
+      await this.tx("readonly", (st) => { const c = st.openCursor(); c.onsuccess = () => { const cur = c.result; if (!cur) return; const id = cur.key; if (!this.urls[id]) { const b = this.toBlob(cur.value); if (b) this.remember(id, URL.createObjectURL(b)); } cur.continue(); }; return null; });
+      Object.values(this.map).forEach((id) => { if (!this.urls[id]) this.missing[id] = true; });
+    } catch (e) { console.warn("photos warm", e); }
+  },
+  load(id) {
+    if (this.urls[id]) return Promise.resolve(this.urls[id]);
+    if (!this.isLocal(id) || this.missing[id]) return Promise.resolve("");
+    return this.get(id).then((b) => { if (!b) { this.missing[id] = true; return ""; } const u = URL.createObjectURL(b); this.remember(id, u); return u; }).catch(() => "");
+  },
+  /* same shape as the assets capability, so a purge screen can use either */
+  async list() {
+    const out = [];
+    await this.tx("readonly", (st) => { const c = st.openCursor(); c.onsuccess = () => { const cur = c.result; if (!cur) return; out.push({ id: cur.key, createdAt: new Date(cur.value.at || 0).toISOString(), size: cur.value.size || 0 }); cur.continue(); }; return null; });
+    return { assets: out };
+  },
+  async delete(id) {
+    await this.tx("readwrite", (st) => st.delete(id));
+    const u = this.urls[id]; if (u) { delete this.live[u]; try { URL.revokeObjectURL(u); } catch (e) {} } delete this.urls[id]; this.missing[id] = true;
+    Object.keys(this.map).forEach((k) => { if (this.map[k] === id) delete this.map[k]; }); this.saveMap();
+  },
+  persist() { try { if (isStandalone() && navigator.storage && navigator.storage.persist) navigator.storage.persisted().then((p) => p || navigator.storage.persist()).catch(() => {}); } catch (e) {} },
+};
+const PIXEL = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
+/* photoUrl(idOrUrl): a URL that works now. Accepts a stored id, an http(s)/data URL, or a stale blob: URL. "" when unknown. */
+function photoUrl(x) {
+  if (!x) return ""; x = String(x);
+  if (x.startsWith("blob:")) { const id = PHOTOS.map[x] || PHOTOS.live[x]; return id ? photoUrl(id) || "" : x; }
+  if (/^(https?:|data:|\.\/|\/)/.test(x)) return x;
+  if (PHOTOS.urls[x]) return PHOTOS.urls[x];
+  if (PHOTOS.isLocal(x) && !PHOTOS.missing[x]) PHOTOS.load(x).then((u) => { if (u) photoRefresh(); });
+  return "";
+}
+const photoRefresh = debounce(() => { refresh(); photoFixDom(document.body); }, 80);
+/* swap stale blob: URLs in an HTML string for live ones (stale + unknown → transparent pixel, never a broken request) */
+function photoFix(html) {
+  if (typeof html !== "string" || html.indexOf("blob:") < 0) return html;
+  return html.replace(/blob:[^"'\s<>)]+/g, (u) => {
+    if (PHOTOS.live[u]) return u; const id = PHOTOS.map[u]; if (!id) return u;
+    if (PHOTOS.urls[id]) return PHOTOS.urls[id];
+    PHOTOS.load(id).then((v) => { if (v) photoRefresh(); }); return PIXEL;
+  });
+}
+/* same for DOM the areas insert themselves, plus <img data-photo="id"> */
+function photoFixEl(el) {
+  const attr = el.tagName === "A" ? "href" : "src"; const cur = el.getAttribute(attr) || "";
+  const id = el.dataset.photo || (cur.startsWith("blob:") ? PHOTOS.map[cur] || PHOTOS.live[cur] : "");
+  if (!id) return;
+  const set = (u) => { if (u && el.getAttribute(attr) !== u) el.setAttribute(attr, u); };
+  if (PHOTOS.urls[id]) set(PHOTOS.urls[id]); else PHOTOS.load(id).then(set);
+}
+function photoFixDom(root) { if (root && root.querySelectorAll) root.querySelectorAll('img[src^="blob:"],a[href^="blob:"],img[data-photo],a[data-photo]').forEach(photoFixEl); }
+try {
+  new MutationObserver((ms) => { for (const m of ms) { if (m.type === "attributes") { if (m.target.matches && m.target.matches('img,a')) photoFixEl(m.target); } else m.addedNodes.forEach((n) => { if (n.nodeType === 1) { if (n.matches('img[src^="blob:"],a[href^="blob:"],[data-photo]')) photoFixEl(n); photoFixDom(n); } }); } })
+    .observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ["src", "href", "data-photo"] });
+} catch (e) {}
+
+/* ───────────────────────── standalone: file download fallback (same API as the downloads capability) ───────────────────────── */
+const LOCAL_DOWNLOADS = {
+  async save({ filename, data, mimeType } = {}) {
+    const name = String(filename || "fichier").replace(/[\\/:*?"<>|]+/g, "-");
+    const blob = data instanceof Blob ? data : new Blob([data ?? ""], { type: mimeType || "application/octet-stream" });
+    /* iPhone home-screen app: <a download> opens a dead-end preview, the share sheet can save, print or AirDrop */
+    if (IS_IOS && isStandalone() && navigator.canShare && window.File) {
+      try {
+        const f = new File([blob], name, { type: blob.type || "application/octet-stream" });
+        if (navigator.canShare({ files: [f] })) { await navigator.share({ files: [f] }); return { ok: true }; }
+      } catch (e) { if (e && e.name === "AbortError") { const d = new Error("declined"); d.code = "declined"; throw d; } /* NotAllowed (no gesture left) → link below */ }
+    }
+    const url = URL.createObjectURL(blob); const a = document.createElement("a");
+    a.href = url; a.download = name; a.rel = "noopener"; a.style.display = "none"; document.body.appendChild(a); a.click();
+    setTimeout(() => { a.remove(); URL.revokeObjectURL(url); }, 60000);
+    return { ok: true };
+  },
+};
+
+/* ───────────────────────── standalone: install (PWA) ───────────────────────── */
+const IS_IOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+const IS_ANDROID = /Android/i.test(navigator.userAgent);
+const isStandalone = () => { try { return window.matchMedia("(display-mode: standalone)").matches || window.matchMedia("(display-mode: fullscreen)").matches || navigator.standalone === true; } catch (e) { return false; } };
+document.documentElement.classList.toggle("standalone", isStandalone());
+let installEvt = null;
+window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installEvt = e; if (S.route === "home") refresh(); });
+window.addEventListener("appinstalled", () => { installEvt = null; try { localStorage.setItem("gg-install-off", "1"); } catch (e) {} if (S.route === "home") refresh(); });
+const installOff = () => { try { return localStorage.getItem("gg-install-off") === "1"; } catch (e) { return false; } };
+function installHint() {
+  if (isStandalone() || installOff() || !S.resto) return "";
+  const step = (n, html) => `<li><span class="n mono">${n}</span><span>${html}</span></li>`;
+  let body;
+  if (IS_IOS) body = `<ol class="inst-steps">${step(1, `Touchez <span class="key">${ico("share")}</span> <b>Partager</b>`)}${step(2, `Choisissez <span class="key">${ico("addsq")}</span> <b>Sur l'écran d'accueil</b>`)}</ol>`;
+  else if (installEvt) body = `<button class="btn acc block" data-act="installApp">${ico("download")}Installer l'app</button>`;
+  else if (IS_ANDROID) body = `<ol class="inst-steps">${step(1, `Touchez <span class="key">${ico("dots")}</span> <b>Menu</b> du navigateur`)}${step(2, `Choisissez <b>Ajouter à l'écran d'accueil</b>`)}</ol>`;
+  else return "";
+  return `<div class="glass inst st" style="--i:1" id="instCard">
+    <button class="inst-x" data-act="installDismiss" aria-label="Masquer">${ico("x")}</button>
+    <div class="inst-hd">${appIcon(50)}<div style="min-width:0"><b class="h3">Installez Gusto</b><div class="sub">Sur l'écran d'accueil : plein écran, ouverture instantanée, même sans réseau.</div></div></div>
+    ${body}${IS_IOS ? `<div class="inst-arrow" aria-hidden="true">${ico("down")}</div>` : ""}</div>`;
+}
+
+/* ───────────────────────── standalone: service worker (offline) ───────────────────────── */
+function registerSW() {
+  try {
+    if (!("serviceWorker" in navigator)) return;
+    if (!(location.protocol === "https:" || /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname))) return;
+    const reg = () => navigator.serviceWorker.register("./sw.js", { scope: "./" }).then((r) => {
+      document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") r.update().catch(() => {}); });
+    }).catch((e) => console.warn("sw", e && e.message));
+    if (document.readyState === "complete") reg(); else window.addEventListener("load", reg, { once: true });
+  } catch (e) {}
+}
 
 function toastUndo(msg) { toast(msg); const t = $("#toastTx"); t.innerHTML = `${esc(msg)} <button data-act="undo" style="all:unset;cursor:pointer;margin-left:10px;font-weight:800;color:#B9A6FF">Annuler</button>`; $("#toast").style.pointerEvents = "auto"; clearTimeout($("#toast")._h); $("#toast")._h = setTimeout(() => { $("#toast").classList.remove("on"); S.ui.undo = null; }, 4000); }
 /* ───────────────────────── toast + burst ───────────────────────── */
@@ -407,3 +626,16 @@ async function saveCsv(name, rows) {
   try { await S.cap.downloads.save({ filename: name, data: new Blob([csv], { type: "text/csv" }) }); SFX.ok(); toast("Fichier prêt"); } catch (e) { if (e && e.code !== "declined") toast("Export impossible.", "err"); }
 }
 
+/* install card actions */
+Object.assign(ACT, {
+  installApp: async () => {
+    if (!installEvt) return; SFX.tap(); const ev = installEvt;
+    try { ev.prompt(); const r = await ev.userChoice; if (r && r.outcome === "accepted") { installEvt = null; SFX.done(); toast("Gusto est installée"); try { localStorage.setItem("gg-install-off", "1"); } catch (e) {} } } catch (e) {}
+    refresh();
+  },
+  installDismiss: () => {
+    try { localStorage.setItem("gg-install-off", "1"); } catch (e) {} SFX.close(); buzz(4);
+    const c = $("#instCard"); if (!c) return refresh();
+    c.style.height = c.offsetHeight + "px"; void c.offsetWidth; c.classList.add("bye"); setTimeout(() => { c.remove(); }, 420);
+  },
+});
