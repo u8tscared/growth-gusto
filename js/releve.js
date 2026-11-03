@@ -149,7 +149,7 @@ VIEWS.releve = {
     S.ui.relJust = null;
     const ring = $("#relRing", v); const to = S.ui.relRingTo;
     if (ring && to != null) { requestAnimationFrame(() => requestAnimationFrame(() => { ring.style.strokeDashoffset = S.ui.relRingC * (1 - to); })); S.ui.relRingPrev = to; }
-    if (S.ui.relScroll) { const el = $(`.fr[data-fr="${S.ui.relScroll}"]`, v); S.ui.relScroll = null; el && setTimeout(() => relScrollToCard(v, el, null, 0), 30); }
+    if (S.ui.relScroll) { const el = $(`.fr[data-fr="${S.ui.relScroll}"]`, v); S.ui.relScroll = null; el && setTimeout(() => { relScrollToCard(v, el, null, 0); if (typeof toastAvoid === "function") toastAvoid(el); }, 30); }
   },
 };
 
@@ -337,6 +337,7 @@ function relAdvance(doneId) {
   if (nx) {
     nx.classList.add("open");
     relScrollToCard(view, nx, cur, shrinkBy);
+    if (typeof toastAvoid === "function") toastAvoid(nx);
   }
   clearTimeout(relAdvance._t);
   relAdvance._t = setTimeout(() => { VIEWS.releve.live = true; S.ui.relScroll = next ? next.id : null; if (S.route === "releve") rerender(); }, 560);
