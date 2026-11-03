@@ -26,7 +26,9 @@ button,input,select,textarea{font:inherit;color:inherit}
 html body :focus-visible:not(input):not(textarea):not(select):not(.sheet):not(.view){outline:2.5px solid var(--accent);outline-offset:2px}
 .sheet:focus,.view:focus{outline:none}
 .skip{all:unset;position:fixed;z-index:120;left:12px;top:calc(var(--sat) + 10px);padding:12px 18px;border-radius:14px;background:var(--ink);color:#fff;font-weight:800;font-size:14px;cursor:pointer;transform:translateY(calc(-100% - 40px));transition:transform .3s var(--ease)}
-.skip:focus,.skip:focus-visible{transform:none}
+.skip:focus{transform:translateY(calc(-100% - 40px))}.skip:focus-visible{transform:none}
+/* touch screens (iPhone, iPad without keyboard): no skip link at all; it only helps keyboard users */
+@media (hover:none),(pointer:coarse){.skip{display:none!important}}
 h1,h2,h3{margin:0;text-wrap:balance}
 [hidden]{display:none!important}
 
@@ -59,7 +61,7 @@ html.standalone .statusveil{display:block;position:fixed;z-index:40;left:0;right
 .side{display:none}
 .main{flex:1;min-width:0;position:relative;height:100%}
 .viewport{position:absolute;inset:0;overflow:hidden}
-.view{position:absolute;inset:0;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:none;padding:calc(env(safe-area-inset-top,0px) + 18px) max(16px,env(safe-area-inset-right,0px)) calc(max(12px,calc(env(safe-area-inset-bottom,0px) - 8px)) + 100px) max(16px,env(safe-area-inset-left,0px));transition:opacity .42s var(--ease),transform .52s var(--ease)}
+.view{position:absolute;inset:0;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:none;padding:calc(env(safe-area-inset-top,0px) + 18px) max(16px,env(safe-area-inset-right,0px)) calc(max(12px,calc(env(safe-area-inset-bottom,0px) - 8px)) + 116px) max(16px,env(safe-area-inset-left,0px));transition:opacity .42s var(--ease),transform .52s var(--ease)}
 .view::-webkit-scrollbar{display:none}
 .view.enter{opacity:0;transform:translateX(26px) scale(.985)}
 .view.enter.back{transform:translateX(-26px) scale(.985)}
@@ -410,12 +412,12 @@ html.kb .tabbar{opacity:0;pointer-events:none}
 
 .fgrid{display:flex;flex-direction:column;gap:14px}
 .ctabar{position:sticky;bottom:calc(env(safe-area-inset-bottom,0px) + 12px);z-index:5;margin-top:4px;filter:drop-shadow(0 10px 20px rgba(40,30,120,.18))}
-/* phone: a sticky bottom is measured from the view's padding edge, and that padding already clears the tab bar (100px) or, without
+/* phone: a sticky bottom is measured from the view's padding edge, and that padding already clears the tab bar (116px) or, without
    tab bar, the home indicator: the CTA then rests 16px above the tab bar / 14px above the screen edge, never mid-screen */
 @media (max-width:959px){
   html:not(.tabs) .view{padding-bottom:calc(max(env(safe-area-inset-bottom,0px),8px) + 14px)}
-  html.tabs .view .ctabar{bottom:-14px}
-  html.tabs .view .ctabar:last-child{margin-bottom:-14px}
+  html.tabs .view .ctabar{bottom:-30px}
+  html.tabs .view .ctabar:last-child{margin-bottom:-30px}
   html:not(.tabs) .view .ctabar{bottom:0}
 }
 .ctabar.grid2{display:grid}
