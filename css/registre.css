@@ -217,3 +217,17 @@
 .rg-tbl tr.cx td:first-child{box-shadow:inset 3px 0 0 var(--faint)}
 .rp-st.neu{background:#EEF0F6;color:#5A6386}
 .rp-t tr.row-cx td{color:#5A6386}
+
+/* ── final pass: chip strips wrap on wide screens, sideways-scroll hint on report tables ── */
+@media (min-width:960px){
+  .rg-bar{align-items:flex-start}
+  .rg-bar .chips{flex-wrap:wrap;overflow:visible;-webkit-mask-image:none;mask-image:none;padding-right:2px}
+}
+.rp-scw{position:relative;min-width:0}
+.rp-scw::after{content:"";position:absolute;top:4px;right:-2px;bottom:2px;width:34px;pointer-events:none;background:linear-gradient(90deg,rgba(255,255,255,0),#fff 85%);opacity:0;transition:opacity .25s}
+.rp-scw.more:not(.end)::after{opacity:1}
+.rp-hint{display:none;align-items:center;gap:4px;margin:3px 0 2px;font-size:10px;font-weight:700;color:#4A1FE6;letter-spacing:.01em}
+.rp-scw.more:not(.moved) .rp-hint{display:flex}
+@media print{
+  html.rg-printing .rp-scw::after,html.rg-printing .rp-hint{display:none!important}
+}

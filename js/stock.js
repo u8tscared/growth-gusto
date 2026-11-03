@@ -19,7 +19,23 @@ const STK_SS = "gg-stk-cm";
 
 /* ───────── helpers ───────── */
 const stkZoneOf = (p) => (p.zone || "").trim() || "Autre";
-function stkZoneRank(z) { const i = STK_ZONE_ORDER.findIndex((x) => x.toLowerCase() === z.toLowerCase()); return i < 0 ? 100 : i; }
+function stkZoneRank(z) {
+  const i = STK_ZONE_ORDER.findIndex((x) => x.toLowerCase() === z.toLowerCase()); if (i >= 0) return i;
+  const fi = S.fridges.findIndex((f) => (f.name || "").trim().toLowerCase() === z.toLowerCase()); if (fi < 0) return 100;
+  const k = stkFridgeKind(S.fridges[fi]); return (k === "congel" ? 4 : k === "cave" ? 9 : 0) + 0.2 + fi / 100;
+}
+/* fridges ↔ catalogue zones: a catalogue zone is the real equipment name when there is one */
+function stkFridgeKind(f) { if (!f) return ""; if (typeof relTypeOf === "function") { try { return relTypeOf(f).k; } catch (e) {} } const n = (f.name || "").toLowerCase(); return /cong[eé]l|surg|n[eé]gativ/.test(n) || f.max <= -10 ? "congel" : /cave|vin|boisson/.test(n) ? "cave" : "frigo"; }
+function stkFridgeFor(kind) { const L = S.fridges.filter((f) => (kind === "congel" ? stkFridgeKind(f) === "congel" : ["cfp", "frigo"].includes(stkFridgeKind(f)))); return L.find((f) => stkFridgeKind(f) === "cfp") || L[0] || null; }
+/* generic catalogue zone → the restaurant's own equipment, when it has one of that kind */
+function stkRealZone(z) { const f = z === "Chambre froide" ? stkFridgeFor("cold") : z === "Congélateur" ? stkFridgeFor("congel") : null; return f ? f.name.trim() : z; }
+/* zone guessed for a received product: the fridge it was stored in, else from the product type */
+function stkZoneGuess(src) {
+  const f = src.fridgeId && S.fridges.find((x) => x.id === src.fridgeId); if (f && (f.name || "").trim()) return f.name.trim();
+  if (src.type === "sec") return "Réserve sèche";
+  if (src.type === "surg") return stkRealZone("Congélateur");
+  return stkRealZone("Chambre froide");
+}
 function stkZones(list = S.products) { return [...new Set(list.map(stkZoneOf))].sort((a, b) => stkZoneRank(a) - stkZoneRank(b) || a.localeCompare(b, "fr")); }
 function stkSorted(scope) { const zs = stkZones(); return S.products.filter((p) => !scope || stkZoneOf(p) === scope).slice().sort((a, b) => zs.indexOf(stkZoneOf(a)) - zs.indexOf(stkZoneOf(b)) || a.name.localeCompare(b.name, "fr")); }
 const stkN = (n) => (n == null || isNaN(n) ? "–" : String(Math.round(n * 1000) / 1000).replace(".", ","));
@@ -68,6 +84,36 @@ function stkEstimate(p) {
   return { last, recv, adj, est: last || recv || adj ? Math.max(0, (last ? last.qty : 0) + recv + adj) : null };
 }
 
+/* Produits reçus (lots, réceptions) absents du catalogue. Ceux que l'on décoche ne sont plus proposés (par restaurant, sur cet appareil). */
+const STK_IGN = "gg-stk-ign";
+const stkIgnored = () => { const o = stkLS(STK_IGN) || {}; return new Set(o[S.rid] || []); };
+function stkIgnore(names) { const o = stkLS(STK_IGN) || {}; o[S.rid] = [...new Set([...(o[S.rid] || []), ...names])].slice(-400); stkLS(STK_IGN, o); }
+function stkRecvSuggest() {
+  const have = new Set(S.products.map((p) => stkNorm(p.name).trim())); const ign = stkIgnored(); const out = new Map();
+  const add = (name, src, at) => {
+    name = String(name || "").replace(/\s*\(test\)\s*$/i, "").trim(); const k = stkNorm(name).trim(); if (!k || have.has(k) || ign.has(k)) return;
+    const e = out.get(k) || { name, k, n: 0, at: 0, unit: "", zone: "", supplier: "" }; e.n++;
+    if ((at || 0) >= e.at) { e.at = at || 0; e.name = name; e.unit = src.unit || e.unit; e.zone = stkZoneGuess(src); e.supplier = src.supplier || e.supplier; }
+    out.set(k, e);
+  };
+  S.receptions.forEach((rc) => (rc.lines || []).forEach((L) => { if (!L.refused) add(L.name, { ...L, supplier: rc.supplier }, rc.at); }));
+  S.lots.forEach((l) => { if (!l.test) add(l.name, l, l.createdAt); });
+  return [...out.values()].sort((a, b) => stkZoneRank(a.zone) - stkZoneRank(b.zone) || a.name.localeCompare(b.name, "fr"));
+}
+function stkRecvCard(i) {
+  const L = stkRecvSuggest(); if (!L.length) return "";
+  return `<div class="glass pad st stk-rcv" style="--i:${i}"><span class="ic">${ico("truck")}</span><div class="tx"><b>${L.length} produit${L.length > 1 ? "s" : ""} reçu${L.length > 1 ? "s" : ""} hors catalogue</b><em>${esc(L.slice(0, 3).map((x) => x.name).join(", "))}${L.length > 3 ? "…" : ""}</em></div><button class="btn soft sm" data-act="stkRecv">${ico("plus")}Ajouter les produits reçus au catalogue</button></div>`;
+}
+function stkRecvSheet() {
+  const L = stkRecvSuggest(); const off = S.ui.stkRv || {}; const n = L.filter((x) => !off[x.k]).length;
+  if (!L.length) return `<div class="stk-stdone"><span class="check draw"><svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg></span><div class="h2" style="font-size:21px">Tout est au catalogue</div><p class="sub">Les produits reçus sont tous dans votre catalogue.</p><button class="btn acc block" data-act="sheetClose">Fermer</button></div>`;
+  const zs = [...new Set(L.map((x) => x.zone))];
+  return `<div class="row"><div><div class="h2" style="font-size:21px">Produits reçus</div><span class="sub">Ils rejoignent le catalogue, rangés dans le frigo où ils ont été mis. Décochez ce que vous ne comptez pas.</span></div><button class="iconbtn" data-act="sheetClose" aria-label="Fermer">${ico("x")}</button></div>
+    <div class="stk-stl">${zs.map((z) => `<div><span class="lbl">${esc(z)}</span><div class="stk-stg">${L.filter((x) => x.zone === z).map((x) => `<button class="stk-st ${off[x.k] ? "" : "on"}" data-act="stkRvToggle" data-v="${esc(x.k)}" aria-pressed="${!off[x.k]}"><i>${ico("check")}</i><span>${esc(x.name)}</span><em>${esc(x.unit || "kg")}</em></button>`).join("")}</div></div>`).join("")}</div>
+    <p class="note" style="margin:0">Les produits décochés ne seront plus proposés. Prix et zone se modifient ensuite dans le catalogue.</p>
+    <div class="ctabar stk-stcta"><button class="btn acc block" data-act="stkRvAdd" ${n ? "" : "disabled"}>Ajouter ${n} produit${n > 1 ? "s" : ""}</button></div>`;
+}
+
 /* Month data: per product count, diff, value, consumption */
 function stkMonthData(m) {
   const pm = stkShift(m, -1), cm = stkCountMap(m), cp = stkCountMap(pm); let value = 0, prevValue = 0, used = 0, priced = 0, likeCur = 0, likePrev = 0;
@@ -101,7 +147,8 @@ VIEWS.stock = {
       return `<div class="inner narrow">${topBar("Stock", { noBack: true })}${seg}
         <div class="glass stk-empty st" style="--i:2"><div class="stk-empty-art">${ico("box")}</div><b class="h2">Votre inventaire en 3 gestes</b>
           <ol class="stk-steps"><li><span>1</span>Créez votre catalogue : produits, zone, unité, prix d'achat.</li><li><span>2</span>Chaque mois, comptez produit par produit avec le pavé.</li><li><span>3</span>Voyez la consommation, la valeur du stock et exportez.</li></ol>
-          <button class="btn acc block" data-act="stkStarter">${ico("sparkle")}Partir de la liste type bistro</button>
+          ${stkRecvSuggest().length ? `<button class="btn acc block" data-act="stkRecv">${ico("truck")}Ajouter les produits reçus au catalogue</button>` : ""}
+          <button class="btn ${stkRecvSuggest().length ? "soft" : "acc"} block" data-act="stkStarter">${ico("sparkle")}Partir de la liste type bistro</button>
           <button class="btn soft block" data-act="prodEdit">${ico("plus")}Ajouter un produit</button></div></div>`;
     }
     return tab === "cat" ? stkCatalogue(seg) : stkInventory(seg);
@@ -138,7 +185,7 @@ function stkInventory(seg) {
       <div><span class="lbl">Consommé</span><div class="h2 mono">${D.used ? stkEur(D.used) : "–"}</div><div class="sub">depuis ${stkMonthName(D.pm)}${part && D.used ? "*" : ""}</div></div>${part && (dv != null || D.used) ? `<p class="note stk-kfn">* sur les produits comptés les deux mois</p>` : ""}</div>`;
   })() : `<div class="glass pad st stk-tip" style="--i:3"><span class="ic">${ico("trend")}</span><div><b>Voir la valeur du stock</b><p class="note">Ajoutez un prix d'achat à vos produits : la valeur et la consommation en € s'affichent ici.</p><button class="btn soft sm" data-act="stockTab" data-v="cat">Ajouter les prix</button></div></div>`;
   const topCard = D.top.length ? `<div class="glass pad st" style="--i:4"><span class="lbl">Plus grosses consommations</span>${D.top.map((r) => `<div class="li"><div class="tx"><b>${esc(r.p.name)}</b><em>${stkN(r.used)} ${esc(stkU(r.used, r.p.unit))} utilisé${r.used >= 2 ? "s" : ""}</em></div><span class="mono stk-strong">${stkEur(r.used * r.p.price)}</span></div>`).join("")}<p class="note" style="margin:8px 0 0">Stock de ${stkMonthName(D.pm)} + achats reçus − stock compté.</p></div>` : "";
-  const exportCard = `<div class="glass pad st stk-exp" style="--i:5"><div><b>Exporter ${stkMonthName(m)}</b><span class="sub">Fichier CSV pour Excel ou votre comptable</span></div><button class="btn soft sm" data-act="exportInv">${ico("download")}CSV</button></div>`;
+  const exportCard = `<div class="glass pad st stk-exp stk-dk" style="--i:5"><div><b>Exporter ${stkMonthName(m)}</b><span class="sub">Fichier CSV pour Excel ou votre comptable</span></div><button class="btn soft sm" data-act="exportInv">${ico("download")}CSV</button></div>`;
   const shown = zones.filter((z) => !S.stkZone || z === S.stkZone);
   const chips = `<div class="chips st" style="--i:3"><button class="chip ${!S.stkZone ? "on" : ""}" data-act="stkZone" data-v="">Toutes <span class="stk-cn">${D.n}/${D.total}</span></button>${zones.map((z) => { const zr = D.rows.filter((r) => stkZoneOf(r.p) === z); const zc = zr.filter((r) => r.c != null).length; return `<button class="chip ${z === S.stkZone ? "on" : ""}" data-act="stkZone" data-v="${esc(z)}">${esc(z)} <span class="stk-cn">${zc === zr.length ? "✓" : `${zc}/${zr.length}`}</span></button>`; }).join("")}</div>`;
   const lists = shown.map((z, zi) => {
@@ -147,8 +194,8 @@ function stkInventory(seg) {
       ${zr.map((r) => `<div class="li tap stk-row ${r.c == null ? "todo" : ""}" data-act="stkEdCount" data-id="${r.p.id}" role="button" tabindex="0"><div class="tx"><b>${esc(r.p.name)}</b><em>${r.pc != null ? `${stkMonthName(D.pm)} : ${stkN(r.pc)} ${esc(stkU(r.pc, r.p.unit))}` : "1er comptage"}${r.val != null ? ` · ${stkEur(r.val)}` : ""}</em></div>
         <div class="stk-q">${r.c != null ? `<b class="mono">${stkN(r.c)}<small> ${esc(stkU(r.c, r.p.unit))}</small></b>${stkDiff(r.d)}` : `<span class="stk-todo">À compter</span>`}</div></div>`).join("")}</div>`;
   }).join("");
-  return `<div class="inner">${topBar("Stock", { noBack: true, right: `<button class="btn soft sm" data-act="exportInv" aria-label="Exporter en CSV">${ico("download")}<span class="stk-hide-s">Exporter</span></button>` })}${seg}
-    <div class="cols"><div>${hero}<div class="stk-ph">${valueCard}</div>${chips}${lists}</div><div class="stk-side"><div class="stk-dk">${valueCard}</div>${topCard}${exportCard}</div></div></div>`;
+  return `<div class="inner">${topBar("Stock", { noBack: true, right: `<button class="btn soft sm stk-tbx" data-act="exportInv" aria-label="Exporter en CSV">${ico("download")}<span class="stk-hide-s">Exporter</span></button>` })}${seg}
+    <div class="cols"><div>${hero}<div class="stk-ph">${valueCard}</div>${stkRecvCard(3)}${chips}${lists}</div><div class="stk-side"><div class="stk-dk">${valueCard}</div>${topCard}${exportCard}</div></div></div>`;
 }
 
 function stkCatalogue(seg) {
@@ -159,10 +206,10 @@ function stkCatalogue(seg) {
     return `<div class="glass pad st stk-grp" style="--i:${Math.min(zi + 3, 9)}" data-zone="${esc(z)}" ${vis ? "" : "hidden"}><div class="row stk-zh"><span class="lbl">${esc(z)} <span class="mono stk-gn">${ps.length}</span></span><button class="btn ghost sm" data-act="prodEdit" data-v="${esc(z)}" aria-label="Ajouter dans ${esc(z)}">${ico("plus")}</button></div>
       ${ps.map((p) => { const hay = stkNorm(`${p.name} ${p.supplier || ""} ${z}`); return `<div class="li tap stk-prow" data-act="prodEdit" data-id="${p.id}" data-q="${esc(hay)}" role="button" tabindex="0" ${nq && !hay.includes(nq) ? "hidden" : ""}><div class="tx"><b>${esc(p.name)}</b><em>${esc(p.unit)}${p.supplier ? ` · ${esc(p.supplier)}` : ""}</em></div>${p.price > 0 ? `<span class="mono stk-price">${stkEur(p.price, 2)}<small>/${esc(p.unit)}</small></span>` : `<span class="stk-noprice">Prix ?</span>`}${ico("chev")}</div>`; }).join("")}</div>`;
   }).join("");
-  return `<div class="inner narrow">${topBar("Stock", { noBack: true, right: `<button class="btn acc sm" data-act="prodEdit">${ico("plus")}Produit</button>` })}${seg}
+  return `<div class="inner stk-cat">${topBar("Stock", { noBack: true, right: `<button class="btn acc sm" data-act="prodEdit">${ico("plus")}Produit</button>` })}${seg}
     <div class="stk-search st" style="--i:2">${ico("search")}<input class="input" id="stkQ" data-stkq="1" type="search" placeholder="Rechercher un produit, un fournisseur…" value="${esc(q)}" autocomplete="off" aria-label="Rechercher"></div>
     <div class="row st" style="--i:2;padding:0 4px"><span class="sub">${S.products.length} produits · ${priced} avec prix</span><button class="btn ghost sm" data-act="stkStarter">${ico("sparkle")}Liste type</button></div>
-    <div class="stk-groups">${groups}</div><div class="glass empty stk-nores" hidden><b>Aucun produit trouvé</b><button class="btn soft sm" data-act="prodEditQ" style="margin-top:10px">${ico("plus")}<span>Créer « <span id="stkQn"></span> »</span></button></div></div>`;
+    ${stkRecvCard(2)}<div class="stk-groups">${groups}</div><div class="glass empty stk-nores" hidden><b>Aucun produit trouvé</b><button class="btn soft sm" data-act="prodEditQ" style="margin-top:10px">${ico("plus")}<span>Créer « <span id="stkQn"></span> »</span></button></div></div>`;
 }
 function stkApplySearch() {
   const inp = $("#stkQ"); if (!inp) return; S.stkQ = inp.value; const nq = stkNorm(inp.value); let any = false;
@@ -305,7 +352,8 @@ function stkEdOpen(pid) {
 
 /* ───────── fiche produit ───────── */
 function stkProdSheet(p, isNew, presetZone) {
-  const zones = [...new Set([...stkZones(), "Chambre froide", "Congélateur", "Réserve sèche", "Cave", "Bar"])].sort((a, b) => stkZoneRank(a) - stkZoneRank(b) || a.localeCompare(b, "fr"));
+  const real = S.fridges.map((f) => (f.name || "").trim()).filter(Boolean);
+  const zones = [...new Set([...stkZones(), ...real, stkRealZone("Chambre froide"), stkRealZone("Congélateur"), "Réserve sèche", "Cave", "Bar"])].sort((a, b) => stkZoneRank(a) - stkZoneRank(b) || a.localeCompare(b, "fr"));
   const units = [...new Set([...STK_UNITS, ...UNITS, ...S.products.map((x) => x.unit).filter(Boolean)])];
   const sups = [...new Set([...S.products.map((x) => x.supplier), ...S.receptions.map((r) => r.supplier), ...S.lots.map((l) => l.supplier)].filter(Boolean))].sort((a, b) => a.localeCompare(b, "fr"));
   const zone = p.zone || presetZone || S.stkZone || zones[0]; const unit = p.unit || "kg";
@@ -367,7 +415,7 @@ Object.assign(ACT, {
   stkStart: (a, id, v) => { SFX.tap(); stkCmOpen(v || null); },
   stkResume: () => { const s = stkSessLoad(); SFX.tap(); stkCmOpen(s ? s.scope : null, s ? s.pid : null); },
   countMode: () => ACT.stkResume(),
-  stkCmClose: () => { const C = S.ui.stkCm; const done = C && C.i >= C.list.length; stkCmClose(); if (C && !done && invProgress().n < S.products.length) toast("Comptage en pause"); },
+  stkCmClose: () => { const C = S.ui.stkCm; const done = C && C.i >= C.list.length; stkCmClose(); if (C && !done && invProgress().n < S.products.length) toast("Comptage en pause", "info"); },
   stkKey: (a, id, v) => stkKey(id, v),
   stkSame: () => { const C = S.ui.stkCm; if (!C) return; const pc = countOf(C.list[C.i], stkShift(C.month, -1)); if (pc == null) return; C.buf = stkN(pc); C.typed = true; const d = $("#stkVal"); $(".n", d).innerHTML = stkBufHtml(C.buf); const u = $(".u", d); if (u && u.dataset.u) u.textContent = stkU(pc, u.dataset.u); d.classList.remove("empty", "bump"); void d.offsetWidth; d.classList.add("bump"); SFX.tap(); buzz(5); stkSessSave(); },
   stkNext: async () => {
@@ -414,11 +462,20 @@ Object.assign(ACT, {
     const l = $("#stkAdjL"); if (l) l.textContent = E.adj ? ` · ${stkSigned(E.adj)} ajusté` : ""; SFX.tick(); buzz(4);
   },
   stkStarter: () => { SFX.tap(); S.ui.stkSt = {}; openSheet(stkStarterSheet()); },
+  stkRecv: () => { SFX.tap(); S.ui.stkRv = {}; openSheet(stkRecvSheet()); },
+  stkRvToggle: (a, id, v) => { const off = (S.ui.stkRv ||= {}); off[v] = !off[v]; a.classList.toggle("on", !off[v]); a.setAttribute("aria-pressed", String(!off[v])); SFX.tick(); const n = stkRecvSuggest().filter((x) => !off[x.k]).length; const b = $('[data-act="stkRvAdd"]'); if (b) { b.textContent = `Ajouter ${n} produit${n > 1 ? "s" : ""}`; b.disabled = !n; } },
+  stkRvAdd: async (a) => {
+    if (a.disabled) return; a.disabled = true; const off = S.ui.stkRv || {}; const L = stkRecvSuggest(); let n = 0; const now = Date.now();
+    try { for (const x of L) { if (off[x.k]) continue; const unit = x.unit || "kg"; await DB.add("products", { name: x.name, unit, zone: x.zone || "Autre", step: stkDefStep(unit), price: null, supplier: x.supplier || "", createdAt: now + n, fromReception: true }); n++; } }
+    catch (e) { SFX.err(); toast("Impossible d'ajouter les produits.", "err"); a.disabled = false; return; }
+    stkIgnore(L.filter((x) => off[x.k]).map((x) => x.k));
+    closeSheet(true); SFX.done(); burst(); toast(`${n} produit${n > 1 ? "s" : ""} ajouté${n > 1 ? "s" : ""} au catalogue`); S.ui.stkRv = null; setTimeout(rerender, 80);
+  },
   prodStarter: () => ACT.stkStarter(),
   stkStToggle: (a, id, v) => { S.ui.stkSt[v] = !S.ui.stkSt[v]; a.classList.toggle("on", !S.ui.stkSt[v]); a.setAttribute("aria-pressed", String(!S.ui.stkSt[v])); SFX.tick(); const n = stkStarterCount(); const b = $('[data-act="stkStAdd"]'); b.textContent = `Ajouter ${n} produit${n > 1 ? "s" : ""}`; b.disabled = !n; },
   stkStAdd: async (a) => {
     if (a.disabled) return; a.disabled = true; const have = new Set(S.products.map((p) => p.name.toLowerCase())); let n = 0; const now = Date.now();
-    try { for (const [zone, L] of STK_STARTER) for (const [name, unit] of L) { if (have.has(name.toLowerCase()) || S.ui.stkSt[name]) continue; await DB.add("products", { name, unit, zone, step: stkDefStep(unit), price: null, supplier: "", createdAt: now + n }); n++; } } catch (e) { SFX.err(); toast("Impossible d'ajouter la liste.", "err"); a.disabled = false; return; }
+    try { for (const [zone, L] of STK_STARTER) for (const [name, unit] of L) { if (have.has(name.toLowerCase()) || S.ui.stkSt[name]) continue; await DB.add("products", { name, unit, zone: stkRealZone(zone), step: stkDefStep(unit), price: null, supplier: "", createdAt: now + n }); n++; } } catch (e) { SFX.err(); toast("Impossible d'ajouter la liste.", "err"); a.disabled = false; return; }
     closeSheet(true); SFX.done(); burst(); toast(`${n} produits ajoutés`); setTimeout(rerender, 80);
   },
   exportInv: async () => {

@@ -36,6 +36,12 @@ const REG_TYPES = { frais: "Frais", ultra: "Ultra-frais", surg: "Surgelé", sec:
 const regLineWhy = (L) => (L.refused || regLineRes(L) ? String(L.reason || (typeof L.reserve === "string" ? L.reserve : "") || "").trim() : "");
 const regBl = (bl) => String(bl || "").trim().replace(/^BL[\s:°n.-]*(?=\S)/i, "");
 const regSlot = (s) => (s === "soir" ? "soir" : "midi");
+/* units: « 6 pièces », « 2 bouteilles » (kg, L, g stay as they are) */
+const REG_PLU = { "pièce": "pièces", bouteille: "bouteilles", "fût": "fûts", botte: "bottes", "boîte": "boîtes", bourriche: "bourriches", plateau: "plateaux", barquette: "barquettes", sac: "sacs", carton: "cartons", colis: "colis", seau: "seaux", pot: "pots", paquet: "paquets", bocal: "bocaux", "unité": "unités", portion: "portions", tranche: "tranches", sachet: "sachets", bidon: "bidons", caisse: "caisses", douzaine: "douzaines", filet: "filets" };
+const regU = (n, u) => { u = String(u || "").trim(); const v = num(n); return v != null && Math.abs(v) >= 2 && REG_PLU[u.toLowerCase()] ? REG_PLU[u.toLowerCase()] : u; };
+const regQty = (q, u) => (q == null || q === "" ? "" : `${String(q).replace(".", ",")} ${regU(q, u)}`.trim());
+/* one rule for the temperature conformity colour, in the registre and in the report: green only without any out-of-range reading */
+const regConfSt = (conf, nBad) => (conf == null ? "neu" : !nBad ? "ok" : conf >= 90 ? "warn" : "bad");
 /* Versions of a corrected reading, oldest first: prev[] snapshots then the current state. Each step i≥1 is one correction. */
 function regVersions(r) {
   const prev = Array.isArray(r.prev) ? r.prev.filter(Boolean) : [];
@@ -101,11 +107,11 @@ function regEntries() {
     const lot = l.lot ? ` · lot ${l.lot}` : "";
     if (!l.receptionId && l.createdAt) E.push({ id: "n" + l.id, at: l.createdAt, kind: "trace", uid: l.uid, what: `Entrée · ${l.name}`, detail: `${fridgeName(l.fridgeId)}${lot}${l.dlc ? ` · DLC ${shortDate(l.dlc)}` : ""}`, valTx: "", st: null, stTx: "", csv: [["Entrée", `${l.name}${lot}`, "", "", "", ""]] });
     if (l.openedAt) E.push({ id: "o" + l.id, at: l.openedAt, kind: "trace", uid: l.openedBy, what: `Ouverture · ${l.name}`, detail: `À consommer avant le ${l.dlcOpen ? shortDate(l.dlcOpen) : "–"}${lot}${l.supplier ? ` · ${l.supplier}` : ""}`, valTx: "", st: "acc", stTx: "Ouvert", photoUrl: regPic(l.openPhotoId, l.openPhotoUrl), csv: [["Ouverture", `${l.name}${lot} · DLC ouverte ${l.dlcOpen ? regFull(l.dlcOpen) : "-"}`, "", "", "", ""]] });
-    if (l.outAt) { const lost = l.status === "lost"; E.push({ id: "x" + l.id, at: l.outAt, kind: "trace", uid: l.outBy, what: `${lost ? "Jeté" : "Sortie"} · ${l.name}`, detail: `${lost && l.lostReason ? `${l.lostReason} · ` : ""}${fridgeName(l.fridgeId)}${lot}${l.qty ? ` · ${l.qty} ${l.unit || ""}` : ""}`, valTx: "", st: lost ? "bad" : "neu", stTx: lost ? "Jeté" : "Sorti", nc: lost, csv: [[lost ? "Perte" : "Sortie", `${l.name}${lot}`, "", lost ? "non" : "", lost ? `Produit jeté${l.lostReason ? ` : ${l.lostReason}` : ""}` : "", ""]] }); }
+    if (l.outAt) { const lost = l.status === "lost"; E.push({ id: "x" + l.id, at: l.outAt, kind: "trace", uid: l.outBy, what: `${lost ? "Jeté" : "Sortie"} · ${l.name}`, detail: `${lost && l.lostReason ? `${l.lostReason} · ` : ""}${fridgeName(l.fridgeId)}${lot}${l.qty ? ` · ${regQty(l.qty, l.unit)}` : ""}`, valTx: "", st: lost ? "bad" : "neu", stTx: lost ? "Jeté" : "Sorti", nc: lost, csv: [[lost ? "Perte" : "Sortie", `${l.name}${lot}`, "", lost ? "non" : "", lost ? `Produit jeté${l.lostReason ? ` : ${l.lostReason}` : ""}` : "", ""]] }); }
   });
   S.choreLogs.forEach((g) => {
     const c = S.chores.find((x) => x.id === g.choreId);
-    E.push({ id: "m" + g.id, at: g.at, kind: "clean", uid: g.uid, what: c ? c.name : "Tâche supprimée", detail: c ? `${c.zone || ""}${c.zone ? " · " : ""}${REG_FREQ[c.freq] || ""}` : "", valTx: "", st: "ok", stTx: "Fait", csv: [["Ménage", `${c ? c.name : "Tâche supprimée"}${c?.zone ? ` · ${c.zone}` : ""}`, "", "oui", "", ""]] });
+    E.push({ id: "m" + g.id, at: g.at, kind: "clean", uid: g.uid, what: c ? c.name : "Tâche supprimée", detail: c ? `${c.zone || ""}${c.zone ? " · " : ""}${regFreqTx(c)}` : "", valTx: "", st: "ok", stTx: "Fait", csv: [["Ménage", `${c ? c.name : "Tâche supprimée"}${c?.zone ? ` · ${c.zone}` : ""}`, "", "oui", "", ""]] });
   });
   const skip = { reception: 1, open: 1, out: 1, lost: 1, chore: 1 };
   S.events.forEach((e) => {
@@ -140,7 +146,7 @@ function regEntries() {
 function regFiltered(all) {
   return regMatch(all, S.regFilter || "all");
 }
-const regIs = (x, f) => (f === "all" ? true : f === "nc" ? x.nc : f === "corr" ? x.fix || x.fixed : x.kind === f);
+const regIs = (x, f) => (f === "all" ? true : f === "nc" ? x.nc : f === "corr" ? x.fix && !x.cx : x.kind === f);
 function regMatch(all, f) {
   const q = (S.ui.regQ || "").trim().toLowerCase(); const W = q ? q.split(/\s+/) : [];
   return all.filter((x) => regIs(x, f) && W.every((w) => x.hay.includes(w)));
@@ -193,10 +199,10 @@ VIEWS.registre = {
     const cells = Array.from({ length: 30 }, (_, i) => { const k = addDays(dayKey(), i - 29); const rs = readingsFor(k); const n = new Set(rs.map((r) => r.fridgeId + r.slot)).size; const bad = rs.some((r) => !r.ok); const cls = !n ? "" : bad ? "r" : n >= exp ? "g" : "y"; return `<i class="${cls}" title="${shortDate(k)} · ${n}/${exp} relevés${bad ? " · hors seuil" : ""}"></i>`; }).join("");
     const rs30 = S.readings.filter((r) => daysUntil(r.day) >= -29);
     const conf = rs30.length ? Math.round((rs30.filter((r) => r.ok).length / rs30.length) * 1000) / 10 : null;
-    const nc30 = all.filter((x) => x.nc && daysUntil(x.day) >= -29).length;
+    const nc30 = all.filter((x) => x.nc && x.kind === "temp" && !x.cx && daysUntil(x.day) >= -29).length;
     return `<div class="inner rg">${topBar("Registre HACCP", { right: `<button class="btn soft sm" data-go="regReport">${ico("printer")}Rapport</button>` })}
       <div class="rg-top">
-        <div class="glass pad st rg-heat" style="--i:1"><div class="row"><span class="lbl">Températures · 30 jours</span><span class="pill ${conf == null ? "neu" : conf >= 98 ? "ok" : conf >= 90 ? "warn" : "bad"}">${conf != null ? `${fmt(conf, 1)} % conformes` : "aucun relevé"}</span></div><div class="heat" style="margin-top:12px">${cells}</div><div class="rg-leg"><span><i class="g"></i>complet</span><span><i class="y"></i>incomplet</span><span><i class="r"></i>hors seuil</span><span class="rg-corr${nc30 ? " on" : ""}">${nc30 ? `${nc30} non-conformité${nc30 > 1 ? "s" : ""} en 30 j` : "Aucune non-conformité en 30 j"}</span></div></div>
+        <div class="glass pad st rg-heat" style="--i:1"><div class="row"><span class="lbl">Températures · 30 jours</span><span class="pill ${regConfSt(conf, nc30)}">${conf != null ? `${fmt(conf, 1)} % conformes` : "aucun relevé"}</span></div><div class="heat" style="margin-top:12px">${cells}</div><div class="rg-leg"><span><i class="g"></i>complet</span><span><i class="y"></i>incomplet</span><span><i class="r"></i>hors seuil</span><span class="rg-corr${nc30 ? " on" : ""}">${nc30 ? `${nc30} relevé${nc30 > 1 ? "s" : ""} hors seuil en 30 j` : "Aucun relevé hors seuil en 30 j"}</span></div></div>
         <button class="glass pad st rg-cta" style="--i:2" data-go="regReport"><span class="ic">${ico("file")}</span><span class="tx"><b>Rapport pour contrôle sanitaire</b><em>Températures, réceptions, traçabilité et ménage. À imprimer ou à exporter.</em></span>${ico("chev")}</button>
       </div>
       <div class="rg-bar st" style="--i:3"><label class="rg-q">${ico("search")}<input class="input" id="regQ" type="search" enterkeyhint="search" autocomplete="off" placeholder="Produit, frigo, personne…" value="${esc(S.ui.regQ || "")}" aria-label="Rechercher dans le registre"></label>
@@ -248,19 +254,62 @@ function regReportData(P) {
   const opened = S.lots.filter((l) => regIn(l.openedAt, P) || (l.status === "lost" && regIn(l.outAt, P))).sort((a, b) => (a.openedAt || a.outAt) - (b.openedAt || b.outAt));
   const cancelled = S.events.filter((e) => e.cancelled && (e.type === "open" || e.type === "out" || e.type === "lost") && regIn(e.at, P)).sort((a, b) => a.at - b.at);
   const logs = S.choreLogs.filter((g) => (g.day ? g.day >= P.from && g.day <= P.to : regIn(g.at, P)));
-  const bucket = (g, len) => Math.floor((parseDay(g.day || regDay(g.at)) - parseDay(eff.from)) / (len * 864e5));
-  const chores = S.chores.map((c) => {
-    const L = logs.filter((g) => g.choreId === c.id); const n = Math.max(1, days.length);
-    const len = c.freq === "semaine" ? 7 : c.freq === "mois" ? 30 : 1;
-    const expN = Math.max(1, Math.ceil(n / len)); const doneN = Math.min(expN, new Set(L.map((g) => bucket(g, len))).size);
-    const last = L.reduce((m, g) => Math.max(m, g.at || 0), 0);
-    return { c, expN, doneN, rate: Math.round((doneN / expN) * 100), last, who: [...new Set(L.map((g) => firstName(nameOf(g.uid))))].join(", ") };
-  });
-  const cExp = chores.reduce((s, x) => s + x.expN, 0), cDone = chores.reduce((s, x) => s + x.doneN, 0);
-  return { days, start: eff.from, clipped: eff.from > P.from, fridges, rd, exp, done, bad, fixes, due, cancelled, recs, lines, opened, chores, cRate: cExp ? Math.round((cDone / cExp) * 100) : null,
+  const { chores, cExp, cDone } = regChoreStats(P, logs, eff);
+  return { days, start: eff.from, clipped: eff.from > P.from, fridges, rd, exp, done, bad, fixes, due, cancelled, recs, lines, opened, chores, cRate: cExp ? Math.round((cDone / cExp) * 100) : null, cExp, cDone,
     conf: rd.length ? Math.round((rd.filter((r) => r.ok).length / rd.length) * 1000) / 10 : null,
     refused: lines.filter((x) => x.L.refused).length, reserves: lines.filter((x) => regLineRes(x.L)).length };
 }
+
+/* Cleaning plan over the period. Each task is only due from the day it was created; with the ménage area's own schedule
+   (menOccOn / menState), weekly and monthly tasks count once per period, and a period still open is not counted as missed. */
+function regFreqTx(c) {
+  if (typeof menFreqTx === "function" && typeof menNorm === "function") { try { return menFreqTx(menNorm(c)); } catch (e) {} }
+  return { jour: "Chaque jour", service: "Après chaque service", jours: "Certains jours", semaine: "Chaque semaine", mois: "Chaque mois" }[c.freq] || "Chaque jour";
+}
+function regChoreStats(P, logs, eff) {
+  const today = dayKey(); const to = P.to < today ? P.to : today;
+  const who = (L) => [...new Set(L.map((g) => firstName(g.by || nameOf(g.uid))).filter(Boolean))].join(", ");
+  const useMen = typeof menOccOn === "function" && typeof menState === "function" && typeof menNorm === "function";
+  const chores = S.chores.map((c0) => {
+    const L = logs.filter((g) => g.choreId === c0.id); const last = L.reduce((m, g) => Math.max(m, g.at || 0), 0);
+    const born = c0.createdAt ? regDay(c0.createdAt) : eff.from; let expN = 0, doneN = 0, pastE = 0, pastD = 0;
+    if (useMen) {
+      const c = menNorm(c0);
+      for (let k = P.from; k <= to; k = addDays(k, 1)) menOccOn(c, k).forEach((o) => { const st = menState(o); const past = k < today; if (st === "done" || st === "late") { doneN++; expN++; if (past) { pastD++; pastE++; } } else if (st === "missed") { expN++; if (past) pastE++; } });
+      /* a weekly / monthly task already done ahead of its day, in the period that is still open, counts as done */
+      if ((c.freq === "semaine" || c.freq === "mois") && typeof menPeriod === "function") for (let i = 1, k = addDays(to, 1); i <= 31; i++, k = addDays(k, 1)) menOccOn(c, k).forEach((o) => { if (menPeriod(o)[0] > to) return; const st = menState(o); if (st === "done" || st === "late") { doneN++; expN++; } });
+    } else {
+      const from = born > eff.from ? born : eff.from; const len = c0.freq === "semaine" ? 7 : c0.freq === "mois" ? 30 : 1;
+      const n = from <= to ? regDaysOf({ from, to }).length : 0;
+      const dk = (g) => g.day || regDay(g.at); const L2 = L.filter((g) => dk(g) >= from);
+      if (len === 1) { expN = Math.max(0, n - 1) * (c0.freq === "service" ? 2 : 1); doneN = L2.length; }
+      else { expN = Math.floor(n / len); doneN = new Set(L2.map((g) => Math.floor((parseDay(dk(g)) - parseDay(from)) / (len * 864e5)))).size; }
+      expN = Math.max(expN, doneN); pastE = expN; pastD = doneN;
+    }
+    return { c: c0, freqTx: regFreqTx(c0), expN, doneN, rate: expN ? Math.round((doneN / expN) * 100) : null, pastE, pastD, last, who: who(L), born };
+  });
+  let cExp = chores.reduce((s, x) => s + x.expN, 0), cDone = chores.reduce((s, x) => s + x.doneN, 0);
+  /* today: the ménage area's own totals (menDayStats(), same numbers as the home and ménage screens), past days from the per-task counts */
+  if (typeof menDayStats === "function" && P.to >= today) {
+    try {
+      const r = menDayStats(); const tt = r && (r.total ?? r.tot);
+      if (r && typeof r.done === "number" && typeof tt === "number") { cExp = chores.reduce((s, x) => s + x.pastE, 0) + tt; cDone = chores.reduce((s, x) => s + x.pastD, 0) + r.done; }
+    } catch (e) {}
+  }
+  return { chores, cExp, cDone };
+}
+
+/* wide report tables scroll sideways on a phone: wrap them so a fade and a hint show there is more */
+const regSc = (html) => `<div class="rp-scw"><div class="rp-sc">${html}</div><span class="rp-hint" aria-hidden="true">Glissez pour voir la suite →</span></div>`;
+function regScHints(root) {
+  $$(".rp-scw", root).forEach((w) => {
+    const sc = $(".rp-sc", w); if (!sc) return;
+    const upd = () => { const more = sc.scrollWidth - sc.clientWidth > 4; w.classList.toggle("more", more); w.classList.toggle("end", !more || sc.scrollLeft + sc.clientWidth >= sc.scrollWidth - 4); w.classList.toggle("moved", sc.scrollLeft > 4); };
+    if (!sc.dataset.rph) { sc.dataset.rph = 1; sc.addEventListener("scroll", upd, { passive: true }); }
+    upd();
+  });
+}
+window.addEventListener("resize", debounce(() => { if (S.route === "regReport") regScHints(document); }, 150));
 
 function regReportHtml(P) {
   const D = regReportData(P); const now = Date.now();
@@ -270,26 +319,26 @@ function regReportHtml(P) {
     return `<td>${rs.map((r) => `<span class="${r.ok ? "" : "nc"}">${regNum(num(r.value))}${r.ok ? "" : "*"}${regVersions(r).length ? `<sup>c</sup>` : ""}</span>`).join(" / ")}<i>${rs.map((r) => esc(initials(nameOf(r.uid)))).join(" ")}</i></td>`;
   };
   const kpi = (lbl, v, sub, cls = "") => `<div class="rp-kpi ${cls}"><span>${lbl}</span><b>${v}</b><em>${sub}</em></div>`;
-  const tempTable = D.fridges.length ? `<div class="rp-sc"><table class="rp-t rp-temps"><thead><tr><th rowspan="2">Date</th>${D.fridges.map((f) => `<th colspan="2">${esc(f.name)}<small>${esc(regRange(f))}</small></th>`).join("")}</tr><tr>${D.fridges.map(() => `<th>Midi</th><th>Soir</th>`).join("")}</tr></thead><tbody>${D.days.map((d) => `<tr><td class="nw">${esc(DAYS[parseDay(d).getDay()].slice(0, 3))}. ${shortDate(d)}</td>${D.fridges.map((f) => cell(d, f, "midi") + cell(d, f, "soir")).join("")}</tr>`).join("")}</tbody></table></div>` : `<p class="rp-empty">Aucune enceinte froide déclarée.</p>`;
-  const ncTable = D.bad.length ? `<div class="rp-sc"><table class="rp-t"><thead><tr><th>Date</th><th>Heure</th><th>Enceinte</th><th class="r">Relevé</th><th>Seuil</th><th>Action corrective</th><th>Par</th></tr></thead><tbody>${D.bad.map((r) => `<tr><td class="nw">${regFull(r.day)}</td><td class="nw">${hm(r.at)}</td><td>${esc(regFrName(r))}</td><td class="r nc nw">${regNum(num(r.value))} °C</td><td class="nw">${esc(regRange(S.fridges.find((f) => f.id === r.fridgeId)))}</td><td>${esc(r.action || "Non renseignée")}</td><td>${esc(nameOf(r.uid))}</td></tr>`).join("")}</tbody></table></div>` : `<p class="rp-ok">Aucune non-conformité de température sur la période.</p>`;
-  const fixTable = D.fixes.length ? `<div class="rp-sc"><table class="rp-t"><thead><tr><th>Relevé concerné</th><th>Enceinte</th><th class="r">Avant</th><th class="r">Après</th><th>Corrigé le</th><th>Par</th><th>Motif</th></tr></thead><tbody>${D.fixes.map((x) => x.ev
+  const tempTable = D.fridges.length ? regSc(`<table class="rp-t rp-temps"><thead><tr><th rowspan="2">Date</th>${D.fridges.map((f) => `<th colspan="2">${esc(f.name)}<small>${esc(regRange(f))}</small></th>`).join("")}</tr><tr>${D.fridges.map(() => `<th>Midi</th><th>Soir</th>`).join("")}</tr></thead><tbody>${D.days.map((d) => `<tr><td class="nw">${esc(DAYS[parseDay(d).getDay()].slice(0, 3))}. ${shortDate(d)}</td>${D.fridges.map((f) => cell(d, f, "midi") + cell(d, f, "soir")).join("")}</tr>`).join("")}</tbody></table>`) : `<p class="rp-empty">Aucune enceinte froide déclarée.</p>`;
+  const ncTable = D.bad.length ? regSc(`<table class="rp-t"><thead><tr><th>Date</th><th>Heure</th><th>Enceinte</th><th class="r">Relevé</th><th>Seuil</th><th>Action corrective</th><th>Par</th></tr></thead><tbody>${D.bad.map((r) => `<tr><td class="nw">${regFull(r.day)}</td><td class="nw">${hm(r.at)}</td><td>${esc(regFrName(r))}</td><td class="r nc nw">${regNum(num(r.value))} °C</td><td class="nw">${esc(regRange(S.fridges.find((f) => f.id === r.fridgeId)))}</td><td>${esc(r.action || "Non renseignée")}</td><td>${esc(nameOf(r.uid))}</td></tr>`).join("")}</tbody></table>`) : `<p class="rp-ok">Aucune non-conformité de température sur la période.</p>`;
+  const fixTable = D.fixes.length ? regSc(`<table class="rp-t"><thead><tr><th>Relevé concerné</th><th>Enceinte</th><th class="r">Avant</th><th class="r">Après</th><th>Corrigé le</th><th>Par</th><th>Motif</th></tr></thead><tbody>${D.fixes.map((x) => x.ev
     ? `<tr><td colspan="4">${esc(regCap(String(x.ev.text).replace(/^a /, "")))}</td><td class="nw">${regFull(regDay(x.at))} ${hm(x.at)}</td><td>${esc(nameOf(x.uid))}</td><td>–</td></tr>`
-    : `<tr><td class="nw">${shortDate(x.r.day || regDay(x.r.at))} ${regSlot(x.from.slot || x.r.slot)}${regSlot(x.from.slot || x.r.slot) !== regSlot(x.to.slot || x.r.slot) ? ` → ${regSlot(x.to.slot)}` : ""}<small>relevé à ${hm(x.from.at || x.r.at)} par ${esc(firstName(nameOf(x.from.uid || x.r.uid)))}</small></td><td>${esc(regFrName(x.r))}</td><td class="r nw"><s>${regNum(num(x.from.value))} °C</s></td><td class="r nw ${x.to.ok === false ? "nc" : ""}">${regNum(num(x.to.value))} °C</td><td class="nw">${regFull(regDay(x.at))} ${hm(x.at)}</td><td>${esc(nameOf(x.uid))}</td><td>${esc(x.why || "Non précisé")}</td></tr>`).join("")}</tbody></table></div>` : `<p class="rp-ok">Aucune correction de relevé sur la période.</p>`;
-  const recTable = D.lines.length ? `<div class="rp-sc"><table class="rp-t"><thead><tr><th>Date</th><th>Fournisseur</th><th>Produit</th><th>Lot</th><th>DLC</th><th class="r">T° reçue</th><th>Décision</th><th>Par</th></tr></thead>${D.lines.map(({ rc, L }, i) => { const first = i === 0 || D.lines[i - 1].rc !== rc; return `${first ? `${i ? "</tbody>" : ""}<tbody class="rp-grp">` : ""}<tr class="${L.refused ? "row-nc" : ""}${first ? " rp-g" : " rp-cont"}">${first ? `<td class="nw">${shortDate(regDay(rc.at))} ${hm(rc.at)}</td><td>${esc(rc.supplier || "–")}${regBl(rc.bl) ? `<small>BL ${esc(regBl(rc.bl))}</small>` : ""}</td>` : `<td></td><td></td>`}<td>${esc(L.name)}${L.qty ? `<small>${esc(L.qty)} ${esc(L.unit || "")}</small>` : ""}${L.type && REG_TYPES[L.type] ? `<small>${REG_TYPES[L.type]}</small>` : ""}${L.sanitary ? `<small class="nw">Estampille ${esc(L.sanitary)}</small>` : ""}${L.peche ? `<small>Pêche ${esc(L.peche)}</small>` : ""}</td><td class="mono">${esc(L.lot || "–")}</td><td class="nw">${L.dlc ? regFull(L.dlc) : "–"}</td><td class="r nw ${L.temp != null && L.tmax != null && L.temp > L.tmax ? "nc" : ""}">${L.temp != null ? `${regNum(L.temp)} °C` : "–"}${L.tmax != null ? `<small>max ${regNum(L.tmax, 0)} °C</small>` : ""}</td><td><span class="rp-st ${regLineSt(L)}">${regLineTx(L)}</span>${regLineWhy(L) ? `<small>${esc(regLineWhy(L))}</small>` : ""}</td><td>${first ? esc(firstName(nameOf(rc.uid))) : ""}</td></tr>`; }).join("")}</tbody></table></div>` : `<p class="rp-empty">Aucune réception sur la période.</p>`;
+    : `<tr><td class="nw">${shortDate(x.r.day || regDay(x.r.at))} ${regSlot(x.from.slot || x.r.slot)}${regSlot(x.from.slot || x.r.slot) !== regSlot(x.to.slot || x.r.slot) ? ` → ${regSlot(x.to.slot)}` : ""}<small>relevé à ${hm(x.from.at || x.r.at)} par ${esc(firstName(nameOf(x.from.uid || x.r.uid)))}</small></td><td>${esc(regFrName(x.r))}</td><td class="r nw"><s>${regNum(num(x.from.value))} °C</s></td><td class="r nw ${x.to.ok === false ? "nc" : ""}">${regNum(num(x.to.value))} °C</td><td class="nw">${regFull(regDay(x.at))} ${hm(x.at)}</td><td>${esc(nameOf(x.uid))}</td><td>${esc(x.why || "Non précisé")}</td></tr>`).join("")}</tbody></table>`) : `<p class="rp-ok">Aucune correction de relevé sur la période.</p>`;
+  const recTable = D.lines.length ? regSc(`<table class="rp-t"><thead><tr><th>Date</th><th>Fournisseur</th><th>Produit</th><th>Lot</th><th>DLC</th><th class="r">T° reçue</th><th>Décision</th><th>Par</th></tr></thead>${D.lines.map(({ rc, L }, i) => { const first = i === 0 || D.lines[i - 1].rc !== rc; return `${first ? `${i ? "</tbody>" : ""}<tbody class="rp-grp">` : ""}<tr class="${L.refused ? "row-nc" : ""}${first ? " rp-g" : " rp-cont"}">${first ? `<td class="nw">${shortDate(regDay(rc.at))} ${hm(rc.at)}</td><td>${esc(rc.supplier || "–")}${regBl(rc.bl) ? `<small>BL ${esc(regBl(rc.bl))}</small>` : ""}</td>` : `<td></td><td></td>`}<td>${esc(L.name)}${L.qty ? `<small>${esc(regQty(L.qty, L.unit))}</small>` : ""}${L.type && REG_TYPES[L.type] ? `<small>${REG_TYPES[L.type]}</small>` : ""}${L.sanitary ? `<small class="nw">Estampille ${esc(L.sanitary)}</small>` : ""}${L.peche ? `<small>Pêche ${esc(L.peche)}</small>` : ""}</td><td class="mono">${esc(L.lot || "–")}</td><td class="nw">${L.dlc ? regFull(L.dlc) : "–"}</td><td class="r nw ${L.temp != null && L.tmax != null && L.temp > L.tmax ? "nc" : ""}">${L.temp != null ? `${regNum(L.temp)} °C` : "–"}${L.tmax != null ? `<small>max ${regNum(L.tmax, 0)} °C</small>` : ""}</td><td><span class="rp-st ${regLineSt(L)}">${regLineTx(L)}</span>${regLineWhy(L) ? `<small>${esc(regLineWhy(L))}</small>` : ""}</td><td>${first ? esc(firstName(nameOf(rc.uid))) : ""}</td></tr>`; }).join("")}</tbody></table>`) : `<p class="rp-empty">Aucune réception sur la période.</p>`;
   const cxRows = D.cancelled.map((e) => { const l = S.lots.find((x) => x.id === e.ref); return `<tr class="row-cx"><td>${esc(l ? l.name : "–")}</td><td><span class="mono">${esc(l?.lot || "–")}</span></td><td colspan="4"><s>${esc(regCap(String(e.text || "").replace(/^a /, "")))} · ${shortDate(regDay(e.at))} ${hm(e.at)} · ${esc(firstName(nameOf(e.uid)))}</s><small>Annulé${e.cancelledBy ? ` par ${esc(firstName(nameOf(e.cancelledBy)))}` : ""}${e.cancelledAt ? ` le ${shortDate(regDay(e.cancelledAt))} à ${hm(e.cancelledAt)}` : ""}</small></td><td class="nw"><span class="rp-st neu">Annulé</span></td></tr>`; }).join("");
-  const tLot = D.opened.length || D.cancelled.length ? `<div class="rp-sc"><table class="rp-t"><thead><tr><th>Produit</th><th>Lot · fournisseur</th><th>Reçu le</th><th>Ouvert le</th><th>À consommer avant</th><th>Sortie</th><th>Statut</th></tr></thead><tbody>${D.opened.map((l) => { const over = l.status === "opened" && l.dlcOpen && daysUntil(l.dlcOpen) < 0; const st = l.status === "lost" ? ["bad", "Jeté"] : l.status === "out" ? ["ok", "Utilisé"] : over ? ["bad", "DLC dépassée"] : ["acc", "En cours"]; return `<tr class="${st[0] === "bad" ? "row-nc" : ""}"><td>${esc(l.name)}</td><td><span class="mono">${esc(l.lot || "–")}</span>${l.supplier ? `<small>${esc(l.supplier)}</small>` : ""}</td><td class="nw">${l.createdAt ? shortDate(regDay(l.createdAt)) : "–"}</td><td class="nw">${l.openedAt ? `${shortDate(regDay(l.openedAt))} ${hm(l.openedAt)}<small>${esc(firstName(nameOf(l.openedBy)))}</small>` : "–"}</td><td class="nw">${l.dlcOpen ? regFull(l.dlcOpen) : l.dlc ? regFull(l.dlc) : "–"}</td><td class="nw">${l.outAt ? `${shortDate(regDay(l.outAt))} ${hm(l.outAt)}<small>${esc(firstName(nameOf(l.outBy)))}</small>` : "–"}</td><td class="nw"><span class="rp-st ${st[0]}">${st[1]}</span>${l.status === "lost" && l.lostReason ? `<small>${esc(l.lostReason)}</small>` : ""}</td></tr>`; }).join("")}${cxRows}</tbody></table></div>` : `<p class="rp-empty">Aucun produit ouvert ou jeté sur la période.</p>`;
-  const tClean = D.chores.length ? `<div class="rp-sc"><table class="rp-t"><thead><tr><th>Tâche</th><th>Zone</th><th>Fréquence</th><th class="r">Réalisé</th><th class="r">Taux</th><th>Dernière fois</th><th>Par</th></tr></thead><tbody>${D.chores.map((x) => `<tr class="${x.rate < 80 ? "row-nc" : ""}"><td>${esc(x.c.name)}</td><td>${esc(x.c.zone || "–")}</td><td class="nw">${REG_FREQ[x.c.freq] || "–"}</td><td class="r nw">${x.doneN} / ${x.expN}</td><td class="r nw"><span class="rp-st ${x.rate >= 95 ? "ok" : x.rate >= 80 ? "warn" : "bad"}">${x.rate} %</span></td><td class="nw">${x.last ? `${shortDate(regDay(x.last))} ${hm(x.last)}` : "Jamais"}</td><td>${esc(x.who || "–")}</td></tr>`).join("")}</tbody></table></div>` : `<p class="rp-empty">Aucun plan de nettoyage déclaré.</p>`;
+  const tLot = D.opened.length || D.cancelled.length ? regSc(`<table class="rp-t"><thead><tr><th>Produit</th><th>Lot · fournisseur</th><th>Reçu le</th><th>Ouvert le</th><th>À consommer avant</th><th>Sortie</th><th>Statut</th></tr></thead><tbody>${D.opened.map((l) => { const over = l.status === "opened" && l.dlcOpen && daysUntil(l.dlcOpen) < 0; const st = l.status === "lost" ? ["bad", "Jeté"] : l.status === "out" ? ["ok", "Utilisé"] : over ? ["bad", "DLC dépassée"] : ["acc", "En cours"]; return `<tr class="${st[0] === "bad" ? "row-nc" : ""}"><td>${esc(l.name)}</td><td><span class="mono">${esc(l.lot || "–")}</span>${l.supplier ? `<small>${esc(l.supplier)}</small>` : ""}</td><td class="nw">${l.createdAt ? shortDate(regDay(l.createdAt)) : "–"}</td><td class="nw">${l.openedAt ? `${shortDate(regDay(l.openedAt))} ${hm(l.openedAt)}<small>${esc(firstName(nameOf(l.openedBy)))}</small>` : "–"}</td><td class="nw">${l.dlcOpen ? regFull(l.dlcOpen) : l.dlc ? regFull(l.dlc) : "–"}</td><td class="nw">${l.outAt ? `${shortDate(regDay(l.outAt))} ${hm(l.outAt)}<small>${esc(firstName(nameOf(l.outBy)))}</small>` : "–"}</td><td class="nw"><span class="rp-st ${st[0]}">${st[1]}</span>${l.status === "lost" && l.lostReason ? `<small>${esc(l.lostReason)}</small>` : ""}</td></tr>`; }).join("")}${cxRows}</tbody></table>`) : `<p class="rp-empty">Aucun produit ouvert ou jeté sur la période.</p>`;
+  const tClean = D.chores.length ? regSc(`<table class="rp-t"><thead><tr><th>Tâche</th><th>Zone</th><th>Fréquence</th><th class="r">Réalisé</th><th class="r">Taux</th><th>Dernière fois</th><th>Par</th></tr></thead><tbody>${D.chores.map((x) => `<tr class="${x.rate != null && x.rate < 80 ? "row-nc" : ""}"><td>${esc(x.c.name)}${x.born > D.start ? `<small>Au plan depuis le ${shortDate(x.born)}</small>` : ""}</td><td>${esc(x.c.zone || "–")}</td><td class="nw">${esc(x.freqTx)}</td><td class="r nw">${x.expN ? `${x.doneN} / ${x.expN}` : "–"}</td><td class="r nw">${x.rate == null ? `<span class="rp-st neu">À venir</span>` : `<span class="rp-st ${x.rate >= 95 ? "ok" : x.rate >= 80 ? "warn" : "bad"}">${x.rate} %</span>`}</td><td class="nw">${x.last ? `${shortDate(regDay(x.last))} ${hm(x.last)}` : "Jamais"}</td><td>${esc(x.who || "–")}</td></tr>`).join("")}</tbody></table>`) : `<p class="rp-empty">Aucun plan de nettoyage déclaré.</p>`;
   return `<article class="rp-paper" id="rpPaper">
     <header class="rp-head"><div class="rp-brand"><span class="rp-mk">${logoMark()}</span><div><b>${esc(S.resto?.name || "Restaurant")}</b><em>Registre sanitaire · plan de maîtrise sanitaire (HACCP)</em></div></div>
       <div class="rp-per"><span>Période contrôlée</span><b>du ${regFull(P.from)} au ${regFull(P.to)}</b><em>${D.clipped ? `registre tenu depuis le ${regFull(D.start)}` : `${D.days.length} jour${D.days.length > 1 ? "s" : ""}`}</em></div></header>
     <h1>Rapport pour contrôle sanitaire</h1>
-    <div class="rp-kpis">${kpi("Relevés de température", `${D.done} / ${D.exp}`, D.exp ? `${Math.round((D.done / D.exp) * 100)} % des relevés attendus` : "–", D.exp && D.done < D.exp ? "warn" : "")}${kpi("Conformité températures", D.conf != null ? `${fmt(D.conf, 1)} %` : "–", `${D.bad.length} hors seuil · ${D.fixes.length} correction${D.fixes.length > 1 ? "s" : ""}`, D.bad.length ? "bad" : "")}${kpi("Réceptions", `${D.recs.length}`, `${D.lines.length} produit${D.lines.length > 1 ? "s" : ""} · ${D.refused} refus · ${D.reserves} réserve${D.reserves > 1 ? "s" : ""}`, D.refused ? "warn" : "")}${kpi("Plan de nettoyage", D.cRate != null ? `${D.cRate} %` : "–", "des tâches prévues réalisées", D.cRate != null && D.cRate < 80 ? "warn" : "")}</div>
+    <div class="rp-kpis">${kpi("Relevés de température", `${D.done} / ${D.exp}`, D.exp ? `${Math.round((D.done / D.exp) * 100)} % des relevés attendus` : "–", D.exp && D.done < D.exp ? "warn" : "")}${kpi("Conformité températures", D.conf != null ? `${fmt(D.conf, 1)} %` : "–", `${D.bad.length} hors seuil · ${D.fixes.length} correction${D.fixes.length > 1 ? "s" : ""}`, { ok: "", neu: "", warn: "warn", bad: "bad" }[regConfSt(D.conf, D.bad.length)])}${kpi("Réceptions", `${D.recs.length}`, `${D.lines.length} produit${D.lines.length > 1 ? "s" : ""} · ${D.refused} refus · ${D.reserves} réserve${D.reserves > 1 ? "s" : ""}`, D.refused ? "warn" : "")}${kpi("Plan de nettoyage", D.cRate != null ? `${D.cRate} %` : "–", D.cExp ? `${D.cDone} / ${D.cExp} tâches prévues réalisées` : "aucune tâche encore due", D.cRate != null && D.cRate < 80 ? "warn" : "")}</div>
     <section><h2><span>1</span>Températures des enceintes froides</h2><p class="rp-note">Deux relevés par jour et par enceinte (midi et soir), en °C. * hors seuil · <sup>c</sup> valeur corrigée (détail plus bas) · « — » relevé manquant. Initiales : personne ayant relevé.${D.clipped ? ` Registre tenu dans l'application depuis le ${regFull(D.start)}.` : ""}</p>${tempTable}
       <h3>Non-conformités et actions correctives</h3>${ncTable}
       <h3>Corrections de relevés</h3><p class="rp-note">Un relevé corrigé n'est jamais effacé : la valeur d'origine, l'auteur, la date et le motif de chaque correction sont conservés.</p>${fixTable}</section>
     <section><h2><span>2</span>Réceptions des marchandises</h2><p class="rp-note">Contrôle à réception : température, DLC, numéro de lot. Un produit refusé repart avec le livreur et n'entre pas en stock.</p>${recTable}</section>
     <section class="${D.opened.length <= 18 ? "rp-keep" : ""}"><h2><span>3</span>Traçabilité des produits ouverts</h2><p class="rp-note">Produits entamés pendant la période, avec la date limite après ouverture, et produits jetés. Une action annulée reste visible, barrée.</p>${tLot}</section>
-    <section class="${D.chores.length <= 18 ? "rp-keep" : ""}"><h2><span>4</span>Plan de nettoyage et de désinfection</h2><p class="rp-note">Tâches prévues et réalisées sur la période. En dessous de 80 %, la ligne est signalée.</p>${tClean}</section>
+    <section class="${D.chores.length <= 18 ? "rp-keep" : ""}"><h2><span>4</span>Plan de nettoyage et de désinfection</h2><p class="rp-note">Tâches prévues et réalisées sur la période, comptées à partir du jour où chaque tâche a été ajoutée au plan. Une tâche hebdomadaire ou mensuelle compte une fois par période, dès qu'elle est faite ou que sa période est terminée. En dessous de 80 %, la ligne est signalée.</p>${tClean}</section>
     <footer class="rp-foot"><div>Document généré le ${regFull(dayKey())} à ${hm(now)} par ${esc(nameOf(S.me.id))} avec Growth Gusto. Chaque enregistrement est daté et attribué à la personne connectée au moment de la saisie.</div><div class="rp-sign"><span>Visa du responsable</span><i></i></div></footer>
   </article>`;
 }
@@ -310,6 +359,7 @@ VIEWS.regReport = {
   after(v) {
     const on = () => { const a = $("#rpFrom", v), b = $("#rpTo", v); if (!a || !b || !a.value || !b.value) return; S.ui.regP = { mode: "custom", from: a.value, to: b.value }; a.blur(); b.blur(); SFX.tick(); setTimeout(rerender, 30); };
     $$("#rpFrom,#rpTo", v).forEach((i) => i.addEventListener("change", on));
+    requestAnimationFrame(() => regScHints(v)); setTimeout(() => regScHints(v), 700);
   },
 };
 

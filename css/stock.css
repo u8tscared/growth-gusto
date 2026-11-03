@@ -190,3 +190,22 @@ html.stk-lock,html.stk-lock body{overflow:hidden}
 .stk-stdone .sub{margin:0 0 10px}
 @media (prefers-reduced-motion:reduce){.stk-empty-art,.stk-warn{animation:none}.stk-val .caret{animation:none}}
 .stk-stdone .check svg{width:30px;height:30px}
+
+/* ───── final pass: one export entry, same width on both tabs, wrapped zone chips, received products ───── */
+@media (min-width:960px){
+  .stk-tbx{display:none!important}
+  .inner > .cols .chips{flex-wrap:wrap;overflow:visible}
+  .stk-cat .stk-groups{columns:2;column-gap:14px}
+  .stk-cat .stk-grp{break-inside:avoid;margin-bottom:14px;display:block}
+  .stk-cat .stk-grp[hidden]{display:none}
+  .stk-cat .stk-search{max-width:none}
+}
+@media (min-width:960px){.stk-cat .stk-groups{display:block}}
+.stk-rcv{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.stk-rcv>.ic{width:44px;height:44px;border-radius:15px;background:linear-gradient(140deg,#FFB27A,#E0752F);color:#fff;flex:none;display:grid;place-items:center;box-shadow:0 10px 20px -12px rgba(224,117,47,.9)}
+.stk-rcv .tx{flex:1;min-width:180px}
+.stk-rcv .tx b{display:block;font-size:14.5px;font-weight:800;letter-spacing:-.015em}
+.stk-rcv .tx em{display:block;font-style:normal;font-size:12.5px;color:var(--muted);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.stk-rcv .btn{height:44px;white-space:normal;text-align:left;line-height:1.2}
+@media (max-width:519px){.stk-rcv .btn{width:100%;justify-content:center;text-align:center}}
+.ctabar.stk-stcta,html.tabs .ctabar.stk-stcta{bottom:0}
