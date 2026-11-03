@@ -302,7 +302,15 @@ function renderChrome() {
     ${S.resto ? `<button class="nav" data-act="restoSwitch" style="background:var(--glass-2);margin-bottom:10px"><span style="width:28px;height:28px;flex:none;border-radius:9px;display:grid;place-items:center;background:linear-gradient(135deg,#7A4DFF,#4A1FE6);color:#fff;font-size:11px;font-weight:800">${esc(initials(S.resto.name))}</span><span style="flex:1;min-width:0;text-align:left"><b style="display:block;color:var(--ink);font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(S.resto.name)}</b><span style="font-size:11.5px">${S.restos.length} établissement${S.restos.length > 1 ? "s" : ""}</span></span>${ico("down")}</button>` : ""}
     <div class="navs">${NAV.map(([r, i, t]) => r === "sep" ? `<div class="sep">${t}</div>` : `<button class="nav ${navOn === r ? "on" : ""}" data-go="${r}">${ico(i)}<span class="nt">${t}</span>${r === "home" && urgentCount() ? `<span class="count">${urgentCount()}</span>` : ""}${r === "releve" && pend > 0 && S.fridges.length ? `<span class="count" style="background:var(--warn)">${pend}</span>` : ""}</button>`).join("")}</div>
     <div class="me" data-go="reglages" role="button" tabindex="0" title="Réglages">${avatar(S.me.id)}<div style="min-width:0;flex:1"><b>${esc(S.me.name || "Vous")}</b><em>${ROLES[myRole()]}</em></div>${ico("sliders")}</div>`;
-  const sv = $(".navs", side); if (sv) { sv.scrollTop = side._st || 0; sv.addEventListener("scroll", () => { side._st = sv.scrollTop; }, { passive: true }); }
+  const sv = $(".navs", side);
+  if (sv) {
+    sv.scrollTop = side._st || 0;
+    /* the active item is always visible (short screens: the list scrolls), and the edge fades only show where there is more to scroll */
+    const act = $(".nav.on", sv);
+    if (act && sv.scrollHeight > sv.clientHeight) { const pad = 14, top = act.offsetTop - sv.offsetTop, bot = top + act.offsetHeight; if (top - pad < sv.scrollTop) sv.scrollTop = Math.max(0, top - pad); else if (bot + pad > sv.scrollTop + sv.clientHeight) sv.scrollTop = bot + pad - sv.clientHeight; side._st = sv.scrollTop; }
+    const fades = () => { const more = sv.scrollHeight - sv.clientHeight; sv.classList.toggle("ft", more > 1 && sv.scrollTop > 2); sv.classList.toggle("fb", more > 1 && sv.scrollTop < more - 2); };
+    fades(); sv.addEventListener("scroll", () => { side._st = sv.scrollTop; fades(); }, { passive: true });
+  }
   const tb = $("#tabbar"); const on = TAB_OF[S.route] || "more";
   if (!tb.dataset.built) {
     tb.dataset.built = 1;
@@ -369,7 +377,11 @@ function renderRoute() {
   return photoFix(V.render(S.params));
 }
 function afterRender(v) { const V = VIEWS[S.route]; V && V.after && V.after(v); }
-const topBar = (title, opts = {}) => `<div class="top st" style="--i:0">${opts.noBack ? "" : `<button class="iconbtn" data-act="back" aria-label="Retour">${ico("back")}</button>`}<span class="h2">${title}</span>${opts.right || ""}</div>`;
+/* desktop / iPad landscape: a top-level route (one of the side nav entries) opened from the side nav has nowhere to go back to, so no « Retour » */
+const DESK_MQ = window.matchMedia("(min-width:960px)");
+const isTopLevel = () => DESK_MQ.matches && !S.history.length && NAV.some((n) => n[0] === S.route);
+const topBar = (title, opts = {}) => `<div class="top st" style="--i:0">${opts.noBack || isTopLevel() ? "" : `<button class="iconbtn" data-act="back" aria-label="Retour">${ico("back")}</button>`}<span class="h2">${title}</span>${opts.right || ""}</div>`;
+try { DESK_MQ.addEventListener("change", () => { if (S.ready && S.resto) rerender(); }); } catch (e) {}
 /* banner(): nothing in the standalone build except, on Accueil, the one-time « Installer l'app » card. */
 const banner = () => (S.slow && DB.mode === "db" ? `<div class="banner st">${ico("clock")}<span>Connexion lente : les données affichées peuvent ne pas être à jour.</span></div>` : "") + (S.route === "home" ? installHint() : "");
 
@@ -377,18 +389,38 @@ const banner = () => (S.slow && DB.mode === "db" ? `<div class="banner st">${ico
 const VIEWS = {};
 
 /* ───────────────────────── sheets ───────────────────────── */
+/* Focus: opening moves focus into the sheet (the dialog itself, so no keyboard pops up on phones), Tab stays inside it while it is open
+   (the page behind is inert), and closing gives focus back to what opened it, when that is still on screen. */
+let sheetOpener = null;
+const FOCUSABLE = 'a[href],button:not([disabled]),input:not([disabled]):not([type=hidden]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"]),[contenteditable=true]';
+const sheetFocusables = () => $$(FOCUSABLE, $("#sheetBody")).filter((e) => !e.closest("[hidden],[inert]") && (e.offsetWidth || e.offsetHeight || e.getClientRects().length));
+function sheetInert(on) { ["#app", "#tabbar", "#skip"].forEach((s) => { const e = $(s); if (!e) return; if (on) e.setAttribute("inert", ""); else e.removeAttribute("inert"); }); }
 function openSheet(html, after) {
   const b = $("#sheetBody"), sh = $("#sheet"); const was = sh.classList.contains("open");
+  const a = document.activeElement; if (!was && a && a !== document.body && !sh.contains(a)) sheetOpener = a;
   b.innerHTML = photoFix(html); if (!was) b.scrollTop = 0; sh.style.transform = ""; $("#scrim").style.opacity = "";
-  $("#scrim").classList.add("on"); sh.classList.add("open"); if (!was) { SFX.sheet(); buzz(4); navGuardPush(); }
+  $("#scrim").classList.add("on"); sh.classList.add("open"); sheetInert(true); if (!was) { SFX.sheet(); buzz(4); navGuardPush(); }
+  const h = $("h1,h2,h3,.h2,.h3", b); if (h) { h.id = h.id || "sheetTitle"; sh.setAttribute("aria-labelledby", h.id); } else sh.removeAttribute("aria-labelledby");
+  if (!sh.contains(document.activeElement)) { try { sh.focus({ preventScroll: true }); } catch (e) {} }
   after && after(b);
 }
 function closeSheet(silent) {
   const sh = $("#sheet"); if (!sh.classList.contains("open")) return;
-  sh.classList.remove("open", "drag"); sh.style.transform = ""; $("#scrim").style.opacity = ""; $("#scrim").classList.remove("on");
-  if (document.activeElement && sh.contains(document.activeElement)) document.activeElement.blur();
+  sh.classList.remove("open", "drag"); sh.style.transform = ""; $("#scrim").style.opacity = ""; $("#scrim").classList.remove("on"); sheetInert(false); sh.removeAttribute("aria-labelledby");
+  const had = document.activeElement && sh.contains(document.activeElement); if (had) document.activeElement.blur();
+  const o = sheetOpener; sheetOpener = null;
+  if (o && o.isConnected && !o.closest(".view.leave") && (had || document.activeElement === document.body)) { try { o.focus({ preventScroll: true }); } catch (e) {} }
   if (!silent) SFX.close();
 }
+document.addEventListener("keydown", (e) => {
+  if (e.key !== "Tab" || !$("#sheet").classList.contains("open")) return;
+  const f = sheetFocusables(), sh = $("#sheet"), a = document.activeElement;
+  if (!f.length) { e.preventDefault(); sh.focus({ preventScroll: true }); return; }
+  const first = f[0], last = f[f.length - 1];
+  if (!sh.contains(a) || a === sh) { e.preventDefault(); (e.shiftKey ? last : first).focus(); return; }
+  if (e.shiftKey && a === first) { e.preventDefault(); last.focus(); }
+  else if (!e.shiftKey && a === last) { e.preventDefault(); first.focus(); }
+});
 /* drag-to-dismiss on touch phones: pull the grab handle, or pull down while the sheet body is scrolled to the top */
 (function sheetDrag() {
   const sh = $("#sheet"), scrim = $("#scrim"), body = $("#sheetBody");
@@ -613,13 +645,15 @@ function installHint() {
   let body;
   if (IS_IOS && IOS_MENU) body = `<ol class="inst-steps">${step(1, `Touchez <span class="key">${ico("dots").replace("<svg ", '<svg style="transform:rotate(90deg)" ')}</span> en bas, puis <b>Partager</b>`)}${step(2, `Choisissez <span class="key">${ico("addsq")}</span> <b>Sur l'écran d'accueil</b>`)}${step(3, `Laissez <b>Ouvrir comme app web</b> activé, puis <b>Ajouter</b>`)}</ol>`;
   else if (IS_IOS) body = `<ol class="inst-steps">${step(1, `Touchez <span class="key">${ico("share")}</span> <b>Partager</b>${IS_IPAD ? " en haut" : ""}`)}${step(2, `Choisissez <span class="key">${ico("addsq")}</span> <b>Sur l'écran d'accueil</b>`)}</ol>`;
-  else if (installEvt) body = `<button class="btn acc block" data-act="installApp">${ico("download")}Installer l'app</button>`;
+  else if (installEvt) body = "";
   else if (IS_ANDROID) body = `<ol class="inst-steps">${step(1, `Touchez <span class="key">${ico("dots")}</span> <b>Menu</b> du navigateur`)}${step(2, `Choisissez <b>Ajouter à l'écran d'accueil</b>`)}</ol>`;
   else return "";
-  return `<div class="glass inst st" style="--i:1" id="instCard">
-    <button class="inst-x" data-act="installDismiss" aria-label="Masquer">${ico("x")}</button>
-    <div class="inst-hd">${appIcon(50)}<div style="min-width:0"><b class="h3">Installez Gusto</b><div class="sub">Sur l'écran d'accueil : plein écran, ouverture instantanée, même sans réseau.</div></div></div>
-    ${body}${IS_IOS && !IS_IPAD ? `<div class="inst-arrow${IOS_MENU ? " end" : ""}" aria-hidden="true">${ico("down")}</div>` : ""}</div>`;
+  /* compact: one row (icon, title, one button, ×), the steps unfold on « Comment ? », so the relevé hero stays above the fold */
+  const open = !!S.ui.instOpen;
+  const cta = installEvt ? `<button class="btn acc sm" data-act="installApp">${ico("download")}Installer</button>` : `<button class="btn soft sm inst-how" data-act="installHow" aria-expanded="${open}" aria-controls="instMore">${open ? "Masquer" : "Comment ?"}</button>`;
+  return `<div class="glass inst st${open ? " open" : ""}" style="--i:1" id="instCard">
+    <div class="inst-hd">${appIcon(38)}<div class="inst-t"><b>Installez Gusto</b><span>Plein écran, même sans réseau</span></div>${cta}<button class="inst-x" data-act="installDismiss" aria-label="Ne plus afficher">${ico("x")}</button></div>
+    ${body ? `<div class="inst-more" id="instMore"><div>${body}${IS_IOS && !IS_IPAD ? `<div class="inst-arrow${IOS_MENU ? " end" : ""}" aria-hidden="true">${ico("down")}</div>` : ""}</div></div>` : ""}</div>`;
 }
 
 /* ───────────────────────── standalone: service worker (offline) ───────────────────────── */
@@ -639,7 +673,7 @@ function registerSW() {
    to the foreground. A new v means the code running here is old: with nothing in progress the app reloads silently (caches dropped,
    so the reload is guaranteed fresh); otherwise a toast offers « Mettre à jour ». sessionStorage guards against reload loops:
    one reload attempt per version per session, after which the version is simply adopted. */
-const APP_V = "2026-11-03.4";
+const APP_V = "2026-11-03.5";
 const UPD = {
   running: null, offered: null,
   get: (k, store) => { try { return store.getItem(k); } catch (e) { return null; } },
@@ -661,7 +695,7 @@ const UPD = {
     if (this.quiet()) return this.apply(v);
     if (this.offered === v) return; this.offered = v;
     toast("Nouvelle version disponible", "info"); const t = $("#toast");
-    $("#toastTx").innerHTML = `<span class="tx">Nouvelle version disponible</span><button data-act="appUpdate" data-v="${esc(v)}">Mettre à jour</button>`;
+    $("#toastTx").innerHTML = `<span class="tx">Nouvelle version disponible</span><button data-act="appUpdate" data-v="${esc(v)}">Mettre à jour</button>`; toastPlace(t);
     t.style.pointerEvents = "auto"; clearTimeout(t._h); t._h = setTimeout(() => { t.classList.remove("on"); t.style.pointerEvents = ""; }, 12000);
   },
   async apply(v) {
@@ -677,20 +711,48 @@ function freshness() {
   document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") UPD.check(); });
 }
 
-function toastUndo(msg) { toast(msg); const t = $("#toast"); $("#toastTx").innerHTML = `<span class="tx">${esc(msg)}</span><button data-act="undo">Annuler</button>`; t.style.pointerEvents = "auto"; clearTimeout(t._h); t._h = setTimeout(() => { t.classList.remove("on"); t.style.pointerEvents = ""; S.ui.undo = null; }, 4000); }
+function toastUndo(msg) { toast(msg); const t = $("#toast"); $("#toastTx").innerHTML = `<span class="tx">${esc(msg)}</span><button data-act="undo">Annuler</button>`; toastPlace(t); t.style.pointerEvents = "auto"; clearTimeout(t._h); t._h = setTimeout(() => { t.classList.remove("on"); t.style.pointerEvents = ""; S.ui.undo = null; }, 4000); }
 /* ───────────────────────── toast + burst ───────────────────────── */
 const TOAST_CHECK = `<svg viewBox="0 0 24 24"><path d="M6 12.5l4 4 8-9"/></svg>`;
 const TOAST_ICONS = { info: `<svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 0 1 15.5-6.2L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15.5 6.2L3 16"/><path d="M3 21v-5h5"/></svg>`, err: `<svg viewBox="0 0 24 24"><path d="M12 6.5v7"/><path d="M12 17.5h.01"/></svg>` };
-/* phone: toasts live at the bottom, just above the tab bar or the sticky CTA (thumb reach for « Annuler », titles stay visible) */
-function toastPlace(t) {
-  if (!window.matchMedia("(max-width:959px)").matches) { t.style.removeProperty("--toastB"); return; }
+/* Phone: toasts live at the bottom, just above the tab bar, the sticky CTA or an open sheet (thumb reach for « Annuler »).
+   They switch to the top of the screen when there is no room above a tall sheet, or when the bottom spot would cover what the person is
+   working on: any element marked [data-toast-avoid] / .toast-avoid in the current screen or sheet (toastAvoid(el) marks one).
+   uiBottomInset() tells an area how many pixels at the bottom are covered by the tab bar, sticky CTA and a bottom toast, so it can scroll
+   the next card fully above them. */
+const PHONE_MQ = window.matchMedia("(max-width:959px)");
+const safeTop = () => { const v = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--sat")); return isNaN(v) ? 0 : v; };
+function bottomEdge() {
   const H = APPH.px || window.innerHeight; let edge = H;
   const tb = $("#tabbar"); if (tb && !tb.classList.contains("hide") && !document.documentElement.classList.contains("kb")) edge = Math.min(edge, tb.getBoundingClientRect().top);
-  const v = $("#viewport .view"); if (v) $$(".ctabar", v).forEach((c) => { const r = c.getBoundingClientRect(); if (r.height && r.top < H && r.bottom > 0) edge = Math.min(edge, r.top); });
-  const sh = $("#sheet"); if (sh.classList.contains("open")) edge = Math.min(edge, sh.getBoundingClientRect().top);
+  const v = $("#viewport .view:not(.leave)"); if (v) $$(".ctabar", v).forEach((c) => { const r = c.getBoundingClientRect(); if (r.height && r.top < H && r.bottom > 0) edge = Math.min(edge, r.top); });
+  return { H, edge };
+}
+function uiBottomInset(withToast = true) {
+  if (!PHONE_MQ.matches) return 0;
+  const { H, edge } = bottomEdge(); const th = Math.max(46, $("#toast").offsetHeight || 0);
+  return Math.round(H - edge + (withToast ? th + 20 : 0));
+}
+function toastAvoid(el) {
+  $$("[data-toast-avoid]").forEach((e) => { if (e !== el) e.removeAttribute("data-toast-avoid"); });
+  if (el) el.setAttribute("data-toast-avoid", "");
+  const t = $("#toast"); if (t.classList.contains("on")) toastPlace(t);
+}
+function toastPlace(t) {
+  t.classList.remove("top");
+  if (!PHONE_MQ.matches) { t.style.removeProperty("--toastB"); return; }
+  let { H, edge } = bottomEdge();
+  const sh = $("#sheet"), sheetOn = sh.classList.contains("open"); if (sheetOn) edge = Math.min(edge, sh.getBoundingClientRect().top);
+  const th = Math.max(46, t.offsetHeight || 0), topY = safeTop() + 10;
+  const bottomBox = [edge - 10 - th, edge - 10], topBox = [topY, topY + th];
+  const scope = sheetOn ? sh : $("#viewport .view:not(.leave)");
+  const avoid = scope ? $$("[data-toast-avoid],.toast-avoid", scope).map((e) => e.getBoundingClientRect()).filter((r) => r.height && r.bottom > 0 && r.top < H) : [];
+  const hit = (b) => avoid.reduce((n, r) => n + Math.max(0, Math.min(b[1], r.bottom) - Math.max(b[0], r.top)), 0);
+  const noRoom = bottomBox[0] < topY + 4;
+  if (noRoom || (hit(bottomBox) > 0 && hit(topBox) < hit(bottomBox))) { t.classList.add("top"); t.style.removeProperty("--toastB"); return; }
   if (edge < H) t.style.setProperty("--toastB", Math.round(H - edge + 10) + "px"); else t.style.removeProperty("--toastB");
 }
-function toast(msg, kind) { const t = $("#toast"); t.style.pointerEvents = ""; t.classList.toggle("info", kind === "info"); $(".check", t).innerHTML = TOAST_ICONS[kind] || TOAST_CHECK; toastPlace(t); $("#toastTx").textContent = msg; t.classList.toggle("err", kind === "err"); const c = $(".check", t); c.classList.remove("draw"); void c.offsetWidth; c.classList.add("draw"); t.classList.add("on"); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove("on"), kind === "err" ? 3800 : 2300); }
+function toast(msg, kind) { const t = $("#toast"); t.style.pointerEvents = ""; t.classList.toggle("info", kind === "info"); $(".check", t).innerHTML = TOAST_ICONS[kind] || TOAST_CHECK; $("#toastTx").textContent = msg; toastPlace(t); t.classList.toggle("err", kind === "err"); const c = $(".check", t); c.classList.remove("draw"); void c.offsetWidth; c.classList.add("draw"); t.classList.add("on"); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove("on"), kind === "err" ? 3800 : 2300); }
 function burst(x = window.innerWidth / 2, y = window.innerHeight / 3) {
   if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
   const b = document.createElement("div"); b.className = "burst"; const cols = ["#7A4DFF", "#4A1FE6", "#9ED7FF", "#C8B6FF", "#2FB985", "#fff"];
@@ -715,7 +777,12 @@ document.addEventListener("click", async (e) => {
   const tab = e.target.closest("[data-tab]");
   if (tab) { const r = tab.dataset.tab; SFX.tap(); buzz(5); if (r !== S.route) { S.history = []; go(r, {}, { replace: true, tab: true }); } else { const v = $("#viewport .view"); v && v.scrollTo({ top: 0, behavior: "smooth" }); } return; }
   const g = e.target.closest("[data-go]");
-  if (g && !e.target.closest("[data-act]")) { SFX.tap(); const p = g.dataset.id ? { id: g.dataset.id } : {}; if (g.dataset.fresh) p.fresh = true; go(g.dataset.go, p); return; }
+  if (g && !e.target.closest("[data-act]")) {
+    SFX.tap(); const p = g.dataset.id ? { id: g.dataset.id } : {}; if (g.dataset.fresh) p.fresh = true;
+    /* the side nav switches sections like the phone tab bar: a fresh history, so the section opens without a « Retour » */
+    if (g.closest("#side")) { if (g.dataset.go === S.route && JSON.stringify(p) === JSON.stringify(S.params || {})) { const v = $("#viewport .view"); v && v.scrollTo({ top: 0, behavior: "smooth" }); return; } S.history = []; go(g.dataset.go, p, { replace: true, tab: true }); return; }
+    go(g.dataset.go, p); return;
+  }
   const a = e.target.closest("[data-act]"); if (!a) return;
   const act = a.dataset.act, id = a.dataset.id, v = a.dataset.v;
   const H = ACT[act]; if (H) { try { await H(a, id, v, e); } catch (err) { console.warn(err); } }
@@ -723,6 +790,8 @@ document.addEventListener("click", async (e) => {
 const ACT = {
   back: () => { SFX.tap(); goBack(); },
   sheetClose: () => closeSheet(),
+  /* « Aller au contenu » (first Tab stop): focus lands on the current screen's first control */
+  skipMain: () => { const v = $("#viewport .view:not(.leave)"); if (!v) return; const f = $$(FOCUSABLE, v).find((e) => e.getClientRects().length && !e.closest("[hidden]")); if (f) f.focus(); else { v.tabIndex = -1; v.focus(); } },
   undo: async () => {
     const u = S.ui.undo; if (!u) return; S.ui.undo = null;
     /* the audit-trail line that went with it: given explicitly (u.evId), or, for a chore log, the "chore" event with the same chore ref, author and time (±5 s) */
@@ -749,6 +818,10 @@ Object.assign(ACT, {
     if (!installEvt) return; SFX.tap(); const ev = installEvt;
     try { ev.prompt(); const r = await ev.userChoice; if (r && r.outcome === "accepted") { installEvt = null; SFX.done(); toast("Gusto est installée"); try { localStorage.setItem("gg-install-off", "1"); } catch (e) {} } } catch (e) {}
     refresh();
+  },
+  installHow: (a) => {
+    SFX.tap(); buzz(4); S.ui.instOpen = !S.ui.instOpen; const c = $("#instCard"); if (!c) return refresh();
+    c.classList.toggle("open", S.ui.instOpen); a.textContent = S.ui.instOpen ? "Masquer" : "Comment ?"; a.setAttribute("aria-expanded", String(S.ui.instOpen));
   },
   installDismiss: () => {
     try { localStorage.setItem("gg-install-off", "1"); } catch (e) {} SFX.close(); buzz(4);
