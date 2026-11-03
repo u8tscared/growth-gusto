@@ -136,7 +136,9 @@ const DB = {
   mode: "local", db: null, subs: [],
   local: (() => { try { return JSON.parse(localStorage.getItem("gg-local") || "{}"); } catch (e) { return {}; } })(),
   listeners: {},
-  saveLocal: debounce(() => { try { localStorage.setItem("gg-local", JSON.stringify(DB.local)); } catch (e) {} }, 300),
+  dirty: false,
+  flush() { if (!DB.dirty) return; DB.dirty = false; try { localStorage.setItem("gg-local", JSON.stringify(DB.local)); } catch (e) {} },
+  saveLocal: (() => { const d = debounce(() => DB.flush(), 60); return () => { DB.dirty = true; d(); }; })(),
   emit(path) { const all = Object.entries(this.local[path] || {}).map(([id, d]) => ({ id, ...d })); (this.listeners[path] || []).forEach((l) => { const o = l.opts || {}; let rows = all.slice(); if (o.order) { const k = o.order, m = o.dir === "desc" ? -1 : 1; rows.sort((a, b) => (a[k] > b[k] ? 1 : a[k] < b[k] ? -1 : 0) * m); } if (o.limit) rows = rows.slice(0, o.limit); l(rows); }); this.saveLocal(); },
   path(col) { return col === "restos" ? "restos" : `restos/${S.rid}/${col}`; },
   watch(col, opts, cb) {
@@ -167,6 +169,9 @@ const DB = {
     if (this.local[path]) delete this.local[path][id]; this.emit(path);
   },
 };
+/* never lose a write to the debounce: flush when the page is hidden, frozen or unloaded */
+["pagehide", "beforeunload"].forEach((ev) => window.addEventListener(ev, () => DB.flush()));
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") DB.flush(); });
 async function safe(p, msg = "Impossible d'enregistrer. Vérifiez la connexion et réessayez.") {
   try { return await p; } catch (e) {
     console.warn(e); SFX.err();
@@ -216,7 +221,6 @@ async function logEvent(type, text, extra = {}) { try { await DB.add("events", {
 
 /* ───────────────────────── capabilities boot ───────────────────────── */
 async function boot() {
-  $("#bootMark").innerHTML = logoMark({ grad: true });
   const C = window.claude;
   const use = async (n) => { try { return C && C.use ? await C.use(n) : null; } catch (e) { return null; } };
   const [db, user, sample, assets, downloads] = await Promise.all([use("db"), use("user"), use("sample"), use("assets"), use("downloads")]);
@@ -239,6 +243,8 @@ async function boot() {
 function finishBoot() {
   renderChrome();
   go(S.resto ? "home" : "onboarding", {}, { replace: true });
+  /* deep link from a home-screen shortcut (manifest "shortcuts"): ./?go=releve — Accueil stays underneath, so Retour lands there */
+  try { const u = new URL(location.href), t = u.searchParams.get("go"); if (t) { u.searchParams.delete("go"); history.replaceState(null, "", u.pathname + u.search + u.hash); if (S.resto && VIEWS[t] && t !== "home" && t !== "onboarding") go(t, t === "reception" ? { fresh: true } : {}); } } catch (e) {}
   setTimeout(() => $("#boot").classList.add("out"), 250);
 }
 let attachedRid = null;
@@ -249,11 +255,11 @@ function attachResto() {
   if (DB.mode === "local") { Object.keys(DB.listeners).forEach((k) => { if (k !== "restos") delete DB.listeners[k]; }); }
   const w = (col, opts, key, after) => DB.watch(col, opts, (rows) => { S[key] = rows; after && after(); onData(); });
   w("fridges", {}, "fridges", () => S.fridges.sort((a, b) => (a.order ?? a.createdAt ?? 0) - (b.order ?? b.createdAt ?? 0)));
-  w("readings", { order: "at", dir: "desc", limit: 600 }, "readings");
-  w("lots", { order: "createdAt", dir: "desc", limit: 600 }, "lots");
+  w("readings", { order: "at", dir: "desc", limit: 3000 }, "readings");
+  w("lots", { order: "createdAt", dir: "desc", limit: 2000 }, "lots");
   w("products", {}, "products", () => S.products.sort((a, b) => a.name.localeCompare(b.name, "fr")));
   w("counts", {}, "counts");
-  w("receptions", { order: "at", dir: "desc", limit: 120 }, "receptions");
+  w("receptions", { order: "at", dir: "desc", limit: 1000 }, "receptions");
   w("events", { order: "at", dir: "desc", limit: 250 }, "events");
   w("notes", {}, "notes");
   w("chores", {}, "chores");
@@ -290,8 +296,8 @@ const TAB_OF = { home: "home", frigos: "frigos", frigo: "frigos", releve: "home"
 function urgentCount() { return activeLots().filter((l) => (daysUntil(dlcOf(l)) ?? 99) <= 1).length; }
 function renderChrome() {
   const side = $("#side");
-  const navOn = TAB_OF[S.route] === "frigos" ? "frigos" : S.route === "note" ? "notes" : S.route;
-  const pend = S.fridges.length * 2 - todayStats().done;
+  const navOn = (VIEWS[S.route] && VIEWS[S.route].nav) || (TAB_OF[S.route] === "frigos" ? "frigos" : { note: "notes", fiche: "notes", tzEdit: "tickets", regReport: "registre" }[S.route] || S.route);
+  const pend = S.fridges.length - todayStats(S.slot || slotNow()).done; /* current service only */
   side.innerHTML = `<div class="brand"><span style="width:30px;height:30px;display:block">${logoMark()}</span>Growth Gusto</div>
     ${S.resto ? `<button class="nav" data-act="restoSwitch" style="background:var(--glass-2);margin-bottom:10px"><span style="width:28px;height:28px;flex:none;border-radius:9px;display:grid;place-items:center;background:linear-gradient(135deg,#7A4DFF,#4A1FE6);color:#fff;font-size:11px;font-weight:800">${esc(initials(S.resto.name))}</span><span style="flex:1;min-width:0;text-align:left"><b style="display:block;color:var(--ink);font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(S.resto.name)}</b><span style="font-size:11.5px">${S.restos.length} établissement${S.restos.length > 1 ? "s" : ""}</span></span>${ico("down")}</button>` : ""}
     <div class="navs">${NAV.map(([r, i, t]) => r === "sep" ? `<div class="sep">${t}</div>` : `<button class="nav ${navOn === r ? "on" : ""}" data-go="${r}">${ico(i)}<span class="nt">${t}</span>${r === "home" && urgentCount() ? `<span class="count">${urgentCount()}</span>` : ""}${r === "releve" && pend > 0 && S.fridges.length ? `<span class="count" style="background:var(--warn)">${pend}</span>` : ""}</button>`).join("")}</div>
@@ -306,26 +312,48 @@ function renderChrome() {
   tb.dataset.on = on;
   const idx = TABS.findIndex((t) => t[0] === on); const ind = $("#ind");
   if (ind) { ind.style.opacity = on === "scan" ? 0 : 1; ind.style.transform = `translateX(calc(${idx} * (100% + 12px)))`; }
-  tb.classList.toggle("hide", ["onboarding", "reception", "note", "tzEdit"].includes(S.route) || !!(VIEWS[S.route] && VIEWS[S.route].hideTabs) || !S.resto);
+  const noTabs = ["onboarding", "reception", "note", "tzEdit"].includes(S.route) || !!(VIEWS[S.route] && VIEWS[S.route].hideTabs) || !S.resto;
+  tb.classList.toggle("hide", noTabs); document.documentElement.classList.toggle("tabs", !noTabs);
   const sd = $("#side"); if (sd) sd.classList.toggle("off", !S.resto || S.route === "onboarding");
 }
 
 /* ───────────────────────── router ───────────────────────── */
-let navLock = false;
-function go(route, params = {}, { back = false, replace = false } = {}) {
-  if (navLock) return;
-  if (!replace && !back) S.history.push({ route: S.route, params: S.params });
-  if (route === "reception" && (!S.rec || params.fresh || S.rec.done)) S.rec = { step: 1, supplier: "", bl: "", lines: [], done: null, open: 0 };
+/* Navigation never drops a tap: a new view can start while the previous one is still leaving (it is removed when its exit ends).
+   The current view is always the FIRST .view in #viewport, so $("#viewport .view") keeps meaning "the visible screen".
+   A repeat of the same navigation within 450ms (double tap) is ignored. Tab switches crossfade, pushes slide. */
+let lastNav = { k: "", t: 0 };
+function go(route, params = {}, { back = false, replace = false, tab = false } = {}) {
+  const key = route + "|" + JSON.stringify(params || {}), now = Date.now();
+  if (!back && key === lastNav.k && now - lastNav.t < 450 && route === S.route) return;
+  lastNav = { k: key, t: now };
+  if (!replace && !back) { S.history.push({ route: S.route, params: S.params }); if (S.history.length > 40) S.history.shift(); }
+  if (route === "reception" && (!S.rec || S.rec.done || (params.fresh && !(S.rec.lines || []).length))) S.rec = { step: 1, supplier: "", bl: "", lines: [], done: null, open: 0 };
   if (route === "stock") { S.zone = S.zone || null; }
   S.route = route; S.params = params; closeSheet(true);
-  const vp = $("#viewport"); const old = $(".view", vp);
-  const v = document.createElement("section"); v.className = "view enter" + (back ? " back" : ""); v.dataset.route = route;
-  v.innerHTML = renderRoute(); vp.appendChild(v);
+  const vp = $("#viewport"); const olds = $$(".view", vp);
+  const v = document.createElement("section"); v.className = "view enter" + (back ? " back" : "") + (tab ? " fade" : ""); v.dataset.route = route;
+  v.innerHTML = renderRoute(); vp.insertBefore(v, vp.firstChild);
   void v.offsetWidth; v.classList.remove("enter", "back");
-  if (old) { old.classList.add("leave"); if (back) old.classList.add("back"); navLock = true; setTimeout(() => { old.remove(); navLock = false; }, 380); }
-  afterRender(v); renderChrome();
+  olds.forEach((o) => {
+    if (o.classList.contains("leave")) { o.remove(); return; }
+    o.classList.add("leave"); if (back) o.classList.add("back"); if (tab) o.classList.add("fade");
+    setTimeout(() => o.remove(), 420);
+  });
+  setTimeout(() => v.classList.remove("fade"), 450);
+  afterRender(v); renderChrome(); navSync();
 }
-function goBack() { if (navLock) return; const h = S.history.pop(); if (h) go(h.route, h.params, { back: true }); else go("home", {}, { back: true }); }
+function goBack() { const h = S.history.pop(); if (h) go(h.route, h.params, { back: true }); else go("home", {}, { back: true }); }
+/* Browser / Android back button and back swipe: one guard entry above the app. Back closes the open sheet first, then walks S.history,
+   then returns to Accueil; on Accueil with nothing left, back leaves the app as usual. */
+let navGuard = false;
+function navGuardPush() { if (navGuard || !S.resto) return; try { history.pushState({ gg: 1 }, ""); navGuard = true; } catch (e) {} }
+function navSync() { if (S.route !== "home" || S.history.length > 0) navGuardPush(); }
+window.addEventListener("popstate", () => {
+  navGuard = false;
+  if ($("#sheet").classList.contains("open")) { closeSheet(); navGuardPush(); return; }
+  if (!S.resto || S.route === "onboarding") return;
+  if (S.history.length || S.route !== "home") { SFX.tap(); goBack(); }
+});
 let pendingRefresh = false;
 function refresh() {
   if (!S.ready) return;
@@ -352,7 +380,7 @@ const VIEWS = {};
 function openSheet(html, after) {
   const b = $("#sheetBody"), sh = $("#sheet"); const was = sh.classList.contains("open");
   b.innerHTML = photoFix(html); if (!was) b.scrollTop = 0; sh.style.transform = ""; $("#scrim").style.opacity = "";
-  $("#scrim").classList.add("on"); sh.classList.add("open"); if (!was) { SFX.sheet(); buzz(4); }
+  $("#scrim").classList.add("on"); sh.classList.add("open"); if (!was) { SFX.sheet(); buzz(4); navGuardPush(); }
   after && after(b);
 }
 function closeSheet(silent) {
@@ -391,10 +419,25 @@ function closeSheet(silent) {
   };
   sh.addEventListener("touchend", end); sh.addEventListener("touchcancel", end);
 })();
+/* iOS home-screen app with a black-translucent status bar: WebKit draws from the very top of the screen but sizes the layout viewport
+   (100vh, 100dvh, fixed positioning) to the screen MINUS the status bar, leaving an empty band at the bottom. Measure the real screen
+   height (screen.* never rotates on iOS, so pick the side that matches the orientation) and size body to it; body is the containing block
+   of every fixed layer in standalone (see base.css). Only a 1..100px shortfall is corrected: Stage Manager / split windows stay as they are. */
+const APPH = { px: 0 };
+function appHeight() {
+  const de = document.documentElement; if (!de.classList.contains("standalone")) { de.style.removeProperty("--appH"); APPH.px = 0; return; }
+  const ih = window.innerHeight, portrait = ih >= window.innerWidth;
+  const sh = portrait ? Math.max(screen.width, screen.height) : Math.min(screen.width, screen.height);
+  const gap = sh - ih; const h = gap > 0 && gap <= 100 ? sh : ih;
+  APPH.px = h; de.style.setProperty("--appH", h + "px");
+}
+appHeight();
+window.addEventListener("resize", appHeight); window.addEventListener("orientationchange", () => setTimeout(appHeight, 250));
 /* on-screen keyboard (iOS): lift the sheet above it and keep the focused field visible */
 (function kbLift() {
   const vv = window.visualViewport; if (!vv) return;
-  const upd = () => { const kb = Math.max(0, window.innerHeight - vv.height - vv.offsetTop); const on = kb > 80; document.documentElement.style.setProperty("--kb", (on ? kb : 0) + "px"); document.documentElement.classList.toggle("kb", on); };
+  const upd = () => { const de = document.documentElement; const kb = Math.max(0, (APPH.px || window.innerHeight) - vv.height - vv.offsetTop); const on = kb > 80; de.style.setProperty("--kb", (on ? kb : 0) + "px"); de.style.setProperty("--vvh", vv.height + "px"); de.classList.toggle("kb", on); };
+  upd();
   vv.addEventListener("resize", upd); vv.addEventListener("scroll", upd);
   document.addEventListener("focusin", (e) => { const t = e.target; if (t.matches && t.matches("input,textarea,select") && t.closest("#sheet")) setTimeout(() => { try { t.scrollIntoView({ block: "nearest", behavior: "smooth" }); } catch (x) {} }, 320); });
 })();
@@ -402,11 +445,19 @@ $("#scrim").addEventListener("click", () => closeSheet());
 document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeSheet(); });
 
 /* ───────────────────────── image helpers ───────────────────────── */
+/* resolves the picked files, or [] when the picker is dismissed (callers destructure: const [f] = await pickImage()) */
 function pickImage(multi = false) {
   return new Promise((res) => {
     const inp = multi ? $("#filePickMulti") : $("#filePick"); inp.value = "";
-    const on = () => { inp.removeEventListener("change", on); res([...(inp.files || [])]); };
-    inp.addEventListener("change", on); inp.click();
+    let done = false;
+    const end = (files) => { if (done) return; done = true; inp.removeEventListener("change", onChange); inp.removeEventListener("cancel", onCancel); window.removeEventListener("focus", onFocus); res(files); };
+    const onChange = () => end([...(inp.files || [])]);
+    const onCancel = () => end([]);
+    /* browsers without the input "cancel" event: the window gets focus back with no file chosen */
+    const onFocus = () => setTimeout(() => { if (!(inp.files && inp.files.length)) end([]); }, 1200);
+    inp.addEventListener("change", onChange); inp.addEventListener("cancel", onCancel);
+    if (!("oncancel" in inp)) setTimeout(() => window.addEventListener("focus", onFocus, { once: true }), 300);
+    inp.click();
   });
 }
 async function shrink(file, max = 1600, q = 0.85) {
@@ -547,8 +598,11 @@ const LOCAL_DOWNLOADS = {
 /* ───────────────────────── standalone: install (PWA) ───────────────────────── */
 const IS_IOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
 const IS_ANDROID = /Android/i.test(navigator.userAgent);
+const IS_IPAD = IS_IOS && !/iPhone|iPod/.test(navigator.userAgent);
+/* Safari 26+ on iPhone: « Partager » lives in the ••• menu at the bottom right */
+const IOS_MENU = IS_IOS && !IS_IPAD && (+((navigator.userAgent.match(/Version\/(\d+)/) || [])[1] || 0) >= 26);
 const isStandalone = () => { try { return window.matchMedia("(display-mode: standalone)").matches || window.matchMedia("(display-mode: fullscreen)").matches || navigator.standalone === true; } catch (e) { return false; } };
-document.documentElement.classList.toggle("standalone", isStandalone());
+document.documentElement.classList.toggle("standalone", isStandalone()); appHeight();
 let installEvt = null;
 window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installEvt = e; if (S.route === "home") refresh(); });
 window.addEventListener("appinstalled", () => { installEvt = null; try { localStorage.setItem("gg-install-off", "1"); } catch (e) {} if (S.route === "home") refresh(); });
@@ -557,14 +611,15 @@ function installHint() {
   if (isStandalone() || installOff() || !S.resto) return "";
   const step = (n, html) => `<li><span class="n mono">${n}</span><span>${html}</span></li>`;
   let body;
-  if (IS_IOS) body = `<ol class="inst-steps">${step(1, `Touchez <span class="key">${ico("share")}</span> <b>Partager</b>`)}${step(2, `Choisissez <span class="key">${ico("addsq")}</span> <b>Sur l'écran d'accueil</b>`)}</ol>`;
+  if (IS_IOS && IOS_MENU) body = `<ol class="inst-steps">${step(1, `Touchez <span class="key">${ico("dots").replace("<svg ", '<svg style="transform:rotate(90deg)" ')}</span> en bas, puis <b>Partager</b>`)}${step(2, `Choisissez <span class="key">${ico("addsq")}</span> <b>Sur l'écran d'accueil</b>`)}${step(3, `Laissez <b>Ouvrir comme app web</b> activé, puis <b>Ajouter</b>`)}</ol>`;
+  else if (IS_IOS) body = `<ol class="inst-steps">${step(1, `Touchez <span class="key">${ico("share")}</span> <b>Partager</b>${IS_IPAD ? " en haut" : ""}`)}${step(2, `Choisissez <span class="key">${ico("addsq")}</span> <b>Sur l'écran d'accueil</b>`)}</ol>`;
   else if (installEvt) body = `<button class="btn acc block" data-act="installApp">${ico("download")}Installer l'app</button>`;
   else if (IS_ANDROID) body = `<ol class="inst-steps">${step(1, `Touchez <span class="key">${ico("dots")}</span> <b>Menu</b> du navigateur`)}${step(2, `Choisissez <b>Ajouter à l'écran d'accueil</b>`)}</ol>`;
   else return "";
   return `<div class="glass inst st" style="--i:1" id="instCard">
     <button class="inst-x" data-act="installDismiss" aria-label="Masquer">${ico("x")}</button>
     <div class="inst-hd">${appIcon(50)}<div style="min-width:0"><b class="h3">Installez Gusto</b><div class="sub">Sur l'écran d'accueil : plein écran, ouverture instantanée, même sans réseau.</div></div></div>
-    ${body}${IS_IOS ? `<div class="inst-arrow" aria-hidden="true">${ico("down")}</div>` : ""}</div>`;
+    ${body}${IS_IOS && !IS_IPAD ? `<div class="inst-arrow${IOS_MENU ? " end" : ""}" aria-hidden="true">${ico("down")}</div>` : ""}</div>`;
 }
 
 /* ───────────────────────── standalone: service worker (offline) ───────────────────────── */
@@ -577,11 +632,55 @@ function registerSW() {
     }).catch((e) => console.warn("sw", e && e.message));
     if (document.readyState === "complete") reg(); else window.addEventListener("load", reg, { once: true });
   } catch (e) {}
+  freshness();
+}
+/* ───────────────────────── auto-update (version.json) ─────────────────────────
+   version.json {"v": "<build id>"} is bumped on every push. It is fetched (no-store) at launch and each time the app comes back
+   to the foreground. A new v means the code running here is old: with nothing in progress the app reloads silently (caches dropped,
+   so the reload is guaranteed fresh); otherwise a toast offers « Mettre à jour ». sessionStorage guards against reload loops:
+   one reload attempt per version per session, after which the version is simply adopted. */
+const APP_V = "2026-11-03.2";
+const UPD = {
+  running: null, offered: null,
+  get: (k, store) => { try { return store.getItem(k); } catch (e) { return null; } },
+  set: (k, v, store) => { try { store.setItem(k, v); } catch (e) {} },
+  async fetchV() { try { const r = await fetch("version.json?ts=" + Date.now(), { cache: "no-store" }); if (!r.ok) return null; const j = await r.json(); return j && j.v ? String(j.v) : null; } catch (e) { return null; } },
+  quiet() {
+    const a = document.activeElement;
+    return !(a && /INPUT|TEXTAREA|SELECT/.test(a.tagName)) && !$("#sheet").classList.contains("open") && ["home", "onboarding"].includes(S.route) && !(S.rec && (S.rec.lines || []).length && !S.rec.done);
+  },
+  async check() {
+    const v = await this.fetchV(); if (!v) return;
+    if (!this.running) {
+      /* launch: the code is current if it says so (APP_V) or if this device already updated to v */
+      if (v === APP_V || v === this.get("gg-v", localStorage)) { this.running = v; this.set("gg-v", v, localStorage); return; }
+      this.running = this.get("gg-v", localStorage) || APP_V;
+    }
+    if (v === this.running) return;
+    if (this.get("gg-upd", sessionStorage) === v) { this.running = v; this.set("gg-v", v, localStorage); return; } /* already reloaded once for v: adopt it, never loop */
+    if (this.quiet()) return this.apply(v);
+    if (this.offered === v) return; this.offered = v;
+    toast("Nouvelle version disponible", "info"); const t = $("#toast");
+    $("#toastTx").innerHTML = `<span class="tx">Nouvelle version disponible</span><button data-act="appUpdate" data-v="${esc(v)}">Mettre à jour</button>`;
+    t.style.pointerEvents = "auto"; clearTimeout(t._h); t._h = setTimeout(() => { t.classList.remove("on"); t.style.pointerEvents = ""; }, 12000);
+  },
+  async apply(v) {
+    this.set("gg-upd", v, sessionStorage); this.set("gg-v", v, localStorage);
+    try { if (window.caches) { const ks = await caches.keys(); await Promise.all(ks.filter((k) => k.startsWith("gg-")).map((k) => caches.delete(k))); } } catch (e) {}
+    try { const r = navigator.serviceWorker && (await navigator.serviceWorker.getRegistration()); if (r) await Promise.race([r.update(), new Promise((ok) => setTimeout(ok, 1500))]); } catch (e) {}
+    location.reload();
+  },
+};
+function freshness() {
+  if (location.protocol === "file:") return;
+  UPD.check();
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") UPD.check(); });
 }
 
-function toastUndo(msg) { toast(msg); const t = $("#toastTx"); t.innerHTML = `${esc(msg)} <button data-act="undo" style="all:unset;cursor:pointer;margin-left:10px;font-weight:800;color:#B9A6FF">Annuler</button>`; $("#toast").style.pointerEvents = "auto"; clearTimeout($("#toast")._h); $("#toast")._h = setTimeout(() => { $("#toast").classList.remove("on"); S.ui.undo = null; }, 4000); }
+function toastUndo(msg) { toast(msg); const t = $("#toast"); $("#toastTx").innerHTML = `<span class="tx">${esc(msg)}</span><button data-act="undo">Annuler</button>`; t.style.pointerEvents = "auto"; clearTimeout(t._h); t._h = setTimeout(() => { t.classList.remove("on"); t.style.pointerEvents = ""; S.ui.undo = null; }, 4000); }
 /* ───────────────────────── toast + burst ───────────────────────── */
-function toast(msg, kind) { const t = $("#toast"); $("#toastTx").textContent = msg; t.classList.toggle("err", kind === "err"); const c = $(".check", t); c.classList.remove("draw"); void c.offsetWidth; c.classList.add("draw"); t.classList.add("on"); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove("on"), kind === "err" ? 3800 : 2300); }
+const TOAST_CHECK = `<svg viewBox="0 0 24 24"><path d="M6 12.5l4 4 8-9"/></svg>`;
+function toast(msg, kind) { const t = $("#toast"); t.style.pointerEvents = ""; t.classList.toggle("info", kind === "info"); $(".check", t).innerHTML = kind === "info" ? `<svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 0 1 15.5-6.2L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15.5 6.2L3 16"/><path d="M3 21v-5h5"/></svg>` : TOAST_CHECK; $("#toastTx").textContent = msg; t.classList.toggle("err", kind === "err"); const c = $(".check", t); c.classList.remove("draw"); void c.offsetWidth; c.classList.add("draw"); t.classList.add("on"); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove("on"), kind === "err" ? 3800 : 2300); }
 function burst(x = window.innerWidth / 2, y = window.innerHeight / 3) {
   if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
   const b = document.createElement("div"); b.className = "burst"; const cols = ["#7A4DFF", "#4A1FE6", "#9ED7FF", "#C8B6FF", "#2FB985", "#fff"];
@@ -604,7 +703,7 @@ document.addEventListener("keydown", (e) => { if ((e.key === "Enter" || e.key ==
 document.addEventListener("click", async (e) => {
   SFX.init();
   const tab = e.target.closest("[data-tab]");
-  if (tab) { const r = tab.dataset.tab; SFX.tap(); buzz(5); if (r !== S.route) { S.history = []; go(r, {}, { replace: true }); } else { const v = $("#viewport .view"); v && v.scrollTo({ top: 0, behavior: "smooth" }); } return; }
+  if (tab) { const r = tab.dataset.tab; SFX.tap(); buzz(5); if (r !== S.route) { S.history = []; go(r, {}, { replace: true, tab: true }); } else { const v = $("#viewport .view"); v && v.scrollTo({ top: 0, behavior: "smooth" }); } return; }
   const g = e.target.closest("[data-go]");
   if (g && !e.target.closest("[data-act]")) { SFX.tap(); const p = g.dataset.id ? { id: g.dataset.id } : {}; if (g.dataset.fresh) p.fresh = true; go(g.dataset.go, p); return; }
   const a = e.target.closest("[data-act]"); if (!a) return;
@@ -614,7 +713,14 @@ document.addEventListener("click", async (e) => {
 const ACT = {
   back: () => { SFX.tap(); goBack(); },
   sheetClose: () => closeSheet(),
-  undo: async () => { const u = S.ui.undo; if (!u) return; S.ui.undo = null; await DB.del(u.col, u.id).catch(() => {}); $("#toast").classList.remove("on"); SFX.close(); },
+  undo: async () => {
+    const u = S.ui.undo; if (!u) return; S.ui.undo = null;
+    /* the audit-trail line that went with it: given explicitly (u.evId), or, for a chore log, the "chore" event with the same chore ref, author and time (±5 s) */
+    let evId = u.evId || null;
+    if (!evId && u.col === "choreLogs") { const log = S.choreLogs.find((l) => l.id === u.id); if (log) { const ev = S.events.filter((e) => e.type === "chore" && e.ref === log.choreId && e.uid === log.uid && Math.abs((e.at || 0) - (log.at || 0)) < 5000).sort((a, b) => Math.abs(a.at - log.at) - Math.abs(b.at - log.at))[0]; if (ev) evId = ev.id; } }
+    await DB.del(u.col, u.id).catch(() => {}); if (evId) await DB.del("events", evId).catch(() => {});
+    $("#toast").classList.remove("on"); SFX.close();
+  },
 
   sound: () => { SFX.on = !SFX.on; try { localStorage.setItem("gg-sound", SFX.on ? "on" : "off"); } catch (e) {} if (SFX.on) SFX.ok(); rerender(); },
 
@@ -623,11 +729,12 @@ const ACT = {
 async function saveCsv(name, rows) {
   const csv = "﻿" + rows.map((r) => r.map((c) => { const s = String(c ?? ""); return /[;"\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; }).join(";")).join("\n");
   if (!S.cap.downloads) { toast("Export indisponible dans cette vue.", "err"); return; }
-  try { await S.cap.downloads.save({ filename: name, data: new Blob([csv], { type: "text/csv" }) }); SFX.ok(); toast("Fichier prêt"); } catch (e) { if (e && e.code !== "declined") toast("Export impossible.", "err"); }
+  try { await S.cap.downloads.save({ filename: name, data: new Blob([csv], { type: "text/csv" }) }); SFX.ok(); toast("Fichier téléchargé"); } catch (e) { if (e && e.code !== "declined") toast("Export impossible.", "err"); }
 }
 
-/* install card actions */
+/* install card + update toast actions */
 Object.assign(ACT, {
+  appUpdate: (a) => { SFX.tap(); $("#toast").classList.remove("on"); UPD.apply(a.dataset.v); },
   installApp: async () => {
     if (!installEvt) return; SFX.tap(); const ev = installEvt;
     try { ev.prompt(); const r = await ev.userChoice; if (r && r.outcome === "accepted") { installEvt = null; SFX.done(); toast("Gusto est installée"); try { localStorage.setItem("gg-install-off", "1"); } catch (e) {} } } catch (e) {}

@@ -18,17 +18,37 @@ const REC_TYPES = [
   { k: "sec", t: "Sec", max: null },
 ];
 const REC_DLC = [1, 3, 5, 7, 14];
-const REC_REASONS_BAD = ["Température trop haute", "Emballage abîmé", "DLC trop courte", "Produit non conforme"];
+const REC_REASONS_BAD = ["Température trop haute", "DLC dépassée", "Emballage abîmé", "DLC trop courte", "Produit non conforme"];
 const REC_REASONS_RES = ["Température limite", "Emballage abîmé", "DLC courte", "Livré en retard"];
 
 /* ───────── state ───────── */
 function recState() {
+  if (S.rec && S.rec.rid && S.rec.rid !== S.rid) S.rec = null; /* switched restaurant: that draft stays saved under its own key */
   if (!S.rec) S.rec = { step: 1, supplier: "", bl: "", lines: [], done: null, open: 0 };
-  const R = S.rec;
+  const R = S.rec; if (!R.rid) R.rid = S.rid;
   R.lines = R.lines || []; if (R.edit == null) R.edit = -1; if (!R.view) R.view = "flow";
   if (!R.cur) R.cur = recBlank();
   return R;
 }
+/* ───────── draft: an unfinished reception survives a reload, a closed app or a dead battery ───────── */
+const recDraftKey = () => `gg-rec-draft-${S.rid || ""}`;
+const REC_DRAFT_KEEP = ["step", "supplier", "bl", "lines", "cur", "edit", "stash", "lastFridge", "lastUnit", "back3", "rid"];
+function recDraftClear() { try { localStorage.removeItem(recDraftKey()); } catch (e) {} }
+const recDraftSave = debounce(() => {
+  const R = S.rec; if (!S.rid || (R && R.rid && R.rid !== S.rid)) return;
+  if (!R || R.done || !((R.supplier || "").trim() || (R.lines || []).length || (R.cur && String(R.cur.name || "").trim()))) return recDraftClear();
+  const d = { at: Date.now() }; REC_DRAFT_KEEP.forEach((k) => { if (R[k] !== undefined) d[k] = R[k]; });
+  try { localStorage.setItem(recDraftKey(), JSON.stringify(d)); } catch (e) {}
+}, 250);
+(function recDraftLoad() {
+  if (S.rec || !S.rid) return;
+  try {
+    const d = JSON.parse(localStorage.getItem(recDraftKey()) || "null");
+    if (!d || !Array.isArray(d.lines) || Date.now() - (d.at || 0) > 18 * 36e5) { recDraftClear(); return; }
+    delete d.at; S.rec = { supplier: "", bl: "", done: null, open: 0, ...d, step: Math.min(3, Math.max(1, +d.step || 1)) };
+    [S.rec.cur, S.rec.stash].forEach((L) => { if (L && L.ocr === "busy") L.ocr = null; });
+  } catch (e) {}
+})();
 function recFridgeFor(tmax, pref) {
   const fr = S.fridges; if (!fr.length) return "";
   const cold = tmax != null && tmax <= -15;
@@ -43,6 +63,7 @@ function recBlank() {
 const recNorm = (s) => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
 const recTypeOf = (L) => L.type || (L.tmax == null ? "sec" : L.tmax <= -15 ? "surg" : L.tmax <= 2 ? "ultra" : "frais");
 const recCold = (L) => recTypeOf(L) !== "sec";
+const recNeedDlc = (L) => ["frais", "ultra"].includes(recTypeOf(L));
 function recIssues(L) {
   const out = []; const t = num(L.temp);
   if (recCold(L)) {
@@ -90,7 +111,7 @@ function recSuggest(q) {
 }
 function recGuessType(name) {
   const n = recNorm(name);
-  if (/surgel|congel/.test(n)) return "surg";
+  if (/surgel|congel|\b(glaces?|sorbets?|creme glacee)\b/.test(n)) return "surg";
   if (/\b(poissons?|saumon|cabillaud|thon|bar|daurade|dorade|lieu|merlu|sole|truite|maquereau|sardines?|crevettes?|moules?|huitres?|saint[- ]jacques|st[- ]jacques|langoustines?|hache|tartare|volaille|poulet|abats?)\b/.test(n)) return "ultra";
   if (/\b(farine|sucre|sel|huile|riz|pates|vin|biere|cafe|the|conserves?|epices?|chocolat|levure)\b/.test(n)) return "sec";
   return "frais";
@@ -130,7 +151,7 @@ VIEWS.reception = {
     return `<div class="inner narrow rec rec-s${R.step}">${body.top}${recProg(R.step)}<div class="rec-stage ${anim}">${body.main}</div>${body.cta}</div>`;
   },
   after(v) {
-    const R = S.rec; if (!R) return;
+    const R = S.rec; if (!R) return; recDraftSave();
     if (R.scrollTo) { const sel = R.scrollTo; R.scrollTo = null; setTimeout(() => { const el = $(sel, v); if (!el) return; let top = -14; for (let n = el; n && n !== v; n = n.offsetParent) top += n.offsetTop; v.scrollTo({ top: Math.max(0, top), behavior: "smooth" }); }, 40); }
     if (R.celebrate) { R.celebrate = false; setTimeout(() => { const s = $(".rec-seal", v); const b = s && s.getBoundingClientRect(); b ? burst(b.left + b.width / 2, b.top + b.height / 2) : burst(); }, 280); }
   },
@@ -207,16 +228,16 @@ function recCard(L, i) {
       <div class="row"><span class="lbl">Température à cœur</span>${recCold(L) ? `<span class="pill ${st === "bad" ? "bad" : st === "ok" ? "ok" : "neu"}" id="recTmax">seuil ${fmt(L.tmax, 0)} °C</span>` : ""}</div>
       <div class="chips rec-types">${REC_TYPES.map((T) => `<button class="chip ${ty === T.k ? "on" : ""}" data-act="recType" data-v="${T.k}">${T.t}</button>`).join("")}</div>
       ${recCold(L) ? `<div class="rec-tv"><button class="step" data-rst="-1" aria-label="Moins 0,1 degré">${ico("minus")}</button>
-        <label class="rec-tnum"><input id="recT" class="mono" data-bind="rec.cur.temp" data-rect="1" value="${esc(L.temp)}" style="width:${recTW(L.temp)}" inputmode="decimal" placeholder="–" enterkeyhint="done" aria-label="Température en °C"><small>°C</small></label>
+        <label class="rec-tnum"><input id="recT" class="mono" data-bind="rec.cur.temp" data-rect="1" value="${esc(L.temp)}" style="${recTStyle(L.temp)}" inputmode="decimal" placeholder="–" enterkeyhint="done" aria-label="Température en °C"><small>°C</small></label>
         <button class="step" data-rst="1" aria-label="Plus 0,1 degré">${ico("plus")}</button></div>
         <div class="rec-tst" id="recTst">${recTstHtml(L)}</div>
         <div class="chips rec-qt" id="recQt">${recQuick(L)}</div>` : `<p class="note rec-dry">Produit sec : pas de température à relever.</p>`}
     </div>
-    <div class="rec-f"><div class="row"><span class="lbl">DLC</span><span class="sub mono" id="recDlcTx">${L.dlc ? `${shortDate(L.dlc)} · ${dd < 0 ? "dépassée" : dd === 0 ? "aujourd'hui" : dd === 1 ? "demain" : `dans ${dd} j`}` : "à choisir"}</span></div>
-      <div class="chips rec-dlc">${REC_DLC.map((d) => { const k = addDays(today, d); return `<button class="chip ${L.dlc === k ? "on" : ""}" data-act="recDlc" data-v="${k}">J+${d}</button>`; }).join("")}<label class="chip ${dlcCustom ? "on" : ""} rec-date">${ico("recCal")}${dlcCustom ? shortDate(L.dlc) : "Date"}<input type="date" data-bind="rec.cur.dlc" data-rer="1" value="${esc(L.dlc)}" aria-label="Choisir la date de DLC"></label></div></div>
-    <div class="rec-f"><span class="lbl">Ranger dans</span><div class="chips rec-fr">${S.fridges.map((f) => `<button class="chip ${L.fridgeId === f.id ? "on" : ""}" data-act="recFr" data-v="${f.id}">${ico("snow")}${esc(f.name)}</button>`).join("") || `<span class="note">Aucun frigo : ajoutez-en dans Frigos.</span>`}</div></div>
+    <div class="rec-f" id="recDlc"><div class="row"><span class="lbl">DLC${recNeedDlc(L) ? "" : ` <i class="rec-opt">facultatif</i>`}</span><span class="sub mono" id="recDlcTx">${L.dlc ? `${shortDate(L.dlc)} · ${dd < 0 ? "dépassée" : dd === 0 ? "aujourd'hui" : dd === 1 ? "demain" : `dans ${dd} j`}` : "à choisir"}</span></div>
+      <div class="rec-dlc">${REC_DLC.map((d) => { const k = addDays(today, d); return `<button class="chip ${L.dlc === k ? "on" : ""}" data-act="recDlc" data-v="${k}">J+${d}</button>`; }).join("")}<label class="chip ${dlcCustom ? "on" : ""} rec-date" title="Autre date">${ico("recCal")}${dlcCustom ? `<span class="mono">${shortDate(L.dlc)}</span>` : ""}<input type="date" data-bind="rec.cur.dlc" data-rer="1" value="${esc(L.dlc)}" aria-label="Choisir la date de DLC"></label></div></div>
+    <div class="rec-f"><span class="lbl">Ranger dans</span>${ty === "surg" && S.fridges.length && !S.fridges.some((f) => f.max <= -15) ? `<p class="note rec-dry">Aucun congélateur dans Frigos : choisissez où le ranger.</p>` : ""}<div class="chips rec-fr">${S.fridges.map((f) => `<button class="chip ${L.fridgeId === f.id ? "on" : ""}" data-act="recFr" data-v="${f.id}">${ico("snow")}${esc(f.name)}</button>`).join("") || `<span class="note">Aucun frigo : ajoutez-en dans Frigos.</span>`}</div></div>
     <div class="rec-f rec-proof">
-      ${L.photoUrl ? `<div class="rec-ph has"><span class="th ${L.ocr === "busy" ? "scan" : ""}"><img src="${esc(L.photoUrl)}" alt="Étiquette sanitaire"></span><span class="tx"><b>Photo prise</b><em>${L.ocr === "busy" ? "Lecture de l'étiquette…" : L.ocr === "fail" ? "Lecture impossible, la photo reste en preuve." : "Gardée en preuve au registre."}</em></span><button class="iconbtn rec-x" data-act="recPhoto" aria-label="Reprendre la photo">${ico("camera")}</button><button class="iconbtn rec-x" data-act="recPhotoRm" aria-label="Retirer la photo">${ico("x")}</button></div>`
+      ${L.photoUrl ? `<div class="rec-ph has"><span class="th ${L.ocr === "busy" ? "scan" : ""}"><img src="${esc(L.photoUrl)}" alt="Étiquette sanitaire"></span><span class="tx"><b>Photo prise</b><em>${L.ocr === "busy" ? "Lecture de l'étiquette…" : L.ocr === "fail" ? "Lecture impossible, la photo reste en preuve." : "Preuve gardée au registre."}</em></span><button class="iconbtn rec-x" data-act="recPhoto" aria-label="Reprendre la photo">${ico("camera")}</button><button class="iconbtn rec-x" data-act="recPhotoRm" aria-label="Retirer la photo">${ico("x")}</button></div>`
         : `<button class="rec-ph" data-act="recPhoto"><span class="ic">${ico("camera")}</span><span class="tx"><b>Photo de l'étiquette</b><em>${S.cap.sample ? "Lot et DLC lus automatiquement" : "Facultatif · preuve sanitaire"}</em></span>${ico("chev")}</button>`}
       ${L.ocr && typeof L.ocr === "object" ? `<div class="ocr">${Object.entries(L.ocr).filter(([, v]) => v).map(([k, v], j) => `<span style="--i:${j}">${esc(k)} : ${esc(v)}</span>`).join("")}</div>` : ""}
       <label class="rec-lot"><span class="lbl">N° de lot</span><input class="input mono" data-bind="rec.cur.lot" value="${esc(L.lot)}" placeholder="facultatif" autocomplete="off" enterkeyhint="done"></label>
@@ -252,7 +273,7 @@ function recStep3() {
   const undecided = bad.filter((L) => !L.decision).length;
   return {
     top: recTop("Contrôle"),
-    main: `${head}${bad.length ? `<div class="rec-callout">${ico("alert")}<span>${bad.length === 1 ? "1 produit n'est pas conforme" : `${bad.length} produits ne sont pas conformes`} : acceptez avec réserve ou refusez.</span></div>` : `<div class="rec-callout ok">${ico("check")}<span>Tout est conforme. Validez pour ranger.</span></div>`}<div class="rec-ctls">${order.map(([L, i]) => recCtl(L, i)).join("")}</div>`,
+    main: `${head}${bad.length ? `<div class="rec-callout">${ico("alert")}<span>${bad.length === 1 ? "1 produit n'est pas conforme : décidez avant de valider." : `${bad.length} produits ne sont pas conformes : décidez avant de valider.`}</span></div>` : `<div class="rec-callout ok">${ico("check")}<span>Tout est conforme. Validez pour ranger.</span></div>`}<div class="rec-ctls">${order.map(([L, i]) => recCtl(L, i)).join("")}</div>`,
     cta: `<div class="ctabar rec-cta"><button class="btn soft" data-act="recGo" data-v="2">Modifier</button><button class="btn acc" data-act="recSave" ${undecided ? `data-off="1"` : ""}>${undecided ? `${ico("alert")}Décider (${undecided})` : `${ico("check")}Valider la réception`}</button></div>`,
   };
 }
@@ -261,7 +282,8 @@ function recCtl(L, i) {
   const d = L.decision || (ok ? "ok" : "");
   const open = !ok || R.ctlOpen === i || d === "refuse";
   const meta = `${L.qty ? `${esc(L.qty)} ${esc(L.unit)} · ` : ""}${recCold(L) ? (t == null ? "– °C" : fmt(t) + " °C") : "sec"} · DLC ${L.dlc ? shortDate(L.dlc) : "–"} · ${esc(fridgeName(L.fridgeId))}`;
-  const opts = ok ? [["ok", "Accepter"], ["refuse", "Refuser"]] : [["reserve", "Accepter avec réserve"], ["refuse", "Refuser"]];
+  const expired = iss.some((x) => x.k === "dlc"); /* a past DLC can't enter the kitchen: fix the entry or refuse */
+  const opts = ok ? [["ok", "Accepter"], ["refuse", "Refuser"]] : expired ? [["fix", "Corriger la DLC"], ["refuse", "Refuser"]] : [["reserve", "Accepter avec réserve"], ["refuse", "Refuser"]];
   const di = opts.findIndex((o) => o[0] === d);
   const reasons = d === "refuse" ? REC_REASONS_BAD : REC_REASONS_RES;
   return `<div class="glass rec-ctl ${ok ? "" : "issue"} ${d === "refuse" ? "refused" : d === "reserve" ? "reserve" : ""} ${open ? "open" : ""}" data-ctl="${i}">
@@ -273,10 +295,12 @@ function recCtl(L, i) {
     </button>
     ${open ? `<div class="rec-ctl-b">
       ${iss.length ? `<div class="rec-iss">${iss.map((x) => `<span class="pill bad">${ico(x.k === "temp" ? "therm" : "recCal")}${esc(x.t)}</span>`).join("")}</div>` : ""}
+      ${expired && d !== "refuse" ? `<p class="note" style="margin:0">DLC dépassée : ce produit ne peut pas entrer en cuisine.</p>` : ""}
       <div class="seg rec-seg ${di < 0 ? "none" : ""}"><span class="knob" style="width:calc(50% - 4px);transform:translateX(${di === 1 ? "100%" : "0"})"></span>${opts.map(([k, tx]) => `<button class="${d === k ? "on" : ""} ${k}" data-act="recDecide" data-i="${i}" data-v="${k}">${tx}</button>`).join("")}</div>
       ${d === "refuse" || d === "reserve" ? `<div class="rec-why"><span class="lbl">${d === "refuse" ? "Motif du refus" : "Motif de la réserve"}</span><div class="chips">${reasons.map((r) => `<button class="chip ${L.reason === r ? "on" : ""}" data-act="recReason" data-i="${i}" data-v="${esc(r)}">${esc(r)}</button>`).join("")}</div>
         <input class="input" data-bind="rec.lines.${i}.reason" value="${esc(reasons.includes(L.reason) ? "" : L.reason)}" placeholder="Autre motif…" autocomplete="off" enterkeyhint="done"></div>
         <p class="note" style="margin:0">${d === "refuse" ? "Repart avec le livreur : noté au registre, n'entre pas en frigo." : "Entre en frigo, la réserve est notée au registre."}</p>` : ""}
+      ${!ok && !expired ? `<button class="btn ghost sm rec-fix" data-act="recFix" data-i="${i}">${ico("edit")}Corriger la saisie</button>` : ""}
     </div>` : ""}
   </div>`;
 }
@@ -318,7 +342,10 @@ function recHistSheet(r) {
 }
 
 /* ───────── in-place updates (no re-render while typing) ───────── */
-const recTW = (v) => `${Math.max(1, String(v || "").length) * 0.56 + 0.12}em`;
+/* the big temperature must never clip ("-19,5" on a 320px phone): width in em of its own font-size, font-size shrinks with length and screen */
+const recTEm = (n) => n * 0.56 + 0.12;
+const recTStyle = (v) => { const n = String(v || "").length; return `width:${recTEm(Math.max(1, n))}em;font-size:min(58px,calc((100vw - 272px) / ${recTEm(Math.max(3, n)).toFixed(2)}))`; };
+const recTFit = (inp) => { inp.style.cssText = recTStyle(inp.value); };
 function recPaintTemp() {
   const L = S.rec?.cur; if (!L) return; const st = recTempState(L);
   const box = $("#recTemp"); if (box) { box.classList.remove("ok", "bad", "none"); box.classList.add(st); }
@@ -328,7 +355,7 @@ function recPaintTemp() {
 }
 function recSetTemp(v) {
   const L = S.rec.cur; const was = recTempState(L); L.temp = v == null ? "" : fmt(v);
-  const inp = $("#recT"); if (inp) { inp.value = L.temp; inp.style.width = recTW(L.temp); const lb = inp.parentElement; lb.classList.remove("bump"); void lb.offsetWidth; lb.classList.add("bump"); }
+  const inp = $("#recT"); if (inp) { inp.value = L.temp; recTFit(inp); const lb = inp.parentElement; lb.classList.remove("bump"); void lb.offsetWidth; lb.classList.add("bump"); }
   recPaintTemp(); const now = recTempState(L);
   if (now !== was && now === "bad") { SFX.err(); buzz([15, 40, 15]); }
 }
@@ -343,11 +370,18 @@ document.addEventListener("pointerdown", (e) => {
 }, true);
 ["pointerup", "pointercancel"].forEach((ev) => document.addEventListener(ev, () => { recPtr = false; clearTimeout(recHold); clearInterval(recHoldI); }, true));
 document.addEventListener("pointerleave", (e) => { if (e.target.closest && e.target.matches("[data-rst]")) { clearTimeout(recHold); clearInterval(recHoldI); } }, true);
+document.addEventListener("click", () => { if (S.rec && S.route === "reception") recDraftSave(); });
 document.addEventListener("input", (e) => {
-  const el = e.target; if (!S.rec || S.route !== "reception") return;
+  const el = e.target; if (!S.rec || S.route !== "reception") return; recDraftSave();
   if (el.dataset.recname) { S.rec.cur.memo = null; const s = $("#recSugs"); if (s) s.innerHTML = recSugsHtml(recSuggest(el.value)); const m = $(".rec-memo"); m && m.remove(); }
-  else if (el.dataset.rect) { el.style.width = recTW(el.value); recPaintTemp(); }
+  else if (el.dataset.rect) { recTFit(el); recPaintTemp(); }
   else if (el.dataset.recsup) { const b = $("#recSupGo"); const v = el.value.trim(); if (b) { b.innerHTML = `${v ? `Continuer avec ${esc(v)}` : "Continuer"}${ico("chev")}`; v ? b.removeAttribute("data-off") : b.setAttribute("data-off", "1"); } const cb = $("#recSupCta"); if (cb) cb.hidden = !v && !!$(".rec-sup"); $$(".rec-sup.on").forEach((x) => x.classList.remove("on")); }
+});
+/* typed a frozen reading (≤ −12 °C) on a chilled type: it is a frozen product, switch the type so the threshold is right */
+document.addEventListener("change", (e) => {
+  const el = e.target; if (!el.dataset || !el.dataset.rect || !S.rec || S.route !== "reception") return;
+  const L = S.rec.cur; const t = num(L.temp); if (t == null || t > -12 || recTypeOf(L) === "surg") return;
+  recSetType(L, "surg"); L.temp = fmt(t); SFX.tick(); rerender();
 });
 /* typed a known product name and left the field: apply its smart defaults */
 document.addEventListener("change", (e) => {
@@ -377,13 +411,16 @@ document.addEventListener("focusin", (e) => {
 });
 
 /* ───────── actions ───────── */
+/* a double tap on « Valider » must not land on the buttons that replace it */
+const recGhost = (R) => !!(R && R.doneAt && Date.now() - R.doneAt < 700);
 function recNudge(sel, msg) { SFX.err(); buzz([20, 40, 20]); if (msg) toast(msg, "err"); const el = $(sel); if (el) { el.classList.remove("shake"); void el.offsetWidth; el.classList.add("shake"); el.scrollIntoView({ block: "center", behavior: "smooth" }); } }
 const recBlur = () => { const a = document.activeElement; a && a.blur && a.blur(); };
 function recStep(n) { const R = recState(); R.anim = n > R.step ? "fwd" : "bwd"; R.step = n; R.ctlOpen = -1; recBlur(); rerender(); const v = $("#viewport .view:not(.leave)"); v && v.scrollTo({ top: 0 }); }
 function recCommitCur() {
   const R = recState(); const L = R.cur;
-  if (!L.name.trim()) { recNudge("#recName", "Quel produit ? Donnez-lui un nom."); return false; }
-  if (recCold(L) && num(L.temp) == null) { recNudge("#recTemp", "Sondez le produit : il manque la température."); return false; }
+  if (!L.name.trim()) { recNudge("#recName", "Quel produit ? Tapez son nom."); return false; }
+  if (recCold(L) && num(L.temp) == null) { recNudge("#recTemp", "Il manque la température."); return false; }
+  if (recNeedDlc(L) && !L.dlc) { recNudge("#recDlc", "Choisissez la DLC."); return false; }
   L.name = L.name.trim(); L.temp = num(L.temp) == null ? "" : fmt(num(L.temp));
   const clean = { ...L, memo: null, applied: null };
   if (R.edit >= 0) R.lines[R.edit] = clean; else R.lines.push(clean);
@@ -406,11 +443,11 @@ Object.assign(ACT, {
   },
   recSupGo: () => {
     const R = recState(); R.supplier = (R.supplier || "").trim();
-    if (!R.supplier) { recNudge("#recSupIn", "Qui livre ? Choisissez ou tapez le fournisseur."); return; }
+    if (!R.supplier) { recNudge("#recSupIn", "Qui livre ? Tapez le fournisseur."); return; }
     const k = recSuppliers().find((s) => recNorm(s.name) === recNorm(R.supplier)); if (k) R.supplier = k.name;
     SFX.tap(); recStep(2);
   },
-  recPick: (a, id, v) => { const R = recState(); recApply(R.cur, v); R.cur.applied = recNorm(v); SFX.tick(); buzz(5); rerender(); },
+  recPick: (a, id, v) => { const R = recState(); recApply(R.cur, v); R.cur.applied = recNorm(v); SFX.tick(); buzz(5); R.scrollTo = "#recCard"; rerender(); },
   recUnit: (a, id, v) => { recState().cur.unit = v; SFX.tick(); $$(".rec-units .chip").forEach((b) => b.classList.toggle("on", b === a)); },
   recType: (a, id, v) => { recSetType(recState().cur, v); SFX.tick(); rerender(); },
   recTq: (a, id, v) => { recSetTemp(+v); SFX.tick(); buzz(5); },
@@ -444,15 +481,33 @@ Object.assign(ACT, {
   },
   recSaveLine: () => {
     const R = recState(); const i = R.edit; if (!recCommitCur()) return;
-    R.cur = R.stash || recBlank(); R.stash = null; R.edit = -1; SFX.ok(); buzz(8); recBlur(); R.scrollTo = `[data-act=recEdit][data-i="${i}"]`; rerender(); R.justAdded = -1;
+    R.cur = R.stash || recBlank(); R.stash = null; R.edit = -1; SFX.ok(); buzz(8); recBlur(); R.justAdded = -1;
+    if (R.back3) { R.back3 = false; return recStep(3); }
+    R.scrollTo = `[data-act=recEdit][data-i="${i}"]`; rerender();
   },
   recEdit: (a) => {
-    const R = recState(); const i = +a.dataset.i; if (R.edit === i) return;
+    const R = recState(); const i = +a.dataset.i; if (R.edit === i) return; R.back3 = false;
     if (R.edit < 0) R.stash = R.cur;
     R.edit = i; R.cur = { ...R.lines[i], applied: recNorm(R.lines[i].name) }; SFX.tap(); R.scrollTo = "#recCard"; rerender();
   },
-  recCancel: () => { const R = recState(); const i = R.edit; R.edit = -1; R.cur = R.stash || recBlank(); R.stash = null; SFX.close(); recBlur(); R.scrollTo = `[data-act=recEdit][data-i="${i}"]`; rerender(); },
-  recRm: (a) => { const R = recState(); const i = +a.dataset.i; const L = R.lines[i]; R.lines.splice(i, 1); R.edit = -1; R.cur = R.stash || recBlank(); R.stash = null; SFX.close(); toast(`${L.name} retiré`); rerender(); },
+  recCancel: () => { const R = recState(); const i = R.edit; R.edit = -1; R.cur = R.stash || recBlank(); R.stash = null; SFX.close(); recBlur(); if (R.back3) { R.back3 = false; return recStep(3); } R.scrollTo = `[data-act=recEdit][data-i="${i}"]`; rerender(); },
+  recRm: (a) => {
+    const R = recState(); const i = +a.dataset.i; const L = R.lines[i]; R.lines.splice(i, 1); R.edit = -1; R.cur = R.stash || recBlank(); R.stash = null; SFX.close(); buzz(8);
+    R.undoRm = { L, i }; const back3 = R.back3; R.back3 = false; rerender();
+    const t = $("#toast"); toast(`${L.name} retiré`); $("#toastTx").innerHTML = `${esc(L.name)} retiré <button class="rec-undo" data-act="recUndoRm">Annuler</button>`; t.style.pointerEvents = "auto";
+    clearTimeout(t._h); t._h = setTimeout(() => { t.classList.remove("on"); t.style.pointerEvents = ""; if (R.undoRm && R.undoRm.L === L) R.undoRm = null; }, 4500);
+    if (back3 && R.lines.length) recStep(3);
+  },
+  recUndoRm: () => {
+    const R = S.rec; const u = R && R.undoRm; if (!u) return; R.undoRm = null; R.lines.splice(Math.min(u.i, R.lines.length), 0, u.L); R.justAdded = Math.min(u.i, R.lines.length - 1);
+    const t = $("#toast"); t.classList.remove("on"); t.style.pointerEvents = ""; SFX.ok(); buzz(6);
+    if (S.route === "reception") { if (R.step === 3) rerender(); else { R.scrollTo = `[data-act=recEdit][data-i="${R.justAdded}"]`; rerender(); } } R.justAdded = -1;
+  },
+  /* from Contrôle: reopen that line in Produits, and come straight back after saving */
+  recFix: (a) => {
+    const R = recState(); const i = +a.dataset.i; if (!R.lines[i]) return;
+    if (R.edit < 0) R.stash = R.cur; R.edit = i; R.cur = { ...R.lines[i], decision: "", reason: "", applied: recNorm(R.lines[i].name) }; R.back3 = true; R.scrollTo = "#recCard"; SFX.tap(); recStep(2);
+  },
   recFinish: () => {
     const R = recState(); const L = R.cur;
     if (R.edit >= 0) { if (!recCommitCur()) return; R.cur = R.stash || recBlank(); R.stash = null; R.edit = -1; }
@@ -462,19 +517,21 @@ Object.assign(ACT, {
   },
   recCtl: (a) => { const R = recState(); const i = +a.dataset.i; const L = R.lines[i]; if (!recOk(L) || L.decision === "refuse") return; R.ctlOpen = R.ctlOpen === i ? -1 : i; SFX.tap(); rerender(); },
   recDecide: (a) => {
-    const R = recState(); const L = R.lines[+a.dataset.i]; const v = a.dataset.v; const iss = recIssues(L); L.decision = v;
-    if (v === "refuse") { if (!REC_REASONS_BAD.includes(L.reason)) L.reason = iss.some((x) => x.k === "temp" && num(L.temp) != null) ? "Température trop haute" : iss.some((x) => x.k === "dlc") ? "DLC trop courte" : ""; SFX.close(); buzz(12); }
+    const R = recState(); const L = R.lines[+a.dataset.i]; const v = a.dataset.v; const iss = recIssues(L);
+    if (v === "fix") return ACT.recFix(a);
+    L.decision = v;
+    if (v === "refuse") { if (!REC_REASONS_BAD.includes(L.reason)) L.reason = iss.some((x) => x.k === "dlc") ? "DLC dépassée" : iss.some((x) => x.k === "temp" && num(L.temp) != null) ? "Température trop haute" : ""; SFX.close(); buzz(12); }
     else if (v === "reserve") { if (!REC_REASONS_RES.includes(L.reason)) L.reason = iss.some((x) => x.k === "temp" && num(L.temp) != null) ? "Température limite" : ""; SFX.tick(); buzz(6); }
     else { L.reason = ""; L.decision = ""; R.ctlOpen = -1; SFX.tick(); }
     rerender();
   },
   recReason: (a) => { const L = recState().lines[+a.dataset.i]; L.reason = L.reason === a.dataset.v ? "" : a.dataset.v; SFX.tick(); $$(`[data-act=recReason][data-i="${a.dataset.i}"]`).forEach((b) => b.classList.toggle("on", b.dataset.v === L.reason)); const inp = a.closest(".rec-why")?.querySelector("input"); if (inp) inp.value = ""; },
-  recLabels: () => { const R = recState(); if (R.done && R.done.length) openLabel(R.done); },
-  recAgain: () => { S.rec = null; const R = recState(); R.anim = "fwd"; SFX.tap(); rerender(); const v = $("#viewport .view:not(.leave)"); v && v.scrollTo({ top: 0 }); },
+  recLabels: () => { const R = recState(); if (recGhost(R)) return; if (R.done && R.done.length) openLabel(R.done); },
+  recAgain: () => { if (recGhost(S.rec)) return; S.rec = null; const R = recState(); R.anim = "fwd"; SFX.tap(); rerender(); const v = $("#viewport .view:not(.leave)"); v && v.scrollTo({ top: 0 }); },
   recSave: async (a) => {
     const R = recState();
     const und = R.lines.findIndex((L) => !recOk(L) && !L.decision);
-    if (und >= 0) { recNudge(`[data-ctl="${und}"]`, `${R.lines[und].name} : acceptez avec réserve ou refusez.`); return; }
+    if (und >= 0) { recNudge(`[data-ctl="${und}"]`, `${R.lines[und].name} : à décider.`); return; }
     if (R.saving) return; R.saving = true; a.setAttribute("disabled", "");
     const now = Date.now();
     const lines = R.lines.map((L) => { const refused = L.decision === "refuse"; const reserve = L.decision === "reserve"; return {
@@ -494,6 +551,6 @@ Object.assign(ACT, {
     const refused = lines.filter((L) => L.refused); const nres = lines.filter((L) => L.reserve).length;
     await logEvent("reception", `a réceptionné ${R.supplier || "une livraison"} · ${ids.length} produit${ids.length > 1 ? "s" : ""}${nres ? ` · ${nres} avec réserve` : ""}${refused.length ? ` · refusé : ${refused.map((L) => L.name + (L.reason ? ` (${L.reason.toLowerCase()})` : "")).join(", ")}` : ""}`, { ref: rid, photoUrl: lines.find((L) => L.photoUrl)?.photoUrl || "" });
     R.saving = false; R.done = ids; R.savedAt = now; R.anim = "fwd"; R.celebrate = true; SFX.done(); buzz([10, 30, 10, 30, 20]);
-    rerender(); const v = $("#viewport .view:not(.leave)"); v && v.scrollTo({ top: 0 });
+    R.doneAt = Date.now(); recDraftClear(); rerender(); const v = $("#viewport .view:not(.leave)"); v && v.scrollTo({ top: 0 });
   },
 });

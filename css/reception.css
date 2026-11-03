@@ -119,7 +119,7 @@ body.rec-kb .rec-cta .btn{height:46px}
 .rec-tst .ico{width:17px;height:17px}
 .rec-temp.ok .rec-tst{color:var(--ok)}
 .rec-temp.bad .rec-tst{color:var(--bad)}
-.rec-qt{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:6px;padding:2px;overflow:visible}
+.rec-qt{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:4px;padding:2px;overflow:visible}
 .rec-qt .chip{justify-content:center;padding:9px 0;font-size:14px;min-width:0;background:rgba(255,255,255,.75)}
 .rec-qt .chip.hot{color:var(--bad)}
 .rec-qt .chip.on{background:var(--ok);border-color:var(--ok);color:#fff}
@@ -223,3 +223,29 @@ body.rec-kb .rec-cta .btn{height:46px}
 .rec-types .chip{flex:1;justify-content:center;padding:9px 8px}
 @media (min-width:960px){.rec-cta.col{grid-template-columns:1.5fr 1fr}}
 .rec-ph.has{gap:10px}.rec-ph.has .tx em{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* ── QA pass: one-hand reach, tap targets, clarity ── */
+/* the primary CTA always sits at the thumb, even on short screens (step 1, a 1-product contrôle) */
+@media (max-width:959px){.rec{min-height:100%;box-sizing:border-box}.rec > .rec-cta{margin-top:auto}}
+/* progress steps: same look, 44px hit area */
+.rec-prog .s{padding:9px 0;margin:-9px 0}
+.rec-card-h .btn{height:44px}
+/* DLC: every choice visible on a phone, no hidden horizontal scroll */
+.rec-dlc{display:grid;grid-template-columns:repeat(5,minmax(0,1fr)) minmax(48px,auto);gap:6px}
+.rec-dlc .chip{justify-content:center;padding:9px 4px;min-width:0}
+.rec-dlc .rec-date{padding:9px 12px}
+.rec-dlc .rec-date .ico{width:17px;height:17px}
+.rec-date .mono{font-size:12.5px}
+.rec-f.shake > .lbl,.rec-f.shake > .row .lbl{color:var(--bad)}
+.rec-f.shake .rec-dlc .chip:not(.on){border-color:rgba(212,42,72,.45)}
+.rec-fr{flex-wrap:wrap;overflow:visible}
+/* contrôle: undecided = two clear, tinted buttons, not floating text */
+.rec-seg.none{background:none;border:0;padding:0;gap:8px}
+.rec-seg.none button{min-height:52px;background:#fff;border-radius:16px;box-shadow:0 0 0 1.5px var(--line) inset,0 8px 18px -14px rgba(40,30,120,.5);transition:transform .15s var(--ease)}
+.rec-seg.none button:active{transform:scale(.97)}
+.rec-seg.none button.reserve{color:var(--warn);box-shadow:0 0 0 1.5px rgba(184,108,0,.35) inset,0 8px 18px -14px rgba(184,108,0,.6)}
+.rec-seg.none button.refuse{color:var(--bad);box-shadow:0 0 0 1.5px rgba(212,42,72,.35) inset,0 8px 18px -14px rgba(212,42,72,.6)}
+.rec-seg.none button.fix{color:var(--accent);box-shadow:0 0 0 1.5px rgba(74,31,230,.3) inset,0 8px 18px -14px rgba(74,31,230,.6)}
+.rec-fix{align-self:flex-start;height:44px;margin:-4px 0 -6px -8px}
+.rec-fix .ico{width:15px;height:15px}
+.rec-undo{all:unset;cursor:pointer;margin-left:6px;padding:10px 12px;margin-block:-10px;font-weight:800;color:#B9A6FF}

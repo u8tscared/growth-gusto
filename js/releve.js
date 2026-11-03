@@ -13,7 +13,7 @@ Object.assign(IC, {
 const REL_TYPES = [
   { k: "frigo", pl: "Frigos", n: "Frigo", s: "Frigo", ic: "fridge", min: 0, max: 4, t: 3, hint: "Froid positif : entre 0 et 4 °C." },
   { k: "cfp", pl: "Chambres froides positives", n: "Chambre froide positive", s: "Chambre froide", ic: "coldroom", min: 0, max: 4, t: 3, hint: "Chambre froide positive : entre 0 et 4 °C." },
-  { k: "congel", pl: "Congélateurs", n: "Congélateur / chambre froide négative", s: "Congélateur", ic: "snow", min: -30, max: -15, t: -18, hint: "Visez -18 °C ou moins. Alerte au-dessus de -15 °C." },
+  { k: "congel", pl: "Congélateurs", n: "Congélateur / chambre froide négative", s: "Congélateur", ic: "snow", min: -40, max: -15, t: -18, hint: "Congélateur ou chambre froide négative : visez -18 °C ou moins, alerte au-dessus de -15 °C." },
   { k: "saladette", pl: "Saladettes", n: "Saladette", s: "Saladette", ic: "saladette", min: 0, max: 4, t: 3, hint: "Saladette : entre 0 et 4 °C." },
   { k: "cave", pl: "Caves à vin / boissons", n: "Cave à vin / boissons", s: "Cave à boissons", ic: "wine", min: 2, max: 8, t: 5, hint: "Boissons : entre 2 et 8 °C." },
   { k: "vitrine", pl: "Vitrines", n: "Vitrine", s: "Vitrine", ic: "vitrine", min: 0, max: 4, t: 3, hint: "Vitrine réfrigérée : entre 0 et 4 °C." },
@@ -31,6 +31,12 @@ const relIco = (f) => ico(relTypeOf(f).ic);
 const relFr = (id) => S.fridges.find((f) => f.id === id);
 const relDeg = (n) => fmt(n, n % 1 ? 1 : 0);
 const relRange = (f) => `${relDeg(f.min)} à ${relDeg(f.max)} °C`;
+const relBetween = (f) => `entre ${relDeg(f.min)} et ${relDeg(f.max)} °C`;
+const relShort = (s, n = 18) => (s.length > n ? s.slice(0, n - 1) + "…" : s);
+/* tap guard: a button runs its action once, even on a double tap */
+function relOnce(a, ms = 900) { if (!a || a.tagName !== "BUTTON") return true; if (a.dataset.busy) return false; a.dataset.busy = "1"; setTimeout(() => { delete a.dataset.busy; }, ms); return true; }
+/* values the cook really set (stepper, slider), as opposed to the pre-filled suggestion */
+const relTouched = () => (S.ui.relTouched ||= new Set());
 const relIn = (f, t) => t >= f.min && t <= f.max;
 const relSlotName = (s) => (s === "soir" ? "soir" : "midi");
 const relSlotCap = (s) => (s === "soir" ? "Soir" : "Midi");
@@ -65,8 +71,13 @@ function relScale(f) {
   const bg = `linear-gradient(90deg,#7DB9FF 0%,#2FB985 ${Math.max(0, a - 4)}%,#2FB985 ${b}%,#F0A43A ${Math.min(100, b + 10)}%,#E14560 100%)`;
   return { lo, hi, pos, bg };
 }
+/* can this pending fridge be signed by « Tout est conforme » ? only with a value someone actually read */
+function relBulkOk(f) {
+  const known = relTouched().has(f.id) || S.readings.some((x) => x.fridgeId === f.id);
+  return known && relIn(f, relSuggest(f));
+}
 function relState(f, t) {
-  if (!relIn(f, t)) return `<span class="rel-st bad">${ico("alert")}Hors seuil · ${relRange(f)}</span>`;
+  if (!relIn(f, t)) return `<span class="rel-st bad">${ico("alert")}${t > f.max ? "Trop chaud" : "Trop froid"} · ${relRange(f)}</span>`;
   const ty = relTypeOf(f); if (ty.k === "congel" && t > ty.t) return `<span class="rel-st warn">${ico("alert")}Toléré · visez ${ty.t} °C</span>`;
   return `<span class="rel-st ok">${ico("check")}Dans le seuil</span>`;
 }
@@ -76,7 +87,7 @@ function relDial(key, f, t) {
   return `<div class="big"><button class="step" data-step="-1" data-id="${key}" aria-label="Moins 0,1 degré">${ico("minus")}</button><div class="rel-vw"><div class="v" id="tv-${key}" style="color:${bad ? "var(--bad)" : "inherit"}">${fmt(t)}<small>°C</small></div><div id="ts-${key}">${relState(f, t)}</div></div><button class="step" data-step="1" data-id="${key}" aria-label="Plus 0,1 degré">${ico("plus")}</button></div>
     <div><div class="scale" data-scale="${key}" data-lo="${lo}" data-hi="${hi}" style="background:${bg}"><span class="safe" style="left:${pos(f.min)}%;right:${100 - pos(f.max)}%"></span><i id="tk-${key}" style="left:${pos(t)}%" data-lo="${lo}" data-hi="${hi}"></i></div><div class="scale-l rel-sl"><span style="left:0">${lo}°</span>${pos(f.min) > 9 ? `<span class="c" style="left:${pos(f.min)}%">${relDeg(f.min)}°</span>` : ""}${pos(f.max) < 91 ? `<span class="c" style="left:${pos(f.max)}%">${relDeg(f.max)}°</span>` : ""}<span style="right:0">${hi}°</span></div></div>`;
 }
-function relFixedPill(r) { return r.editedAt ? `<span class="pill warn rel-fx">${ico("edit")}corrigé</span>` : ""; }
+function relFixedPill(r) { return r.editedAt ? `<span class="pill warn rel-fx" title="Corrigé">${ico("edit")}<span class="rel-fxt">corrigé</span></span>` : ""; }
 function relFixedLine(r) { return r.editedAt ? `corrigé par ${esc(firstName(nameOf(r.editedBy)))} · ${when(r.editedAt)}` : ""; }
 function relRing(done, exp, size = 58) {
   const R = size / 2 - 5, C = 2 * Math.PI * R, p = exp ? done / exp : 0; const prev = S.ui.relRingPrev ?? p;
@@ -101,7 +112,7 @@ VIEWS.releve = {
       }
       const last = S.readings.find((x) => x.fridgeId === f.id);
       const t = relSuggest(f); S.temp[f.id] = t; const isOpen = S.open === f.id;
-      return `<div class="glass fr ${isOpen ? "open" : ""} st" style="--i:${i + 3}" data-fr="${f.id}"><div class="head" data-act="frOpen" data-id="${f.id}"><span class="ic">${relIco(f)}</span><div style="flex:1;min-width:0"><b class="h3">${esc(f.name)}</b><div class="who">Seuil ${relRange(f)}${last ? ` · dernier ${fmt(last.value)}°` : ""}</div></div><span class="pend"></span></div>
+      return `<div class="glass fr ${isOpen ? "open" : ""} st" style="--i:${i + 3}" data-fr="${f.id}"><div class="head" data-act="frOpen" data-id="${f.id}" role="button" tabindex="0" aria-expanded="${isOpen}"><span class="ic">${relIco(f)}</span><div style="flex:1;min-width:0"><b class="h3 rel-ell" style="display:block">${esc(f.name)}</b><div class="who"><span class="rel-ell">Seuil ${relRange(f)}${last ? ` · dernier ${fmt(last.value)}°` : " · premier relevé"}</span></div></div><span class="pend"></span></div>
         <div class="dial"><div><div class="dz">${relDial(f.id, f, t)}
           <button class="btn acc block" data-act="saveReading" data-id="${f.id}">${ico("check")}<span data-tlv="${f.id}" data-pre="Valider">Valider ${fmt(t)} °C</span></button>
         </div></div></div></div>`;
@@ -110,7 +121,7 @@ VIEWS.releve = {
     const celeb = S.ui.relCeleb; S.ui.relCeleb = false;
     const sum = full
       ? `<div class="glass pad rel-sum full st ${celeb ? "celeb" : ""}" style="--i:2"><div class="rel-sumrow">${relRing(done, exp)}<div class="rel-sumtx"><b class="h3">Relevé du ${relSlotName(slot)} terminé</b><div class="sub">${exp} frigo${exp > 1 ? "s" : ""} signé${exp > 1 ? "s" : ""}${rs.some((r) => !r.ok) ? ` · <span style="color:var(--bad)">${rs.filter((r) => !r.ok).length} hors seuil</span>` : ", tout est conforme"}. Touchez un frigo pour le corriger.</div></div></div>${slot === "midi" && readingsFor(day, "soir").length < exp ? `<button class="btn soft block" data-act="slot" data-v="soir">Passer au relevé du soir${ico("chev")}</button>` : ""}</div>`
-      : `<div class="glass pad rel-sum st" style="--i:2"><div class="rel-sumrow">${relRing(done, exp)}<div class="rel-sumtx"><b class="h3">${done ? `${done} relevé${done > 1 ? "s" : ""} sur ${exp}` : `${exp} frigo${exp > 1 ? "s" : ""} à relever`}</b><div class="sub rel-ell">Reste : ${pending.map((f) => esc(f.name)).join(", ")}</div></div></div>${pending.length >= 2 ? `<button class="btn soft block rel-all" data-act="relAll">${ico("sparkle")}Tout est conforme</button>` : ""}</div>`;
+      : `<div class="glass pad rel-sum st" style="--i:2"><div class="rel-sumrow">${relRing(done, exp)}<div class="rel-sumtx"><b class="h3">${done ? `${done} relevé${done > 1 ? "s" : ""} sur ${exp}` : `${exp} frigo${exp > 1 ? "s" : ""} à relever`}</b><div class="sub rel-ell">Reste : ${pending.map((f) => esc(f.name)).join(", ")}</div></div></div>${pending.filter(relBulkOk).length >= 2 ? `<button class="btn soft block rel-all" data-act="relAll">${ico("sparkle")}Tout est conforme</button>` : ""}</div>`;
     return `<div class="inner narrow">${topBar("Relevé des frigos")}
       <div class="seg st" style="--i:1" id="slotSeg"><span class="knob" style="width:calc(50% - 4px);transform:translateX(${slot === "soir" ? "100%" : "0"})"></span><button class="${slot === "midi" ? "on" : ""}" data-act="slot" data-v="midi">Midi</button><button class="${slot === "soir" ? "on" : ""}" data-act="slot" data-v="soir">Soir</button></div>
       ${sum}
@@ -134,11 +145,12 @@ VIEWS.frigos = {
       const ok = last ? relIn(f, last.value) : null; const late = last && Date.now() - last.at > 864e5;
       const st = ok == null ? "none" : !ok ? "bad" : late ? "late" : "ok";
       const stTx = { none: "Jamais relevé", bad: "Hors seuil", late: "En retard", ok: "Conforme" }[st];
-      return `<div class="glass pad st rel-fcard" style="--i:${i + 1}" data-go="frigo" data-id="${f.id}" role="button" tabindex="0"><div class="row"><div class="hstack" style="min-width:0"><span class="ic ${st === "bad" ? "bad" : ""}">${relIco(f)}</span><div style="min-width:0"><b class="h3 rel-ell" style="display:block">${esc(f.name)}</b><div class="rel-meta"><span class="rel-dot ${st}" title="${stTx}"></span><span>${stTx}</span><span class="rel-sep">·</span><span>${fl.length} produit${fl.length > 1 ? "s" : ""}</span></div></div></div><div style="text-align:right;flex:none"><div class="mono rel-ft" style="color:${ok === false ? "var(--bad)" : "inherit"}">${last ? fmt(last.value) + "°" : "–"}</div><div class="sub" style="font-size:11.5px">${last ? relAgo(last.at) : "à relever"}</div></div></div>${fl[0] ? `<div class="rel-next"><span class="rel-ell">Prochaine DLC · <b>${esc(fl[0].name)}</b></span>${dlcPill(dlcOf(fl[0]))}</div>` : ""}</div>`;
+      return `<div class="glass pad st rel-fcard" style="--i:${Math.min(i + 1, 12)}" data-go="frigo" data-id="${f.id}" role="button" tabindex="0" aria-label="${esc(f.name)} · ${stTx}"><div class="row"><div class="hstack" style="min-width:0"><span class="ic ${st === "bad" ? "bad" : ""}">${relIco(f)}</span><div style="min-width:0"><b class="h3 rel-ell" style="display:block">${esc(f.name)}</b><div class="rel-meta"><span class="rel-dot ${st}"></span><span>${stTx}</span><span class="rel-sep">·</span><span class="rel-ell">${fl.length ? `${fl.length} produit${fl.length > 1 ? "s" : ""}` : relRange(f)}</span></div></div></div>${last ? `<div style="text-align:right;flex:none"><div class="mono rel-ft" style="color:${ok === false ? "var(--bad)" : "inherit"}">${fmt(last.value)}°</div><div class="sub" style="font-size:11.5px">${relAgo(last.at)}</div></div>` : ""}</div>${fl[0] ? `<div class="rel-next"><span class="rel-ell">Prochaine DLC · <b>${esc(fl[0].name)}</b></span>${dlcPill(dlcOf(fl[0]))}</div>` : ""}</div>`;
     };
     const groups = []; S.fridges.forEach((f) => { const ty = relTypeOf(f); let g = groups.find((x) => x.ty.k === ty.k); if (!g) groups.push((g = { ty, fs: [] })); g.fs.push(f); });
     let n = 0;
-    const list = groups.length > 1
+    /* headers only help when they actually group things: not 6 headers for 6 fridges */
+    const list = groups.length > 1 && groups.length <= Math.ceil(S.fridges.length / 2)
       ? groups.map((g) => `<div class="rel-grp"><div class="rel-grph st" style="--i:${n + 1}">${ico(g.ty.ic)}<span>${esc(g.ty.pl)}</span><em>${g.fs.length}</em></div><div class="fgrid">${g.fs.map((f) => card(f, ++n)).join("")}</div></div>`).join("")
       : `<div class="fgrid">${S.fridges.map((f) => card(f, ++n)).join("")}</div>`;
     return `<div class="inner wide">${topBar("Frigos", { noBack: true, right: `${S.fridges.length > 1 ? `<button class="iconbtn" data-act="fridgeOrder" aria-label="Réorganiser">${ico("order")}</button>` : ""}<button class="btn soft sm" data-act="fridgeEdit">${ico("plus")}Ajouter</button>` })}
@@ -177,7 +189,7 @@ VIEWS.frigo = {
         <div class="rel-legend"><span><i class="m"></i>Midi</span><span><i class="s"></i>Soir</span><span><i class="b"></i>Seuil ${relRange(f)}</span><span><i class="x"></i>Hors seuil</span></div></div>
       <div class="glass pad st" style="--i:3"><div class="row"><span class="lbl">Relevés</span><span class="sub" style="font-size:12px">Touchez pour corriger</span></div>${relHistory(f)}</div>
       </div><div>
-      <div class="grid2 st" style="--i:2"><button class="btn soft" data-go="releve">${ico("therm")}Relever</button><button class="btn soft" data-go="scan">${ico("into")}Ranger</button></div>
+      <div class="grid2 st" style="--i:2"><button class="btn soft" data-act="relGoRead" data-id="${f.id}">${ico("therm")}Relever</button><button class="btn soft" data-go="scan">${ico("into")}Ranger</button></div>
       <div class="glass pad st" style="--i:4"><div class="row"><span class="lbl">À sortir en premier</span><span class="sub">${lots.length} produit${lots.length > 1 ? "s" : ""}</span></div>${lotList(lots, false)}</div>
       </div></div></div>`;
   },
@@ -204,7 +216,9 @@ function relDrawChart(el, f) {
   g += `<rect x="${padL}" y="${y(f.max)}" width="${W - padL - padR}" height="${y(f.min) - y(f.max)}" class="band"/><line x1="${padL}" x2="${W - padR}" y1="${y(f.max)}" y2="${y(f.max)}" class="th"/><line x1="${padL}" x2="${W - padR}" y1="${y(f.min)}" y2="${y(f.min)}" class="th"/>`;
   days.forEach((k, di) => { const d = parseDay(k); const isT = k === today; g += `<text x="${padL + cw * di + cw / 2}" y="${H - 17}" text-anchor="middle" class="xl ${isT ? "t" : ""}">${isT ? "auj." : DAYS[d.getDay()].slice(0, 3) + "."}</text><text x="${padL + cw * di + cw / 2}" y="${H - 4}" text-anchor="middle" class="xd ${isT ? "t" : ""}">${d.getDate()}</text>`; });
   let line = "";
-  if (pts.length >= 2) line = `<path class="rel-ln" pathLength="1" d="${pts.map((p, i) => `${i ? "L" : "M"}${x(p.di, p.s).toFixed(1)} ${y(p.r.value).toFixed(1)}`).join(" ")}"/>`;
+  /* the line breaks over a missing day, so a gap never looks like a measured trend */
+  const slotIx = (p) => p.di * 2 + (p.s === "soir" ? 1 : 0);
+  if (pts.length >= 2) line = `<path class="rel-ln" pathLength="1" d="${pts.map((p, i) => `${!i || slotIx(p) - slotIx(pts[i - 1]) > 2 ? "M" : "L"}${x(p.di, p.s).toFixed(1)} ${y(p.r.value).toFixed(1)}`).join(" ")}"/>`;
   const dots = pts.map((p, i) => { const bad = !relIn(f, p.r.value); return `<circle class="rel-pt ${p.s} ${bad ? "bad" : ""}" style="--d:${i * 40}ms" cx="${x(p.di, p.s).toFixed(1)}" cy="${y(p.r.value).toFixed(1)}" r="${bad ? 5.5 : 4.5}"/>`; }).join("");
   const anim = S.ui.relChartSeen !== f.id; S.ui.relChartSeen = f.id;
   el.innerHTML = `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" class="${anim ? "anim" : ""}" role="img" aria-label="Températures de ${esc(f.name)} sur 7 jours, ${pts.length} relevés">${g}<line class="cross" id="relCross" y1="${padT}" y2="${H - padB}" x1="0" x2="0" opacity="0"/>${line}${dots}</svg><div class="rel-tip" id="relTip"></div>${pts.length ? "" : `<div class="rel-nodata">Aucun relevé cette semaine</div>`}`;
@@ -229,7 +243,7 @@ let holdT = null, holdI = null;
 function stepTemp(id, dir) { setTemp(id, Math.round(((S.temp[id] ?? 3) + dir * 0.1) * 10) / 10); }
 function setTemp(id, t) {
   const f = relFridgeForKey(id); if (!f) return; if (S.temp[id] === t) return;
-  S.temp[id] = t;
+  S.temp[id] = t; relTouched().add(id);
   const v = $("#tv-" + id); if (v) { v.innerHTML = `${fmt(t)}<small>°C</small>`; v.style.color = relIn(f, t) ? "" : "var(--bad)"; v.classList.remove("bump"); void v.offsetWidth; v.classList.add("bump"); }
   const st = $("#ts-" + id); if (st) st.innerHTML = relState(f, t);
   const k = $("#tk-" + id); if (k) { const lo = +k.dataset.lo, hi = +k.dataset.hi; k.style.left = Math.max(0, Math.min(100, ((t - lo) / (hi - lo)) * 100)) + "%"; }
@@ -248,15 +262,28 @@ document.addEventListener("pointerdown", (e) => {
   }
   const s = e.target.closest("[data-step]"); if (!s) return; e.preventDefault();
   const id = s.dataset.id, dir = +s.dataset.step; stepTemp(id, dir);
-  holdT = setTimeout(() => { holdI = setInterval(() => stepTemp(id, dir), 70); }, 380);
+  /* long press repeats, then speeds up: -18 °C is reachable from 3 °C in a few seconds */
+  let n = 0; const tick = () => { n++; stepTemp(id, dir); holdI = setTimeout(tick, n < 10 ? 90 : n < 30 ? 45 : 22); };
+  holdT = setTimeout(tick, 380);
 });
-["pointerup", "pointercancel", "pointerleave"].forEach((ev) => document.addEventListener(ev, () => { clearTimeout(holdT); clearInterval(holdI); }, true));
+["pointerup", "pointercancel", "pointerleave"].forEach((ev) => document.addEventListener(ev, (e) => { if (ev === "pointerleave" && !(e.target.matches && e.target.matches("[data-step]"))) return; clearTimeout(holdT); clearTimeout(holdI); }, true));
+window.addEventListener("blur", () => { clearTimeout(holdT); clearTimeout(holdI); });
 
 /* ───────────────────────── commit, advance, undo ───────────────────────── */
 function relCorrSheet(f, t, act, id) {
-  openSheet(`<div style="text-align:center"><span class="ic bad" style="width:56px;height:56px;border-radius:20px;margin:0 auto">${ico("alert")}</span><div class="h2" style="margin-top:10px;font-size:21px">${fmt(t)} °C, hors seuil</div><p class="sub" style="margin:4px 0 0">${esc(f.name)} doit être entre ${relRange(f)}. Qu'avez-vous fait ?</p></div>
-    <div style="display:flex;flex-direction:column;gap:8px">${ACTIONS.map((x) => `<button class="chip" style="text-align:left;padding:13px 16px;border-radius:16px;white-space:normal" data-act="${act}" data-v="${esc(x)}" data-id="${id}">${esc(x)}</button>`).join("")}</div>`);
+  const back = act === "corr" ? `data-act="sheetClose"` : `data-act="relFixBack" data-id="${id}"`;
+  openSheet(`<div style="text-align:center"><span class="ic bad rel-bigic">${ico("alert")}</span><div class="h2" style="margin-top:10px;font-size:21px">${fmt(t)} °C : ${t > f.max ? "trop chaud" : "trop froid"}</div><p class="sub" style="margin:4px 0 0">${esc(f.name)} doit être ${relBetween(f)}. Qu'avez-vous fait ?</p></div>
+    <div class="rel-acts">${ACTIONS.map((x) => `<button class="rel-act" data-act="${act}" data-v="${esc(x)}" data-id="${id}">${esc(x)}${ico("chev")}</button>`).join("")}</div>
+    <div class="rel-other"><input class="input" id="relActTx" placeholder="Autre action…" autocomplete="off" maxlength="120" aria-label="Autre action corrective"><button class="btn acc" data-act="${act}" data-v="__other" data-id="${id}" aria-label="Valider cette action">${ico("check")}</button></div>
+    <button class="btn ghost block" ${back}>${ico("therm")}Changer la température</button>`);
   SFX.err(); buzz([20, 40, 20]);
+}
+/* the corrective action picked on the sheet (a preset, or the free text) */
+function relPickedAction(v) {
+  if (v !== "__other") return v;
+  const el = $("#relActTx"); const tx = (el && el.value || "").trim();
+  if (!tx) { SFX.err(); toast("Décrivez l'action menée.", "err"); el && el.focus(); return null; }
+  return tx;
 }
 function relSetUndo(u, msg) {
   S.ui.relUndo = { ...u, exp: Date.now() + 4200 };
@@ -265,15 +292,19 @@ function relSetUndo(u, msg) {
 function relSlotComplete(day, slot) { return S.fridges.every((fr) => readingsFor(day, slot).find((r) => r.fridgeId === fr.id)); }
 function relCelebrate() { S.ui.relCeleb = true; SFX.done(); buzz([12, 40, 12]); setTimeout(() => burst(), 120); }
 
+const relDoneNow = (id) => readingsFor(dayKey(), S.slot).some((r) => r.fridgeId === id);
 async function commitReading(id, t, ok, action) {
   const f = relFr(id); const day = dayKey(), slot = S.slot;
-  const rid = await safe(DB.add("readings", { fridgeId: id, value: t, slot, day, at: Date.now(), uid: S.me.id, ok, action }));
+  if (S.route === "releve") VIEWS.releve.live = false; /* keep the card on screen for its seal animation */
+  let rid;
+  try { rid = await safe(DB.add("readings", { fridgeId: id, fname: f.name, value: t, slot, day, at: Date.now(), uid: S.me.id, ok, action })); }
+  catch (e) { VIEWS.releve.live = true; refresh(); return; }
   await logEvent("reading", `a relevé ${f.name} · ${fmt(t)} °C${ok ? "" : ` · hors seuil, ${action.toLowerCase()}`}`, { ref: id });
-  delete S.temp[id];
+  delete S.temp[id]; relTouched().delete(id);
   const complete = relSlotComplete(day, slot);
   relAdvance(id);
-  if (complete) { relCelebrate(); relSetUndo({ kind: "add", ids: [rid], fridgeId: id, value: t }, `Relevé du ${slot} complet`); }
-  else { SFX.ok(); buzz(12); relSetUndo({ kind: "add", ids: [rid], fridgeId: id, value: t }, `${f.name.length > 18 ? f.name.slice(0, 17) + "…" : f.name} · ${fmt(t)} °C`); }
+  if (complete) { relCelebrate(); relSetUndo({ kind: "add", ids: [rid], fridgeId: id, value: t }, `Relevé du ${slot} terminé`); }
+  else { SFX.ok(); buzz(12); relSetUndo({ kind: "add", ids: [rid], fridgeId: id, value: t }, `${relShort(f.name)} · ${fmt(t)} °C`); }
 }
 /* collapse the validated card, expand the next pending one, then re-render once the motion is over */
 function relAdvance(doneId) {
@@ -281,7 +312,7 @@ function relAdvance(doneId) {
   const order = [...S.fridges.slice(idx + 1), ...S.fridges.slice(0, idx)];
   const next = order.find((f) => !rs.find((r) => r.fridgeId === f.id));
   S.open = next ? next.id : null; S.ui.relJust = new Set([doneId]);
-  if (S.route !== "releve") return;
+  if (S.route !== "releve") { VIEWS.releve.live = true; return; }
   const view = $("#viewport .view:not(.leave)"); const cur = $(`.fr[data-fr="${doneId}"]`, view); const nx = next && $(`.fr[data-fr="${next.id}"]`, view);
   VIEWS.releve.live = false;
   let shrinkBy = 0; if (cur) { const d = $(".dial", cur); shrinkBy = d ? d.offsetHeight : 0; cur.classList.remove("open"); cur.classList.add("sealing"); }
@@ -301,11 +332,12 @@ Object.assign(ACT, {
   frOpen: (a, id) => { S.open = S.open === id ? "__none" : id; SFX.tap(); $$(".fr[data-fr]").forEach((el) => el.classList.toggle("open", el.dataset.fr === S.open)); },
   saveReading: async (a, id) => {
     const f = relFr(id); const t = S.temp[id];
-    if (!f || t == null || isNaN(t)) return; if (a && a.disabled) return; if (a && a.tagName === "BUTTON") { a.disabled = true; setTimeout(() => { a.disabled = false; }, 900); }
+    if (!f || t == null || isNaN(t) || !relOnce(a)) return;
+    if (relDoneNow(id)) { rerender(); return; }
     if (!relIn(f, t)) { relCorrSheet(f, t, "corr", id); return; }
     await commitReading(id, t, true, "");
   },
-  corr: async (a, id, v) => { closeSheet(true); await commitReading(id, S.temp[id], false, v); },
+  corr: async (a, id, v) => { const act = relPickedAction(v); if (!act || !relOnce(a, 2000)) return; if (!relFr(id) || relDoneNow(id)) { closeSheet(true); return; } closeSheet(true); await commitReading(id, S.temp[id], false, act); },
 
   relUndo: async () => {
     const u = S.ui.relUndo; if (!u || Date.now() > u.exp) return; S.ui.relUndo = null; $("#toast").classList.remove("on");
@@ -313,13 +345,18 @@ Object.assign(ACT, {
     if (u.kind === "add") {
       for (const id of u.ids) await DB.del("readings", id).catch(() => {});
       await logEvent("reading", u.ids.length > 1 ? `a annulé ${u.ids.length} relevés validés d'un coup` : `a annulé le relevé ${f ? f.name : ""} · ${fmt(u.value)} °C`, { ref: u.fridgeId });
-      if (u.ids.length === 1) { S.open = u.fridgeId; S.temp[u.fridgeId] = u.value; S.ui.relScroll = u.fridgeId; } else S.open = null;
+      if (u.ids.length === 1) { S.open = u.fridgeId; S.temp[u.fridgeId] = u.value; relTouched().add(u.fridgeId); S.ui.relScroll = u.fridgeId; } else S.open = null;
     } else if (u.kind === "del") {
       await DB.set("readings", u.id, u.data).catch(() => {});
       await logEvent("reading", `a restauré le relevé ${f ? f.name : ""} · ${fmt(u.data.value)} °C`, { ref: u.fridgeId });
     } else if (u.kind === "edit") {
       await DB.set("readings", u.id, u.data).catch(() => {});
       await logEvent("reading", `a annulé la correction de ${f ? f.name : ""} · retour à ${fmt(u.data.value)} °C`, { ref: u.fridgeId });
+    } else if (u.kind === "fridge") {
+      await DB.set("fridges", u.id, u.data).catch(() => {});
+      for (const l of u.lots || []) await DB.update("lots", l, { fridgeId: u.id }).catch(() => {});
+      await logEvent("fridge", `a annulé la suppression de ${u.data.name}`, { ref: u.id });
+      toast(`${relShort(u.data.name, 24)} est de retour`);
     }
     S.ui.relRingPrev = null; SFX.close(); buzz(6);
   },
@@ -327,23 +364,28 @@ Object.assign(ACT, {
   /* tout est conforme */
   relAll: () => {
     const rs = readingsFor(dayKey(), S.slot); const pend = S.fridges.filter((f) => !rs.find((r) => r.fridgeId === f.id));
-    const okL = pend.filter((f) => relIn(f, relSuggest(f))), badL = pend.filter((f) => !relIn(f, relSuggest(f)));
-    openSheet(`<div><div class="h2" style="font-size:21px">Tout est conforme ?</div><p class="sub" style="margin:4px 0 0">Vérifiez chaque thermomètre. ${okL.length > 1 ? "Ces relevés seront signés" : "Ce relevé sera signé"} à votre nom pour le ${S.slot}.</p></div>
-      <div class="rel-bulk">${okL.map((f) => `<div class="li"><span class="ic ok">${relIco(f)}</span><div class="tx"><b>${esc(f.name)}</b><em>Seuil ${relRange(f)}</em></div><span class="mono rel-v">${fmt(relSuggest(f))}°</span></div>`).join("")}
-      ${badL.map((f) => `<div class="li"><span class="ic bad">${ico("alert")}</span><div class="tx"><b>${esc(f.name)}</b><em style="color:var(--bad)">Dernière valeur hors seuil : à relever à la main</em></div><span class="mono rel-v" style="color:var(--bad)">${fmt(relSuggest(f))}°</span></div>`).join("")}</div>
+    const okL = pend.filter(relBulkOk), badL = pend.filter((f) => !relBulkOk(f));
+    SFX.tap();
+    openSheet(`<div><div class="h2" style="font-size:21px">Tout est conforme ?</div><p class="sub" style="margin:4px 0 0">Vérifiez chaque thermomètre : ${okL.length > 1 ? "ces relevés seront signés" : "ce relevé sera signé"} à votre nom pour le ${S.slot}.</p></div>
+      <div class="rel-bulk">${okL.map((f) => `<div class="li"><span class="ic ok">${relIco(f)}</span><div class="tx"><b class="rel-ell">${esc(f.name)}</b><em>Seuil ${relRange(f)}</em></div><span class="mono rel-v">${fmt(relSuggest(f))}°</span></div>`).join("")}
+      ${badL.map((f) => { const never = !relTouched().has(f.id) && !S.readings.some((x) => x.fridgeId === f.id); return `<div class="li rel-skip"><span class="ic">${relIco(f)}</span><div class="tx"><b class="rel-ell">${esc(f.name)}</b><em>${never ? "Jamais relevé : à mesurer à la main" : `<span style="color:var(--bad)">Dernière valeur hors seuil : à mesurer</span>`}</em></div><span class="mono rel-v" style="color:var(--faint)">–</span></div>`; }).join("")}</div>
       ${okL.length ? `<button class="btn acc block" data-act="relAllOk">${ico("check")}Valider ${okL.length} relevé${okL.length > 1 ? "s" : ""}</button>` : `<p class="note">Aucun frigo ne peut être validé d'un coup.</p>`}<button class="btn ghost block" data-act="sheetClose">Annuler</button>`);
   },
   relAllOk: async (a) => {
-    if (a.disabled) return; a.disabled = true;
+    if (!relOnce(a, 3000)) return;
     const day = dayKey(), slot = S.slot; const rs = readingsFor(day, slot);
-    const list = S.fridges.filter((f) => !rs.find((r) => r.fridgeId === f.id) && relIn(f, relSuggest(f)));
+    const list = S.fridges.filter((f) => !rs.find((r) => r.fridgeId === f.id) && relBulkOk(f));
+    if (!list.length) { closeSheet(true); return; }
     const vals = list.map((f) => relSuggest(f));
     const ids = [], now = Date.now();
-    for (const [i, f] of list.entries()) { ids.push(await safe(DB.add("readings", { fridgeId: f.id, value: vals[i], slot, day, at: now + i, uid: S.me.id, ok: true, action: "" }))); delete S.temp[f.id]; }
+    VIEWS.releve.live = false;
+    try { for (const [i, f] of list.entries()) { ids.push(await safe(DB.add("readings", { fridgeId: f.id, fname: f.name, value: vals[i], slot, day, at: now + i, uid: S.me.id, ok: true, action: "" }))); delete S.temp[f.id]; relTouched().delete(f.id); } }
+    finally { VIEWS.releve.live = true; }
     await logEvent("reading", `a validé ${list.length} relevé${list.length > 1 ? "s" : ""} conforme${list.length > 1 ? "s" : ""} (${slot}) : ${list.map((f, i) => `${f.name} ${fmt(vals[i])} °C`).join(", ")}`);
     closeSheet(true); S.open = null; S.ui.relJust = new Set(list.map((f) => f.id));
-    if (relSlotComplete(day, slot)) { relCelebrate(); relSetUndo({ kind: "add", ids }, `Relevé du ${slot} complet`); }
+    if (relSlotComplete(day, slot)) { relCelebrate(); relSetUndo({ kind: "add", ids }, `Relevé du ${slot} terminé`); }
     else { SFX.ok(); buzz(12); relSetUndo({ kind: "add", ids }, `${list.length} relevé${list.length > 1 ? "s" : ""} validé${list.length > 1 ? "s" : ""}`); }
+    rerender();
   },
 
   /* edit a validated reading */
@@ -353,6 +395,7 @@ Object.assign(ACT, {
     const clash = S.readings.find((x) => x.id !== r.id && x.fridgeId === r.fridgeId && x.day === r.day && x.slot === other);
     const canDel = r.uid === S.me.id || ["gerant", "chef"].includes(myRole());
     const vers = [...(r.prev || []), { value: r.value, slot: r.slot, ok: r.ok, at: r.editedAt || r.at, uid: r.editedBy || r.uid, why: r.editReason || "", cur: true }];
+    const multiSlot = new Set(vers.map((x) => x.slot || r.slot)).size > 1;
     SFX.tap();
     openSheet(`<div class="rel-eh"><span class="ic ${r.ok ? "ok" : "bad"}">${relIco(f)}</span><div style="flex:1;min-width:0"><b class="h3">${esc(f.name)}</b><div class="sub">Relevé du ${relSlotName(r.slot)} · ${relDayLabel(r.day).toLowerCase()}</div></div><span class="mono rel-ev" style="color:${r.ok ? "var(--ok)" : "var(--bad)"}">${fmt(r.value)}°</span></div>
       ${r.ok ? "" : `<div class="rel-warn">${ico("alert")}<span>${esc(r.action || "Hors seuil")}</span></div>`}
@@ -361,31 +404,26 @@ Object.assign(ACT, {
         <button class="rel-opt" data-act="relSlot" data-id="${r.id}" ${clash ? "disabled" : ""}><span class="ic">${ico("clock")}</span><span class="tx"><b>Passer au ${other}</b><em>${clash ? `Le relevé du ${other} existe déjà ce jour-là` : `Si ce relevé a été fait le ${other}`}</em></span>${ico("chev")}</button>
         <button class="rel-opt bad" data-act="relDel" data-id="${r.id}" ${canDel ? "" : "disabled"}><span class="ic bad">${ico("trash")}</span><span class="tx"><b>Supprimer le relevé</b><em>${canDel ? "Une confirmation vous sera demandée" : "Réservé au gérant, au chef ou à l'auteur"}</em></span>${ico("chev")}</button>
       </div>
-      <div><span class="lbl">Historique</span><div class="rel-hist">${vers.slice().reverse().map((x, i, arr) => `<div class="rel-hv ${x.cur ? "cur" : ""}"><span class="rel-hdot"></span><div class="tx"><b><span class="mono" style="${x.cur ? "" : "text-decoration:line-through;color:var(--muted)"}">${fmt(x.value)} °C</span> · ${relSlotName(x.slot || r.slot)}</b><em>${i === arr.length - 1 ? "Relevé" : "Corrigé"} par ${esc(firstName(nameOf(x.uid)))} · ${when(x.at)}${x.why ? ` · ${esc(x.why)}` : ""}</em></div></div>`).join("")}</div></div>
+      <div><span class="lbl">${vers.length > 1 ? `Historique · ${vers.length - 1} correction${vers.length > 2 ? "s" : ""}` : "Historique"}</span><div class="rel-hist">${vers.slice().reverse().map((x, i, arr) => `<div class="rel-hv ${x.cur ? "cur" : ""}"><span class="rel-hdot"></span><div class="tx"><b><span class="mono" style="${x.cur ? "" : "text-decoration:line-through;color:var(--muted)"}">${fmt(x.value)} °C</span>${multiSlot ? ` · ${relSlotName(x.slot || r.slot)}` : ""}</b><em>${i === arr.length - 1 ? "Relevé" : "Corrigé"} par ${esc(firstName(nameOf(x.uid)))} · ${when(x.at)}${x.why ? ` · ${esc(x.why)}` : ""}</em></div></div>`).join("")}</div></div>
       <button class="btn ghost block" data-act="sheetClose">Fermer</button>`);
   },
-  relFix: (a, rid) => {
-    const r = S.readings.find((x) => x.id === rid); if (!r) return; const f = relFr(r.fridgeId); const key = "e-" + rid;
-    S.temp[key] = r.value; S.ui.relWhy = "";
-    openSheet(`<div class="row" style="justify-content:flex-start"><button class="iconbtn" data-act="relEdit" data-id="${rid}" aria-label="Retour">${ico("back")}</button><div style="flex:1;min-width:0"><b class="h3">Corriger ${esc(f.name)}</b><div class="sub">Relevé du ${relSlotName(r.slot)} · avant ${fmt(r.value)} °C</div></div></div>
-      <div class="dz rel-fixdz">${relDial(key, f, r.value)}</div>
-      <div class="field"><span>Pourquoi ? (facultatif)</span><div class="chips rel-why">${["Faute de frappe", "Thermomètre mal lu", "Nouvelle mesure", "Mauvais frigo"].map((w) => `<button class="chip" data-act="relWhy" data-v="${w}">${w}</button>`).join("")}</div></div>
-      <button class="btn acc block" data-act="relFixSave" data-id="${rid}">${ico("check")}<span data-tlv="${key}" data-pre="Enregistrer">Enregistrer ${fmt(r.value)} °C</span></button>`);
-  },
+  relFix: (a, rid) => relFixOpen(rid, false),
+  relFixBack: (a, rid) => relFixOpen(rid, true),
   relWhy: (a, id, v) => { S.ui.relWhy = S.ui.relWhy === v ? "" : v; $$(".rel-why .chip").forEach((c) => c.classList.toggle("on", c.dataset.v === S.ui.relWhy)); SFX.tick(); },
   relFixSave: async (a, rid) => {
     const r = S.readings.find((x) => x.id === rid); if (!r) return; const f = relFr(r.fridgeId); const t = S.temp["e-" + rid];
-    if (t == null || isNaN(t)) return;
+    if (!f || t == null || isNaN(t) || !relOnce(a, 2000)) return;
     if (t === r.value) { closeSheet(); toast("Valeur inchangée"); return; }
     if (!relIn(f, t)) { relCorrSheet(f, t, "relFixCorr", rid); return; }
     await relApplyEdit(r, { value: t, ok: true, action: "" }, S.ui.relWhy, `a corrigé ${f.name} · ${fmt(r.value)} → ${fmt(t)} °C (relevé du ${relSlotName(r.slot)} ${shortDate(r.day)})`, `Corrigé · ${fmt(t)} °C`);
   },
   relFixCorr: async (a, rid, v) => {
     const r = S.readings.find((x) => x.id === rid); if (!r) return; const f = relFr(r.fridgeId); const t = S.temp["e-" + rid];
-    await relApplyEdit(r, { value: t, ok: false, action: v }, S.ui.relWhy, `a corrigé ${f.name} · ${fmt(r.value)} → ${fmt(t)} °C, hors seuil, ${v.toLowerCase()} (relevé du ${relSlotName(r.slot)} ${shortDate(r.day)})`, `Corrigé · ${fmt(t)} °C hors seuil`);
+    v = relPickedAction(v); if (!f || !v || t == null || isNaN(t) || !relOnce(a, 2000)) return;
+    await relApplyEdit(r, { value: t, ok: false, action: v }, S.ui.relWhy, `a corrigé ${f.name} · ${fmt(r.value)} → ${fmt(t)} °C, hors seuil, ${v.toLowerCase()} (relevé du ${relSlotName(r.slot)} ${shortDate(r.day)})`, `Corrigé · ${fmt(t)} °C`);
   },
   relSlot: async (a, rid) => {
-    const r = S.readings.find((x) => x.id === rid); if (!r || a.disabled) return; const f = relFr(r.fridgeId); const other = r.slot === "midi" ? "soir" : "midi";
+    const r = S.readings.find((x) => x.id === rid); if (!r || a.disabled || !relOnce(a, 2000)) return; const f = relFr(r.fridgeId); if (!f) return; const other = r.slot === "midi" ? "soir" : "midi";
     if (S.readings.find((x) => x.id !== r.id && x.fridgeId === r.fridgeId && x.day === r.day && x.slot === other)) { SFX.err(); toast(`Le relevé du ${other} existe déjà`, "err"); return; }
     await relApplyEdit(r, { slot: other }, "Créneau corrigé", `a déplacé le relevé ${f.name} du ${r.slot} au ${other} (${shortDate(r.day)})`, `Passé au ${other}`);
   },
@@ -396,11 +434,11 @@ Object.assign(ACT, {
     buzz(10);
   },
   relDelOk: async (a, rid) => {
-    const r = S.readings.find((x) => x.id === rid); if (!r) return; const f = relFr(r.fridgeId); const { id, ...data } = r;
+    const r = S.readings.find((x) => x.id === rid); if (!r || !relOnce(a, 2000)) return; const f = relFr(r.fridgeId); const { id, ...data } = r;
     await safe(DB.del("readings", rid));
     await logEvent("reading", `a supprimé le relevé ${f.name} · ${fmt(r.value)} °C (${r.slot} ${shortDate(r.day)})`, { ref: r.fridgeId });
     closeSheet(true); S.ui.relRingPrev = null; SFX.close(); buzz(10);
-    if (r.day === dayKey() && r.slot === S.slot) { S.open = r.fridgeId; S.temp[r.fridgeId] = r.value; }
+    if (r.day === dayKey() && r.slot === S.slot) { S.open = r.fridgeId; S.temp[r.fridgeId] = r.value; relTouched().add(r.fridgeId); }
     relSetUndo({ kind: "del", id: rid, data, fridgeId: r.fridgeId }, "Relevé supprimé");
   },
   relMore: () => { S.ui.relDays = (S.ui.relDays || 7) + 14; SFX.tap(); rerender(); },
@@ -413,7 +451,7 @@ Object.assign(ACT, {
     openSheet(`<div class="h2" style="font-size:20px">${f ? "Modifier l'équipement" : "Nouvel équipement"}</div>
       <div class="field"><span>Type</span><div class="rel-types">${REL_TYPES.map((t) => `<button class="rel-type ${t.k === ty.k ? "on" : ""}" data-act="fType" data-v="${t.k}" aria-pressed="${t.k === ty.k}">${ico(t.ic)}<b>${esc(t.s)}</b></button>`).join("")}</div></div>
       <label class="field"><span>Nom</span><input class="input" id="fName" value="${esc(name)}" placeholder="Chambre froide 3" autocomplete="off"></label>
-      <div class="grid2"><label class="field"><span>Minimum °C</span><input class="input mono" id="fMin" inputmode="decimal" value="${relDeg(f ? f.min : ty.min)}"></label><label class="field"><span id="fMaxL">${ty.k === "congel" ? "Alerte au-dessus de °C" : "Maximum °C"}</span><input class="input mono" id="fMax" inputmode="decimal" value="${relDeg(f ? f.max : ty.max)}"></label></div>
+      <div class="grid2"><label class="field"><span>Minimum °C</span><span class="rel-num"><input class="input mono" id="fMin" inputmode="decimal" autocomplete="off" value="${relDeg(f ? f.min : ty.min)}"><button type="button" class="rel-sign" data-act="fSign" data-v="fMin" aria-label="Changer le signe">±</button></span></label><label class="field"><span id="fMaxL">${ty.k === "congel" ? "Alerte au-dessus de °C" : "Maximum °C"}</span><span class="rel-num"><input class="input mono" id="fMax" inputmode="decimal" autocomplete="off" value="${relDeg(f ? f.max : ty.max)}"><button type="button" class="rel-sign" data-act="fSign" data-v="fMax" aria-label="Changer le signe">±</button></span></label></div>
       <p class="note" id="fHint" style="margin:-4px 0 0">${esc(ty.hint)}</p>
       <button class="btn acc block" data-act="fridgeSave" data-id="${id || ""}">${ico("check")}Enregistrer</button>${f ? `<button class="btn ghost block" style="color:var(--bad)" data-act="fridgeDel" data-id="${id}">${ico("trash")}Supprimer cet équipement</button>` : ""}`);
   },
@@ -427,21 +465,35 @@ Object.assign(ACT, {
     [$("#fMin"), $("#fMax")].forEach((el) => { el.classList.remove("bump"); void el.offsetWidth; el.classList.add("bump"); });
     SFX.tick(); buzz(4);
   },
+  /* iOS decimal keypads have no minus key: freezers need one */
+  fSign: (a, id, v) => {
+    const el = $("#" + v); if (!el) return; const x = el.value.trim();
+    el.value = x.startsWith("-") || x.startsWith("−") ? x.slice(1) : "-" + (x || "0");
+    el.classList.remove("bump"); void el.offsetWidth; el.classList.add("bump"); SFX.tick(); buzz(4);
+  },
   fridgeSave: async (a, id) => {
-    const name = $("#fName").value.trim(), min = num($("#fMin").value), max = num($("#fMax").value), type = S.ui.fType || "frigo";
-    if (!name) { SFX.err(); toast("Donnez un nom à l'équipement.", "err"); $("#fName").focus(); return; }
-    if (min == null || max == null || min >= max) { SFX.err(); toast("Le minimum doit être plus bas que le maximum.", "err"); return; }
+    const name = $("#fName").value.trim().replace(/\s+/g, " "), rd = (v) => num(String(v).replace("−", "-")), min = rd($("#fMin").value), max = rd($("#fMax").value), type = S.ui.fType || "frigo";
+    const bad = (msg, el) => { SFX.err(); toast(msg, "err"); if (el) { el.classList.remove("shake"); void el.offsetWidth; el.classList.add("shake"); } };
+    if (!name) return bad("Donnez un nom à l'équipement.", $("#fName"));
+    if (S.fridges.some((f) => f.id !== id && f.name.toLowerCase() === name.toLowerCase())) return bad("Ce nom est déjà pris.", $("#fName"));
+    if (min == null) return bad("Le minimum doit être un nombre, par exemple 0 ou -18.", $("#fMin"));
+    if (max == null) return bad("Le maximum doit être un nombre, par exemple 4 ou -15.", $("#fMax"));
+    if (min < -60 || min > 30 || max < -60 || max > 30) return bad("Les seuils doivent être entre -60 et 30 °C.", min < -60 || min > 30 ? $("#fMin") : $("#fMax"));
+    if (min >= max) return bad("Le minimum doit être plus bas que le maximum.", $("#fMin"));
+    if (!relOnce(a, 2000)) return;
     const lo = Math.round(min * 10) / 10, hi = Math.round(max * 10) / 10;
-    if (id) {
-      const f = relFr(id);
-      await safe(DB.update("fridges", id, { name, min: lo, max: hi, type }));
-      if (f && (f.name !== name || f.min !== lo || f.max !== hi)) await logEvent("fridge", `a modifié ${f.name}${f.name !== name ? ` → ${name}` : ""} · seuil ${relDeg(lo)} à ${relDeg(hi)} °C`, { ref: id });
-    } else {
-      const order = S.fridges.reduce((m, f) => Math.max(m, f.order ?? 0), -1) + 1;
-      await safe(DB.add("fridges", { name, min: lo, max: hi, type, order, createdAt: Date.now() }));
-      await logEvent("fridge", `a ajouté ${name} · seuil ${relDeg(lo)} à ${relDeg(hi)} °C`);
-    }
-    closeSheet(true); SFX.ok(); buzz(12); toast(id ? "Équipement mis à jour" : `Ajouté : ${name}`);
+    try {
+      if (id) {
+        const f = relFr(id); if (!f) { closeSheet(true); return; }
+        await safe(DB.update("fridges", id, { name, min: lo, max: hi, type }));
+        if (f.name !== name || f.min !== lo || f.max !== hi || f.type !== type) await logEvent("fridge", `a modifié ${f.name}${f.name !== name ? ` → ${name}` : ""} · ${relTypeOf({ type }).s.toLowerCase()} · seuil ${relDeg(lo)} à ${relDeg(hi)} °C${f.min !== lo || f.max !== hi ? ` (avant ${relDeg(f.min)} à ${relDeg(f.max)} °C)` : ""}`, { ref: id });
+      } else {
+        const order = S.fridges.reduce((m, f) => Math.max(m, f.order ?? 0), -1) + 1;
+        await safe(DB.add("fridges", { name, min: lo, max: hi, type, order, createdAt: Date.now() }));
+        await logEvent("fridge", `a ajouté ${name} · seuil ${relDeg(lo)} à ${relDeg(hi)} °C`);
+      }
+    } catch (e) { return; }
+    closeSheet(true); SFX.ok(); buzz(12); toast(id ? "Équipement mis à jour" : `Ajouté : ${relShort(name, 26)}`);
   },
   fridgeOrder: () => { openSheet(relOrderHtml()); },
   fMove: async (a, id, v) => {
@@ -453,10 +505,40 @@ Object.assign(ACT, {
     SFX.tick(); buzz(5);
     $("#sheetBody").innerHTML = relOrderHtml(); const el = $(`#sheetBody .rel-ord[data-fid="${id}"]`); if (el) el.classList.add("rel-moved");
   },
-  fridgeDel: (a, id) => { const n = activeLots().filter((l) => l.fridgeId === id).length; openSheet(`<div style="text-align:center"><span class="ic bad" style="width:56px;height:56px;border-radius:20px;margin:0 auto">${ico("trash")}</span><div class="h2" style="margin-top:10px;font-size:21px">Supprimer ${esc(fridgeName(id))} ?</div><p class="sub" style="margin:4px 0 0">Les relevés passés restent dans le registre.${n ? ` ${n} produit${n > 1 ? "s" : ""} y ${n > 1 ? "sont" : "est"} encore rangé${n > 1 ? "s" : ""} : pensez à les déplacer.` : ""}</p></div><div class="grid2"><button class="btn soft" data-act="fridgeEdit" data-id="${id}">Annuler</button><button class="btn danger" data-act="fridgeDelOk" data-id="${id}">Supprimer</button></div>`); buzz(10); },
-  fridgeDelOk: async (a, id) => { const n = fridgeName(id); await safe(DB.del("fridges", id)); await logEvent("fridge", `a supprimé ${n}`); closeSheet(true); SFX.close(); toast(`Supprimé : ${n}`); if (S.route === "frigo") goBack(); },
+  fridgeDel: (a, id) => {
+    const f = relFr(id); if (!f) return; const n = activeLots().filter((l) => l.fridgeId === id).length; const others = S.fridges.filter((x) => x.id !== id);
+    const nr = S.readings.filter((r) => r.fridgeId === id).length;
+    if (n && others.length && !others.some((x) => x.id === S.ui.relMoveTo)) S.ui.relMoveTo = (others.find((x) => relTypeOf(x).k === relTypeOf(f).k) || others[0]).id;
+    openSheet(`<div style="text-align:center"><span class="ic bad rel-bigic">${ico("trash")}</span><div class="h2" style="margin-top:10px;font-size:21px">Supprimer ${esc(f.name)} ?</div><p class="sub" style="margin:4px 0 0">${nr > 1 ? `Ses ${nr} relevés restent dans le registre.` : nr ? "Son relevé reste dans le registre." : "Aucun relevé à conserver."}${n ? ` ${n} produit${n > 1 ? "s y sont" : " y est"} encore rangé${n > 1 ? "s" : ""}.` : ""}</p></div>
+      ${n && others.length ? `<div class="field"><span>Déplacer ${n > 1 ? "les produits" : "le produit"} vers</span><div class="rel-mv">${others.map((x) => `<button class="chip ${x.id === S.ui.relMoveTo ? "on" : ""}" data-act="fMoveTo" data-v="${x.id}" data-id="${id}">${esc(x.name)}</button>`).join("")}</div></div>` : ""}
+      <div class="grid2"><button class="btn soft" data-act="fridgeEdit" data-id="${id}">Annuler</button><button class="btn danger" data-act="fridgeDelOk" data-id="${id}">Supprimer</button></div>`);
+    buzz(10);
+  },
+  fMoveTo: (a, id, v) => { S.ui.relMoveTo = v; $$(".rel-mv .chip").forEach((c) => c.classList.toggle("on", c.dataset.v === v)); SFX.tick(); },
+  fridgeDelOk: async (a, id) => {
+    const f = relFr(id); if (!f || !relOnce(a, 2000)) return; const { id: _x, ...data } = f;
+    const lots = activeLots().filter((l) => l.fridgeId === id); const to = relFr(S.ui.relMoveTo) && S.ui.relMoveTo !== id ? S.ui.relMoveTo : null;
+    try { await safe(DB.del("fridges", id)); } catch (e) { return; }
+    const moved = [];
+    if (to) for (const l of lots) { await DB.update("lots", l.id, { fridgeId: to }).catch(() => {}); moved.push(l.id); }
+    await logEvent("fridge", `a supprimé ${f.name}${moved.length ? ` · ${moved.length} produit${moved.length > 1 ? "s" : ""} déplacé${moved.length > 1 ? "s" : ""} vers ${fridgeName(to)}` : ""}`, { ref: id });
+    delete S.temp[id]; if (S.open === id) S.open = null;
+    closeSheet(true); SFX.close(); buzz(10);
+    relSetUndo({ kind: "fridge", id, data, lots: moved, fridgeId: id }, `Supprimé : ${relShort(f.name, 22)}`);
+    if (S.route === "frigo") goBack();
+  },
+  relGoRead: (a, id) => { SFX.tap(); S.slot = slotNow(); S.open = id; S.ui.relScroll = id; go("releve"); },
 });
 
+function relFixOpen(rid, keep) {
+  const r = S.readings.find((x) => x.id === rid); if (!r) return; const f = relFr(r.fridgeId); if (!f) return; const key = "e-" + rid;
+  if (!keep || S.temp[key] == null) { S.temp[key] = r.value; S.ui.relWhy = ""; }
+  const t = S.temp[key];
+  openSheet(`<div class="row" style="justify-content:flex-start"><button class="iconbtn" data-act="relEdit" data-id="${rid}" aria-label="Retour">${ico("back")}</button><div style="flex:1;min-width:0"><b class="h3 rel-ell" style="display:block">Corriger ${esc(f.name)}</b><div class="sub">Relevé du ${relSlotName(r.slot)} · avant ${fmt(r.value)} °C</div></div></div>
+    <div class="dz rel-fixdz">${relDial(key, f, t)}</div>
+    <div class="field"><span>Pourquoi ? (facultatif)</span><div class="rel-why">${["Faute de frappe", "Thermomètre mal lu", "Nouvelle mesure", "Mauvais frigo"].map((w) => `<button class="chip ${S.ui.relWhy === w ? "on" : ""}" data-act="relWhy" data-v="${w}">${w}</button>`).join("")}</div></div>
+    <button class="btn acc block" data-act="relFixSave" data-id="${rid}">${ico("check")}<span data-tlv="${key}" data-pre="Enregistrer">Enregistrer ${fmt(t)} °C</span></button>`);
+}
 function relDefaultName(ty) {
   const names = new Set(S.fridges.map((f) => f.name.toLowerCase())); if (!names.has(ty.s.toLowerCase())) return ty.s;
   let i = 2; while (names.has(`${ty.s} ${i}`.toLowerCase())) i++; return `${ty.s} ${i}`;
@@ -476,6 +558,6 @@ async function relApplyEdit(r, patch, why, logText, msg) {
   relSetUndo({ kind: "edit", id, data: before, fridgeId: r.fridgeId }, msg);
 }
 function relOrderHtml() {
-  const rows = S.fridges.map((f, i) => `<div class="li rel-ord" data-fid="${f.id}"><span class="ic">${relIco(f)}</span><div class="tx"><b>${esc(f.name)}</b><em>${esc(relTypeOf(f).s)} · ${relRange(f)}</em></div><button class="iconbtn" data-act="fMove" data-id="${f.id}" data-v="-1" aria-label="Monter" ${i === 0 ? "disabled" : ""}>${ico("up")}</button><button class="iconbtn" data-act="fMove" data-id="${f.id}" data-v="1" aria-label="Descendre" ${i === S.fridges.length - 1 ? "disabled" : ""}>${ico("down")}</button><button class="iconbtn" data-act="fridgeEdit" data-id="${f.id}" aria-label="Modifier">${ico("edit")}</button></div>`).join("");
+  const rows = S.fridges.map((f, i) => `<div class="li rel-ord" data-fid="${f.id}"><span class="ic">${relIco(f)}</span><div class="tx"><b class="rel-ell">${esc(f.name)}</b><em>${relRange(f)}</em></div><button class="iconbtn" data-act="fMove" data-id="${f.id}" data-v="-1" aria-label="Monter" ${i === 0 ? "disabled" : ""}>${ico("up")}</button><button class="iconbtn" data-act="fMove" data-id="${f.id}" data-v="1" aria-label="Descendre" ${i === S.fridges.length - 1 ? "disabled" : ""}>${ico("down")}</button><button class="iconbtn" data-act="fridgeEdit" data-id="${f.id}" aria-label="Modifier">${ico("edit")}</button></div>`).join("");
   return `<div><div class="h2" style="font-size:20px">Ordre des équipements</div><p class="sub" style="margin:4px 0 0">C'est l'ordre du relevé : suivez le sens de votre tournée.</p></div><div class="rel-ordl">${rows}</div><button class="btn soft block" data-act="sheetClose">Terminé</button>`;
 }

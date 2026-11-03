@@ -19,18 +19,59 @@ const noteSplit = (t) => String(t || "").split(/\n+/).map((s) => s.replace(/^\s*
 const noteSteps = (n) => (Array.isArray(n.steps) ? n.steps.map((s) => String(s || "").trim()).filter(Boolean) : noteKind(n) === "Notes" ? [] : noteSplit(n.body));
 const noteIntro = (n) => (Array.isArray(n.steps) || noteKind(n) === "Notes" ? String(n.body || "").trim() : "");
 const noteAllergenLabel = (k) => NOTE_ALLERGENS.find((a) => a[0] === k)?.[1] || k;
-const noteNorm = (s) => String(s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").trim();
+const noteNorm = (s) => String(s || "").toLowerCase().replace(/œ/g, "oe").replace(/æ/g, "ae").normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[’']/g, " ").trim();
 const noteHay = (n) => noteNorm([n.title, n.body, ...(n.steps || []), ...(n.ingredients || []).map((g) => g.name), ...(n.allergens || []).map(noteAllergenLabel)].join(" "));
+const noteMatch = (n, q) => { const h = noteHay(n); return q.split(/\s+/).filter(Boolean).every((w) => h.includes(w)); };
 function noteNum(v) { if (v >= 100) return String(Math.round(v)); const d = v >= 10 ? 1 : 2; return String(+v.toFixed(d)).replace(".", ","); }
-function noteScale(qty, unit, k) {
-  const n = num(qty); unit = String(unit || "").trim();
-  if (n == null) return { q: String(qty || ""), u: unit };
-  let v = n * k, u = unit; const lu = u.toLowerCase();
-  if (lu === "g" && v >= 1000) { v /= 1000; u = "kg"; } else if (lu === "kg" && v < 1) { v *= 1000; u = "g"; }
-  else if (lu === "ml" && v >= 1000) { v /= 1000; u = "L"; } else if (lu === "cl" && v >= 100) { v /= 100; u = "L"; } else if (lu === "l" && v < 1) { v *= 100; u = "cl"; }
-  if (/^pi[eè]ce$/i.test(u) && v >= 2) u += "s";
-  return { q: noteNum(v), u };
+/* quantities: "200", "1,5", "1/2", "1 1/2", "½", ranges "2-3" / "2 à 3", and a text tail "200 env." */
+const NOTE_UFRAC = { "½": "1/2", "¼": "1/4", "¾": "3/4", "⅓": "1/3", "⅔": "2/3", "⅛": "1/8" };
+function noteVal(s) {
+  s = String(s).trim().replace(/(\d)?\s*([½¼¾⅓⅔⅛])/g, (m, d, f) => (d ? d + " " : "") + NOTE_UFRAC[f]);
+  let m = s.match(/^\d+(?:[.,]\d+)?$/); if (m) return +s.replace(",", ".");
+  m = s.match(/^(?:(\d+)\s+)?(\d+)\s*\/\s*(\d+)$/); if (m && +m[3]) return +(m[1] || 0) + m[2] / m[3];
+  return null;
 }
+function noteParse(q) {
+  const s = String(q ?? "").trim(); if (!s) return null;
+  const r = s.split(/\s*(?:-|–|\sà\s)\s*/); if (r.length === 2) { const a = noteVal(r[0]), b = noteVal(r[1]); if (a != null && b != null) return { v: [a, b], rest: "" }; }
+  const v = noteVal(s); if (v != null) return { v: [v], rest: "" };
+  const m = s.match(/^([\d.,/½¼¾⅓⅔⅛ ]*\d[½¼¾⅓⅔⅛]?)\s+(\D.*)$/); if (m) { const x = noteVal(m[1]); if (x != null) return { v: [x], rest: m[2] }; }
+  return null;
+}
+const NOTE_COUNT = /^(pi[eè]ce|botte|feuille|pinc[ée]e|gousse|tranche|branche|brin|boule|sachet|bo[iî]te|bocal|œuf|oeuf|jaune|blanc|zeste|citron|c\. à [sc]\.|cuill[eè]re)s?$/i;
+const NOTE_PLURAL = /^(pi[eè]ce|botte|feuille|pinc[ée]e|gousse|tranche|branche|brin|boule|sachet|bo[iî]te|bocal|œuf|oeuf|jaune|blanc|zeste|citron|cuill[eè]re)s?$/i;
+function noteUnitForm(u, v) { if (!NOTE_PLURAL.test(u)) return u; const base = u.replace(/s$/i, ""); return v >= 2 ? base + "s" : base; }
+/* count units read better as kitchen fractions: ½, 1 ¼, ⅓ … */
+function noteFrac(v) {
+  if (v >= 10) return String(Math.round(v));
+  const w = Math.floor(v), f = v - w; const C = [[0, ""], [0.125, "⅛"], [0.25, "¼"], [1 / 3, "⅓"], [0.5, "½"], [2 / 3, "⅔"], [0.75, "¾"], [1, ""]];
+  let best = C[0]; for (const c of C) if (Math.abs(f - c[0]) < Math.abs(f - best[0])) best = c;
+  const W = best[0] === 1 ? w + 1 : w; if (!W && !best[1]) return noteNum(v);
+  return W ? `${W}${best[1] ? " " + best[1] : ""}` : best[1];
+}
+function noteFmt(v, u) {
+  const lu = u.toLowerCase();
+  if (!u || NOTE_COUNT.test(u)) return noteFrac(v);
+  if ((lu === "g" || lu === "ml") && v >= 10) return String(Math.round(v));
+  return noteNum(v);
+}
+function noteScale(qty, unit, k) {
+  const p = noteParse(qty); unit = String(unit || "").trim();
+  if (!p) return { q: String(qty || ""), u: unit };
+  const conv = (v) => {
+    let u = unit; const lu = u.toLowerCase();
+    if (lu === "g" && v >= 1000) { v /= 1000; u = "kg"; } else if (lu === "kg" && v < 1) { v *= 1000; u = "g"; }
+    else if (lu === "ml" && v >= 1000) { v /= 1000; u = "L"; } else if (lu === "cl" && v >= 100) { v /= 100; u = "L"; } else if (lu === "l" && v < 1) { v *= 100; u = "cl"; }
+    return { v, u };
+  };
+  const vs = p.v.map((x) => conv(x * k)); const u = noteUnitForm(vs[vs.length - 1].u, vs[vs.length - 1].v);
+  const sameU = vs.every((x) => x.u === vs[0].u);
+  const q = sameU ? vs.map((x) => noteFmt(x.v, x.u)).join("–") : vs.map((x) => noteFmt(x.v, x.u) + " " + x.u).join("–");
+  return { q: q + (p.rest ? " " + p.rest : ""), u: sameU ? u : "" };
+}
+/* French typography for display (already-escaped text): no line break inside "180 °C", "25 min", before ":" "?" "!" ";" */
+const noteTy = (h) => String(h).replace(/(\d) (?=(°|%|€|g\b|kg\b|cl\b|ml\b|L\b|min\b|minutes?\b|secondes?\b|s\b|h\b|heures?\b|jours?\b|cm\b|mm\b))/g, "$1 ").replace(/ ([:;!?»])/g, " $1").replace(/« /g, "« ").replace(/(\d) (\d{3})\b/g, "$1 $2");
+const noteLinkify = (h) => String(h).replace(/(\+33\s?[1-9]|\b0[1-9])((?:[\s.-]?\d{2}){4})\b/g, (m) => `<a class="nt-tel" href="tel:${m.replace(/[^\d+]/g, "")}">${m}</a>`);
 
 /* ───────── starter HACCP procedures ───────── */
 const NOTE_STARTER = [
@@ -88,7 +129,7 @@ function noteCard(n, i) {
 }
 function noteListHTML() {
   const q = noteNorm(S.noteQ); const tab = S.noteCat;
-  const list = S.notes.filter((n) => (q ? noteHay(n).includes(q) : noteKind(n) === tab)).sort((a, b) => (b.updatedAt || b.at || 0) - (a.updatedAt || a.at || 0));
+  const list = S.notes.filter((n) => (q ? noteMatch(n, q) : noteKind(n) === tab)).sort((a, b) => (b.updatedAt || b.at || 0) - (a.updatedAt || a.at || 0));
   const miss = noteMissingStarter();
   const starter = !q && tab === "Procédures" && miss.length ? `<div class="glass nt-starter st" style="--i:4"><div class="ic ok">${ico("sparkle")}</div><div style="flex:1;min-width:0"><b class="h3">${miss.length === NOTE_STARTER.length ? "Les 4 procédures HACCP essentielles" : `${notePlural(miss.length, "procédure")} HACCP à ajouter`}</b><p class="note" style="margin:3px 0 0">${miss.map((p) => esc(p.title)).join(" · ")}. Rédigées en français clair, modifiables.</p></div><button class="btn acc sm" data-act="noteSeed">${ico("plus")}Ajouter</button></div>` : "";
   const head = q ? `<div class="sub">${notePlural(list.length, "résultat")} pour « ${esc(S.noteQ.trim())} »</div>` : "";
@@ -96,7 +137,8 @@ function noteListHTML() {
     : tab === "Recettes" ? `<div class="glass empty st" style="--i:5"><div class="ic">${ico("ntChef")}</div><b>Aucune fiche recette</b>Ingrédients, grammages, portions, étapes et allergènes, au même endroit.<div style="margin-top:14px"><button class="btn acc sm" data-act="noteNew" data-v="Recettes">${ico("plus")}Créer une recette</button></div></div>`
     : tab === "Procédures" ? (starter ? "" : `<div class="glass empty st" style="--i:5"><div class="ic ok">${ico("shield")}</div><b>Aucune procédure</b>Écrivez vos méthodes de nettoyage, de réception, d'hygiène.</div>`)
     : `<div class="glass empty st" style="--i:5"><div class="ic">${ico("ntNote")}</div><b>Aucune note</b>Infos pour l'équipe, contacts, rappels.<div style="margin-top:14px"><button class="btn acc sm" data-act="noteNew" data-v="Notes">${ico("plus")}Écrire une note</button></div></div>`;
-  return `${head}${starter}${list.length ? `<div class="nt-grid">${list.map(noteCard).join("")}</div>` : ""}${empty}`;
+  const extra = !q && tab === "Recettes" ? noteProcListHTML() : "";
+  return `${head}${starter}${extra}${list.length ? `<div class="nt-grid">${list.map(noteCard).join("")}</div>` : ""}${empty}`;
 }
 function noteListPaint(anim) { const L = $("#noteList"); if (!L) return; L.innerHTML = noteListHTML(); if (!anim) $$(".st", L).forEach((e) => (e.style.animation = "none")); }
 VIEWS.notes = {
@@ -117,58 +159,69 @@ VIEWS.notes = {
 };
 
 /* ───────── read view ───────── */
+const notePortCur = (n) => { const base = num(n.portions); const P = S.ui.notePortions?.[n.id]; return P ?? (base && base > 0 ? base : 1); };
 function noteIngHTML(n) {
-  const base = num(n.portions); const P = S.ui.notePortions?.[n.id]; const k = base ? (P ?? base) / base : P ?? 1;
+  const base = num(n.portions); const k = base && base > 0 ? notePortCur(n) / base : notePortCur(n);
   return (n.ingredients || []).map((g) => { const s = noteScale(g.qty, g.unit, k); return `<li><span class="nt-iname">${esc(g.name)}</span><span class="nt-lead"></span><b class="nt-iqty mono">${esc(s.q)}${s.u ? `<small>${esc(s.u)}</small>` : ""}</b></li>`; }).join("");
 }
+const notePortW = (s) => `${Math.max(1, String(s).length) + 0.3}ch`;
 function noteScalerHTML(n) {
-  const base = num(n.portions); const P = S.ui.notePortions?.[n.id];
-  if (base) {
-    const v = P ?? base; const quick = [...new Set([Math.max(1, Math.round(base / 2)), base, base * 2, 10, 20, 50])].sort((a, b) => a - b).slice(0, 6);
-    return `<div class="nt-scaler"><button class="iconbtn nt-step" data-act="notePort" data-v="-1" aria-label="Moins">${ico("minus")}</button><label class="nt-pval"><input class="mono" id="ntPort" inputmode="numeric" value="${v}" aria-label="Portions"><span id="ntPortLbl">${v > 1 ? "portions" : "portion"}</span></label><button class="iconbtn nt-step" data-act="notePort" data-v="1" aria-label="Plus">${ico("plus")}</button></div>
-      <div class="chips nt-quick">${quick.map((x) => `<button class="chip ${x === v ? "on" : ""}" data-act="notePortSet" data-v="${x}">${x}${x === base ? " · base" : ""}</button>`).join("")}</div>`;
+  const base = num(n.portions); const v = notePortCur(n); const sv = noteNum(v);
+  if (base && base > 0) {
+    const quick = [...new Set([Math.max(1, Math.round(base / 2)), base, base * 2, 10, 20, 50])].sort((a, b) => a - b).slice(0, 6);
+    return `<div class="nt-scaler"><button class="iconbtn nt-step" data-act="notePort" data-v="-1" aria-label="Une portion de moins">${ico("minus")}</button><label class="nt-pval"><input class="mono" id="ntPort" inputmode="decimal" enterkeyhint="done" autocomplete="off" value="${sv}" style="width:${notePortW(sv)}" aria-label="Nombre de portions"><span id="ntPortLbl">${v >= 2 ? "portions" : "portion"}</span></label><button class="iconbtn nt-step" data-act="notePort" data-v="1" aria-label="Une portion de plus">${ico("plus")}</button></div>
+      <div class="nt-quick">${quick.map((x) => `<button class="chip ${x === v ? "on" : ""} ${x === base ? "base" : ""}" data-act="notePortSet" data-v="${x}">${noteNum(x)}${x === base ? "<em>fiche</em>" : ""}</button>`).join("")}</div>`;
   }
-  const v = P ?? 1;
-  return `<div class="nt-scaler"><button class="iconbtn nt-step" data-act="notePort" data-v="-1" aria-label="Moins">${ico("minus")}</button><label class="nt-pval"><span>×</span><input class="mono" id="ntPort" inputmode="decimal" value="${noteNum(v)}" aria-label="Multiplier la recette"></label><button class="iconbtn nt-step" data-act="notePort" data-v="1" aria-label="Plus">${ico("plus")}</button></div>`;
+  return `<div class="nt-scaler"><button class="iconbtn nt-step" data-act="notePort" data-v="-1" aria-label="Moins">${ico("minus")}</button><label class="nt-pval"><span>×</span><input class="mono" id="ntPort" inputmode="decimal" enterkeyhint="done" autocomplete="off" value="${sv}" style="width:${notePortW(sv)}" aria-label="Multiplier la recette"></label><button class="iconbtn nt-step" data-act="notePort" data-v="1" aria-label="Plus">${ico("plus")}</button></div>`;
 }
-function noteRefreshScale(id) {
+function noteRefreshScale(id, fromInput) {
   const n = S.notes.find((x) => x.id === id); if (!n) return;
   const L = $("#ntIngs"); if (L) { L.innerHTML = noteIngHTML(n); $$(".nt-iqty", L).forEach((e) => { e.classList.remove("bump"); void e.offsetWidth; e.classList.add("bump"); }); }
-  const base = num(n.portions); const v = S.ui.notePortions[id] ?? base ?? 1;
+  const v = notePortCur(n);
   $$(".nt-quick .chip").forEach((c) => c.classList.toggle("on", +c.dataset.v === v));
-  const lab = $("#ntPortLbl"); if (lab) lab.textContent = v > 1 ? "portions" : "portion";
+  const lab = $("#ntPortLbl"); if (lab) lab.textContent = v >= 2 ? "portions" : "portion";
+  const i = $("#ntPort"); if (i) { if (!fromInput) { i.value = noteNum(v); i.classList.remove("bump"); void i.offsetWidth; i.classList.add("bump"); } i.style.width = notePortW(i.value); i.classList.remove("bad"); }
 }
 function noteRunHTML(n, steps) {
   const R = S.ui.noteRun?.id === n.id ? S.ui.noteRun : { done: [] }; const done = R.done.length; const cur = steps.findIndex((_, i) => !R.done.includes(i));
-  return `<div class="glass pad nt-runbar st" style="--i:3"><div class="hstack" style="justify-content:space-between"><span class="lbl">Mode pas-à-pas</span><span class="mono nt-runct"><b>${done}</b> / ${steps.length}</span></div><div class="nt-prog"><i style="width:${steps.length ? (done / steps.length) * 100 : 0}%"></i></div><p class="note" style="margin:8px 0 0">Touchez chaque étape quand elle est faite.</p></div>
-    <ol class="nt-run">${steps.map((s, i) => `<li class="st ${R.done.includes(i) ? "done" : ""} ${i === cur ? "cur" : ""}" style="--i:${Math.min(i + 4, 14)}"><button data-act="noteTick" data-id="${esc(n.id)}" data-v="${i}" aria-pressed="${R.done.includes(i)}"><span class="nt-box">${ico("check")}</span><span class="nt-rnum mono">${i + 1}</span><span class="nt-rtx">${esc(s)}</span></button></li>`).join("")}</ol>
+  return `<div class="glass pad nt-runbar st" style="--i:3"><div class="hstack" style="justify-content:space-between"><span class="lbl">Étape par étape</span><span class="mono nt-runct"><b>${done}</b> / ${steps.length}</span></div><div class="nt-prog"><i style="width:${steps.length ? (done / steps.length) * 100 : 0}%"></i></div><p class="note nt-runhint" style="margin:8px 0 0">Touchez chaque étape quand elle est faite.</p></div>
+    <ol class="nt-run">${steps.map((s, i) => `<li class="st ${R.done.includes(i) ? "done" : ""} ${i === cur ? "cur" : ""}" style="--i:${Math.min(i + 4, 14)}"><button data-act="noteTick" data-id="${esc(n.id)}" data-v="${i}" aria-pressed="${R.done.includes(i)}"><span class="nt-box">${ico("check")}</span><span class="nt-rnum mono">${i + 1}</span><span class="nt-rtx">${noteTy(esc(s))}</span></button></li>`).join("")}</ol>
     <div class="glass nt-runend" ${done && done === steps.length ? "" : "hidden"}><div class="check draw">${ico("check")}</div><b class="h3">Procédure terminée</b><span class="note">C'est noté dans le registre.</span><button class="btn soft sm" data-act="noteRunReset" data-id="${esc(n.id)}">${ico("ntReset")}Recommencer</button></div>`;
 }
 VIEWS.fiche = {
   render({ id }) {
     const n = S.notes.find((x) => x.id === id);
-    if (!n) return `<div class="inner narrow">${topBar("Fiche")}<div class="glass empty st" style="--i:1"><div class="ic">${ico("book")}</div><b>Fiche introuvable</b>Elle a peut-être été supprimée.</div></div>`;
+    if (!n) return `<div class="inner narrow nt-wrap">${topBar("Fiche")}<div class="glass empty st" style="--i:1"><div class="ic">${ico("book")}</div><b>Fiche introuvable</b>Elle a peut-être été supprimée.</div></div>`;
     const k = noteKind(n); const steps = noteSteps(n); const intro = noteIntro(n); const ings = n.ingredients || []; const al = n.allergens || [];
     const pill = k === "Recettes" ? `<span class="pill acc">${ico("ntChef")}Recette</span>` : k === "Procédures" ? `<span class="pill ok">${ico("shield")}Procédure</span>` : `<span class="pill neu">${ico("ntNote")}Note</span>`;
     const hero = `<div class="nt-hero st ${n.photo ? "has-ph" : ""}" style="--i:1">${n.photo ? `<div class="nt-photo"><img src="${esc(n.photo)}" alt=""></div>` : ""}<div class="nt-htx">${pill}<h1 class="nt-title">${esc(n.title || "Sans titre")}</h1><span class="who">${avatar(n.uid, true)}${esc(firstName(nameOf(n.uid)))} · modifié ${when(n.updatedAt || n.at)}</span></div></div>`;
     const top = `<div class="top st" style="--i:0"><button class="iconbtn" data-act="back" aria-label="Retour">${ico("back")}</button><span class="h2"></span><button class="btn soft sm" data-act="noteEdit" data-id="${esc(n.id)}">${ico("edit")}Modifier</button></div>`;
-    const stepsHTML = steps.length ? `<div class="glass pad st" style="--i:4"><span class="lbl">Étapes</span><ol class="nt-steps">${steps.map((s, i) => `<li><span class="nt-snum mono">${i + 1}</span><span>${esc(s)}</span></li>`).join("")}</ol></div>` : "";
-    const introHTML = (lbl, i) => (intro ? `<div class="glass pad st nt-intro" style="--i:${i}"><span class="lbl">${lbl}</span><p>${esc(intro)}</p></div>` : "");
+    const stepsHTML = steps.length ? `<div class="glass pad st" style="--i:4"><span class="lbl">Étapes</span><ol class="nt-steps">${steps.map((s, i) => `<li><span class="nt-snum mono">${i + 1}</span><span>${noteTy(esc(s))}</span></li>`).join("")}</ol></div>` : "";
+    const introHTML = (lbl, i) => (intro ? `<div class="glass pad st nt-intro" style="--i:${i}"><span class="lbl">${lbl}</span><p>${noteTy(esc(intro))}</p></div>` : "");
     if (k === "Recettes") {
-      const alHTML = `<div class="glass pad st" style="--i:3"><span class="lbl">Allergènes</span>${al.length ? `<div class="nt-als">${al.map((a) => `<span class="nt-al on">${ico("alert")}${esc(noteAllergenLabel(a))}</span>`).join("")}</div>` : `<p class="note" style="margin:8px 0 0">Aucun allergène indiqué. Vérifiez la fiche avant de servir un client allergique.</p>`}</div>`;
-      return `<div class="inner wide nt-wrap">${top}${hero}<div class="cols nt-cols"><div>
-        <div class="glass pad st nt-ingcard" style="--i:2"><span class="lbl">${num(n.portions) ? "Pour combien de portions ?" : "Quantité"}</span>${noteScalerHTML(n)}
+      const alHTML = al.length ? `<div class="glass pad st nt-alcard has" style="--i:2"><span class="lbl">${ico("alert")}${notePlural(al.length, "allergène")}</span><div class="nt-als">${al.map((a) => `<span class="nt-al on">${esc(noteAllergenLabel(a))}</span>`).join("")}</div></div>`
+        : `<div class="glass pad st nt-alcard" style="--i:2"><span class="lbl">Allergènes</span><p class="note" style="margin:6px 0 0">Aucun allergène indiqué. Vérifiez la fiche avant de servir un client allergique.</p></div>`;
+      const tab = S.ui.noteTab?.[n.id] === "process" ? "process" : "fiche"; const PL = (n.process || []).length;
+      const seg = `<div class="seg nt-seg nt-fseg st" style="--i:2"><span class="knob" style="width:calc(50% - 4px);transform:translateX(${tab === "process" ? 100 : 0}%)"></span><button class="${tab === "fiche" ? "on" : ""}" data-act="noteFTab" data-id="${esc(n.id)}" data-v="fiche">${ico("ntChef")}<span>Fiche recette</span></button><button class="${tab === "process" ? "on" : ""}" data-act="noteFTab" data-id="${esc(n.id)}" data-v="process">${ico("ntFlow")}<span>Process HACCP</span>${PL ? `<em class="mono">${PL}</em>` : `<em class="ntp-todo">à faire</em>`}</button></div>`;
+      if (tab === "process") return `<div class="inner wide nt-wrap">${top}${hero}${seg}<div id="ntFBody" class="nt-fbody">${noteProcTabHTML(n)}</div>${noteFilesHTML(n)}</div>`;
+      return `<div class="inner wide nt-wrap">${top}${hero}${seg}<div id="ntFBody" class="nt-fbody">${alHTML}<div class="cols nt-cols"><div>
+        <div class="glass pad st nt-ingcard" style="--i:3"><span class="lbl">${num(n.portions) ? "Pour combien de portions ?" : "Multiplier la recette"}</span>${noteScalerHTML(n)}
         ${ings.length ? `<ul class="nt-ings" id="ntIngs">${noteIngHTML(n)}</ul>` : `<p class="note" style="margin:0">Pas encore d'ingrédients. Touchez « Modifier » pour les ajouter.</p>`}</div>
-        ${alHTML}</div><div>${stepsHTML}${introHTML("Conseils du chef", 5)}</div></div></div>`;
+        </div><div>${stepsHTML || `<div class="glass pad st" style="--i:4"><span class="lbl">Étapes</span><p class="note" style="margin:6px 0 0">Pas encore d'étapes. Touchez « Modifier » pour les écrire.</p></div>`}${introHTML("Conseils du chef", 5)}</div></div></div>${noteFilesHTML(n)}</div>`;
     }
-    if (k === "Procédures") return `<div class="inner narrow nt-wrap">${top}${hero}${introHTML("Quand et pourquoi", 2)}${steps.length ? noteRunHTML(n, steps) : `<div class="glass empty st" style="--i:3">Aucune étape. Touchez « Modifier » pour les écrire.</div>`}</div>`;
-    return `<div class="inner narrow nt-wrap">${top}${hero}<div class="glass pad st nt-body" style="--i:2">${n.body ? esc(n.body) : `<span class="note">Note vide.</span>`}</div></div>`;
+    if (k === "Procédures") return `<div class="inner narrow nt-wrap">${top}${hero}${introHTML("Quand et pourquoi", 2)}${steps.length ? noteRunHTML(n, steps) : `<div class="glass empty st" style="--i:3">Aucune étape. Touchez « Modifier » pour les écrire.</div>`}${noteFilesHTML(n)}</div>`;
+    return `<div class="inner narrow nt-wrap">${top}${hero}<div class="glass pad st nt-body" style="--i:2">${n.body ? noteLinkify(noteTy(esc(n.body))) : `<span class="note">Note vide.</span>`}</div>${noteFilesHTML(n)}</div>`;
   },
   after(v) {
     setTimeout(() => { const b = $('#side .nav[data-go="notes"]'); b && b.classList.add("on"); }, 0);
+    noteFilesBind(v);
     const i = $("#ntPort", v); if (!i) return; const id = S.params.id;
-    i.addEventListener("focus", () => i.select());
-    i.addEventListener("input", () => { const x = num(i.value); if (x && x > 0 && x <= 10000) { (S.ui.notePortions ||= {})[id] = x; noteRefreshScale(id); } });
+    i.addEventListener("focus", () => setTimeout(() => i.select(), 0));
+    i.addEventListener("input", () => {
+      i.style.width = notePortW(i.value); const x = num(i.value);
+      if (x != null && x > 0 && x <= 9999) { (S.ui.notePortions ||= {})[id] = Math.round(x * 100) / 100; noteRefreshScale(id, true); } else i.classList.toggle("bad", i.value.trim() !== "");
+    });
+    i.addEventListener("blur", () => { const n = S.notes.find((x) => x.id === id); if (!n) return; const want = noteNum(notePortCur(n)); if (i.value !== want) { if (i.classList.contains("bad")) { SFX.err(); buzz(20); } noteRefreshScale(id); } });
     i.addEventListener("keydown", (e) => { if (e.key === "Enter") i.blur(); });
   },
 };
@@ -183,7 +236,7 @@ function noteDraft(id) {
   d.ingredients ||= []; d.allergens ||= []; d.photo ||= ""; d.portions ??= "";
   ["id", "updatedAt", "uid", "at"].forEach((key) => delete d[key]); return d;
 }
-const noteSnap = (N) => JSON.stringify({ t: (N.title || "").trim(), c: N.cat, b: (N.body || "").trim(), i: (N.ingredients || []).filter((g) => g.name.trim()), s: (N.steps || []).filter((s) => s.trim()), p: String(N.portions ?? ""), a: [...(N.allergens || [])].sort(), ph: N.photo || "" });
+const noteSnap = (N) => JSON.stringify({ t: (N.title || "").trim(), c: N.cat, b: (N.body || "").trim(), i: (N.ingredients || []).filter((g) => String(g.name || "").trim()), s: (N.steps || []).filter((s) => s.trim()), p: String(N.portions ?? ""), a: [...(N.allergens || [])].sort(), ph: N.photo || "" });
 VIEWS.note = {
   live: false,
   render({ id }) {
@@ -193,7 +246,7 @@ VIEWS.note = {
     const photo = N.photo ? `<div class="nt-ephoto"><img src="${esc(N.photo)}" alt=""><div class="nt-ephbtn"><button class="btn soft sm" data-act="notePhoto">${ico("camera")}Changer</button><button class="btn soft sm" data-act="notePhotoDel" style="color:var(--bad)">${ico("trash")}Retirer</button></div></div>`
       : `<button class="nt-addph" data-act="notePhoto" ${S.ui.notePhBusy ? "disabled" : ""}>${ico(S.ui.notePhBusy ? "clock" : "camera")}<span>${S.ui.notePhBusy ? "Préparation de la photo…" : "Ajouter une photo"}</span><em>facultatif</em></button>`;
     const ingsHTML = `<div class="glass pad st nt-esec" style="--i:3"><div class="nt-ehead"><span class="lbl">Ingrédients</span>
-        <label class="nt-eport"><span>Pour</span><input class="input mono" data-bind="ui.note.portions" inputmode="numeric" value="${esc(N.portions)}" placeholder="4" aria-label="Nombre de portions"><span>portions</span></label></div>
+        <label class="nt-eport"><span>Pour</span><input class="input mono nt-eportin" data-bind="ui.note.portions" inputmode="decimal" autocomplete="off" value="${esc(N.portions)}" placeholder="4" aria-label="Nombre de portions"><span>portions</span></label></div>
       <div class="nt-erows">${N.ingredients.map((g, i) => `<div class="nt-erow"><input class="input nt-n" data-bind="ui.note.ingredients.${i}.name" data-nkey="ing" data-i="${i}" value="${esc(g.name)}" placeholder="Ingrédient" aria-label="Ingrédient ${i + 1}" enterkeyhint="next"><input class="input mono nt-q" data-bind="ui.note.ingredients.${i}.qty" data-nkey="ing" data-i="${i}" inputmode="decimal" value="${esc(g.qty)}" placeholder="Qté" aria-label="Quantité" enterkeyhint="next"><input class="input nt-u" list="ntUnits" data-bind="ui.note.ingredients.${i}.unit" data-nkey="ing" data-i="${i}" value="${esc(g.unit)}" placeholder="g" aria-label="Unité" enterkeyhint="next"><button class="iconbtn nt-del" data-act="noteIngDel" data-v="${i}" aria-label="Retirer l'ingrédient">${ico("x")}</button></div>`).join("")}</div>
       <datalist id="ntUnits">${NOTE_UNITS.map((u) => `<option value="${esc(u)}">`).join("")}</datalist>
       <button class="btn ghost sm" data-act="noteIngAdd" style="align-self:flex-start">${ico("plus")}Ajouter un ingrédient</button></div>
@@ -203,7 +256,7 @@ VIEWS.note = {
     const bodyHTML = isN ? `<div class="glass pad st nt-esec" style="--i:3"><span class="lbl">Contenu</span><textarea class="input nt-ebody" data-bind="ui.note.body" placeholder="Écrivez ici…">${esc(N.body)}</textarea></div>`
       : `<div class="glass pad st nt-esec" style="--i:6"><span class="lbl">${isR ? "Conseils du chef" : "Quand et pourquoi"}</span><textarea class="input" style="min-height:96px" data-bind="ui.note.body" placeholder="${isR ? "Dressage, conservation, astuces… (facultatif)" : "Fréquence, matériel, précautions… (facultatif)"}">${esc(N.body)}</textarea></div>`;
     return `<div class="inner narrow nt-wrap"><div class="top st" style="--i:0"><button class="iconbtn" data-act="noteBack" aria-label="Retour">${ico("back")}</button><span class="h2">${id === "new" ? "Nouvelle fiche" : "Modifier la fiche"}</span>${id !== "new" ? `<button class="iconbtn" data-act="noteDel" aria-label="Supprimer la fiche" style="color:var(--bad)">${ico("trash")}</button>` : ""}</div>
-      <div class="glass pad st nt-esec" style="--i:1"><input class="input nt-etitle" data-bind="ui.note.title" value="${esc(N.title)}" placeholder="${isR ? "Nom de la recette" : isN ? "Titre de la note" : "Nom de la procédure"}" aria-label="Titre">
+      <div class="glass pad st nt-esec" style="--i:1"><textarea class="input nt-etitle" rows="1" data-bind="ui.note.title" enterkeyhint="done" placeholder="${isR ? "Nom de la recette" : isN ? "Titre de la note" : "Nom de la procédure"}" aria-label="Titre">${esc(N.title)}</textarea>
         <div class="seg nt-seg" id="ntESeg"><span class="knob" style="width:calc(33.33% - 3px);transform:translateX(${ix * 100}%)"></span>${NOTE_TABS.map(([k, ic]) => `<button class="${N.cat === k ? "on" : ""}" data-act="noteSetCat" data-v="${k}">${ico(ic)}<span>${k === "Recettes" ? "Recette" : k === "Procédures" ? "Procédure" : "Note"}</span></button>`).join("")}</div></div>
       ${!isN || N.photo ? `<div class="st" style="--i:2">${photo}</div>` : ""}
       ${isR ? ingsHTML : ""}${isN ? "" : stepsHTML}${bodyHTML}
@@ -211,7 +264,12 @@ VIEWS.note = {
   },
   after(v) {
     const grow = (t) => { t.style.height = "auto"; t.style.height = t.scrollHeight + 2 + "px"; };
-    $$(".nt-estep textarea", v).forEach((t) => { grow(t); t.addEventListener("input", () => grow(t)); });
+    $$(".nt-estep textarea, textarea.nt-etitle", v).forEach((t) => { grow(t); t.addEventListener("input", () => grow(t)); });
+    const T = $("textarea.nt-etitle", v);
+    if (T) { /* the title is one line that wraps: Enter closes the keyboard, pasted line breaks become spaces */
+      T.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.isComposing) { e.preventDefault(); T.blur(); } });
+      T.addEventListener("input", () => { if (/\n/.test(T.value)) { T.value = T.value.replace(/\s*\n+\s*/g, " "); S.ui.note.title = T.value; grow(T); } });
+    }
     if (!v._ntKeys) v._ntKeys = 1, v.addEventListener("keydown", (e) => {
       const t = e.target; if (S.route !== "note" || e.key !== "Enter" || e.shiftKey || !t.dataset.nkey || e.isComposing) return;
       const i = +t.dataset.i; e.preventDefault();
@@ -224,6 +282,19 @@ VIEWS.note = {
 };
 const noteRer = () => { const a = document.activeElement; if (a && a.blur && a !== document.body) a.blur(); rerender(); const v = $("#viewport .view:not(.leave)"); v && $$(".st", v).forEach((e) => (e.style.animation = "none")); };
 function noteSegMove(segId, v) { const seg = $("#" + segId); if (!seg) return; const ix = NOTE_TABS.findIndex((t) => t[0] === v); $$("button", seg).forEach((b) => { b.classList.toggle("on", b.dataset.v === v); b.classList.remove("dim"); }); $(".knob", seg).style.transform = `translateX(${ix * 100}%)`; }
+const noteDirty = () => !!S.ui.note && noteSnap(S.ui.note) !== S.ui.noteOrig;
+const noteGuardDirty = () => (S.route === "note" && noteDirty()) || (S.route === "noteProc" && npDirty());
+function noteAskLeave() {
+  const a = document.activeElement; if (a && a.blur && a !== document.body) a.blur();
+  openSheet(`<div class="h2" style="font-size:20px">Enregistrer les modifications ?</div><p class="sub" style="margin:0">Sinon, elles seront perdues.</p><div class="grid2"><button class="btn soft" data-act="noteDiscard" style="color:var(--bad)">Ne pas enregistrer</button><button class="btn acc" data-act="noteSaveFromSheet">${ico("check")}Enregistrer</button></div>`);
+}
+/* leaving the editor any other way (side nav on tablet / desktop, profile) asks first; closing the tab warns too */
+document.addEventListener("click", (e) => {
+  if (!noteGuardDirty()) return; const g = e.target.closest("[data-go],[data-tab]"); if (!g || g.closest("#viewport .view:not(.leave)") || g.closest("#sheet")) return;
+  e.preventDefault(); e.stopPropagation(); const route = g.dataset.go || g.dataset.tab; const params = g.dataset.id ? { id: g.dataset.id } : {};
+  S.ui.notePending = { route, params }; SFX.tap(); noteAskLeave();
+}, true);
+window.addEventListener("beforeunload", (e) => { if (noteGuardDirty()) { e.preventDefault(); e.returnValue = ""; } });
 function noteLeave() { S.ui.note = null; S.ui.noteNewCat = null; goBack(); }
 
 async function notePhotoUrl(file) {
@@ -252,10 +323,13 @@ Object.assign(ACT, {
   /* read view */
   notePort: (a, id, v) => {
     const pid = S.params.id; const n = S.notes.find((x) => x.id === pid); if (!n) return; const base = num(n.portions); S.ui.notePortions ||= {};
-    const cur = S.ui.notePortions[pid] ?? base ?? 1; const step = base ? 1 : 0.5; const nx = Math.max(step, Math.min(10000, Math.round((cur + step * +v) / step) * step));
-    if (nx === cur) { SFX.err(); return; } S.ui.notePortions[pid] = nx; SFX.tick(); buzz(5); const i = $("#ntPort"); if (i) { i.value = base ? nx : noteNum(nx); i.classList.remove("bump"); void i.offsetWidth; i.classList.add("bump"); } noteRefreshScale(pid);
+    const cur = notePortCur(n); const step = base && base > 0 ? 1 : 0.5;
+    let nx = +v > 0 ? Math.floor(cur / step + 1e-9) * step + step : Math.ceil(cur / step - 1e-9) * step - step; /* 2,5 + 1 → 3, 2,5 − 1 → 2 */
+    nx = Math.min(9999, Math.max(step, Math.round(nx * 100) / 100));
+    if (nx === cur) { SFX.err(); buzz(20); const i = $("#ntPort"); if (i) { i.classList.remove("shake"); void i.offsetWidth; i.classList.add("shake"); } return; }
+    S.ui.notePortions[pid] = nx; SFX.tick(); buzz(5); noteRefreshScale(pid);
   },
-  notePortSet: (a, id, v) => { const pid = S.params.id; (S.ui.notePortions ||= {})[pid] = +v; SFX.tick(); buzz(5); const i = $("#ntPort"); if (i) i.value = v; noteRefreshScale(pid); },
+  notePortSet: (a, id, v) => { const pid = S.params.id; (S.ui.notePortions ||= {})[pid] = +v; SFX.tick(); buzz(5); noteRefreshScale(pid); },
   noteTick: async (a, id, v) => {
     const n = S.notes.find((x) => x.id === id); if (!n) return; const steps = noteSteps(n);
     if (S.ui.noteRun?.id !== id) S.ui.noteRun = { id, done: [] }; const R = S.ui.noteRun; const i = +v;
@@ -280,36 +354,362 @@ Object.assign(ACT, {
   noteStepDel: (a, id, v) => { S.ui.note.steps.splice(+v, 1); if (!S.ui.note.steps.length) S.ui.note.steps.push(""); SFX.close(); noteRer(); },
   noteAl: (a, id, v) => { const L = S.ui.note.allergens; const on = !L.includes(v); if (on) L.push(v); else L.splice(L.indexOf(v), 1); a.classList.toggle("on", on); a.setAttribute("aria-pressed", on); a.innerHTML = ico(on ? "check" : "plus") + esc(noteAllergenLabel(v)); SFX.tick(); buzz(5); },
   notePhoto: async () => {
-    const [f] = await pickImage(); if (!f) return; S.ui.notePhBusy = true; noteRer();
-    try { const r = await notePhotoUrl(f); S.ui.note.photo = r.url; S.ui.note.photoId = r.id; SFX.ok(); } catch (e) { console.warn(e); SFX.err(); toast("Photo illisible. Essayez une autre image.", "err"); }
-    S.ui.notePhBusy = false; if (S.route === "note") noteRer();
+    const [f] = await pickImage(); if (!f) return; const N = S.ui.note; S.ui.notePhBusy = true; noteRer();
+    try { const r = await notePhotoUrl(f); if (S.ui.note === N) { N.photo = r.url; N.photoId = r.id; SFX.ok(); } } catch (e) { console.warn(e); if (S.ui.note === N) { SFX.err(); toast("Photo illisible. Essayez une autre image.", "err"); } }
+    S.ui.notePhBusy = false; if (S.route === "note" && S.ui.note === N) noteRer();
   },
   notePhotoDel: () => { S.ui.note.photo = ""; S.ui.note.photoId = ""; SFX.close(); noteRer(); },
-  noteBack: () => {
-    const N = S.ui.note; if (!N || noteSnap(N) === S.ui.noteOrig) { SFX.tap(); noteLeave(); return; }
-    openSheet(`<div class="h2" style="font-size:20px">Quitter sans enregistrer ?</div><p class="sub" style="margin:0">Vos modifications seront perdues.</p><div class="grid2"><button class="btn soft" data-act="sheetClose">Continuer</button><button class="btn danger" data-act="noteDiscard">Quitter</button></div>`);
+  noteBack: () => { S.ui.notePending = null; if (!noteDirty()) { SFX.tap(); noteLeave(); return; } noteAskLeave(); },
+  noteDiscard: () => {
+    closeSheet(true); const p = S.ui.notePending; S.ui.notePending = null;
+    const proc = S.route === "noteProc"; S.ui.np = null; SFX.close();
+    if (p) { S.ui.note = null; S.ui.noteNewCat = null; go(p.route, p.params, { replace: true }); } else if (proc) goBack(); else noteLeave();
   },
-  noteDiscard: () => { closeSheet(true); noteLeave(); },
+  noteSaveFromSheet: () => { closeSheet(true); S.ui.noteFromSheet = true; const b = $("#viewport .view:not(.leave) [data-act=noteSave], #viewport .view:not(.leave) [data-act=npSave]"); if (b && !b.disabled) b.click(); },
   noteSave: async (a) => {
     const N = S.ui.note; const id = N._id; const isR = N.cat === "Recettes", isN = N.cat === "Notes";
-    const title = (N.title || "").trim();
+    if (!N || a.disabled) return;
+    if (S.ui.notePhBusy) { SFX.err(); toast("Un instant : la photo se prépare."); return; }
+    const title = String(N.title || "").replace(/\s+/g, " ").trim(); const por = num(N.portions);
     if (!title) { SFX.err(); buzz(30); toast("Donnez un titre à la fiche.", "err"); const t = $(".nt-etitle"); if (t) { t.focus(); t.classList.remove("shake"); void t.offsetWidth; t.classList.add("shake"); } return; }
+    if (isR && !(por > 0 && por <= 9999)) { SFX.err(); buzz(30); toast("Indiquez les portions.", "err"); const t = $(".nt-eportin"); if (t) { t.scrollIntoView({ block: "center", behavior: "smooth" }); t.focus({ preventScroll: true }); t.classList.remove("shake"); void t.offsetWidth; t.classList.add("shake"); } return; }
     const d = { title, cat: N.cat, body: String(N.body || "").trim(), updatedAt: Date.now(), uid: S.me.id,
-      ingredients: isR ? (N.ingredients || []).filter((g) => String(g.name || "").trim()).map((g) => ({ name: g.name.trim(), qty: String(g.qty ?? "").trim(), unit: String(g.unit ?? "").trim() })) : [],
+      ingredients: isR ? (N.ingredients || []).filter((g) => String(g.name || "").trim()).map((g) => ({ name: String(g.name).trim(), qty: String(g.qty ?? "").trim(), unit: String(g.unit ?? "").trim() })) : [],
       steps: isN ? [] : (N.steps || []).map((s) => String(s || "").trim()).filter(Boolean),
-      allergens: isR ? N.allergens || [] : [], portions: isR ? Math.max(0.01, num(N.portions) || 1) : 1, photo: N.photo || "", photoId: N.photoId || "" };
+      allergens: isR ? N.allergens || [] : [], portions: isR ? Math.round(por * 100) / 100 : 1, photo: N.photo || "", photoId: N.photoId || "" };
     a.disabled = true;
     try {
-      if (id === "new") { d.at = Date.now(); const nid = await safe(DB.add("notes", d)); await logEvent("note", `a créé la fiche « ${d.title} »`, { ref: nid }); S.ui.note = null; S.ui.noteNewCat = null; S.noteCat = d.cat; SFX.ok(); buzz(10); toast("Fiche enregistrée"); go("fiche", { id: nid }, { replace: true }); }
-      else { await safe(DB.update("notes", id, d)); await logEvent("note", `a modifié la fiche « ${d.title} »`, { ref: id }); S.noteCat = d.cat; SFX.ok(); buzz(10); toast("Fiche enregistrée"); noteLeave(); }
+      let nid = id;
+      if (id === "new") { d.at = Date.now(); nid = await safe(DB.add("notes", d)); await logEvent("note", `a créé la fiche « ${d.title} »`, { ref: nid }); }
+      else { await safe(DB.update("notes", id, d)); await logEvent("note", `a modifié la fiche « ${d.title} »`, { ref: id }); }
+      S.noteCat = d.cat; SFX.ok(); buzz(10); toast("Fiche enregistrée");
+      const p = S.ui.noteFromSheet ? S.ui.notePending : null; S.ui.notePending = null; S.ui.noteFromSheet = false; /* a sheet dismissed by the scrim leaves no pending route */
+      if (p) { S.ui.note = null; S.ui.noteNewCat = null; go(p.route, p.params, { replace: true }); }
+      else if (id === "new") { S.ui.note = null; S.ui.noteNewCat = null; go("fiche", { id: nid }, { replace: true }); }
+      else noteLeave();
     } catch (e) { a.disabled = false; }
   },
   noteDel: () => { openSheet(`<div class="h2" style="font-size:20px">Supprimer cette fiche ?</div><p class="sub" style="margin:0">Elle disparaît pour toute l'équipe. Impossible d'annuler.</p><div class="grid2"><button class="btn soft" data-act="sheetClose">Annuler</button><button class="btn danger" data-act="noteDelOk">${ico("trash")}Supprimer</button></div>`); },
   noteDelOk: async () => {
-    closeSheet(true); const id = S.ui.note._id; const t = S.ui.note.title;
-    try { await safe(DB.del("notes", id)); } catch (e) { return; }
+    closeSheet(true); if (!S.ui.note || S.ui.noteDeleting) return; S.ui.noteDeleting = true; const id = S.ui.note._id; const t = S.ui.note.title;
+    try { await safe(DB.del("notes", id)); } catch (e) { S.ui.noteDeleting = false; return; } finally { setTimeout(() => (S.ui.noteDeleting = false), 600); }
     await logEvent("note", `a supprimé la fiche « ${t || "Sans titre"} »`, { ref: id });
     S.ui.note = null; S.history = S.history.filter((h) => !(h.params && h.params.id === id)); SFX.close(); toast("Fiche supprimée"); goBack();
   },
 });
 
+
+/* ═════════ Process HACCP (diagramme de fabrication), export PDF, documents joints ═════════
+   Recipe doc fields (all optional, backward compatible):
+   process: [{k: step type, t: title, x: instruction, c: {l: limite critique, m: surveillance, a: action corrective} | null}]
+   processV: number (version, +1 at each save) · processAt: ts · processBy: uid
+   files: [{id, name, type, size, at, uid}]  (the bytes live on this device, IndexedDB "gg-notes-files") */
+Object.assign(IC, {
+  ntFlow: ["M5 3h6v5H5z", "M13 16h6v5h-6z", "M8 8v4a2 2 0 0 0 2 2h4a2 2 0 0 1 2 2"],
+  ntHand: ["M18 11V6a2 2 0 0 0-4 0v1", "M14 10V4a2 2 0 0 0-4 0v2", "M10 10.5V6a2 2 0 0 0-4 0v8", "M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-6-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"],
+  ntFlame: ["M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.07-2.14-.22-4.05 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.15.43-2.29 1-3a2.5 2.5 0 0 0 2.5 2.5z"],
+  ntDrop: ["M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z"],
+  ntUp: ["m18 15-6-6-6 6"],
+  ntDown: ["m6 9 6 6 6-6"],
+  ntClip: ["m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"],
+  ntFile: ["M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z", "M14 2v4a2 2 0 0 0 2 2h4", "M9 15h6", "M9 11h2"],
+  ntCarrot: ["M2.27 21.7s9.87-3.5 12.73-6.36a4.5 4.5 0 0 0-6.36-6.37C5.77 11.84 2.27 21.7 2.27 21.7z", "M8.64 14l-2.05-2.04", "M15.34 15l-2.46-2.46", "M22 9s-1.33-2-3.5-2C16.86 7 15 9 15 9s1.33 2 3.5 2S22 9 22 9z", "M15 2s-2 1.33-2 3.5S15 9 15 9s2-1.84 2-3.5C17 3.33 15 2 15 2z"],
+  ntUtensils: ["M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2", "M7 2v20", "M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7"],
+  ntBowl: ["M12 21a9 9 0 0 0 9-9H3a9 9 0 0 0 9 9Z", "M7 21h10", "M19.5 12 22 6"],
+  ntPlate: ["M3 17h18", "M12 7a8 8 0 0 0-8 8h16a8 8 0 0 0-8-8Z", "M12 7V5", "M10 5h4"],
+});
+TAB_OF.noteProc = "more"; TAB_OF.noteDoc = "more";
+
+/* step library: [type, icon, title, instruction, CCP [limite, surveillance, action] | null] */
+const NOTE_PLIB = [
+  ["reception", "truck", "Réception des marchandises", "Contrôler la température, la DLC et l'emballage de chaque produit à la livraison.", ["Frais 0 à +4 °C · surgelés ≤ -18 °C · DLC valide", "Thermomètre sonde, lecture des étiquettes", "Refuser le produit et le noter sur le bon de livraison"], 1],
+  ["stockage", "box", "Stockage", "Ranger aussitôt : froid 0 à +4 °C, surgelés à -18 °C, épicerie au sec. Premier entré, premier sorti.", ["Froid positif 0 à +4 °C", "Relevé des frigos 2 fois par jour", "Déplacer les produits, appeler le technicien, jeter si besoin"]],
+  ["fiche", "book", "Lecture de la fiche recette", "Lire la fiche : ingrédients, grammages, allergènes et étapes.", null],
+  ["mains", "ntHand", "Lavage des mains", "Savon bactéricide 30 secondes, rinçage, essuie-mains à usage unique.", null],
+  ["ustensiles", "ntUtensils", "Préparation des ustensiles", "Ustensiles, planches et plan de travail lavés, propres et désinfectés.", null],
+  ["legumes", "ntDrop", "Lavage et désinfection des légumes", "Bain javellisé (dose et temps indiqués sur le produit), puis rinçage abondant à l'eau potable.", ["Dose et temps de contact du produit respectés", "Dose mesurée, minuteur", "Refaire le bain puis le rinçage"], 1],
+  ["epluchage", "ntCarrot", "Épluchage", "Éplucher sur un plan propre, à l'écart des produits cuits.", null],
+  ["decoupe", "scissors", "Découpe", "Sur une planche propre réservée au produit. Se laver les mains après chaque découpe.", null],
+  ["lavust", "spray", "Lavage des ustensiles", "Laver, rincer et désinfecter couteaux, planches et bacs avant de passer au cuit.", null],
+  ["assemblage", "ntBowl", "Marinade / assemblage", "Assembler au froid, filmer et étiqueter avec la date.", ["Au froid, 0 à +3 °C", "Étiquette avec la date et l'heure", "Jeter si le produit est resté hors du froid"]],
+  ["cuisson", "ntFlame", "Cuisson", "Cuire jusqu'à cœur.", ["≥ +63 °C à cœur", "Sonde à cœur", "Prolonger la cuisson"]],
+  ["duree", "clock", "Temps de cuisson", "Respecter le temps de cuisson indiqué sur la fiche.", null],
+  ["temp", "therm", "Prise de température en fin de cuisson", "Sonde désinfectée au cœur du produit, valeur notée.", ["≥ +63 °C à cœur", "Sonde, valeur notée dans le registre", "Poursuivre la cuisson puis reprendre la température"], 1],
+  ["refroid", "snow", "Refroidissement rapide en cellule", "En cellule dès la fin de cuisson, en bacs peu épais. Noter la température et l'heure au début et à la fin.", ["De +63 °C à +3 °C en moins de 2 h", "Température et heure notées au début et à la fin", "Au-delà de 2 h : jeter le produit"], 1],
+  ["froid", "snow", "Stockage au froid", "Filmé, étiqueté avec la date de fabrication et la DLC.", ["0 à +3 °C · étiquette et DLC", "Relevé des frigos, lecture des étiquettes", "Jeter si DLC dépassée ou température non conforme"], 1],
+  ["remise", "ntFlame", "Remise en température", "Réchauffer rapidement, une seule fois.", ["≥ +63 °C à cœur en moins d'1 h", "Sonde et heure", "Si la température n'est pas atteinte en 1 h : jeter"], 1],
+  ["chaud", "therm", "Maintien au chaud", "Bain-marie ou étuve jusqu'au service.", ["≥ +63 °C", "Sonde toutes les heures", "Remettre en température ou jeter"], 1],
+  ["service", "ntPlate", "Service", "Dresser avec des ustensiles propres et servir sans attendre.", null],
+  ["libre", "edit", "Autre étape", "", null],
+];
+/* the 6th field marks the steps that are a CCP by default; the others keep a suggested control for when the chef turns CCP on */
+const noteLib = (k) => { const L = NOTE_PLIB.find((x) => x[0] === k) || NOTE_PLIB[NOTE_PLIB.length - 1]; return { k: L[0], ic: L[1], t: L[2], x: L[3], c: L[4], on: !!L[5] }; };
+const noteStep = (k, t, x, c) => { const L = noteLib(k); const cc = c === undefined ? (L.on ? L.c : null) : c; return { k: L.k, t: t || L.t, x: x ?? L.x, c: cc ? { l: cc[0], m: cc[1], a: cc[2] } : null }; };
+
+/* generator: a standard process built from the recipe */
+const NOTE_VEG = /carott|oignon|echalot|ail\b|celeri|poireau|champignon|pomme de terre|patate|legume|tomate|courgette|aubergine|poivron|persil|ciboulette|cerfeuil|basilic|coriandre|salade|topinambour|navet|panais|chou|epinard|haricot vert|petit pois|radis|betterave|fenouil|asperge|courge|potiron|herbe|thym|laurier|citron|orange|pomme\b|poire|fraise|framboise|fruit/;
+const NOTE_PROT = /boeuf|veau|porc|agneau|mouton|volaille|poulet|canard|dinde|pintade|lapin|viande|paleron|joue|filet|cote|entrecote|lardon|jambon|saucisse|poisson|cabillaud|saumon|thon|bar\b|dorade|merlu|lieu|truite|sole|crevette|gambas|moule|saint-jacques|calamar|seiche|poulpe|crustace|homard|langoustine/;
+const NOTE_COOK = /cui[rst]|cuisson|four|roti|rotir|frire|frit|friture|poel|mijot|brais|saut|bouill|grill|confi|blanch|rissol|saisir|frem|reduire|caramel|\d\s*°c/;
+const noteIngNames = (n, re) => (n.ingredients || []).map((g) => String(g.name || "").trim()).filter((s) => s && re.test(noteNorm(s)));
+const noteCooked = (n) => NOTE_COOK.test(noteNorm([n.title, ...noteSteps(n)].join(" ")));
+const noteList = (a) => { const s = a.slice(0, 6).map((x) => x.toLowerCase()); return s.length > 1 ? s.slice(0, -1).join(", ") + " et " + s[s.length - 1] : s[0] || ""; };
+function noteProcGen(n, mode) {
+  const veg = noteIngNames(n, NOTE_VEG), prot = noteIngNames(n, NOTE_PROT); const cooked = noteCooked(n);
+  const hay = noteNorm(noteSteps(n).join(" ")); const names = (n.ingredients || []).map((g) => g.name).filter(Boolean);
+  const P = [noteStep("reception", "", names.length ? `Contrôler température, DLC et emballage : ${noteList(names)}${names.length > 6 ? "…" : "."}` : undefined), noteStep("stockage"), noteStep("fiche"), noteStep("mains"), noteStep("ustensiles")];
+  if (veg.length) {
+    P.push(noteStep("legumes", "", `${noteList(veg).replace(/^./, (c) => c.toUpperCase())} : bain javellisé (dose et temps indiqués sur le produit), puis rinçage abondant à l'eau potable.`));
+    P.push(noteStep("epluchage"), noteStep("decoupe", "Découpe des légumes"), noteStep("mains", "Lavage des mains", "Après la découpe des légumes."));
+  }
+  if (prot.length) P.push(noteStep("decoupe", `Découpe : ${noteList(prot)}`, "Sur la planche réservée au cru, à l'écart des légumes prêts."), noteStep("mains", "Lavage des mains", "Après la découpe du produit cru."));
+  P.push(noteStep("lavust"));
+  if (/marin|assembl|melang|monter|farcir|dresser au froid/.test(hay)) P.push(noteStep("assemblage"));
+  if (cooked) {
+    P.push(noteStep("cuisson", "", "Cuire jusqu'à cœur, en suivant la fiche recette."), noteStep("temp"));
+    if (mode === "avance") P.push(noteStep("refroid"), noteStep("froid"), noteStep("remise"), noteStep("chaud"));
+  } else P.push(noteStep("froid", "Stockage au froid jusqu'au service"));
+  P.push(noteStep("service"));
+  return P;
+}
+
+/* starter example: Bœuf bourguignon, the owner's sequence */
+function noteBourguignon() {
+  const S_ = noteStep;
+  return {
+    title: "Bœuf bourguignon", cat: "Recettes", seed: "bourguignon", portions: 8, allergens: ["gluten", "lait", "sulfites"],
+    body: "Meilleur réchauffé le lendemain. Servir avec des pommes vapeur ou des tagliatelles fraîches.",
+    ingredients: [["Paleron de bœuf", "1,6", "kg"], ["Vin rouge de Bourgogne", "75", "cl"], ["Carottes", "500", "g"], ["Oignons", "300", "g"], ["Ail", "3", "gousse"], ["Bouquet garni", "1", "pièce"], ["Lardons fumés", "200", "g"], ["Champignons de Paris", "300", "g"], ["Oignons grelots", "200", "g"], ["Farine", "30", "g"], ["Fond de veau", "50", "cl"], ["Beurre", "40", "g"], ["Huile", "3", "c. à s."], ["Sel, poivre", "", "pincée"]].map(([name, qty, unit]) => ({ name, qty, unit })),
+    steps: ["Couper le bœuf en cubes de 5 cm.", "Mariner 12 h au froid avec le vin, les carottes, les oignons, l'ail et le bouquet garni.", "Égoutter et sécher la viande. Garder la marinade.", "Saisir la viande dans l'huile, singer avec la farine.", "Mouiller avec la marinade et le fond de veau, porter à ébullition.", "Cuire 3 h à frémissement, à couvert.", "Rissoler lardons, champignons et oignons grelots au beurre, ajouter en fin de cuisson.", "Rectifier l'assaisonnement."],
+    process: [
+      S_("reception", "", "Contrôler température, DLC et emballage : bœuf, lardons, fond de veau, légumes."),
+      S_("stockage"),
+      S_("fiche"),
+      S_("mains"),
+      S_("ustensiles", "Préparation des ustensiles lavés et propres"),
+      S_("legumes", "Lavage des légumes à la javel + rinçage", "Carottes, oignons, ail, champignons : bain javellisé (dose et temps indiqués sur le produit), puis rinçage abondant à l'eau potable."),
+      S_("epluchage", "", "Carottes, oignons, ail, oignons grelots."),
+      S_("decoupe", "Découpe des légumes", "Lavage des mains après chaque découpe."),
+      S_("mains", "", "Après la découpe des légumes."),
+      S_("lavust"),
+      S_("decoupe", "Découpe du bœuf", "Cubes de 5 cm, sur la planche rouge réservée à la viande crue."),
+      S_("mains", "", "Après la découpe de la viande crue."),
+      S_("assemblage", "Marinade", "Bœuf, vin et garniture aromatique : 12 h au froid, filmé et étiqueté."),
+      S_("cuisson", "Cuisson du bœuf", "Saisir, singer, mouiller puis mijoter à couvert."),
+      S_("duree", "", "3 h à frémissement."),
+      S_("temp"),
+      S_("refroid", "Mise en cellule de refroidissement"),
+      S_("froid", "Stockage"),
+      S_("remise"),
+      S_("chaud"),
+      S_("service"),
+    ],
+  };
+}
+
+/* ───────── documents joints (PDF, photos): bytes on this device ───────── */
+const NOTE_FILES = {
+  _db: null, urls: {},
+  open() {
+    return (this._db ||= new Promise((res, rej) => {
+      if (!window.indexedDB) return rej(new Error("no indexedDB"));
+      const r = indexedDB.open("gg-notes-files", 1);
+      r.onupgradeneeded = () => { if (!r.result.objectStoreNames.contains("files")) r.result.createObjectStore("files"); };
+      r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); r.onblocked = () => rej(new Error("blocked"));
+    }));
+  },
+  async tx(mode, fn) { const db = await this.open(); return new Promise((res, rej) => { const t = db.transaction("files", mode); const q = fn(t.objectStore("files")); t.oncomplete = () => res(q && q.result); t.onerror = () => rej(t.error); t.onabort = () => rej(t.error); }); },
+  put(id, buf, type) { return this.tx("readwrite", (s) => s.put({ buf, type }, id)); },
+  get(id) { return this.tx("readonly", (s) => s.get(id)); },
+  async del(id) { if (this.urls[id]) { URL.revokeObjectURL(this.urls[id]); delete this.urls[id]; } return this.tx("readwrite", (s) => s.delete(id)); },
+  async url(id) { if (this.urls[id]) return this.urls[id]; const r = await this.get(id); if (!r) return null; return (this.urls[id] = URL.createObjectURL(new Blob([r.buf], { type: r.type || "application/octet-stream" }))); },
+};
+const noteSize = (b) => (b >= 1048576 ? `${noteNum(b / 1048576)} Mo` : `${Math.max(1, Math.round(b / 1024))} Ko`);
+function noteFilesHTML(n) {
+  const F = n.files || [];
+  return `<div class="glass pad st nt-files" style="--i:8"><div class="nt-fhead"><span class="lbl">Documents${F.length ? ` · ${F.length}` : ""}</span></div>
+    ${F.length ? `<div class="nt-flist">${F.map((f) => `<div class="nt-file"><a class="nt-fopen" data-nf="${esc(f.id)}" href="#" target="_blank" rel="noopener"><span class="nt-ficon ${/pdf/.test(f.type) ? "pdf" : "img"}">${/pdf/.test(f.type) ? "PDF" : ico("image")}</span><span class="nt-fname"><b>${esc(f.name)}</b><em>${noteSize(f.size || 0)} · ajouté ${when(f.at)}</em></span></a><button class="iconbtn nt-del" data-act="noteFileDel" data-id="${esc(n.id)}" data-v="${esc(f.id)}" aria-label="Retirer le document">${ico("trash")}</button></div>`).join("")}</div>` : `<p class="note" style="margin:0">Joignez vos documents existants : process, fiche technique fournisseur, analyses…</p>`}
+    <button class="nt-addph nt-addfile" data-act="noteFileAdd" data-id="${esc(n.id)}">${ico("ntClip")}<span>Joindre un PDF ou une photo</span></button>
+    ${F.length ? `<p class="note" style="margin:0">Les documents sont gardés sur cet appareil.</p>` : ""}</div>`;
+}
+async function noteFilesBind(v) {
+  for (const a of $$("[data-nf]", v)) {
+    const id = a.dataset.nf; let u = null; try { u = await NOTE_FILES.url(id); } catch (e) {}
+    if (u) a.href = u; else { a.classList.add("missing"); a.removeAttribute("target"); const em = $("em", a); if (em) em.textContent = "Pas sur cet appareil"; }
+  }
+}
+document.addEventListener("click", (e) => { const a = e.target.closest("a[data-nf]"); if (a && (a.getAttribute("href") === "#" || a.classList.contains("missing"))) { e.preventDefault(); if (a.classList.contains("missing")) toast("Ce document a été ajouté depuis un autre appareil.", "err"); } else if (a) { SFX.tap(); } }, true);
+
+/* ───────── process: read tab ───────── */
+function noteCcpHTML(c, cls = "ntp-cc") {
+  const R = [["Limite critique", c.l], ["Surveillance", c.m], ["Action corrective", c.a]].filter((r) => String(r[1] || "").trim());
+  return R.length ? `<dl class="${cls}">${R.map(([k, t]) => `<div><dt>${k}</dt><dd>${noteTy(esc(t))}</dd></div>`).join("")}</dl>` : "";
+}
+function noteProcTabHTML(n) {
+  const P = n.process || [];
+  if (!P.length) return `<div class="glass ntp-empty st" style="--i:3"><div class="ntp-art">${["truck", "ntHand", "ntFlame", "snow", "ntPlate"].map((k, i) => `<span style="--d:${i}">${ico(k)}</span>`).join("<i></i>")}</div>
+      <b class="h3">Process HACCP à créer</b><p>Le diagramme de fabrication demandé lors des contrôles d'hygiène : chaque étape du plat, de la réception au service, avec ses points critiques.</p>
+      <button class="btn acc" data-act="npGen" data-id="${esc(n.id)}">${ico("sparkle")}Générer le process</button><span class="note">Créé à partir des ingrédients et des étapes de la recette. Tout reste modifiable.</span></div>`;
+  let ci = 0;
+  const flow = P.map((s, i) => { const L = noteLib(s.k); const cc = s.c ? ++ci : 0; return `<li class="ntp-st ${s.c ? "ccp" : ""} st" style="--i:${Math.min(i + 4, 16)}"><span class="ntp-node">${ico(L.ic)}</span><div class="ntp-card"><div class="ntp-hd"><span class="ntp-n mono">${i + 1}</span><b>${esc(s.t || L.t)}</b>${s.c ? `<span class="ntp-ccp">CCP ${cc}</span>` : ""}</div>${s.x ? `<p>${noteTy(esc(s.x))}</p>` : ""}${s.c ? noteCcpHTML(s.c) : ""}</div></li>`; }).join("");
+  return `<div class="glass pad ntp-sum st" style="--i:3"><div><b class="h3">${notePlural(P.length, "étape")} · ${ci ? `${ci} point${ci > 1 ? "s" : ""} critique${ci > 1 ? "s" : ""}` : "aucun point critique"}</b><span class="note">Version ${n.processV || 1}${n.processAt ? ` · mise à jour ${when(n.processAt)}` : ""}</span></div>
+      <div class="grid2"><button class="btn soft" data-act="npEdit" data-id="${esc(n.id)}">${ico("edit")}Modifier</button><button class="btn acc" data-go="noteDoc" data-id="${esc(n.id)}">${ico("printer")}Exporter en PDF</button></div></div>
+    <ol class="ntp-flow">${flow}</ol>`;
+}
+
+/* ───────── process: editor ───────── */
+const npSnap = (L) => JSON.stringify((L || []).map((s) => [s.k, String(s.t || "").trim(), String(s.x || "").trim(), s.c ? [s.c.l, s.c.m, s.c.a].map((x) => String(x || "").trim()) : 0]));
+VIEWS.noteProc = {
+  live: false, hideTabs: true,
+  render({ id }) {
+    const n = S.notes.find((x) => x.id === id);
+    if (!n) return `<div class="inner narrow nt-wrap">${topBar("Process HACCP")}<div class="glass empty">Fiche introuvable.</div></div>`;
+    if (!S.ui.np || S.ui.np.id !== id) { S.ui.np = { id, steps: JSON.parse(JSON.stringify(n.process || [])) }; S.ui.npOrig = npSnap(S.ui.np.steps); }
+    const L = S.ui.np.steps;
+    const card = (s, i) => { const B = noteLib(s.k); return `<div class="glass ntp-ecard ${s.c ? "ccp" : ""}" data-i="${i}">
+        <div class="ntp-ehd"><span class="ntp-node">${ico(B.ic)}</span><span class="ntp-n mono">${i + 1}</span><input class="input ntp-et" data-bind="ui.np.steps.${i}.t" value="${esc(s.t)}" placeholder="${esc(B.t)}" aria-label="Nom de l'étape ${i + 1}"></div>
+        <textarea class="input ntp-ex" rows="1" data-bind="ui.np.steps.${i}.x" placeholder="Consigne (facultatif)" aria-label="Consigne">${esc(s.x || "")}</textarea>
+        ${s.c ? `<div class="ntp-ecc"><label><span>Limite critique</span><input class="input" data-bind="ui.np.steps.${i}.c.l" value="${esc(s.c.l || "")}" placeholder="Ex. ≥ +63 °C à cœur"></label><label><span>Surveillance</span><input class="input" data-bind="ui.np.steps.${i}.c.m" value="${esc(s.c.m || "")}" placeholder="Ex. Sonde à cœur, valeur notée"></label><label><span>Action corrective</span><input class="input" data-bind="ui.np.steps.${i}.c.a" value="${esc(s.c.a || "")}" placeholder="Ex. Prolonger la cuisson"></label></div>` : ""}
+        <div class="ntp-etools"><button class="ntp-cctog ${s.c ? "on" : ""}" data-act="npCcp" data-v="${i}" aria-pressed="${!!s.c}">${ico(s.c ? "check" : "plus")}Point critique</button><span style="flex:1"></span>
+          <button class="iconbtn" data-act="npMove" data-v="${i}" data-id="-1" aria-label="Monter l'étape" ${i === 0 ? "disabled" : ""}>${ico("ntUp")}</button><button class="iconbtn" data-act="npMove" data-v="${i}" data-id="1" aria-label="Descendre l'étape" ${i === L.length - 1 ? "disabled" : ""}>${ico("ntDown")}</button><button class="iconbtn ntp-trash" data-act="npDel" data-v="${i}" aria-label="Supprimer l'étape">${ico("trash")}</button></div></div>`; };
+    return `<div class="inner narrow nt-wrap"><div class="top st" style="--i:0"><button class="iconbtn" data-act="npBack" aria-label="Retour">${ico("back")}</button><span class="h2">Process HACCP</span></div>
+      <p class="sub st" style="--i:1;margin:-6px 0 0">${esc(n.title)} · ${notePlural(L.length, "étape")}</p>
+      <div class="ntp-elist">${L.length ? L.map(card).join("") : `<div class="glass empty">Aucune étape. Ajoutez-en depuis la bibliothèque.</div>`}</div>
+      <button class="nt-addph st" style="--i:3" data-act="npLib">${ico("plus")}<span>Ajouter une étape</span><em>bibliothèque HACCP</em></button>
+      <div class="ctabar st" style="--i:4"><button class="btn acc block" data-act="npSave">${ico("check")}Enregistrer le process</button></div></div>`;
+  },
+  after(v) {
+    const grow = (t) => { t.style.height = "auto"; t.style.height = t.scrollHeight + 2 + "px"; };
+    $$(".ntp-ex", v).forEach((t) => { grow(t); t.addEventListener("input", () => grow(t)); });
+    if (S.ui.npFlash != null) { const c = $(`.ntp-ecard[data-i="${S.ui.npFlash}"]`, v); S.ui.npFlash = null; if (c) { c.classList.add("flash"); c.scrollIntoView({ block: "center", behavior: "smooth" }); } }
+    setTimeout(() => { const b = $('#side .nav[data-go="notes"]'); b && b.classList.add("on"); }, 0);
+  },
+};
+const npDirty = () => !!S.ui.np && npSnap(S.ui.np.steps) !== S.ui.npOrig;
+const npRer = (flash) => { S.ui.npFlash = flash; noteRer(); };
+
+/* ───────── export: printable A4 document ───────── */
+function noteDocHTML(n, P, proposed) {
+  const ings = n.ingredients || []; const al = n.allergens || []; let ci = 0; const ccps = [];
+  const flow = P.map((s, i) => { const L = noteLib(s.k); const cc = s.c ? ++ci : 0; if (s.c) ccps.push({ i, cc, s, L }); return `<li class="${s.c ? "ccp" : ""}"><div class="ntd-box"><span class="ntd-n">${i + 1}</span><div class="ntd-tx"><b>${esc(s.t || L.t)}</b>${s.c ? ` <em class="ntd-badge">CCP ${cc}</em>` : ""}${s.x ? `<p>${noteTy(esc(s.x))}</p>` : ""}${s.c && s.c.l ? `<p class="ntd-lim">${noteTy(esc(s.c.l))}</p>` : ""}</div></div></li>`; }).join("");
+  const today = new Date().toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
+  const por = num(n.portions);
+  return `<article class="ntd">
+    <header class="ntd-h"><div class="ntd-hl"><div class="ntd-k">Fiche process HACCP · diagramme de fabrication</div><h1>${esc(n.title || "Sans titre")}</h1>
+      <div class="ntd-meta"><span>${esc(S.resto?.name || "")}</span>${por ? `<span>${noteNum(por)} portion${por >= 2 ? "s" : ""}</span>` : ""}<span>${proposed ? "Process proposé, à valider" : `Version ${n.processV || 1}`}</span><span>Édité le ${today}</span></div></div>
+      <div class="ntd-logo">${(() => { try { return logoMark({ mono: "#4A1FE6" }); } catch (e) { return ""; } })()}</div></header>
+    <section class="ntd-two"><div><h2>Ingrédients</h2>${ings.length ? `<table class="ntd-t ntd-ing"><tbody>${ings.map((g) => { const s = noteScale(g.qty, g.unit, 1); return `<tr><td>${esc(g.name)}</td><td class="r">${esc(s.q)} ${esc(s.u)}</td></tr>`; }).join("")}</tbody></table>` : `<p class="ntd-muted">Non renseignés.</p>`}</div>
+      <div><h2>Allergènes</h2>${al.length ? `<div class="ntd-al">${al.map((a) => `<span>${esc(noteAllergenLabel(a))}</span>`).join("")}</div>` : `<p class="ntd-muted">Aucun allergène déclaré sur la fiche.</p>`}
+      <h2 style="margin-top:5mm">Légende</h2><p class="ntd-muted"><span class="ntd-key"></span> Étape &nbsp; <span class="ntd-key ccp"></span> Point critique (CCP) : limite à respecter, contrôle noté.</p></div></section>
+    <section><h2>Diagramme de fabrication</h2><ol class="ntd-flow">${flow}</ol></section>
+    <section class="ntd-keep"><h2>Points critiques à maîtriser (CCP)</h2>${ccps.length ? `<table class="ntd-t ntd-ccp"><thead><tr><th>CCP</th><th>Étape</th><th>Limite critique</th><th>Surveillance</th><th>Action corrective</th></tr></thead><tbody>${ccps.map(({ i, cc, s, L }) => `<tr><td class="ntd-c">${cc}</td><td><b>${esc(s.t || L.t)}</b><br><span class="ntd-muted">étape ${i + 1}</span></td><td>${noteTy(esc(s.c.l || "—"))}</td><td>${noteTy(esc(s.c.m || "—"))}</td><td>${noteTy(esc(s.c.a || "—"))}</td></tr>`).join("")}</tbody></table>` : `<p class="ntd-muted">Aucun point critique défini.</p>`}</section>
+    <section class="ntd-sign ntd-keep"><div><span>Établi par</span><i></i><span>Date</span><i></i><span>Signature</span><i class="tall"></i></div><div><span>Vérifié par (responsable)</span><i></i><span>Date</span><i></i><span>Signature</span><i class="tall"></i></div></section>
+    <footer class="ntd-f">${esc(S.resto?.name || "")} · Plan de maîtrise sanitaire · ${esc(n.title || "")}</footer></article>`;
+}
+const noteDocList = (id) => (id === "all" ? S.notes.filter((n) => noteKind(n) === "Recettes" && (n.title || "").trim()).sort((a, b) => String(a.title).localeCompare(String(b.title), "fr")) : S.notes.filter((n) => n.id === id));
+const noteDocProc = (n) => (n.process && n.process.length ? { P: n.process, proposed: false } : { P: noteProcGen(n, noteCooked(n) ? "avance" : "now"), proposed: true });
+VIEWS.noteDoc = {
+  render({ id }) {
+    const L = noteDocList(id); const all = id === "all";
+    if (!L.length) return `<div class="inner narrow nt-wrap">${topBar(all ? "Tous les process" : "Fiche process")}<div class="glass empty st" style="--i:1"><div class="ic">${ico("ntFlow")}</div><b>Aucune recette</b>Créez une fiche recette pour éditer son process HACCP.</div></div>`;
+    const miss = L.filter((n) => !(n.process && n.process.length)).length;
+    return `<div class="inner wide nt-wrap ntd-screen">${topBar(all ? "Tous les process HACCP" : "Fiche process", { right: `<button class="btn acc sm" data-act="notePrint">${ico("printer")}PDF</button>` })}
+      <div class="glass pad ntd-hint st" style="--i:1"><div class="ic">${ico("printer")}</div><div><b>${all ? `${notePlural(L.length, "plat")}, un par page.` : "Prêt à imprimer ou à enregistrer en PDF."}</b><p class="note" style="margin:3px 0 0">Touchez « Exporter en PDF », puis choisissez « Enregistrer au format PDF ». Sur iPhone : touchez le bouton Partager de l'aperçu, puis « Enregistrer dans Fichiers ».</p>${miss ? `<p class="note nt-warn" style="margin:6px 0 0">${miss === 1 ? "1 plat n'a pas encore de process : un process standard est proposé" : `${miss} plats n'ont pas encore de process : un process standard est proposé`}, à valider.</p>` : ""}</div></div>
+      <div class="ntd-stack st" style="--i:2">${L.map((n) => { const d = noteDocProc(n); return noteDocHTML(n, d.P, d.proposed); }).join("")}</div>
+      <div class="ctabar st" style="--i:3"><button class="btn acc block" data-act="notePrint">${ico("printer")}Exporter en PDF</button></div></div>`;
+  },
+  after() { setTimeout(() => { const b = $('#side .nav[data-go="notes"]'); b && b.classList.add("on"); }, 0); },
+};
+function notePrintCleanup() { document.documentElement.classList.remove("nt-printing"); const p = $("#ntPrint"); if (p) p.remove(); if (notePrintCleanup.t) { document.title = notePrintCleanup.t; notePrintCleanup.t = null; } }
+window.addEventListener("afterprint", () => { if (document.documentElement.classList.contains("nt-printing")) setTimeout(notePrintCleanup, 300); });
+function notePrintPrep() {
+  notePrintCleanup(); const docs = $$("#viewport .view:not(.leave) .ntd"); if (!docs.length) return false;
+  const box = document.createElement("div"); box.id = "ntPrint"; box.innerHTML = docs.map((d) => d.outerHTML).join(""); document.body.appendChild(box);
+  document.documentElement.classList.add("nt-printing");
+  const L = noteDocList(S.params.id); notePrintCleanup.t = document.title;
+  document.title = (S.params.id === "all" ? `Process HACCP - ${S.resto?.name || ""}` : `Process HACCP - ${L[0]?.title || ""}`).replace(/[\/\\:]/g, "-");
+  return true;
+}
+
+/* ───────── list: export-all row + example ───────── */
+function noteProcListHTML() {
+  const R = S.notes.filter((n) => noteKind(n) === "Recettes"); const has = S.notes.some((n) => n.seed === "bourguignon" || noteNorm(n.title) === "boeuf bourguignon");
+  const ex = !has && R.length < 3 ? `<div class="glass nt-starter nt-exrow st" style="--i:4"><div class="ic acc">${ico("ntChef")}</div><div style="flex:1;min-width:0"><b class="h3">Exemple : Bœuf bourguignon</b><p class="note" style="margin:3px 0 0">Une fiche complète pour 8 portions, avec son process HACCP de la réception au service.</p></div><button class="btn soft sm" data-act="noteExample">${ico("plus")}Ajouter</button></div>` : "";
+  const all = R.length ? `<div class="glass nt-procall st" style="--i:3"><div class="ic">${ico("ntFlow")}</div><div style="flex:1;min-width:0"><b>Process HACCP</b><span class="note">${R.filter((n) => n.process && n.process.length).length} / ${R.length} plat${R.length > 1 ? "s" : ""} avec un process</span></div><button class="btn soft sm" data-go="noteDoc" data-id="all">${ico("printer")}Tout exporter</button></div>` : "";
+  return all + ex;
+}
+
+Object.assign(ACT, {
+  noteFTab: (a, id, v) => { (S.ui.noteTab ||= {})[id] = v; SFX.tick(); buzz(5); rerender(); const b = $("#ntFBody"); if (b) { b.classList.remove("in"); void b.offsetWidth; b.classList.add("in"); } },
+  noteExample: async (a) => {
+    if (a.disabled) return; a.disabled = true; const t = Date.now(); const d = { ...noteBourguignon(), uid: S.me.id, at: t, updatedAt: t, processV: 1, processAt: t, processBy: S.me.id, photo: "", files: [] };
+    let id; try { id = await safe(DB.add("notes", d)); } catch (e) { a.disabled = false; return; }
+    await logEvent("note", `a ajouté la fiche « ${d.title} »`, { ref: id });
+    SFX.done(); buzz(14); const r = a.getBoundingClientRect(); burst(r.left + r.width / 2, r.top); toast("Bœuf bourguignon ajouté");
+    (S.ui.noteTab ||= {})[id] = "process"; go("fiche", { id });
+  },
+  npGen: (a, id) => {
+    const n = S.notes.find((x) => x.id === id); if (!n) return;
+    if (!noteCooked(n)) return ACT.npGenGo(a, id, "now");
+    openSheet(`<div class="h2" style="font-size:20px">Comment ce plat est-il servi ?</div><p class="sub" style="margin:0">Le process change selon la liaison.</p>
+      <button class="ntp-choice" data-act="npGenGo" data-id="${esc(id)}" data-v="now"><span class="ic">${ico("ntFlame")}</span><span><b>Cuit et servi aussitôt</b><em>Cuisson, contrôle à cœur, service.</em></span></button>
+      <button class="ntp-choice" data-act="npGenGo" data-id="${esc(id)}" data-v="avance"><span class="ic">${ico("snow")}</span><span><b>Préparé à l'avance</b><em>Cellule de refroidissement, stockage, remise en température.</em></span></button>`);
+  },
+  npGenGo: async (a, id, v) => {
+    closeSheet(true); const n = S.notes.find((x) => x.id === id); if (!n || S.ui.npBusy) return; S.ui.npBusy = true;
+    const P = noteProcGen(n, v); const t = Date.now();
+    try { await safe(DB.update("notes", id, { process: P, processV: (n.processV || 0) + 1, processAt: t, processBy: S.me.id })); } catch (e) { S.ui.npBusy = false; return; }
+    S.ui.npBusy = false; await logEvent("note", `a créé le process HACCP « ${n.title} »`, { ref: id });
+    (S.ui.noteTab ||= {})[id] = "process"; SFX.done(); buzz(14); burst(); toast(`Process créé : ${notePlural(P.length, "étape")}`); rerender();
+  },
+  npEdit: (a, id) => { S.ui.np = null; SFX.tap(); go("noteProc", { id }); },
+  npBack: () => { S.ui.notePending = null; if (!npDirty()) { SFX.tap(); S.ui.np = null; goBack(); return; } noteAskLeave(); },
+  npCcp: (a, id, v) => { const s = S.ui.np.steps[+v]; if (s.c) s.c = null; else { const L = noteLib(s.k); s.c = L.c ? { l: L.c[0], m: L.c[1], a: L.c[2] } : { l: "", m: "", a: "" }; } SFX.tick(); buzz(5); npRer(+v); },
+  npMove: (a, id, v) => { const L = S.ui.np.steps; const i = +v, j = i + +id; if (j < 0 || j >= L.length) return; [L[i], L[j]] = [L[j], L[i]]; SFX.tick(); buzz(5); npRer(j); },
+  npDel: (a, id, v) => { const L = S.ui.np.steps; const i = +v; const c = $(`.ntp-ecard[data-i="${i}"]`); SFX.close(); buzz(6); const go_ = () => { L.splice(i, 1); noteRer(); }; if (c) { c.classList.add("bye"); setTimeout(go_, 220); } else go_(); },
+  npLib: () => {
+    openSheet(`<div class="h2" style="font-size:20px">Ajouter une étape</div><p class="sub" style="margin:0">Elle s'ajoute à la fin. Déplacez-la ensuite avec les flèches.</p>
+      <div class="ntp-lib">${NOTE_PLIB.map(([k, ic, t, x, c, on]) => `<button data-act="npAdd" data-v="${k}"><span class="ntp-node">${ico(ic)}</span><span>${esc(t)}</span>${on ? `<em>CCP</em>` : ""}</button>`).join("")}</div>`);
+  },
+  npAdd: (a, id, v) => { closeSheet(true); const L = S.ui.np.steps; const s = noteStep(v); if (v === "libre") s.t = ""; L.push(s); SFX.tick(); buzz(6); npRer(L.length - 1); if (v === "libre") setTimeout(() => { const i = $(`.ntp-ecard[data-i="${L.length - 1}"] .ntp-et`); i && i.focus({ preventScroll: true }); }, 450); },
+  npSave: async (a) => {
+    const D = S.ui.np; if (!D || a.disabled) return; const n = S.notes.find((x) => x.id === D.id); if (!n) return;
+    const P = D.steps.map((s) => { const L = noteLib(s.k); const c = s.c && [s.c.l, s.c.m, s.c.a].some((x) => String(x || "").trim()) ? { l: String(s.c.l || "").trim(), m: String(s.c.m || "").trim(), a: String(s.c.a || "").trim() } : null; return { k: L.k, t: String(s.t || "").trim() || L.t, x: String(s.x || "").trim(), c }; });
+    if (!P.length) { SFX.err(); buzz(30); toast("Ajoutez au moins une étape.", "err"); return; }
+    a.disabled = true;
+    try { await safe(DB.update("notes", D.id, { process: P, processV: (n.processV || 0) + 1, processAt: Date.now(), processBy: S.me.id })); } catch (e) { a.disabled = false; return; }
+    await logEvent("note", `a modifié le process HACCP « ${n.title} »`, { ref: D.id });
+    SFX.ok(); buzz(10); toast("Process enregistré"); S.ui.np = null; (S.ui.noteTab ||= {})[D.id] = "process";
+    const p = S.ui.noteFromSheet ? S.ui.notePending : null; S.ui.notePending = null; S.ui.noteFromSheet = false; if (p) go(p.route, p.params, { replace: true }); else goBack();
+  },
+  notePrint: () => { if (!notePrintPrep()) return; SFX.print ? SFX.print() : SFX.tap(); buzz(8); setTimeout(() => { try { window.print(); } catch (e) {} }, 80); },
+  noteFileAdd: (a, id) => {
+    const inp = document.createElement("input"); inp.type = "file"; inp.accept = "application/pdf,image/*"; inp.multiple = true; inp.hidden = true; document.body.appendChild(inp);
+    inp.addEventListener("change", async () => {
+      const fs = [...(inp.files || [])]; inp.remove(); if (!fs.length) return;
+      const n = S.notes.find((x) => x.id === id); if (!n) return; const add = [];
+      for (const f of fs) {
+        if (!/pdf$|^image\//.test(f.type) && !/\.pdf$/i.test(f.name)) { toast("Seuls les PDF et les photos sont acceptés.", "err"); continue; }
+        let blob = f, type = f.type || "application/pdf";
+        if (/^image\//.test(type) && f.size > 1500000) { try { blob = (await shrink(f, 2000, 0.82)).blob; type = "image/jpeg"; } catch (e) {} }
+        if (blob.size > 25 * 1048576) { SFX.err(); toast(`« ${f.name} » est trop lourd (25 Mo max).`, "err"); continue; }
+        const fid = "nf-" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+        try { await NOTE_FILES.put(fid, await blob.arrayBuffer(), type); } catch (e) { console.warn(e); SFX.err(); toast("Impossible de garder ce document sur l'appareil.", "err"); continue; }
+        add.push({ id: fid, name: f.name || "document.pdf", type, size: blob.size, at: Date.now(), uid: S.me.id });
+      }
+      if (!add.length) return;
+      try { await safe(DB.update("notes", id, { files: [...(n.files || []), ...add] })); } catch (e) { return; }
+      await logEvent("note", `a joint ${add.length > 1 ? `${add.length} documents` : `« ${add[0].name} »`} à « ${n.title} »`, { ref: id });
+      SFX.ok(); buzz(10); toast(add.length > 1 ? `${add.length} documents joints` : "Document joint");
+    }, { once: true });
+    inp.click();
+  },
+  noteFileDel: (a, id, v) => {
+    const n = S.notes.find((x) => x.id === id); const f = (n?.files || []).find((x) => x.id === v); if (!f) return;
+    openSheet(`<div class="h2" style="font-size:20px">Retirer ce document ?</div><p class="sub" style="margin:0">« ${esc(f.name)} » sera supprimé de cet appareil.</p><div class="grid2"><button class="btn soft" data-act="sheetClose">Annuler</button><button class="btn danger" data-act="noteFileDelOk" data-id="${esc(id)}" data-v="${esc(v)}">${ico("trash")}Retirer</button></div>`);
+  },
+  noteFileDelOk: async (a, id, v) => {
+    closeSheet(true); const n = S.notes.find((x) => x.id === id); if (!n || !(n.files || []).some((x) => x.id === v)) return;
+    try { await safe(DB.update("notes", id, { files: (n.files || []).filter((x) => x.id !== v) })); } catch (e) { return; }
+    NOTE_FILES.del(v).catch(() => {}); SFX.close(); toast("Document retiré");
+  },
+});
