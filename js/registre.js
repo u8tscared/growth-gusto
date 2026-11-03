@@ -1,40 +1,278 @@
-/* Growth Gusto — area: registre */
+/* Growth Gusto — area: registre
+   Le registre sanitaire : chronologie de tout ce qui s'est passé (relevés, réceptions, ouvertures, ménage, corrections),
+   tableau triable sur ordinateur, rapport A4 imprimable pour un contrôle sanitaire (DDPP), export CSV, purge des photos. */
+
+TAB_OF.regReport = "more";
+Object.assign(IC, {
+  file: ["M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z", "M14 2v4a2 2 0 0 0 2 2h4", "M8 13h8", "M8 17h5", "f:M6 3h8v4h5v13H5z"],
+  sortud: ["m7 15 5 5 5-5", "m7 9 5-5 5 5"],
+});
+
+const REG_K = {
+  temp: { t: "Températures", s: "Relevé", ic: "therm", c: "#1F7AE0" },
+  rec: { t: "Réceptions", s: "Réception", ic: "truck", c: "#E0752F" },
+  trace: { t: "Traçabilité", s: "Traçabilité", ic: "box", c: "#4A1FE6" },
+  clean: { t: "Ménage", s: "Ménage", ic: "spray", c: "#0B9B6A" },
+  other: { t: "Équipe", s: "Équipe", ic: "users", c: "#5A6386" },
+};
+const REG_F = [["all", "Tout"], ["temp", "Températures"], ["rec", "Réceptions"], ["trace", "Traçabilité"], ["clean", "Ménage"], ["corr", "Corrections"]];
+const REG_FREQ = { jour: "Chaque jour", semaine: "Chaque semaine", mois: "Chaque mois" };
+const REG_PHOTO_DAYS = 183;
+
+const regNum = (v, d = 1) => (v == null || v === "" || isNaN(v) ? "" : fmt(v, d));
+const regDay = (ts) => dayKey(new Date(ts));
+const regLong = (k, year = true) => { const d = parseDay(k); return d ? `${DAYS[d.getDay()]} ${d.getDate()} ${MONTHS[d.getMonth()]}${year ? ` ${d.getFullYear()}` : ""}` : "–"; };
+const regFull = (k) => { const d = parseDay(k); return d ? `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}` : "–"; };
+const regDayLabel = (k) => { const t = dayKey(); const y = addDays(t, -1); const same = k.slice(0, 4) === t.slice(0, 4); return k === t ? `Aujourd'hui · ${regLong(k, false)}` : k === y ? `Hier · ${regLong(k, false)}` : regLong(k, !same); };
+const regCap = (s) => { s = String(s || "").replace(/^a /, ""); return s.charAt(0).toUpperCase() + s.slice(1); };
+const regRange = (f) => (f && f.min != null && f.max != null ? `${fmt(f.min, 0)} à ${fmt(f.max, 0)} °C` : "");
+const regPic = (id, url) => (typeof photoUrl === "function" ? (id && photoUrl(id)) || photoUrl(url) : url || "");
+const regPhotoStore = () => S.cap.assets || (typeof PHOTOS !== "undefined" ? PHOTOS : null);
+const regLineSt = (L) => (L.refused ? "bad" : L.ok === false ? "warn" : "ok");
+const regLineTx = (L) => (L.refused ? "Refusé" : L.ok === false ? "Accepté avec réserve" : "Conforme");
+
+/* Toutes les entrées du registre, à partir des données structurées (plus fiables que le texte des événements). */
+function regEntries() {
+  const E = [];
+  S.readings.forEach((r) => {
+    const f = S.fridges.find((x) => x.id === r.fridgeId); const rg = regRange(f);
+    E.push({ id: "r" + r.id, at: r.at, kind: "temp", uid: r.uid,
+      what: `${fridgeName(r.fridgeId)} · relevé du ${r.slot === "soir" ? "soir" : "midi"}`,
+      detail: r.ok ? (rg ? `Seuil ${rg}` : "") : `Hors seuil${rg ? ` (${rg})` : ""} · ${r.action || "action non renseignée"}`,
+      val: num(r.value), valTx: `${regNum(num(r.value))} °C`, st: r.ok ? "ok" : "bad", stTx: r.ok ? "Conforme" : "Non conforme", corr: !r.ok,
+      csv: [[`Relevé ${r.slot || ""}`.trim(), fridgeName(r.fridgeId), regNum(num(r.value)), r.ok ? "oui" : "non", r.ok ? "" : r.action || ""]] });
+  });
+  S.receptions.forEach((rc) => {
+    const L = rc.lines || []; const refused = L.filter((x) => x.refused); const res = L.filter((x) => x.ok === false && !x.refused);
+    const st = refused.length ? "bad" : res.length ? "warn" : "ok";
+    E.push({ id: "c" + rc.id, at: rc.at, kind: "rec", uid: rc.uid,
+      what: `${rc.supplier || "Livraison"}${rc.bl ? ` · BL ${rc.bl}` : ""}`,
+      detail: L.map((x) => `${x.name}${x.temp != null ? ` ${regNum(x.temp)} °C` : ""}${x.dlc ? ` · DLC ${shortDate(x.dlc)}` : ""}${x.refused ? " · refusé" : x.ok === false ? " · réserve" : ""}`).join(" ; ") || "Aucun produit",
+      val: L.length, valTx: `${L.length} produit${L.length > 1 ? "s" : ""}`, st,
+      stTx: refused.length ? `${refused.length} refusé${refused.length > 1 ? "s" : ""}` : res.length ? `${res.length} réserve${res.length > 1 ? "s" : ""}` : "Conforme",
+      corr: st !== "ok", photoUrl: (() => { const x = L.find((y) => y.photoId || y.photoUrl); return x ? regPic(x.photoId, x.photoUrl) : ""; })(),
+      csv: L.length ? L.map((x) => ["Réception", `${rc.supplier || ""}${rc.bl ? ` · BL ${rc.bl}` : ""} · ${x.name} · lot ${x.lot || "-"} · DLC ${x.dlc ? regFull(x.dlc) : "-"}`, regNum(x.temp), x.refused ? "refusé" : x.ok === false ? "réserve" : "oui", x.refused ? "Produit refusé, reparti avec le livreur" : ""]) : [["Réception", rc.supplier || "", "", "", ""]] });
+  });
+  S.lots.forEach((l) => {
+    const lot = l.lot ? ` · lot ${l.lot}` : "";
+    if (!l.receptionId && l.createdAt) E.push({ id: "n" + l.id, at: l.createdAt, kind: "trace", uid: l.uid, what: `Entrée · ${l.name}`, detail: `${fridgeName(l.fridgeId)}${lot}${l.dlc ? ` · DLC ${shortDate(l.dlc)}` : ""}`, valTx: "", st: null, stTx: "", corr: false, csv: [["Entrée", `${l.name}${lot}`, "", "", ""]] });
+    if (l.openedAt) E.push({ id: "o" + l.id, at: l.openedAt, kind: "trace", uid: l.openedBy, what: `Ouverture · ${l.name}`, detail: `À consommer avant le ${l.dlcOpen ? shortDate(l.dlcOpen) : "–"}${lot}${l.supplier ? ` · ${l.supplier}` : ""}`, valTx: "", st: "acc", stTx: "Ouvert", corr: false, photoUrl: regPic(l.openPhotoId, l.openPhotoUrl), csv: [["Ouverture", `${l.name}${lot} · DLC ouverte ${l.dlcOpen ? regFull(l.dlcOpen) : "-"}`, "", "", ""]] });
+    if (l.outAt) { const lost = l.status === "lost"; E.push({ id: "x" + l.id, at: l.outAt, kind: "trace", uid: l.outBy, what: `${lost ? "Jeté" : "Sortie"} · ${l.name}`, detail: `${fridgeName(l.fridgeId)}${lot}${l.qty ? ` · ${l.qty} ${l.unit || ""}` : ""}`, valTx: "", st: lost ? "bad" : "neu", stTx: lost ? "Jeté" : "Sorti", corr: lost, csv: [[lost ? "Perte" : "Sortie", `${l.name}${lot}`, "", lost ? "non" : "", lost ? "Produit jeté" : ""]] }); }
+  });
+  S.choreLogs.forEach((g) => {
+    const c = S.chores.find((x) => x.id === g.choreId);
+    E.push({ id: "m" + g.id, at: g.at, kind: "clean", uid: g.uid, what: c ? c.name : "Tâche supprimée", detail: c ? `${c.zone || ""}${c.zone ? " · " : ""}${REG_FREQ[c.freq] || ""}` : "", valTx: "", st: "ok", stTx: "Fait", corr: false, csv: [["Ménage", `${c ? c.name : "Tâche supprimée"}${c?.zone ? ` · ${c.zone}` : ""}`, "", "oui", ""]] });
+  });
+  const skip = { reading: 1, reception: 1, open: 1, out: 1, lost: 1, chore: 1 };
+  S.events.forEach((e) => {
+    if (skip[e.type]) return;
+    const kind = e.type === "lot" ? "trace" : "other";
+    E.push({ id: "e" + e.id, at: e.at, kind, uid: e.uid, what: regCap(e.text), detail: "", valTx: "", st: null, stTx: "", corr: false, photoUrl: regPic(e.photoId, e.photoUrl), csv: [[REG_K[kind].s, regCap(e.text), "", "", ""]] });
+  });
+  E.forEach((x) => { x.day = regDay(x.at); x.who = nameOf(x.uid); x.hay = `${x.what} ${x.detail} ${x.valTx} ${x.stTx} ${x.who} ${REG_K[x.kind].t}`.toLowerCase(); });
+  return E.filter((x) => x.at).sort((a, b) => b.at - a.at);
+}
+
+function regFiltered(all) {
+  const f = S.regFilter || "all"; const q = (S.ui.regQ || "").trim().toLowerCase();
+  return all.filter((x) => (f === "all" ? true : f === "corr" ? x.corr : x.kind === f) && (!q || q.split(/\s+/).every((w) => x.hay.includes(w))));
+}
+
+const regPill = (x) => (x.st ? `<span class="pill ${x.st}">${x.st === "bad" ? `<span class="dot"></span>` : ""}${esc(x.stTx)}</span>` : "");
+const regKic = (k) => `<span class="rg-k" style="--k:${REG_K[k].c}">${ico(REG_K[k].ic)}</span>`;
+
+function regListHtml(all) {
+  const rows = regFiltered(all);
+  if (!all.length) return `<div class="glass empty"><div class="ic">${ico("shield")}</div><b>Le registre est vide</b>Il se remplit tout seul : chaque relevé, réception, ouverture ou tâche de ménage y est noté avec la date, l'heure et la personne.</div>`;
+  if (!rows.length) return `<div class="glass empty"><div class="ic">${ico("search")}</div><b>Aucun résultat</b>${S.ui.regQ ? `Rien ne correspond à « ${esc(S.ui.regQ)} ».` : "Rien dans cette catégorie pour l'instant."}</div>`;
+  const N = S.ui.regN || 80;
+  /* phone / tablet: timeline grouped by day */
+  const perDay = {}; rows.forEach((x) => (perDay[x.day] = (perDay[x.day] || 0) + 1));
+  let tl = ""; let cur = null;
+  rows.slice(0, N).forEach((x) => {
+    if (x.day !== cur) { if (cur) tl += `</div>`; cur = x.day; tl += `<div class="rg-dh"><span>${esc(regDayLabel(x.day))}</span><em>${perDay[x.day]}</em></div><div class="glass rg-grp">`; }
+    tl += `<div class="rg-it${x.corr ? " corr" : ""}">${regKic(x.kind)}<div class="tx"><b>${esc(x.what)}</b>${x.detail ? `<em>${esc(x.detail)}</em>` : ""}<span class="rg-who">${avatar(x.uid, true)}${esc(firstName(x.who) || x.who)} · <span class="mono">${hm(x.at)}</span></span></div><div class="rg-v">${x.kind === "temp" ? `<b class="mono ${x.st === "bad" ? "bad" : ""}">${esc(x.valTx)}</b>` : ""}${x.kind === "temp" && x.st === "ok" ? "" : regPill(x)}${x.photoUrl ? `<a class="thumb" href="${esc(x.photoUrl)}" target="_blank" rel="noopener" aria-label="Voir la photo"><img src="${esc(x.photoUrl)}" alt=""></a>` : ""}</div></div>`;
+  });
+  if (cur) tl += `</div>`;
+  /* desktop: sortable table */
+  const so = S.ui.regSort || { k: "at", d: -1 };
+  const key = { at: (x) => x.at, kind: (x) => REG_K[x.kind].t, what: (x) => x.what.toLowerCase(), val: (x) => (x.kind === "temp" ? x.val ?? -999 : -999), st: (x) => ({ bad: 0, warn: 1, acc: 2, neu: 3, ok: 4 }[x.st] ?? 5), who: (x) => x.who.toLowerCase() }[so.k] || ((x) => x.at);
+  const sorted = rows.slice().sort((a, b) => { const A = key(a), B = key(b); return A > B ? so.d : A < B ? -so.d : b.at - a.at; }).slice(0, Math.max(N, 200));
+  const th = (k, t, cls = "") => `<th class="${cls}" aria-sort="${so.k === k ? (so.d > 0 ? "ascending" : "descending") : "none"}"><button data-act="regSort" data-v="${k}" class="${so.k === k ? "on" : ""}">${t}${so.k === k ? ico("down", so.d > 0 ? "up" : "") : ico("sortud", "dim")}</button></th>`;
+  let tb = ""; let d0 = null;
+  sorted.forEach((x) => {
+    if (so.k === "at" && x.day !== d0) { d0 = x.day; tb += `<tr class="rg-tday"><td colspan="7"><span>${esc(regDayLabel(x.day))}</span><em>${perDay[x.day]}</em></td></tr>`; }
+    tb += `<tr class="${x.corr ? "corr" : ""}"><td class="mono nw">${so.k === "at" ? "" : `${shortDate(x.day)} `}${hm(x.at)}</td><td class="nw"><span class="rg-tk">${regKic(x.kind)}${REG_K[x.kind].s}</span></td><td class="rg-what"><b>${esc(x.what)}</b>${x.detail ? `<em>${esc(x.detail)}</em>` : ""}</td><td class="mono nw r ${x.st === "bad" && x.kind === "temp" ? "bad" : ""}">${x.kind === "temp" || x.kind === "rec" ? esc(x.valTx) : ""}</td><td class="nw">${regPill(x)}</td><td class="nw"><span class="rg-who">${avatar(x.uid, true)}${esc(x.who)}</span></td><td class="nw ph">${x.photoUrl ? `<a class="thumb" href="${esc(x.photoUrl)}" target="_blank" rel="noopener" aria-label="Voir la photo"><img src="${esc(x.photoUrl)}" alt=""></a>` : ""}</td></tr>`;
+  });
+  const more = rows.length > N ? `<button class="btn soft block rg-more" data-act="regMore">Afficher plus · encore ${rows.length - N}</button>` : "";
+  return `<div class="rg-tl">${tl}</div><div class="glass rg-tw"><table class="rg-tbl"><thead><tr>${th("at", "Date")}${th("kind", "Type")}${th("what", "Détail")}${th("val", "Valeur", "r")}${th("st", "Statut")}${th("who", "Par")}<th aria-label="Photo"></th></tr></thead><tbody>${tb}</tbody></table></div>${more}`;
+}
+
+function regCountTx(all) { const n = regFiltered(all).length; return `${n} entrée${n > 1 ? "s" : ""}`; }
+function regPaint() { const all = regEntries(); const el = $("#regList"); if (el) el.innerHTML = regListHtml(all); const c = $("#regCount"); if (c) c.textContent = regCountTx(all); }
+
 VIEWS.registre = {
   render() {
-    const f = S.regFilter; const types = { all: null, temp: ["reading"], rec: ["reception"], trace: ["lot", "open", "out", "lost"], clean: ["chore"] };
-    const ev = S.events.filter((e) => !types[f] || types[f].includes(e.type)).slice(0, 80);
+    const all = regEntries(); const f = S.regFilter || "all";
     const exp = Math.max(1, S.fridges.length * 2);
     const cells = Array.from({ length: 30 }, (_, i) => { const k = addDays(dayKey(), i - 29); const rs = readingsFor(k); const n = new Set(rs.map((r) => r.fridgeId + r.slot)).size; const bad = rs.some((r) => !r.ok); const cls = !n ? "" : bad ? "r" : n >= exp ? "g" : "y"; return `<i class="${cls}" title="${shortDate(k)} · ${n}/${exp} relevés${bad ? " · hors seuil" : ""}"></i>`; }).join("");
-    const conf = (() => { const rs = S.readings.filter((r) => daysUntil(r.day) >= -29); return rs.length ? Math.round((rs.filter((r) => r.ok).length / rs.length) * 1000) / 10 : null; })();
-    return `<div class="inner">${topBar("Registre HACCP", { right: `<button class="btn soft sm" data-act="exportReg">${ico("download")}Exporter</button>` })}
-      <div class="cols"><div>
-      <div class="glass pad st" style="--i:1"><div class="row"><span class="lbl">30 derniers jours</span><span class="sub">${conf != null ? `${fmt(conf, 1)} % conformes` : "aucun relevé"}</span></div><div class="heat" style="margin-top:12px">${cells}</div><div class="hstack" style="gap:14px;margin-top:10px;font-size:11.5px;color:var(--muted);flex-wrap:wrap"><span class="hstack" style="gap:5px"><i style="width:10px;height:10px;border-radius:3px;background:#2FB985"></i>complet</span><span class="hstack" style="gap:5px"><i style="width:10px;height:10px;border-radius:3px;background:#F0A43A"></i>incomplet</span><span class="hstack" style="gap:5px"><i style="width:10px;height:10px;border-radius:3px;background:#E14560"></i>hors seuil</span></div></div>
-      <div class="chips st" style="--i:2">${[["all", "Tout"], ["temp", "Températures"], ["rec", "Réceptions"], ["trace", "Traçabilité"], ["clean", "Ménage"]].map(([k, t]) => `<button class="chip ${f === k ? "on" : ""}" data-act="regF" data-v="${k}">${t}</button>`).join("")}</div>
-      <div class="glass pad st" style="--i:3">${ev.length ? ev.map((e) => `<div class="li">${avatar(e.uid)}<div class="tx"><b style="white-space:normal">${esc(said(e.uid, e.text))}</b><em>${when(e.at)}</em></div>${e.photoUrl ? `<a class="thumb" style="width:46px;height:46px;border-radius:10px" href="${esc(e.photoUrl)}" target="_blank" rel="noopener"><img src="${esc(e.photoUrl)}" alt="Photo"></a>` : ""}</div>`).join("") : `<div class="empty">Le registre se remplit tout seul à chaque action.</div>`}</div>
-      </div><div>
-      <div class="glass pad st" style="--i:4;display:flex;flex-direction:column;gap:10px"><span class="lbl">Photos d'étiquettes</span><p class="note" style="margin:0">Les photos sont gardées 6 mois, comme demandé, puis supprimées depuis ce bouton.</p><button class="btn soft" data-act="purge" ${S.cap.assets ? "" : "disabled"}>${ico("trash")}Supprimer les photos de plus de 6 mois</button></div>
-      <div class="glass pad st" style="--i:5"><span class="lbl">Pour un contrôle</span><p class="note" style="margin:6px 0 0">« Exporter » produit un fichier tableur avec tous les relevés, réceptions, ouvertures et sorties, avec date, heure et auteur.</p></div>
-      </div></div></div>`;
+    const rs30 = S.readings.filter((r) => daysUntil(r.day) >= -29);
+    const conf = rs30.length ? Math.round((rs30.filter((r) => r.ok).length / rs30.length) * 1000) / 10 : null;
+    const corr30 = all.filter((x) => x.corr && daysUntil(x.day) >= -29).length;
+    const cnt = (k) => (k === "all" ? all.length : k === "corr" ? all.filter((x) => x.corr).length : all.filter((x) => x.kind === k).length);
+    return `<div class="inner rg">${topBar("Registre HACCP", { right: `<button class="btn soft sm" data-go="regReport">${ico("printer")}Rapport</button>` })}
+      <div class="rg-top">
+        <div class="glass pad st rg-heat" style="--i:1"><div class="row"><span class="lbl">Températures · 30 jours</span><span class="pill ${conf == null ? "neu" : conf >= 98 ? "ok" : conf >= 90 ? "warn" : "bad"}">${conf != null ? `${fmt(conf, 1)} % conformes` : "aucun relevé"}</span></div><div class="heat" style="margin-top:12px">${cells}</div><div class="rg-leg"><span><i class="g"></i>complet</span><span><i class="y"></i>incomplet</span><span><i class="r"></i>hors seuil</span><span class="rg-corr">${corr30} correction${corr30 > 1 ? "s" : ""} en 30 j</span></div></div>
+        <button class="glass pad st rg-cta" style="--i:2" data-go="regReport"><span class="ic">${ico("file")}</span><span class="tx"><b>Rapport pour contrôle sanitaire</b><em>Températures, réceptions, traçabilité et ménage. À imprimer ou à exporter.</em></span>${ico("chev")}</button>
+      </div>
+      <div class="rg-bar st" style="--i:3"><label class="rg-q">${ico("search")}<input class="input" id="regQ" type="search" enterkeyhint="search" autocomplete="off" placeholder="Produit, frigo, personne…" value="${esc(S.ui.regQ || "")}" aria-label="Rechercher dans le registre"></label>
+        <div class="chips">${REG_F.map(([k, t]) => `<button class="chip ${f === k ? "on" : ""}${k === "corr" ? " corrchip" : ""}" data-act="regF" data-v="${k}">${t}<span class="rg-n">${cnt(k)}</span></button>`).join("")}</div></div>
+      <div class="rg-meta st" style="--i:4"><span class="sub" id="regCount">${regCountTx(all)}</span><span class="sub">Rien ne peut être effacé du registre</span></div>
+      <div id="regList" class="st" style="--i:5">${regListHtml(all)}</div>
+      <div class="glass pad st rg-photo" style="--i:6"><span class="ic">${ico("image")}</span><div class="tx"><b>Photos d'étiquettes et de livraisons</b><em>Les photos de plus de 6 mois sont supprimées. Les relevés et les traces écrites restent dans le registre.</em></div><button class="btn soft sm" data-act="purge">${ico("trash")}Vérifier</button></div>
+    </div>`;
+  },
+  after(v) {
+    const q = $("#regQ", v);
+    if (q) q.addEventListener("input", debounce(() => { S.ui.regQ = q.value; S.ui.regN = 80; regPaint(); }, 120));
+    regAutoPurge();
   },
 };
 
+/* ───────── rapport pour contrôle sanitaire ───────── */
+function regPeriod() {
+  const t = dayKey(); const P = (S.ui.regP ||= { mode: "30", from: addDays(t, -29), to: t });
+  if (P.mode === "7") return { from: addDays(t, -6), to: t, mode: "7" };
+  if (P.mode === "30") return { from: addDays(t, -29), to: t, mode: "30" };
+  let from = P.from || addDays(t, -29), to = P.to || t; if (from > to) [from, to] = [to, from];
+  if (regDaysOf({ from, to }).length > 366) from = addDays(to, -365);
+  return { from, to, mode: "custom" };
+}
+const regIn = (ts, P) => { if (!ts) return false; const k = regDay(ts); return k >= P.from && k <= P.to; };
+function regDaysOf(P) { const out = []; let k = P.from; let g = 0; while (k <= P.to && g++ < 400) { out.push(k); k = addDays(k, 1); } return out; }
+
+/* First day the register was kept: days before it are not counted as missing records. */
+function regStartDay() {
+  const ts = [S.resto?.createdAt, ...S.readings.map((r) => r.at), ...S.receptions.map((r) => r.at), ...S.choreLogs.map((g) => g.at), ...S.lots.map((l) => l.createdAt)].filter(Boolean);
+  return ts.length ? regDay(Math.min(...ts)) : dayKey();
+}
+function regReportData(P) {
+  const start = regStartDay(); const eff = { from: P.from < start ? start : P.from, to: P.to };
+  const days = eff.from <= eff.to ? regDaysOf(eff) : [];
+  const fridges = S.fridges.slice();
+  const rd = S.readings.filter((r) => r.day >= P.from && r.day <= P.to);
+  const exp = fridges.length * 2 * days.length;
+  const done = new Set(rd.filter((r) => fridges.some((f) => f.id === r.fridgeId)).map((r) => r.day + r.fridgeId + r.slot)).size;
+  const bad = rd.filter((r) => !r.ok).sort((a, b) => a.at - b.at);
+  const recs = S.receptions.filter((rc) => regIn(rc.at, P)).sort((a, b) => a.at - b.at);
+  const lines = recs.flatMap((rc) => (rc.lines || []).map((L) => ({ rc, L })));
+  const opened = S.lots.filter((l) => regIn(l.openedAt, P) || (l.status === "lost" && regIn(l.outAt, P))).sort((a, b) => (a.openedAt || a.outAt) - (b.openedAt || b.outAt));
+  const logs = S.choreLogs.filter((g) => (g.day ? g.day >= P.from && g.day <= P.to : regIn(g.at, P)));
+  const bucket = (g, len) => Math.floor((parseDay(g.day || regDay(g.at)) - parseDay(eff.from)) / (len * 864e5));
+  const chores = S.chores.map((c) => {
+    const L = logs.filter((g) => g.choreId === c.id); const n = Math.max(1, days.length);
+    const len = c.freq === "semaine" ? 7 : c.freq === "mois" ? 30 : 1;
+    const expN = Math.max(1, Math.ceil(n / len)); const doneN = Math.min(expN, new Set(L.map((g) => bucket(g, len))).size);
+    const last = L.reduce((m, g) => Math.max(m, g.at || 0), 0);
+    return { c, expN, doneN, rate: Math.round((doneN / expN) * 100), last, who: [...new Set(L.map((g) => firstName(nameOf(g.uid))))].join(", ") };
+  });
+  const cExp = chores.reduce((s, x) => s + x.expN, 0), cDone = chores.reduce((s, x) => s + x.doneN, 0);
+  return { days, start: eff.from, clipped: eff.from > P.from, fridges, rd, exp, done, bad, recs, lines, opened, chores, cRate: cExp ? Math.round((cDone / cExp) * 100) : null,
+    conf: rd.length ? Math.round((rd.filter((r) => r.ok).length / rd.length) * 1000) / 10 : null,
+    refused: lines.filter((x) => x.L.refused).length, reserves: lines.filter((x) => x.L.ok === false && !x.L.refused).length };
+}
+
+function regReportHtml(P) {
+  const D = regReportData(P); const now = Date.now();
+  const cell = (day, f, slot) => {
+    const rs = D.rd.filter((r) => r.day === day && r.fridgeId === f.id && r.slot === slot).sort((a, b) => a.at - b.at);
+    if (!rs.length) return `<td class="miss">—</td>`;
+    return `<td>${rs.map((r) => `<span class="${r.ok ? "" : "nc"}">${regNum(num(r.value))}${r.ok ? "" : "*"}</span>`).join(" / ")}<i>${rs.map((r) => esc(initials(nameOf(r.uid)))).join(" ")}</i></td>`;
+  };
+  const kpi = (lbl, v, sub, cls = "") => `<div class="rp-kpi ${cls}"><span>${lbl}</span><b>${v}</b><em>${sub}</em></div>`;
+  const tempTable = D.fridges.length ? `<div class="rp-sc"><table class="rp-t rp-temps"><thead><tr><th rowspan="2">Date</th>${D.fridges.map((f) => `<th colspan="2">${esc(f.name)}<small>${esc(regRange(f))}</small></th>`).join("")}</tr><tr>${D.fridges.map(() => `<th>Midi</th><th>Soir</th>`).join("")}</tr></thead><tbody>${D.days.map((d) => `<tr><td class="nw">${esc(DAYS[parseDay(d).getDay()].slice(0, 3))}. ${shortDate(d)}</td>${D.fridges.map((f) => cell(d, f, "midi") + cell(d, f, "soir")).join("")}</tr>`).join("")}</tbody></table></div>` : `<p class="rp-empty">Aucune enceinte froide déclarée.</p>`;
+  const ncTable = D.bad.length ? `<div class="rp-sc"><table class="rp-t"><thead><tr><th>Date</th><th>Heure</th><th>Enceinte</th><th class="r">Relevé</th><th>Seuil</th><th>Action corrective</th><th>Par</th></tr></thead><tbody>${D.bad.map((r) => `<tr><td class="nw">${regFull(r.day)}</td><td class="nw">${hm(r.at)}</td><td>${esc(fridgeName(r.fridgeId))}</td><td class="r nc nw">${regNum(num(r.value))} °C</td><td class="nw">${esc(regRange(S.fridges.find((f) => f.id === r.fridgeId)))}</td><td>${esc(r.action || "Non renseignée")}</td><td>${esc(nameOf(r.uid))}</td></tr>`).join("")}</tbody></table></div>` : `<p class="rp-ok">Aucune non-conformité de température sur la période.</p>`;
+  const recTable = D.lines.length ? `<div class="rp-sc"><table class="rp-t"><thead><tr><th>Date</th><th>Fournisseur</th><th>Produit</th><th>Lot</th><th>DLC</th><th class="r">T° reçue</th><th>Décision</th><th>Par</th></tr></thead><tbody>${D.lines.map(({ rc, L }) => `<tr class="${L.refused ? "row-nc" : ""}"><td class="nw">${shortDate(regDay(rc.at))} ${hm(rc.at)}</td><td>${esc(rc.supplier || "–")}${rc.bl ? `<small>BL ${esc(rc.bl)}</small>` : ""}</td><td>${esc(L.name)}${L.qty ? `<small>${esc(L.qty)} ${esc(L.unit || "")}</small>` : ""}${L.sanitary ? `<small>N° sanitaire ${esc(L.sanitary)}</small>` : ""}</td><td class="mono">${esc(L.lot || "–")}</td><td class="nw">${L.dlc ? regFull(L.dlc) : "–"}</td><td class="r nw ${L.temp != null && L.tmax != null && L.temp > L.tmax ? "nc" : ""}">${L.temp != null ? `${regNum(L.temp)} °C` : "–"}${L.tmax != null ? `<small>max ${regNum(L.tmax, 0)} °C</small>` : ""}</td><td class="nw"><span class="rp-st ${regLineSt(L)}">${regLineTx(L)}</span></td><td>${esc(firstName(nameOf(rc.uid)))}</td></tr>`).join("")}</tbody></table></div>` : `<p class="rp-empty">Aucune réception sur la période.</p>`;
+  const tLot = D.opened.length ? `<div class="rp-sc"><table class="rp-t"><thead><tr><th>Produit</th><th>Lot · fournisseur</th><th>Reçu le</th><th>Ouvert le</th><th>À consommer avant</th><th>Sortie</th><th>Statut</th></tr></thead><tbody>${D.opened.map((l) => { const over = l.status === "opened" && l.dlcOpen && daysUntil(l.dlcOpen) < 0; const st = l.status === "lost" ? ["bad", "Jeté"] : l.status === "out" ? ["ok", "Utilisé"] : over ? ["bad", "DLC dépassée"] : ["acc", "En cours"]; return `<tr class="${st[0] === "bad" ? "row-nc" : ""}"><td>${esc(l.name)}</td><td><span class="mono">${esc(l.lot || "–")}</span>${l.supplier ? `<small>${esc(l.supplier)}</small>` : ""}</td><td class="nw">${l.createdAt ? shortDate(regDay(l.createdAt)) : "–"}</td><td class="nw">${l.openedAt ? `${shortDate(regDay(l.openedAt))} ${hm(l.openedAt)}<small>${esc(firstName(nameOf(l.openedBy)))}</small>` : "–"}</td><td class="nw">${l.dlcOpen ? regFull(l.dlcOpen) : l.dlc ? regFull(l.dlc) : "–"}</td><td class="nw">${l.outAt ? `${shortDate(regDay(l.outAt))} ${hm(l.outAt)}<small>${esc(firstName(nameOf(l.outBy)))}</small>` : "–"}</td><td class="nw"><span class="rp-st ${st[0]}">${st[1]}</span></td></tr>`; }).join("")}</tbody></table></div>` : `<p class="rp-empty">Aucun produit ouvert ou jeté sur la période.</p>`;
+  const tClean = D.chores.length ? `<div class="rp-sc"><table class="rp-t"><thead><tr><th>Tâche</th><th>Zone</th><th>Fréquence</th><th class="r">Réalisé</th><th class="r">Taux</th><th>Dernière fois</th><th>Par</th></tr></thead><tbody>${D.chores.map((x) => `<tr class="${x.rate < 80 ? "row-nc" : ""}"><td>${esc(x.c.name)}</td><td>${esc(x.c.zone || "–")}</td><td class="nw">${REG_FREQ[x.c.freq] || "–"}</td><td class="r nw">${x.doneN} / ${x.expN}</td><td class="r nw"><span class="rp-st ${x.rate >= 95 ? "ok" : x.rate >= 80 ? "warn" : "bad"}">${x.rate} %</span></td><td class="nw">${x.last ? `${shortDate(regDay(x.last))} ${hm(x.last)}` : "Jamais"}</td><td>${esc(x.who || "–")}</td></tr>`).join("")}</tbody></table></div>` : `<p class="rp-empty">Aucun plan de nettoyage déclaré.</p>`;
+  return `<article class="rp-paper" id="rpPaper">
+    <header class="rp-head"><div class="rp-brand"><span class="rp-mk">${logoMark()}</span><div><b>${esc(S.resto?.name || "Restaurant")}</b><em>Registre sanitaire · plan de maîtrise sanitaire (HACCP)</em></div></div>
+      <div class="rp-per"><span>Période contrôlée</span><b>du ${regFull(P.from)} au ${regFull(P.to)}</b><em>${D.clipped ? `registre tenu depuis le ${regFull(D.start)}` : `${D.days.length} jour${D.days.length > 1 ? "s" : ""}`}</em></div></header>
+    <h1>Rapport pour contrôle sanitaire</h1>
+    <div class="rp-kpis">${kpi("Relevés de température", `${D.done} / ${D.exp}`, D.exp ? `${Math.round((D.done / D.exp) * 100)} % des relevés attendus` : "–", D.exp && D.done < D.exp ? "warn" : "")}${kpi("Conformité températures", D.conf != null ? `${fmt(D.conf, 1)} %` : "–", `${D.bad.length} non-conformité${D.bad.length > 1 ? "s" : ""}`, D.bad.length ? "bad" : "")}${kpi("Réceptions", `${D.recs.length}`, `${D.lines.length} produits · ${D.refused} refus · ${D.reserves} réserve${D.reserves > 1 ? "s" : ""}`, D.refused ? "warn" : "")}${kpi("Plan de nettoyage", D.cRate != null ? `${D.cRate} %` : "–", "des tâches prévues réalisées", D.cRate != null && D.cRate < 80 ? "warn" : "")}</div>
+    <section><h2><span>1</span>Températures des enceintes froides</h2><p class="rp-note">Deux relevés par jour et par enceinte (midi et soir), en °C. * hors seuil. « — » : relevé manquant. Initiales : personne ayant relevé.${D.clipped ? ` Registre tenu dans l'application depuis le ${regFull(D.start)}.` : ""}</p>${tempTable}
+      <h3>Non-conformités et actions correctives</h3>${ncTable}</section>
+    <section><h2><span>2</span>Réceptions des marchandises</h2><p class="rp-note">Contrôle à réception : température, DLC, numéro de lot. Un produit refusé repart avec le livreur et n'entre pas en stock.</p>${recTable}</section>
+    <section><h2><span>3</span>Traçabilité des produits ouverts</h2><p class="rp-note">Produits entamés pendant la période, avec la date limite après ouverture, et produits jetés.</p>${tLot}</section>
+    <section><h2><span>4</span>Plan de nettoyage et de désinfection</h2><p class="rp-note">Tâches prévues et réalisées sur la période. En dessous de 80 %, la ligne est signalée.</p>${tClean}</section>
+    <footer class="rp-foot"><div>Document généré le ${regFull(dayKey())} à ${hm(now)} par ${esc(nameOf(S.me.id))} avec Growth Gusto. Chaque enregistrement est daté et attribué à la personne connectée au moment de la saisie.</div><div class="rp-sign"><span>Visa du responsable</span><i></i></div></footer>
+  </article>`;
+}
+
+VIEWS.regReport = {
+  render() {
+    const P = regPeriod(); const t = dayKey();
+    const seg = [["7", "7 jours"], ["30", "30 jours"], ["custom", "Dates"]]; const ix = seg.findIndex((s) => s[0] === P.mode);
+    return `<div class="inner rg rp">${topBar("Rapport sanitaire", { right: `<button class="btn soft sm rg-dk" data-act="regCsv">${ico("download")}CSV</button><button class="btn acc sm rg-dk" data-act="regPrint">${ico("printer")}Imprimer</button>` })}
+      <div class="glass pad st rp-tools" style="--i:1"><span class="lbl">Période</span>
+        <div class="seg" id="rpSeg"><span class="knob" style="width:calc(33.33% - 3px);transform:translateX(${ix * 100}%)"></span>${seg.map(([k, tx]) => `<button class="${P.mode === k ? "on" : ""}" data-act="regPer" data-v="${k}">${tx}</button>`).join("")}</div>
+        ${P.mode === "custom" ? `<div class="grid2"><label class="field"><span>Du</span><input class="input" type="date" id="rpFrom" max="${t}" value="${P.from}"></label><label class="field"><span>Au</span><input class="input" type="date" id="rpTo" max="${t}" value="${P.to}"></label></div>` : ""}
+        <p class="note" style="margin:0">L'aperçu ci-dessous est ce qui sera imprimé, au format A4. Pour un PDF, choisissez « Enregistrer au format PDF » dans la fenêtre d'impression.</p></div>
+      <div class="rp-wrap st" style="--i:2">${regReportHtml(P)}</div>
+      <div class="ctabar grid2 rp-cta"><button class="btn soft" data-act="regCsv">${ico("download")}CSV</button><button class="btn acc" data-act="regPrint">${ico("printer")}Imprimer</button></div>
+    </div>`;
+  },
+  after(v) {
+    const on = () => { const a = $("#rpFrom", v), b = $("#rpTo", v); if (!a || !b || !a.value || !b.value) return; S.ui.regP = { mode: "custom", from: a.value, to: b.value }; a.blur(); b.blur(); SFX.tick(); setTimeout(rerender, 30); };
+    $$("#rpFrom,#rpTo", v).forEach((i) => i.addEventListener("change", on));
+  },
+};
+
+/* CSV: core's saveCsv when the downloads capability exists, otherwise a plain browser download. */
+async function regSaveCsv(name, rows) {
+  if (S.cap.downloads) return saveCsv(name, rows);
+  const csv = "﻿" + rows.map((r) => r.map((c) => { const s = String(c ?? ""); return /[;"\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; }).join(";")).join("\r\n");
+  try { const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" })); const a = document.createElement("a"); a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 4000); SFX.ok(); toast("Fichier prêt"); }
+  catch (e) { toast("Export impossible.", "err"); }
+}
+
+/* Photos older than 6 months: shared assets when available, plus photos stored inside local records (standalone). */
+let regPurged = null;
+function regAutoPurge() { if (regPurged === S.rid || !S.rid) return; regPurged = S.rid; setTimeout(() => regPurge(true).catch(() => {}), 1500); }
+async function regPurge(silent) {
+  const lim = Date.now() - REG_PHOTO_DAYS * 864e5; let n = 0;
+  const store = regPhotoStore();
+  if (store) {
+    try { const { assets } = await store.list(); const old = (assets || []).filter((x) => { const t = new Date(x.createdAt || x.at || 0).getTime(); return t && t < lim; }); for (const x of old) { await store.delete(x.id); n++; } }
+    catch (e) { if (!silent) toast(S.cap.assets ? "Suppression impossible : seuls les éditeurs peuvent gérer les photos." : "Suppression impossible sur cet appareil.", "err"); return -1; }
+  }
+  if (DB.mode === "local") {
+    const isPic = (u) => typeof u === "string" && /^(data|blob):/.test(u);
+    const scan = (col, tsOf, fix) => { const rows = DB.local[DB.path(col)] || {}; for (const [id, d] of Object.entries(rows)) { const ts = tsOf(d); if (!ts || ts >= lim) continue; const p = fix(d); if (p) { n += p.n; delete p.n; DB.update(col, id, p); } } };
+    scan("events", (d) => d.at, (d) => (isPic(d.photoUrl) ? { photoUrl: "", n: 1 } : null));
+    scan("lots", (d) => d.createdAt, (d) => { let k = 0; const p = {}; if (isPic(d.photoUrl)) { p.photoUrl = ""; k++; } if (isPic(d.openPhotoUrl)) { p.openPhotoUrl = ""; k++; } return k ? { ...p, n: k } : null; });
+    scan("receptions", (d) => d.at, (d) => { let k = 0; const lines = (d.lines || []).map((L) => (isPic(L.photoUrl) ? (k++, { ...L, photoUrl: "" }) : L)); return k ? { lines, n: k } : null; });
+  }
+  if (!silent) { if (n) { toast(`${n} photo${n > 1 ? "s" : ""} de plus de 6 mois supprimée${n > 1 ? "s" : ""}`); SFX.ok(); } else toast("Aucune photo de plus de 6 mois"); }
+  return n;
+}
 
 Object.assign(ACT, {
-  regF: (a, id, v) => { S.regFilter = v; SFX.tick(); rerender(); },
-  exportReg: async () => {
-    const rows = [["Date", "Heure", "Type", "Détail", "Valeur", "Conforme", "Auteur"]];
-    S.readings.slice().reverse().forEach((r) => rows.push([r.day, hm(r.at), `Relevé ${r.slot}`, fridgeName(r.fridgeId), String(r.value).replace(".", ","), r.ok ? "oui" : `non : ${r.action || ""}`, nameOf(r.uid)]));
-    S.receptions.slice().reverse().forEach((rc) => (rc.lines || []).forEach((L) => rows.push([dayKey(new Date(rc.at)), hm(rc.at), "Réception", `${rc.supplier} · ${L.name} · lot ${L.lot || "-"} · DLC ${L.dlc || "-"}`, L.temp != null ? String(L.temp).replace(".", ",") : "", L.ok ? "oui" : "réserve", nameOf(rc.uid)])));
-    S.lots.forEach((l) => { if (l.openedAt) rows.push([dayKey(new Date(l.openedAt)), hm(l.openedAt), "Ouverture", `${l.name} · DLC ouverte ${l.dlcOpen}`, "", "", nameOf(l.openedBy)]); if (l.outAt) rows.push([dayKey(new Date(l.outAt)), hm(l.outAt), l.status === "lost" ? "Perte" : "Sortie", l.name, "", "", nameOf(l.outBy)]); });
-    await saveCsv(`registre-haccp-${dayKey()}.csv`, rows);
+  regF: (a, id, v) => { S.regFilter = v; S.ui.regN = 80; SFX.tick(); buzz(4); rerender(); },
+  regSort: (a, id, v) => { const so = S.ui.regSort || { k: "at", d: -1 }; S.ui.regSort = so.k === v ? { k: v, d: -so.d } : { k: v, d: v === "at" || v === "val" ? -1 : 1 }; SFX.tick(); regPaint(); },
+  regMore: () => { S.ui.regN = (S.ui.regN || 80) + 120; SFX.tap(); regPaint(); },
+  regPer: (a, id, v) => {
+    const P = regPeriod(); S.ui.regP = { mode: v, from: P.from, to: P.to };
+    const seg = $("#rpSeg"); if (seg) { $$("button", seg).forEach((b) => b.classList.toggle("on", b === a)); $(".knob", seg).style.transform = `translateX(${["7", "30", "custom"].indexOf(v) * 100}%)`; }
+    SFX.tick(); setTimeout(rerender, 220);
   },
-  purge: async (a) => {
-    if (!S.cap.assets) return; a.setAttribute("disabled", "");
-    try { const { assets } = await S.cap.assets.list(); const lim = Date.now() - 183 * 864e5; const old = assets.filter((x) => new Date(x.createdAt).getTime() < lim);
-      if (!old.length) { toast("Aucune photo de plus de 6 mois"); a.removeAttribute("disabled"); return; }
-      for (const x of old) await S.cap.assets.delete(x.id); toast(`${old.length} photo${old.length > 1 ? "s" : ""} supprimée${old.length > 1 ? "s" : ""}`); SFX.ok();
-    } catch (e) { toast("Suppression impossible : seuls les éditeurs peuvent gérer les photos.", "err"); }
-    a.removeAttribute("disabled");
+  regPrint: () => { SFX.tap(); buzz(8); const P = regPeriod(); const t = document.title; document.title = `Rapport sanitaire ${S.resto?.name || ""} du ${regFull(P.from)} au ${regFull(P.to)}`.replace(/\//g, "-"); setTimeout(() => { window.print(); document.title = t; }, 60); },
+  regCsv: async () => {
+    const P = regPeriod();
+    const rows = [["Date", "Heure", "Catégorie", "Détail", "Valeur (°C)", "Conforme", "Action corrective", "Auteur"]];
+    regEntries().filter((x) => x.day >= P.from && x.day <= P.to).sort((a, b) => a.at - b.at).forEach((x) => (x.csv || []).forEach((c) => rows.push([regFull(x.day), hm(x.at), c[0], c[1], c[2], c[3], c[4], x.who])));
+    await regSaveCsv(`registre-haccp-${P.from}_${P.to}.csv`, rows);
   },
-
+  exportReg: () => ACT.regCsv(),
+  purge: async (a) => { a.setAttribute("disabled", ""); await regPurge(false); a.removeAttribute("disabled"); },
 });
