@@ -27,7 +27,9 @@ const stkSigned = (n) => (n > 0 ? "+" : n < 0 ? "−" : "") + stkN(Math.abs(n));
 const stkEur = (n, d = 0) => (n == null || isNaN(n) ? "–" : Number(n).toLocaleString("fr-FR", { minimumFractionDigits: d, maximumFractionDigits: d }) + " €");
 const stkShift = (m, k) => { const [y, mo] = m.split("-").map(Number); return monthKey(new Date(y, mo - 1 + k, 1)); };
 const stkMonthName = (m) => MONTHS[+m.split("-")[1] - 1];
-const stkNorm = (s) => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+const stkNorm = (s) => String(s || "").toLowerCase().replace(/œ/g, "oe").replace(/æ/g, "ae").normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[’']/g, " ").replace(/\s+/g, " ");
+const STK_PLU = { "pièce": "pièces", bouteille: "bouteilles", "fût": "fûts", botte: "bottes", "boîte": "boîtes", bourriche: "bourriches", plateau: "plateaux", barquette: "barquettes", sac: "sacs", carton: "cartons", seau: "seaux", pot: "pots", paquet: "paquets", "bocal": "bocaux", "unité": "unités", portion: "portions", "tranche": "tranches", "sachet": "sachets", "bidon": "bidons", "caisse": "caisses" };
+const stkU = (n, u) => (n != null && Math.abs(n) >= 2 && STK_PLU[u] ? STK_PLU[u] : u || "");
 const stkDefStep = (u) => (u === "kg" || u === "L" ? 0.5 : u === "g" ? 100 : 1);
 const stkHasPrice = () => S.products.some((p) => p.price > 0);
 function stkLS(k, v) { try { if (v === undefined) return JSON.parse(localStorage.getItem(k) || "null"); if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, JSON.stringify(v)); } catch (e) { return null; } }
@@ -80,12 +82,13 @@ function stkMonthData(m) {
   const top = rows.filter((r) => r.used > 0 && r.p.price > 0).sort((a, b) => b.used * b.p.price - a.used * a.p.price).slice(0, 5);
   return { m, pm, rows, value, prevValue, likeCur, likePrev, used, top, priced, n: rows.filter((r) => r.c != null).length, total: rows.length };
 }
-function invSummary() { const D = stkMonthData(monthKey()); return { value: D.value, prevValue: D.prevValue, used: D.used, top: D.top.map((r) => ({ name: r.p.name, unit: r.p.unit, cur: r.c, prev: r.pc, used: r.used })) }; }
+const stkR2 = (n) => Math.round((n || 0) * 100) / 100;
+function invSummary() { const D = stkMonthData(monthKey()); return { value: stkR2(D.value), prevValue: stkR2(D.prevValue), used: stkR2(D.used), top: D.top.map((r) => ({ name: r.p.name, unit: r.p.unit, cur: r.c, prev: r.pc, used: r.used })) }; }
 
 function stkDiff(d, suffix = "") {
   if (d == null) return "";
   const k = d > 0 ? "up" : d < 0 ? "dn" : "eq";
-  return `<span class="stk-d ${k}" title="${d === 0 ? "Identique au mois précédent" : ""}">${ico(k === "up" ? "stkUp" : k === "dn" ? "stkDn" : "stkEq")}${d === 0 ? "" : `<span class="mono">${stkSigned(d)}${suffix}</span>`}</span>`;
+  return `<span class="stk-d ${k}" title="${d === 0 ? "Identique au mois précédent" : d > 0 ? "En hausse" : "En baisse"}">${ico(k === "up" ? "stkUp" : k === "dn" ? "stkDn" : "stkEq")}${d === 0 ? "" : `<span class="mono">${stkN(Math.abs(d))}${suffix}</span>`}</span>`;
 }
 
 /* ───────── view ───────── */
@@ -93,7 +96,7 @@ VIEWS.stock = {
   render() {
     stkEnsureMoves();
     const tab = S.stockTab === "cat" ? "cat" : "inv";
-    const seg = `<div class="seg st" style="--i:1"><span class="knob" style="width:calc(50% - 4px);transform:translateX(${tab === "cat" ? "100%" : "0"})"></span><button class="${tab === "inv" ? "on" : ""}" data-act="stockTab" data-v="inv">Inventaire</button><button class="${tab === "cat" ? "on" : ""}" data-act="stockTab" data-v="cat">Catalogue <span class="stk-segn mono">${S.products.length || ""}</span></button></div>`;
+    const seg = `<div class="seg stk-seg st" style="--i:1"><span class="knob" style="width:calc(50% - 4px);transform:translateX(${tab === "cat" ? "100%" : "0"})"></span><button class="${tab === "inv" ? "on" : ""}" data-act="stockTab" data-v="inv">Inventaire</button><button class="${tab === "cat" ? "on" : ""}" data-act="stockTab" data-v="cat">Catalogue <span class="stk-segn mono">${S.products.length || ""}</span></button></div>`;
     if (!S.products.length) {
       return `<div class="inner narrow">${topBar("Stock", { noBack: true })}${seg}
         <div class="glass stk-empty st" style="--i:2"><div class="stk-empty-art">${ico("box")}</div><b class="h2">Votre inventaire en 3 gestes</b>
@@ -129,18 +132,20 @@ function stkInventory(seg) {
       ${cta}${!isCur ? `<span class="pill neu" style="align-self:center">Mois passé · touchez un produit pour corriger</span>` : ""}</div>`;
   const valueCard = stkHasPrice() ? (() => {
     const dv = D.likePrev ? ((D.likeCur - D.likePrev) / D.likePrev) * 100 : null;
-    return `<div class="glass pad st stk-kpis" style="--i:3"><div><span class="lbl">Valeur du stock</span><div class="h2 mono">${stkEur(D.value)}</div><div class="sub">${dv != null ? `${stkDiff(Math.round(dv), " %")} vs ${stkMonthName(D.pm)}${D.n < D.total ? "*" : ""}` : `${D.priced}/${D.total} produits avec prix`}</div></div>
-      <div><span class="lbl">Consommé</span><div class="h2 mono">${D.used ? stkEur(D.used) : "–"}</div><div class="sub">depuis ${stkMonthName(D.pm)}</div></div>${dv != null && D.n < D.total ? `<p class="note stk-kfn">* à périmètre égal : produits comptés les deux mois</p>` : ""}</div>`;
+    const none = D.n === 0, part = !none && D.n < D.total;
+    const vSub = none ? "Comptez pour la calculer" : dv != null ? `<span class="stk-vs">${stkDiff(Math.round(dv), " %")}<span>vs ${stkMonthName(D.pm)}${part ? "*" : ""}</span></span>` : D.priced < D.total ? `${D.priced}/${D.total} produits avec prix` : part ? `sur ${D.n} produits comptés` : "";
+    return `<div class="glass pad st stk-kpis" style="--i:3"><div><span class="lbl">Valeur du stock</span><div class="h2 mono">${none ? "–" : stkEur(D.value)}</div><div class="sub">${vSub}</div></div>
+      <div><span class="lbl">Consommé</span><div class="h2 mono">${D.used ? stkEur(D.used) : "–"}</div><div class="sub">depuis ${stkMonthName(D.pm)}${part && D.used ? "*" : ""}</div></div>${part && (dv != null || D.used) ? `<p class="note stk-kfn">* sur les produits comptés les deux mois</p>` : ""}</div>`;
   })() : `<div class="glass pad st stk-tip" style="--i:3"><span class="ic">${ico("trend")}</span><div><b>Voir la valeur du stock</b><p class="note">Ajoutez un prix d'achat à vos produits : la valeur et la consommation en € s'affichent ici.</p><button class="btn soft sm" data-act="stockTab" data-v="cat">Ajouter les prix</button></div></div>`;
-  const topCard = D.top.length ? `<div class="glass pad st" style="--i:4"><span class="lbl">Plus grosses consommations</span>${D.top.map((r) => `<div class="li"><div class="tx"><b>${esc(r.p.name)}</b><em>${stkN(r.used)} ${esc(r.p.unit)} utilisés</em></div><span class="mono stk-strong">${stkEur(r.used * r.p.price)}</span></div>`).join("")}<p class="note" style="margin:8px 0 0">Stock de ${stkMonthName(D.pm)} + achats reçus − stock compté.</p></div>` : "";
+  const topCard = D.top.length ? `<div class="glass pad st" style="--i:4"><span class="lbl">Plus grosses consommations</span>${D.top.map((r) => `<div class="li"><div class="tx"><b>${esc(r.p.name)}</b><em>${stkN(r.used)} ${esc(stkU(r.used, r.p.unit))} utilisé${r.used >= 2 ? "s" : ""}</em></div><span class="mono stk-strong">${stkEur(r.used * r.p.price)}</span></div>`).join("")}<p class="note" style="margin:8px 0 0">Stock de ${stkMonthName(D.pm)} + achats reçus − stock compté.</p></div>` : "";
   const exportCard = `<div class="glass pad st stk-exp" style="--i:5"><div><b>Exporter ${stkMonthName(m)}</b><span class="sub">Fichier CSV pour Excel ou votre comptable</span></div><button class="btn soft sm" data-act="exportInv">${ico("download")}CSV</button></div>`;
   const shown = zones.filter((z) => !S.stkZone || z === S.stkZone);
   const chips = `<div class="chips st" style="--i:3"><button class="chip ${!S.stkZone ? "on" : ""}" data-act="stkZone" data-v="">Toutes <span class="stk-cn">${D.n}/${D.total}</span></button>${zones.map((z) => { const zr = D.rows.filter((r) => stkZoneOf(r.p) === z); const zc = zr.filter((r) => r.c != null).length; return `<button class="chip ${z === S.stkZone ? "on" : ""}" data-act="stkZone" data-v="${esc(z)}">${esc(z)} <span class="stk-cn">${zc === zr.length ? "✓" : `${zc}/${zr.length}`}</span></button>`; }).join("")}</div>`;
   const lists = shown.map((z, zi) => {
     const zr = stkSorted(z).map((p) => byId[p.id]); const zc = zr.filter((r) => r.c != null).length;
     return `<div class="glass pad st" style="--i:${Math.min(zi + 4, 9)}"><div class="row stk-zh"><span class="lbl">${esc(z)} <span class="mono">${zc}/${zr.length}</span></span>${isCur && zc < zr.length ? `<button class="btn ghost sm" data-act="stkStart" data-v="${esc(z)}">Compter</button>` : ""}</div>
-      ${zr.map((r) => `<div class="li tap stk-row ${r.c == null ? "todo" : ""}" data-act="stkEdCount" data-id="${r.p.id}" role="button" tabindex="0"><div class="tx"><b>${esc(r.p.name)}</b><em>${r.pc != null ? `${stkMonthName(D.pm)} : ${stkN(r.pc)} ${esc(r.p.unit)}` : "1er comptage"}${r.val != null ? ` · ${stkEur(r.val)}` : ""}</em></div>
-        <div class="stk-q">${r.c != null ? `<b class="mono">${stkN(r.c)}<small> ${esc(r.p.unit)}</small></b>${stkDiff(r.d)}` : `<span class="stk-todo">À compter</span>`}</div></div>`).join("")}</div>`;
+      ${zr.map((r) => `<div class="li tap stk-row ${r.c == null ? "todo" : ""}" data-act="stkEdCount" data-id="${r.p.id}" role="button" tabindex="0"><div class="tx"><b>${esc(r.p.name)}</b><em>${r.pc != null ? `${stkMonthName(D.pm)} : ${stkN(r.pc)} ${esc(stkU(r.pc, r.p.unit))}` : "1er comptage"}${r.val != null ? ` · ${stkEur(r.val)}` : ""}</em></div>
+        <div class="stk-q">${r.c != null ? `<b class="mono">${stkN(r.c)}<small> ${esc(stkU(r.c, r.p.unit))}</small></b>${stkDiff(r.d)}` : `<span class="stk-todo">À compter</span>`}</div></div>`).join("")}</div>`;
   }).join("");
   return `<div class="inner">${topBar("Stock", { noBack: true, right: `<button class="btn soft sm" data-act="exportInv" aria-label="Exporter en CSV">${ico("download")}<span class="stk-hide-s">Exporter</span></button>` })}${seg}
     <div class="cols"><div>${hero}<div class="stk-ph">${valueCard}</div>${chips}${lists}</div><div class="stk-side"><div class="stk-dk">${valueCard}</div>${topCard}${exportCard}</div></div></div>`;
@@ -157,7 +162,7 @@ function stkCatalogue(seg) {
   return `<div class="inner narrow">${topBar("Stock", { noBack: true, right: `<button class="btn acc sm" data-act="prodEdit">${ico("plus")}Produit</button>` })}${seg}
     <div class="stk-search st" style="--i:2">${ico("search")}<input class="input" id="stkQ" data-stkq="1" type="search" placeholder="Rechercher un produit, un fournisseur…" value="${esc(q)}" autocomplete="off" aria-label="Rechercher"></div>
     <div class="row st" style="--i:2;padding:0 4px"><span class="sub">${S.products.length} produits · ${priced} avec prix</span><button class="btn ghost sm" data-act="stkStarter">${ico("sparkle")}Liste type</button></div>
-    <div class="stk-groups">${groups}</div><div class="glass empty stk-nores" hidden><b>Aucun produit trouvé</b><button class="btn soft sm" data-act="prodEditQ" style="margin-top:10px">${ico("plus")}Créer « <span id="stkQn"></span> »</button></div></div>`;
+    <div class="stk-groups">${groups}</div><div class="glass empty stk-nores" hidden><b>Aucun produit trouvé</b><button class="btn soft sm" data-act="prodEditQ" style="margin-top:10px">${ico("plus")}<span>Créer « <span id="stkQn"></span> »</span></button></div></div>`;
 }
 function stkApplySearch() {
   const inp = $("#stkQ"); if (!inp) return; S.stkQ = inp.value; const nq = stkNorm(inp.value); let any = false;
@@ -173,7 +178,8 @@ function stkSessSave() { const C = S.ui.stkCm; if (!C) return; stkLS(STK_SS, { r
 function stkKeypad(ctx) {
   return `<div class="keypad stk-kp">${["1", "2", "3", "4", "5", "6", "7", "8", "9", ",", "0", "del"].map((k) => `<button data-act="stkKey" data-id="${ctx}" data-v="${k}" aria-label="${k === "del" ? "Effacer (appui long : tout effacer)" : k === "," ? "Virgule" : k}" class="${k === "del" ? "del" : k === "," ? "sep" : ""}">${k === "del" ? ico("back") : k}</button>`).join("")}</div>`;
 }
-function stkValHtml(buf, unit, id) { return `<div class="stk-val ${buf === "" ? "empty" : ""} ${buf.length > 4 ? "long" : ""}" id="${id}"><span class="mono n">${esc(buf || "0")}</span><span class="caret"></span><span class="u">${esc(unit)}</span></div>`; }
+const stkBufHtml = (b) => esc(b || "0").replace(",", '<i class="cm">,</i>');
+function stkValHtml(buf, unit, id) { return `<div class="stk-val ${buf === "" ? "empty" : ""} ${buf.length > 6 ? "xlong" : buf.length > 4 ? "long" : ""}" id="${id}"><span class="mono n">${stkBufHtml(buf)}</span><span class="caret"></span><span class="u" data-u="${esc(unit)}">${esc(stkU(num(buf), unit))}</span></div>`; }
 
 function stkCmCard() {
   const C = S.ui.stkCm; const p = S.products.find((x) => x.id === C.list[C.i]); if (!p) return "";
@@ -181,14 +187,14 @@ function stkCmCard() {
   return `<div class="stk-card" id="stkCard">
     <span class="pill acc stk-zp">${esc(stkZoneOf(p))}</span>
     <div class="stk-pn">${esc(p.name)}</div>
-    <div class="stk-pm">${esc(p.unit)}${p.supplier ? ` · ${esc(p.supplier)}` : ""}${cur != null ? ` · <b class="okc">déjà compté</b>` : ""}</div>
+    ${p.supplier || cur != null ? `<div class="stk-pm">${[p.supplier ? esc(p.supplier) : "", cur != null ? `<b class="okc">${ico("check")}Déjà compté</b>` : ""].filter(Boolean).join(" · ")}</div>` : ""}
     ${stkValHtml(C.buf, p.unit, "stkVal")}
-    ${pc != null ? `<button class="stk-hint" data-act="stkSame"><span>Le mois dernier</span><b class="mono">${stkN(pc)} ${esc(p.unit)}</b><em>Même quantité</em></button>` : `<div class="stk-hint none"><span>Premier comptage de ce produit</span></div>`}
+    <div class="stk-hintw" id="stkHint">${pc != null ? `<button class="stk-hint" data-act="stkSame"><span>Le mois dernier</span><b class="mono">${stkN(pc)} ${esc(stkU(pc, p.unit))}</b><em>Même quantité</em></button>` : `<div class="stk-hint none"><span>Premier comptage de ce produit</span></div>`}</div>
   </div>`;
 }
 function stkCmHead() {
   const C = S.ui.stkCm; const cm = stkCountMap(C.month); const n = C.list.filter((id) => cm[id] != null).length; const p = S.products.find((x) => x.id === C.list[C.i]);
-  return `<div class="stk-cm-zone"><b>${esc(C.scope || (p ? stkZoneOf(p) : "Inventaire"))}</b><span class="mono">${Math.min(C.i + 1, C.list.length)} / ${C.list.length}</span></div>
+  return `<div class="stk-cm-zone"><b>${esc(C.scope || `Inventaire de ${stkMonthName(C.month)}`)}</b><span class="mono">${Math.min(C.i + 1, C.list.length)} / ${C.list.length}</span></div>
     <div class="prog stk-cm-prog"><i style="width:${C.list.length ? (n / C.list.length) * 100 : 0}%"></i></div>`;
 }
 function stkCmOpen(scope, pid) {
@@ -215,6 +221,9 @@ function stkCmClose(silent) {
 }
 function stkCmGo(dir) {
   const C = S.ui.stkCm; const st = $("#stkStage"); const old = $("#stkCard");
+  const ex = new Set(S.products.map((p) => p.id));
+  if (C.list.some((id) => !ex.has(id))) { const at = C.list[C.i]; const before = C.list.slice(0, C.i).filter((id) => ex.has(id)).length; C.list = C.list.filter((id) => ex.has(id)); C.i = ex.has(at) ? before : before - (dir > 0 ? 1 : 0); if (!C.list.length) { stkCmClose(); return; } }
+  C.lock = Date.now() + 240; C.warned = null;
   C.i = Math.max(0, C.i + dir); if (C.i >= C.list.length) { stkCmFinish(); return; }
   stkCmLoad(); stkSessSave();
   const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -228,7 +237,7 @@ function stkCmFinish() {
   const full = all.n === all.total; const done = C.list.length - left.length;
   $("#stkStage").innerHTML = `<div class="stk-card stk-fin" id="stkCard"><span class="check draw stk-fck"><svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg></span>
     <div class="stk-pn">${full ? "Inventaire terminé" : left.length ? "Tour terminé" : C.scope ? "Zone terminée" : "Tour terminé"}</div>
-    <div class="stk-pm">${C.scope && !full ? `${esc(C.scope)} · ` : ""}${done} compté${done > 1 ? "s" : ""}${left.length ? ` · ${left.length} passé${left.length > 1 ? "s" : ""}` : ""} · ${all.n}/${all.total} au total</div>
+    <div class="stk-pm">${full ? `${all.total} produits comptés pour ${stkMonthName(C.month)}${stkHasPrice() ? ` · stock de ${stkEur(stkMonthData(C.month).value)}` : ""}` : `${C.scope ? `${esc(C.scope)} · ` : ""}${done} compté${done > 1 ? "s" : ""}${left.length ? ` · ${left.length} passé${left.length > 1 ? "s" : ""}` : ""} · ${all.n}/${all.total} au total`}</div>
     <div class="stk-fbtns">${left.length ? `<button class="btn acc block" data-act="stkRetry">Compter les ${left.length} passé${left.length > 1 ? "s" : ""}</button>` : !full ? `<button class="btn acc block" data-act="stkStart">Continuer l'inventaire</button>` : ""}<button class="btn ${left.length || !full ? "soft" : "acc"} block" data-act="stkCmClose">Voir le résumé</button></div></div>`;
   if (full) { stkLS(STK_SS, null); SFX.done(); burst(window.innerWidth / 2, window.innerHeight / 3); buzz([10, 40, 10]); if (S.ui.stkLogged !== C.month) { S.ui.stkLogged = C.month; logEvent("stock", `a terminé l'inventaire de ${monthLabel(C.month)}`); } }
   else { SFX.ok(); stkSessSave(); }
@@ -240,6 +249,16 @@ async function stkCmCommit() {
   if (v !== cur) { try { await stkWriteCount(pid, C.month, v); } catch (e) { return false; } }
   return true;
 }
+/* Garde-fou : une valeur 10× plus grande que le mois dernier (ou énorme) demande un 2e appui sur Suivant. */
+function stkCmOdd(C) {
+  if (!C.typed || C.buf === "") return false; const v = num(C.buf); const pid = C.list[C.i]; if (v == null || v === countOf(pid, C.month)) return false;
+  const pc = countOf(pid, stkShift(C.month, -1)); const p = S.products.find((x) => x.id === pid);
+  const odd = pc != null && pc > 0 ? v >= pc * 10 && v - pc >= 10 : v >= 1000;
+  if (!odd || C.warned === C.buf) return false;
+  C.warned = C.buf; const h = $("#stkHint");
+  if (h) h.innerHTML = `<div class="stk-warn" role="alert">${ico("alert")}<span><b>${stkN(v)} ${esc(stkU(v, p ? p.unit : ""))}, c'est bien ça ?</b>${pc != null && pc > 0 ? `Le mois dernier : ${stkN(pc)} ${esc(stkU(pc, p ? p.unit : ""))}. ` : ""}Touchez Suivant pour confirmer.</span></div>`;
+  stkShake($("#stkVal")); SFX.err(); buzz([8, 30, 8]); return true;
+}
 function stkShake(el) { if (el && el.animate) el.animate([{ transform: "translateX(0)" }, { transform: "translateX(-10px)" }, { transform: "translateX(8px)" }, { transform: "translateX(-5px)" }, { transform: "none" }], { duration: 360, easing: "ease-out" }); }
 function stkKey(ctx, k) {
   const C = ctx === "cm" ? S.ui.stkCm : S.ui.stkEd; if (!C) return;
@@ -247,9 +266,10 @@ function stkKey(ctx, k) {
   if (k === "del") b = C.typed ? b.slice(0, -1) : "";
   else if (k === "clr") b = "";
   else if (k === ",") { if (!b.includes(",")) b = (b || "0") + ","; }
-  else { const dec = b.split(",")[1]; if (b.replace(",", "").length >= 6 || (dec && dec.length >= 3)) { stkShake($(ctx === "cm" ? "#stkVal" : "#stkEdVal")); SFX.err(); return; } b = b === "0" ? k : b + k; }
+  else { const [ip, dec] = b.split(","); if (dec != null ? dec.length >= 3 : ip.length >= 6) { stkShake($(ctx === "cm" ? "#stkVal" : "#stkEdVal")); SFX.err(); return; } b = b === "0" ? k : b + k; }
   C.buf = b; C.typed = true; SFX.tick(); buzz(3);
-  const d = $(ctx === "cm" ? "#stkVal" : "#stkEdVal"); if (d) { $(".n", d).textContent = b || "0"; d.classList.toggle("empty", b === ""); d.classList.toggle("long", b.length > 4); d.classList.remove("bump"); void d.offsetWidth; d.classList.add("bump"); }
+  if (ctx === "cm" && C.warned != null) { C.warned = null; const h = $("#stkHint"), cur = $("#stkCm .stk-warn"); if (h && cur) { const pid = C.list[C.i], p = S.products.find((x) => x.id === pid), pc = countOf(pid, stkShift(C.month, -1)); h.innerHTML = pc != null && p ? `<button class="stk-hint" data-act="stkSame"><span>Le mois dernier</span><b class="mono">${stkN(pc)} ${esc(stkU(pc, p.unit))}</b><em>Même quantité</em></button>` : `<div class="stk-hint none"><span>Premier comptage de ce produit</span></div>`; } }
+  const d = $(ctx === "cm" ? "#stkVal" : "#stkEdVal"); if (d) { $(".n", d).innerHTML = stkBufHtml(b); const u = $(".u", d); if (u && u.dataset.u) u.textContent = stkU(num(b), u.dataset.u); d.classList.toggle("empty", b === ""); d.classList.toggle("long", b.length > 4 && b.length <= 6); d.classList.toggle("xlong", b.length > 6); d.classList.remove("bump"); void d.offsetWidth; d.classList.add("bump"); }
   if (ctx === "cm") stkSessSave();
 }
 function stkLongPress(el) {
@@ -299,7 +319,7 @@ function stkProdSheet(p, isNew, presetZone) {
     ${E ? `<div class="stk-adj"><div style="min-width:0"><span class="lbl">Stock estimé</span><div class="stk-adjv"><b class="mono" id="stkEst">${E.est != null ? stkN(E.est) : "–"}</b> <span>${esc(p.unit)}</span></div><em class="note">${E.last ? `Compté ${stkN(E.last.qty)} en ${stkMonthName(E.last.month)}` : "Jamais compté"}${E.recv ? ` · +${stkN(E.recv)} reçus` : ""}<span id="stkAdjL">${E.adj ? ` · ${stkSigned(E.adj)} ajusté` : ""}</span></em></div>
       <div class="cnt"><button data-act="stkAdj" data-id="${p.id}" data-v="-1" aria-label="Retirer">${ico("minus")}</button><button data-act="stkAdj" data-id="${p.id}" data-v="1" aria-label="Ajouter">${ico("plus")}</button></div></div>
       <p class="note stk-adjn">Ajustement rapide (casse, dépannage) : l'inventaire du mois n'est pas modifié.</p>` : ""}
-    ${isNew ? `<div class="grid2" style="grid-template-columns:1fr 1.3fr"><button class="btn soft" data-act="prodSave" data-v="more">Ajouter + autre</button><button class="btn acc" data-act="prodSave">Ajouter</button></div>`
+    ${isNew ? `<div class="grid2 stk-addb"><button class="btn soft" data-act="prodSave" data-v="more">Ajouter + autre</button><button class="btn acc" data-act="prodSave">Ajouter</button></div>`
     : `<button class="btn acc block" data-act="prodSave" data-id="${p.id}">Enregistrer</button><button class="btn ghost block stk-del" data-act="prodDel" data-id="${p.id}">${ico("trash")}Supprimer le produit</button>`}`;
 }
 function stkProdOpen(id, presetZone, presetName) {
@@ -323,8 +343,11 @@ const STK_STARTER = [
 function stkStarterCount() { const have = new Set(S.products.map((p) => p.name.toLowerCase())); return STK_STARTER.reduce((a, [, L]) => a + L.filter(([nm]) => !have.has(nm.toLowerCase()) && !S.ui.stkSt[nm]).length, 0); }
 function stkStarterSheet() {
   const have = new Set(S.products.map((p) => p.name.toLowerCase())); const n = stkStarterCount();
-  return `<div class="row"><div><div class="h2" style="font-size:21px">Liste type bistro</div><span class="sub">Décochez ce que vous n'avez pas. Ajoutez vos prix ensuite.</span></div><button class="iconbtn" data-act="sheetClose" aria-label="Fermer">${ico("x")}</button></div>
-    <div class="stk-stl">${STK_STARTER.map(([z, L]) => `<div><span class="lbl">${esc(z)}</span><div class="stk-stg">${L.map(([nm, u]) => { const h = have.has(nm.toLowerCase()); const off = h || S.ui.stkSt[nm]; return `<button class="stk-st ${off ? "" : "on"} ${h ? "have" : ""}" data-act="stkStToggle" data-v="${esc(nm)}" ${h ? "disabled" : ""} aria-pressed="${!off}"><i>${ico("check")}</i><span>${esc(nm)}</span><em>${h ? "déjà là" : esc(u)}</em></button>`; }).join("")}</div></div>`).join("")}</div>
+  const groups = STK_STARTER.map(([z, L]) => [z, L.filter(([nm]) => !have.has(nm.toLowerCase()))]).filter(([, L]) => L.length);
+  const all = STK_STARTER.reduce((a, [, L]) => a + L.length, 0), got = all - groups.reduce((a, [, L]) => a + L.length, 0);
+  if (!groups.length) return `<div class="stk-stdone"><span class="check draw"><svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg></span><div class="h2" style="font-size:21px">Tout est déjà là</div><p class="sub">Les ${all} produits de la liste type sont dans votre catalogue.</p><button class="btn acc block" data-act="sheetClose">Fermer</button></div>`;
+  return `<div class="row"><div><div class="h2" style="font-size:21px">Liste type bistro</div><span class="sub">${got ? `${got} produits déjà dans votre catalogue. ` : ""}Décochez ce que vous n'avez pas.${got ? "" : " Ajoutez vos prix ensuite."}</span></div><button class="iconbtn" data-act="sheetClose" aria-label="Fermer">${ico("x")}</button></div>
+    <div class="stk-stl">${groups.map(([z, L]) => `<div><span class="lbl">${esc(z)}</span><div class="stk-stg">${L.map(([nm, u]) => { const h = have.has(nm.toLowerCase()); const off = h || S.ui.stkSt[nm]; return `<button class="stk-st ${off ? "" : "on"} ${h ? "have" : ""}" data-act="stkStToggle" data-v="${esc(nm)}" ${h ? "disabled" : ""} aria-pressed="${!off}"><i>${ico("check")}</i><span>${esc(nm)}</span><em>${h ? "déjà là" : esc(u)}</em></button>`; }).join("")}</div></div>`).join("")}</div>
     <div class="ctabar stk-stcta"><button class="btn acc block" data-act="stkStAdd" ${n ? "" : "disabled"}>Ajouter ${n} produit${n > 1 ? "s" : ""}</button></div>`;
 }
 
@@ -346,15 +369,16 @@ Object.assign(ACT, {
   countMode: () => ACT.stkResume(),
   stkCmClose: () => { const C = S.ui.stkCm; const done = C && C.i >= C.list.length; stkCmClose(); if (C && !done && invProgress().n < S.products.length) toast("Comptage en pause"); },
   stkKey: (a, id, v) => stkKey(id, v),
-  stkSame: () => { const C = S.ui.stkCm; const pc = countOf(C.list[C.i], stkShift(C.month, -1)); if (pc == null) return; C.buf = stkN(pc); C.typed = true; const d = $("#stkVal"); $(".n", d).textContent = C.buf; d.classList.remove("empty", "bump"); void d.offsetWidth; d.classList.add("bump"); SFX.tap(); buzz(5); stkSessSave(); },
+  stkSame: () => { const C = S.ui.stkCm; if (!C) return; const pc = countOf(C.list[C.i], stkShift(C.month, -1)); if (pc == null) return; C.buf = stkN(pc); C.typed = true; const d = $("#stkVal"); $(".n", d).innerHTML = stkBufHtml(C.buf); const u = $(".u", d); if (u && u.dataset.u) u.textContent = stkU(pc, u.dataset.u); d.classList.remove("empty", "bump"); void d.offsetWidth; d.classList.add("bump"); SFX.tap(); buzz(5); stkSessSave(); },
   stkNext: async () => {
-    const C = S.ui.stkCm; if (!C || C.busy || C.i >= C.list.length) return; C.busy = true;
+    const C = S.ui.stkCm; if (!C || C.busy || C.i >= C.list.length || Date.now() < (C.lock || 0)) return;
+    if (stkCmOdd(C)) return; C.busy = true;
     const ok = await stkCmCommit(); C.busy = false;
     if (!ok) { stkShake($("#stkVal")); SFX.err(); buzz([8, 30, 8]); return; }
     SFX.ok(); buzz(6); stkCmGo(1);
   },
-  stkSkip: () => { const C = S.ui.stkCm; if (!C || C.i >= C.list.length) return; SFX.tap(); stkCmGo(1); },
-  stkPrev: () => { const C = S.ui.stkCm; if (!C || C.i === 0) return; SFX.tap(); stkCmGo(-1); },
+  stkSkip: () => { const C = S.ui.stkCm; if (!C || C.i >= C.list.length || Date.now() < (C.lock || 0)) return; SFX.tap(); stkCmGo(1); },
+  stkPrev: () => { const C = S.ui.stkCm; if (!C || C.i === 0 || Date.now() < (C.lock || 0)) return; SFX.tap(); stkCmGo(-1); },
   stkRetry: () => { const C = S.ui.stkCm; const cm = stkCountMap(C.month); const first = C.list.find((id) => cm[id] == null); stkCmOpen(C.scope, first); },
   stkEdCount: (a, id) => { SFX.tap(); stkEdOpen(id); },
   stkEdSave: async () => {
@@ -399,9 +423,10 @@ Object.assign(ACT, {
   },
   exportInv: async () => {
     const m = S.stkMonth || monthKey(); const D = stkMonthData(m); const byId = {}; D.rows.forEach((r) => { byId[r.p.id] = r; });
-    const head = ["Zone", "Produit", "Unité", "Fournisseur", "Prix d'achat (€)", `Stock ${monthLabel(D.pm)}`, `Stock ${monthLabel(m)}`, "Écart", "Consommé", "Valeur (€)"];
-    const rows = [head].concat(stkSorted().map((p) => { const r = byId[p.id]; return [stkZoneOf(p), p.name, p.unit, p.supplier || "", p.price > 0 ? stkN(Math.round(p.price * 100) / 100) : "", r.pc != null ? stkN(r.pc) : "", r.c != null ? stkN(r.c) : "", r.d != null ? stkN(r.d) : "", r.used != null ? stkN(r.used) : "", r.val != null ? stkN(Math.round(r.val * 100) / 100) : ""]; }));
-    rows.push([], ["Total", `${D.n}/${D.total} comptés`, "", "", "", "", "", "", D.used ? stkN(Math.round(D.used * 100) / 100) : "", stkN(Math.round(D.value * 100) / 100)]);
+    const tx = (v) => { const t = String(v || ""); return /^[=+\-@]/.test(t) ? "'" + t : t; };
+    const head = ["Zone", "Produit", "Unité", "Fournisseur", "Prix d'achat (€)", `Stock ${monthLabel(D.pm)}`, `Stock ${monthLabel(m)}`, "Écart", "Consommé (qté)", "Consommé (€)", "Valeur du stock (€)"];
+    const rows = [head].concat(stkSorted().map((p) => { const r = byId[p.id]; const pr = p.price > 0 ? p.price : 0; return [tx(stkZoneOf(p)), tx(p.name), p.unit, tx(p.supplier), pr ? stkN(stkR2(pr)) : "", r.pc != null ? stkN(r.pc) : "", r.c != null ? stkN(r.c) : "", r.d != null ? stkN(r.d) : "", r.used != null ? stkN(r.used) : "", r.used != null && pr ? stkN(stkR2(Math.max(0, r.used) * pr)) : "", r.val != null ? stkN(stkR2(r.val)) : ""]; }));
+    rows.push([], ["Total", `${D.n}/${D.total} comptés`, "", "", "", "", "", "", "", D.used ? stkN(stkR2(D.used)) : "", stkN(stkR2(D.value))]);
     await stkDownload(`inventaire-${m}.csv`, rows);
   },
 });
