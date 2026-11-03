@@ -30,7 +30,7 @@ const menDow = (k) => parseDay(k).getDay();
 const menWeekStart = (k) => addDays(k, -((menDow(k) + 6) % 7));
 const menMonthEnd = (k) => { const d = parseDay(k); return dayKey(new Date(d.getFullYear(), d.getMonth() + 1, 0)); };
 const menDim = (k) => +menMonthEnd(k).slice(8);
-const M = { tab: "jour", wk: 0, sel: null, open: {}, just: null, justAt: 0, ring: 0, logs: null, logsRid: null, names: [], signer: "" };
+const M = { busy: {}, tab: "jour", wk: 0, sel: null, open: {}, just: null, justAt: 0, ring: 0, logs: null, logsRid: null, names: [], signer: "" };
 try { M.signer = localStorage.getItem("gg-men-signer") || ""; M.names = JSON.parse(localStorage.getItem("gg-men-names") || "[]"); } catch (e) {}
 const menSaveNames = () => { try { localStorage.setItem("gg-men-names", JSON.stringify(M.names)); } catch (e) {} };
 
@@ -81,17 +81,22 @@ function menPeriod(o) {
 const menKey = (o) => `${o.c.id}|${o.day}|${o.slot}`;
 function menLogFor(o) { // first completion of the occurrence's period
   const [a, b] = menPeriod(o); const per = a !== b;
-  for (const l of menLogsOf(o.c.id)) {
-    if (per ? l.day >= a && l.day <= b : l.day === o.day && (o.slot ? l.slot === o.slot : !l.slot || o.c.freq !== "service")) return l;
+  const L = menLogsOf(o.c.id);
+  if (o.slot) { // « après chaque service »: a log without slot (home's quick check, legacy) fills the first open service of that day
+    const day = L.filter((l) => l.day === o.day); const hit = day.find((l) => l.slot === o.slot); if (hit) return hit;
+    const free = day.filter((l) => !l.slot || !MEN_SLOTS.includes(l.slot)); const open = MEN_SLOTS.filter((s) => !day.some((l) => l.slot === s));
+    return free[open.indexOf(o.slot)] || null;
   }
+  for (const l of L) if (per ? l.day >= a && l.day <= b : l.day === o.day) return l;
   return null;
 }
+const MEN_SLOTS = ["midi", "soir"];
 /* state: done | late | todo | overdue | missed | upcoming */
 function menState(o, today = dayKey(), hour = new Date().getHours()) {
   const l = menLogFor(o); o.log = l;
   if (l) return (o.st = l.day > o.day ? "late" : "done");
   if (o.day > today) return (o.st = "upcoming");
-  if (o.day === today) return (o.st = hour >= (MEN_MOMENTS[o.moment]?.due || 24) ? "overdue" : "todo");
+  if (o.day === today) { const due = MEN_MOMENTS[o.moment]?.due || 24; const born = o.c.createdAt && o.day === menStart(o.c) ? new Date(o.c.createdAt).getHours() : -1; return (o.st = hour >= due && born < due ? "overdue" : "todo"); } // a task added after its hour is not « en retard » on its first day
   return (o.st = menPeriod(o)[1] < today ? "missed" : "overdue");
 }
 const menIsDone = (o) => o.st === "done" || o.st === "late";
@@ -186,7 +191,7 @@ function menCount(el, from, to) {
 function menEmpty() {
   return `<div class="glass men-hello st" style="--i:1">
     <div class="men-hello-ic">${ico("spray")}</div>
-    <b class="h2">Votre plan de nettoyage en&nbsp;1&nbsp;tap</b>
+    <b class="h2">Votre plan de nettoyage en&nbsp;un&nbsp;geste</b>
     <p class="sub">${MEN_STARTER.length} tâches HACCP pour un petit restaurant : ouverture, après le midi, fermeture, chaque semaine et chaque mois. Tout reste modifiable.</p>
     <div class="men-hello-z">${MEN_ZONES.map((z) => `<span class="pill neu">${z}</span>`).join("")}</div>
     <button class="btn acc block" data-act="menStarter">${ico("sparkle")}Charger le plan type HACCP</button>
@@ -216,7 +221,8 @@ function menTodayView() {
   const wk = sec("week", "À faire cette semaine", "Tâches hebdomadaires et mensuelles", "menCal", week, true);
   const groupsHtml = MEN_MO.map((g) => sec(g, MEN_MOMENTS[g].t, MEN_MOMENTS[g].hint, MEN_MOMENTS[g].ic, groups[g])).join("");
   const nothing = !all.length && !week.length ? `<div class="glass empty st" style="--i:3"><div class="ic ok">${ico("check")}</div><b>Rien de prévu aujourd'hui</b>Les tâches apparaissent ici les jours où elles sont dues.</div>` : "";
-  return `<div class="men-today"><div class="men-side">${hero}<div class="men-wk-d">${wk}</div></div><div class="men-main">${groupsHtml}<div class="men-wk-m">${wk}</div>${nothing}</div></div>`;
+  const wkLate = week.some((o) => o.st === "overdue");
+  return `<div class="men-today"><div class="men-side">${hero}<div class="men-wk-d">${wk}</div></div><div class="men-main">${wkLate ? `<div class="men-wk-m">${wk}</div>` : ""}${groupsHtml}${wkLate ? "" : `<div class="men-wk-m">${wk}</div>`}${nothing}</div></div>`;
 }
 function menRow(o, showDay) {
   const c = o.c, l = o.log, k = menKey(o), dn = menIsDone(o); const just = M.just === k && Date.now() - M.justAt < 1400;
@@ -224,7 +230,7 @@ function menRow(o, showDay) {
   const sub = dn ? `<span class="men-who">${esc(menBy(l))} · ${when(l.at)}${o.st === "late" ? " · en retard" : ""}</span>` : [showDay ? menWhenTx(o) : "", c.zone, c.notes].filter(Boolean).map(esc).join(" · ");
   const per = !showDay && (c.freq === "semaine" || c.freq === "mois") ? `<span class="men-tag">${c.freq === "mois" ? "Mensuel" : "Hebdo"}</span>` : "";
   const tags = `${per}${o.slot ? `<span class="men-tag">${menSlotTx(o.slot)}</span>` : ""}${c.who && !dn ? `<span class="men-tag who">${esc(firstName(c.who))}</span>` : ""}${c.photo && !dn ? `<span class="men-tag ph" title="Photo obligatoire">${ico("camera")}</span>` : ""}${o.st === "overdue" ? `<span class="pill bad"><span class="dot"></span>En retard</span>` : ""}`;
-  const right = dn ? (l.photoUrl ? `<button class="men-ph" data-act="menLog" data-id="${l.id}" aria-label="Voir la photo"><img src="${esc(l.photoUrl)}" alt=""></button>` : `<button class="men-ph add" data-act="menPhotoAdd" data-id="${l.id}" aria-label="Ajouter une photo de preuve">${ico("camera")}</button>`) : "";
+  const right = dn ? (menHasPic(l) ? `<button class="men-ph" data-act="menLog" data-id="${l.id}" aria-label="Voir la photo">${menImg(l)}</button>` : `<button class="men-ph add" data-act="menPhotoAdd" data-id="${l.id}" aria-label="Ajouter une photo de preuve">${ico("camera")}</button>`) : "";
   const act = canDo ? `data-act="menDo" data-v="${k}" aria-label="Marquer « ${esc(c.name)} » comme fait"` : dn ? `data-act="menLog" data-id="${l.id}" aria-label="Détails de « ${esc(c.name)} »"` : `data-act="menHist" data-id="${c.id}"`;
   return `<div class="men-row ${o.st} ${just ? "just" : ""}" ${act} role="button" tabindex="0">
     ${menMark(o.st)}<div class="tx"><b>${esc(c.name)}</b><em>${sub}</em></div><span class="men-tags">${tags}</span>${right}${just ? `<span class="men-fx" aria-hidden="true">${"<i></i>".repeat(8)}</span>` : ""}</div>`;
@@ -235,12 +241,12 @@ function menWeekView() {
   const t = dayKey(); const ws = addDays(menWeekStart(t), M.wk * 7); const days = [...Array(7)].map((_, i) => addDays(ws, i));
   if (!M.sel || M.sel < ws || M.sel > days[6]) M.sel = M.wk === 0 ? t : ws;
   const per = days.map((k) => { const occ = menDay(k); const d = occ.filter(menIsDone).length; const miss = occ.filter((o) => o.st === "missed" || (o.st === "overdue" && k < t)).length; return { k, occ, d, miss, n: occ.length, pct: occ.length ? Math.round((d / occ.length) * 100) : null }; });
-  const comp = menCompliance(ws, days[6]); const s0 = parseDay(ws), e = parseDay(days[6]);
+  const comp = menCompliance(ws, days[6]); const sofar = per.filter((p) => p.k <= t).reduce((x, p) => ({ d: x.d + p.d, n: x.n + p.n }), { d: 0, n: 0 }); const s0 = parseDay(ws), e = parseDay(days[6]);
   const MO = ["janv.", "févr.", "mars", "avr.", "mai", "juin", "juil.", "août", "sept.", "oct.", "nov.", "déc."]; const mo = (d) => MO[d.getMonth()];
   const title = M.wk === 0 ? "Cette semaine" : M.wk === -1 ? "Semaine dernière" : M.wk === 1 ? "Semaine prochaine" : `Semaine du ${shortDate(ws)}`;
   const nav = `<div class="glass men-wnav st" style="--i:2"><button class="iconbtn" data-act="menWk" data-v="-1" aria-label="Semaine précédente">${ico("back")}</button>
     <div class="men-wt"><b>${title}</b><em>${s0.getMonth() === e.getMonth() ? `${s0.getDate()} – ${e.getDate()} ${MONTHS[e.getMonth()]}` : `${s0.getDate()} ${mo(s0)} – ${e.getDate()} ${mo(e)}`}</em></div>
-    <div class="men-wstat">${comp.pct != null ? `<span class="pill ${menPctCls(comp.pct)}">${comp.pct}% fait</span>` : ""}${comp.missed.length ? `<span class="pill bad">${comp.missed.length} oubli${comp.missed.length > 1 ? "s" : ""}</span>` : ""}</div>
+    <div class="men-wstat">${sofar.n ? `<span class="pill ${sofar.d === sofar.n ? "ok" : M.wk < 0 ? menPctCls(Math.round((sofar.d / sofar.n) * 100)) : "neu"}">${sofar.d}/${sofar.n} fait</span>` : ""}${comp.missed.length ? `<span class="pill bad">${comp.missed.length} oubli${comp.missed.length > 1 ? "s" : ""}</span>` : ""}</div>
     <button class="iconbtn" data-act="menWk" data-v="1" aria-label="Semaine suivante">${ico("chev")}</button></div>`;
   // phone: day strip + the selected day
   const strip = `<div class="men-strip st" style="--i:3">${per.map((p, i) => `<button class="men-day ${p.k === M.sel ? "on" : ""} ${p.k === t ? "today" : ""} ${p.k > t ? "fut" : ""}" data-act="menSel" data-v="${p.k}" aria-pressed="${p.k === M.sel}"><span>${MEN_DOW[i]}</span><b>${+p.k.slice(8)}</b><span class="men-cr ${p.miss ? "bad" : p.n && p.d === p.n ? "ok" : ""}">${menRing(p.pct ?? 0, 30, 14)}</span><i class="${p.miss ? "bad" : p.n && p.d === p.n ? "ok" : ""}">${p.n ? (p.miss ? `${p.miss} oubli${p.miss > 1 ? "s" : ""}` : `${p.d}/${p.n}`) : "–"}</i></button>`).join("")}</div>`;
@@ -251,8 +257,8 @@ function menWeekView() {
     ${sp.n ? MEN_MO.filter((g) => byM[g].length).map((g) => `<div class="men-dlg"><span class="men-dlh">${ico(MEN_MOMENTS[g].ic)}${MEN_MOMENTS[g].t}</span>${byM[g].map((o) => (sp.k === t ? menRow(o) : roRow(o))).join("")}</div>`).join("") : `<div class="empty" style="padding:18px 0 6px">Rien de prévu ce jour-là.</div>`}</div>`;
   // desktop: the classic plan-de-nettoyage grid
   const rows = menChores().filter((c) => days.some((k) => menOccOn(c, k).length));
-  const mx = `<div class="glass men-mx st" style="--i:3"><table><thead><tr><th class="tn"><span class="lbl">Tâche</span></th>${per.map((p, i) => `<th class="${p.k === t ? "today" : ""}"><span>${MEN_DOW[i]}</span><b>${+p.k.slice(8)}</b><i class="men-bar"><i class="${menPctCls(p.pct)}" style="width:${p.pct ?? 0}%"></i></i></th>`).join("")}</tr></thead><tbody>
-    ${MEN_MO.map((g) => { const R = rows.filter((c) => (c.freq === "service" ? g === "midi" : c.moment === g)); return R.length ? `<tr class="men-mh"><td colspan="8"><span>${ico(MEN_MOMENTS[g].ic)}${MEN_MOMENTS[g].t}</span></td></tr>` + R.map((c) => `<tr><td class="tn"><button data-act="menHist" data-id="${c.id}"><b>${esc(c.name)}</b><em>${esc([c.zone, menFreqTx(c)].filter(Boolean).join(" · "))}</em></button></td>${per.map((p) => { const os = p.occ.filter((o) => o.c.id === c.id); return `<td class="${p.k === t ? "today" : ""}">${os.length ? `<span class="men-cell">${os.map((o) => `<button data-act="${o.log ? "menLog" : o.day === t && !menIsDone(o) ? "menDo" : "menHist"}" ${o.day === t && !o.log ? `data-v="${menKey(o)}"` : ""} data-id="${o.log ? o.log.id : c.id}" title="${esc(menCellTitle(o))}" aria-label="${esc(menCellTitle(o))}">${menMark(o.st, true)}</button>`).join("")}</span>` : `<span class="men-nil"></span>`}</td>`; }).join("")}</tr>`).join("") : ""; }).join("")}
+  const mx = `<div class="glass men-mx st" style="--i:3"><table><thead><tr><th class="tn"><span class="lbl">Tâche</span></th>${per.map((p, i) => `<th class="${p.k === t ? "today" : ""}"><span>${MEN_DOW[i]}</span><b>${+p.k.slice(8)}</b><i class="men-bar"><i class="${p.k < t ? menPctCls(p.pct) : p.n && p.d === p.n ? "ok" : "acc"}" style="width:${p.pct ?? 0}%"></i></i></th>`).join("")}</tr></thead><tbody>
+    ${MEN_MO.map((g) => { const R = rows.filter((c) => (c.freq === "service" ? g === "midi" : c.moment === g)); return R.length ? `<tr class="men-mh"><td colspan="8"><span>${ico(MEN_MOMENTS[g].ic)}${g === "midi" ? "Après le service" : MEN_MOMENTS[g].t}</span></td></tr>` + R.map((c) => `<tr><td class="tn"><button data-act="menHist" data-id="${c.id}" title="${esc(c.name)}"><b>${esc(c.name)}</b><em>${esc([c.zone, menFreqTx(c)].filter(Boolean).join(" · "))}</em></button></td>${per.map((p) => { const os = p.occ.filter((o) => o.c.id === c.id); return `<td class="${p.k === t ? "today" : ""}">${os.length ? `<span class="men-cell">${os.map((o) => `<button data-act="${o.log ? "menLog" : o.day === t && !menIsDone(o) ? "menDo" : "menHist"}" ${o.day === t && !o.log ? `data-v="${menKey(o)}"` : ""} data-id="${o.log ? o.log.id : c.id}" title="${esc(menCellTitle(o))}" aria-label="${esc(menCellTitle(o))}">${menMark(o.st, true)}</button>`).join("")}</span>` : `<span class="men-nil"></span>`}</td>`; }).join("")}</tr>`).join("") : ""; }).join("")}
     </tbody></table><div class="men-leg">${[["done", "Fait"], ["late", "Fait en retard"], ["overdue", "En retard"], ["missed", "Oublié"], ["todo", "À faire"], ["upcoming", "Prévu"]].map(([s, tx]) => `<span>${menMark(s, true)}${tx}</span>`).join("")}</div></div>`;
   return `${nav}<div class="men-wphone">${strip}${list}</div><div class="men-wdesk">${mx}</div>`;
 }
@@ -287,10 +293,10 @@ function menEditorHtml() {
   const zones = MEN_ZONES.includes(d.zone) || !d.zone ? MEN_ZONES : [...MEN_ZONES, d.zone];
   const sub = d.freq === "jours" ? `<div class="men-dows">${MEN_DOW.map((t, i) => `<button class="chip ${d.days.includes(menDowJs(i)) ? "on" : ""}" data-act="menEdDay" data-v="${menDowJs(i)}" aria-pressed="${d.days.includes(menDowJs(i))}">${t}</button>`).join("")}</div>`
     : d.freq === "semaine" ? `<div class="men-dows">${MEN_DOW.map((t, i) => `<button class="chip ${d.wday === menDowJs(i) ? "on" : ""}" data-act="menEdWday" data-v="${menDowJs(i)}" aria-pressed="${d.wday === menDowJs(i)}">${t}</button>`).join("")}</div>`
-    : d.freq === "mois" ? `<div class="men-mday"><span class="sub">Le</span><div class="cnt"><button data-act="menEdMday" data-v="-1" aria-label="Jour précédent">${ico("minus")}</button><input class="mono" id="menMday" value="${d.mday == 1 ? "1er" : d.mday}" readonly aria-label="Jour du mois"><button data-act="menEdMday" data-v="1" aria-label="Jour suivant">${ico("plus")}</button></div><span class="sub">de chaque mois${d.mday > 28 ? ", ou le dernier jour" : ""}</span></div>`
+    : d.freq === "mois" ? `<div class="men-mgrid" role="group" aria-label="Jour du mois">${[...Array(31)].map((_, i) => `<button class="${+d.mday === i + 1 ? "on" : ""}" data-act="menEdMdaySet" data-v="${i + 1}" aria-pressed="${+d.mday === i + 1}">${i + 1}</button>`).join("")}</div><p class="note men-fnote">${ico("menCal")}${menFreqTx({ freq: "mois", mday: d.mday })}${d.mday > 28 ? ", ou le dernier jour si le mois est plus court" : ""}</p>`
     : d.freq === "service" ? `<p class="note men-fnote">${ico("menMeal")}Deux pointages par jour : après le service du midi et à la fermeture.</p>` : "";
   return `<div class="h2" style="font-size:20px">${d._id ? "Modifier la tâche" : "Nouvelle tâche"}</div>
-    <label class="field"><span>Tâche</span><input class="input" id="menName" data-bind="ui.men.name" value="${esc(d.name)}" placeholder="Ex. Désinfecter les plans de travail" autocomplete="off"></label>
+    <label class="field"><span>Tâche</span><input class="input" id="menName" maxlength="140" data-bind="ui.men.name" value="${esc(d.name)}" placeholder="Ex. Désinfecter les plans de travail" autocomplete="off"></label>
     <div class="field"><span>Zone</span><div class="chips men-wrap">${zones.map((z) => `<button class="chip ${d.zone === z ? "on" : ""}" data-act="menEdSet" data-id="zone" data-v="${esc(z)}">${esc(z)}</button>`).join("")}</div></div>
     <div class="field"><span>Fréquence</span><div class="chips men-wrap">${MEN_FREQS.map(([k, t]) => `<button class="chip ${d.freq === k ? "on" : ""}" data-act="menEdFreq" data-v="${k}">${t}</button>`).join("")}</div>${sub}</div>
     ${d.freq !== "service" ? `<div class="field"><span>Moment</span><div class="men-mseg">${MEN_MO.map((k) => `<button class="${d.moment === k ? "on" : ""}" data-act="menEdSet" data-id="moment" data-v="${k}" aria-pressed="${d.moment === k}">${ico(MEN_MOMENTS[k].ic)}<span>${k === "midi" ? "Après le midi" : MEN_MOMENTS[k].t}</span></button>`).join("")}</div></div>` : ""}
@@ -306,7 +312,7 @@ const menEdRedraw = (focus) => { const sh = $("#sheet"); const st = sh.scrollTop
 function menLogSheet(l) {
   const c = S.chores.find((x) => x.id === l.choreId); const today = l.day === dayKey();
   return `<div class="hstack men-lh"><span class="men-mk done">${menCheckSvg}</span><div style="min-width:0"><div class="h2" style="font-size:20px">${esc(c?.name || "Tâche supprimée")}</div><div class="sub">Fait par ${esc(l.by || nameOf(l.uid))} · ${menLongDay(l.day)} à ${hm(l.at)}${l.slot ? ` · service du ${l.slot}` : ""}</div></div></div>
-    ${l.photoUrl ? `<img class="men-big" src="${esc(l.photoUrl)}" alt="Photo de preuve">` : `<button class="btn soft block" data-act="menPhotoAdd" data-id="${l.id}">${ico("camera")}Ajouter une photo de preuve</button>`}
+    ${menHasPic(l) ? menImg(l, "men-big", "Photo de preuve") : `<button class="btn soft block" data-act="menPhotoAdd" data-id="${l.id}">${ico("camera")}Ajouter une photo de preuve</button>`}
     ${c?.notes ? `<div class="note men-meth">${ico("menDrop")}${esc(c.notes)}</div>` : ""}
     <div class="grid2">${c ? `<button class="btn soft" data-act="menHist" data-id="${c.id}">${ico("menHist")}Historique</button>` : `<button class="btn soft" data-act="sheetClose">Fermer</button>`}${today ? `<button class="btn danger" data-act="menUnlog" data-id="${l.id}">${ico("menUndo")}Annuler</button>` : `<button class="btn soft" data-act="sheetClose">Fermer</button>`}</div>`;
 }
@@ -320,19 +326,40 @@ function menHistSheet(c) {
     ${c.notes ? `<div class="note men-meth">${ico("menDrop")}${esc(c.notes)}</div>` : ""}
     <div class="men-hstat"><div class="men-hs"><span class="lbl">30 derniers jours</span><b class="mono ${menPctCls(cp.pct)}">${cp.pct != null ? cp.pct + "%" : "–"}</b><em>${cp.tot ? `${cp.done}/${cp.tot} fait${cp.missed.length ? ` · ${cp.missed.length} oubli${cp.missed.length > 1 ? "s" : ""}` : ""}` : "Pas encore de données"}</em></div>
       <div class="men-cal" aria-label="4 dernières semaines">${MEN_DOW.map((d) => `<span>${d[0]}</span>`).join("")}${cells.map((x) => `<i class="${x.st} ${x.k === t ? "t" : ""} ${x.k > t ? "fut" : ""}" title="${shortDate(x.k)}"></i>`).join("")}</div></div>
-    <div><span class="lbl">Derniers pointages</span>${logs.length ? `<div class="men-hl">${logs.slice(0, 8).map((l) => `<div class="li tap" data-act="menLog" data-id="${l.id}" role="button" tabindex="0"><span class="men-mk done sm">${menCheckSvg}</span><div class="tx"><b>${esc(l.by || nameOf(l.uid))}</b><em>${menCap(menLongDay(l.day))} · ${hm(l.at)}${l.slot ? ` · ${l.slot}` : ""}</em></div>${l.photoUrl ? `<span class="men-ph"><img src="${esc(l.photoUrl)}" alt=""></span>` : ""}</div>`).join("")}</div>` : `<div class="empty" style="padding:14px 0 4px">Jamais pointée pour l'instant.</div>`}</div>
+    <div><span class="lbl">Derniers pointages</span>${logs.length ? `<div class="men-hl">${logs.slice(0, 8).map((l) => `<div class="li tap" data-act="menLog" data-id="${l.id}" role="button" tabindex="0"><span class="men-mk done sm">${menCheckSvg}</span><div class="tx"><b>${esc(l.by || nameOf(l.uid))}</b><em>${menCap(menLongDay(l.day))} · ${hm(l.at)}${l.slot ? ` · ${l.slot}` : ""}</em></div>${menHasPic(l) ? `<span class="men-ph">${menImg(l)}</span>` : ""}</div>`).join("")}</div>` : `<div class="empty" style="padding:14px 0 4px">Jamais pointée pour l'instant.</div>`}</div>
     <button class="btn soft block" data-act="menEdit" data-id="${c.id}">${ico("edit")}Modifier la tâche</button>`;
 }
 
-/* ── photo proof: compressed data URL when there is no asset store (standalone) ── */
+/* ── photo proof: stored by core's upload() (IndexedDB on the device, or the asset store), the log keeps the id.
+   Older logs may hold an inline data: URL in photoUrl: still displayed. ── */
+const menPicMissing = (id) => typeof PHOTOS !== "undefined" && PHOTOS.missing && PHOTOS.missing[id];
+const menHasPic = (l) => !!(l && ((l.photoId && !menPicMissing(l.photoId)) || l.photoUrl));
+const menPicUrl = (l) => (typeof photoUrl === "function" ? (l.photoId && photoUrl(l.photoId)) || photoUrl(l.photoUrl) : l.photoUrl) || "";
+const menImg = (l, cls, alt) => `<img${cls ? ` class="${cls}"` : ""}${l.photoId ? ` data-photo="${esc(l.photoId)}"` : ""} src="${esc(menPicUrl(l) || "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7")}" alt="${alt || ""}">`;
 async function menPhoto() {
   const [f] = await pickImage(); if (!f) return null;
   try {
-    const { blob, canvas } = await shrink(f, 900, 0.75); const up = await upload(blob);
-    if (up && up.url && !/^blob:/.test(up.url)) return { photoUrl: up.url, photoId: up.id || "" };
-    const k = Math.min(1, 480 / Math.max(canvas.width, canvas.height)); const c2 = document.createElement("canvas"); c2.width = Math.round(canvas.width * k); c2.height = Math.round(canvas.height * k); c2.getContext("2d").drawImage(canvas, 0, 0, c2.width, c2.height);
-    return { photoUrl: c2.toDataURL("image/jpeg", 0.6), photoId: "" };
-  } catch (e) { console.warn(e); toast("Photo illisible, réessayez.", "err"); return null; }
+    const { blob } = await shrink(f, 1280, 0.8); const up = await upload(blob || f);
+    if (!up || !up.id) throw new Error("photo not stored");
+    return { photoId: up.id, photoUrl: /^https?:/.test(up.url || "") ? up.url : "" }; // a blob: URL dies on reload: the id is the reference
+  } catch (e) { console.warn(e); SFX.err(); toast("Photo non enregistrée, réessayez.", "err"); return null; }
+}
+
+/* one check: optional photo proof, sound + haptics, log + audit event, undo toast, group / day celebration */
+async function menDoIt(a, v, c, slot) {
+  const cid = c.id;
+  let ph = null; if (c.photo) { toast("Photo de preuve obligatoire"); ph = await menPhoto(); if (!ph) return; }
+    a && a.classList && a.classList.add("press"); menSfx.check(); buzz(12);
+    const by = menSigner(); M.just = v; M.justAt = Date.now();
+    const evId = await DB.add("events", { type: "chore", text: `a fait « ${c.name} »${slot ? ` (${slot})` : ""}`, at: Date.now(), uid: S.me.id, by, ref: cid }).catch(() => "");
+    const logId = await safe(DB.add("choreLogs", { choreId: cid, at: Date.now(), day: dayKey(), uid: S.me.id, by, evId, ...(slot ? { slot } : {}), ...(ph || {}) })).catch(() => null);
+    if (!logId) { M.just = null; return; }
+    S.ui.menUndo = { logId, evId }; toastUndo(`${c.name.length > 34 ? c.name.slice(0, 32).trim() + "…" : c.name} : fait`); const ub = $("#toastTx button"); if (ub) ub.dataset.act = "menUndo";
+    setTimeout(() => {
+      const { groups } = menToday(); const occ = [...groups.ouverture, ...groups.midi, ...groups.fermeture]; const g = occ.find((o) => menKey(o) === v)?.moment;
+      if (g && occ.every(menIsDone)) { SFX.done(); buzz([12, 40, 12]); burst(); setTimeout(() => toast("Ménage du jour terminé, bravo !"), 1500); }
+      else if (g && groups[g].every(menIsDone)) { SFX.done(); buzz([8, 30, 8]); const el = $(`.men-gh[data-v="${g}"]`); const r = el?.getBoundingClientRect(); if (r) burst(r.left + r.width - 50, r.top + r.height / 2); }
+    }, 380);
 }
 
 /* ── sound: a bright « squeaky clean » chirp ── */
@@ -344,20 +371,17 @@ Object.assign(ACT, {
   menWk: (a, id, v) => { M.wk += +v; M.sel = null; SFX.tick(); rerender(); },
   menSel: (a, id, v) => { M.sel = v; SFX.tick(); buzz(3); rerender(); },
   menDo: async (a, id, v) => {
+    if (!v || Date.now() - (M.busy[v] || 0) < 1500) return; // double tap (the photo picker may never answer if cancelled: time-boxed, not a lock)
     const [cid, day, slot] = v.split("|"); const raw = S.chores.find((x) => x.id === cid); if (!raw) return; const c = menNorm(raw);
+    const occ = menOccOn(c, day).find((o) => o.slot === (slot || "")); if (occ && menLogFor(occ)) return; // already checked
     if (!menSigner()) { M.pending = v; ACT.menSigner(); return; }
-    let ph = null; if (c.photo) { toast("Photo de preuve obligatoire"); ph = await menPhoto(); if (!ph) return; }
-    a.classList.add("press"); menSfx.check(); buzz(12);
-    const by = menSigner(); M.just = v; M.justAt = Date.now(); void day;
-    const evId = await DB.add("events", { type: "chore", text: `a fait « ${c.name} »${slot ? ` (${slot})` : ""}`, at: Date.now(), uid: S.me.id, by, ref: cid }).catch(() => "");
-    const logId = await safe(DB.add("choreLogs", { choreId: cid, at: Date.now(), day: dayKey(), uid: S.me.id, by, evId, ...(slot ? { slot } : {}), ...(ph || {}) })).catch(() => null);
-    if (!logId) { M.just = null; return; }
-    S.ui.menUndo = { logId, evId }; toastUndo(`${c.name.length > 34 ? c.name.slice(0, 32).trim() + "…" : c.name} : fait`); const ub = $("#toastTx button"); if (ub) ub.dataset.act = "menUndo";
-    setTimeout(() => {
-      const { groups } = menToday(); const occ = [...groups.ouverture, ...groups.midi, ...groups.fermeture]; const g = occ.find((o) => menKey(o) === v)?.moment;
-      if (g && occ.every(menIsDone)) { SFX.done(); buzz([12, 40, 12]); burst(); setTimeout(() => toast("Ménage du jour terminé, bravo !"), 1500); }
-      else if (g && groups[g].every(menIsDone)) { SFX.done(); buzz([8, 30, 8]); const el = $(`.men-gh[data-v="${g}"]`); const r = el?.getBoundingClientRect(); if (r) burst(r.left + r.width - 50, r.top + r.height / 2); }
-    }, 380);
+    M.busy[v] = Date.now();
+    try { await menDoIt(a, v, c, slot); } finally { delete M.busy[v]; }
+  },
+  // home's « Fait » button: check the chore's open occurrence (overdue first), with the same photo, signature and slot rules
+  choreDo: async (a, id) => {
+    const { groups, week } = menToday(); const L = [...groups.ouverture, ...groups.midi, ...groups.fermeture, ...week].filter((o) => o.c.id === id && (o.st === "overdue" || o.st === "todo"));
+    const o = L.find((x) => x.st === "overdue") || L[0]; if (!o) return; return ACT.menDo(a, null, menKey(o));
   },
   menUndo: async () => { const u = S.ui.menUndo; if (!u) return; S.ui.menUndo = null; S.ui.undo = null; M.just = null; await DB.del("choreLogs", u.logId).catch(() => {}); if (u.evId) await DB.del("events", u.evId).catch(() => {}); $("#toast").classList.remove("on"); SFX.close(); buzz(6); },
   menUnlog: async (a, id) => { const l = menLogs().find((x) => x.id === id); if (!l) return; await safe(DB.del("choreLogs", id)).catch(() => {}); if (l.evId) await DB.del("events", l.evId).catch(() => {}); closeSheet(true); SFX.close(); toast("Pointage annulé"); },
@@ -384,6 +408,7 @@ Object.assign(ACT, {
   menEdFreq: (a, id, v) => { const d = S.ui.men; d.freq = v; if (v === "jours" && !d.days.length) d.days = [menDow(dayKey())]; if (v === "semaine" && d.wday == null) d.wday = 1; if (v === "mois" && d.mday == null) d.mday = 1; SFX.tick(); menEdRedraw(); },
   menEdDay: (a, id, v) => { const d = S.ui.men; v = +v; d.days = d.days.includes(v) ? d.days.filter((x) => x !== v) : [...d.days, v].sort(); SFX.tick(); buzz(3); menEdRedraw(); },
   menEdWday: (a, id, v) => { S.ui.men.wday = +v; SFX.tick(); menEdRedraw(); },
+  menEdMdaySet: (a, id, v) => { S.ui.men.mday = Math.max(1, Math.min(31, +v || 1)); SFX.tick(); buzz(3); menEdRedraw(); },
   menEdMday: (a, id, v) => { const d = S.ui.men; d.mday = Math.max(1, Math.min(31, (+d.mday || 1) + +v)); SFX.tick(); menEdRedraw(); },
   menEdPhoto: () => { S.ui.men.photo = !S.ui.men.photo; SFX.tick(); buzz(4); menEdRedraw(); },
   menEdWho: () => { S.ui.men._whoIn = true; SFX.tick(); menEdRedraw("#menWhoIn"); },

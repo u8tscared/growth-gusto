@@ -255,3 +255,19 @@
 .ring .men-ring .tr{stroke:rgba(255,255,255,.2)}
 .ring .men-ring .br{stroke:#fff;filter:drop-shadow(0 0 6px rgba(255,255,255,.6));transition:stroke-dashoffset 1.2s var(--ease)}
 #toastTx:has([data-act=menUndo]){-webkit-line-clamp:3}
+
+/* QA pass: tap targets ≥44px, matrix that never overflows, month day grid */
+.men .top .iconbtn,.men-wnav .iconbtn{width:44px;height:44px}
+.men .top .btn.sm{min-height:44px}
+.men-signer{min-height:44px;padding:8px 10px 8px 13px;font-size:12.5px}
+.men-mx table{table-layout:fixed}
+.men-mx th.tn,.men-mx td.tn{width:30%}
+.men-mx td.tn button{display:flex;flex-direction:column;justify-content:center;width:100%;min-height:44px;box-sizing:border-box}
+.men-cell button{width:36px;height:44px;border-radius:12px}
+.men-bar>i.acc{background:var(--accent)}
+.men-mgrid{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;margin-top:8px}
+.men-mgrid button{all:unset;cursor:pointer;box-sizing:border-box;height:44px;border-radius:14px;display:grid;place-items:center;font:700 14px/1 "JetBrains Mono",ui-monospace,monospace;background:var(--glass);border:1px solid var(--edge);color:var(--ink);transition:transform .2s var(--spring),background .2s,color .2s}
+.men-mgrid button:active{transform:scale(.9)}
+.men-mgrid button.on{background:var(--accent);border-color:var(--accent);color:#fff;box-shadow:0 8px 16px -10px rgba(74,31,230,.8)}
+.men-mgrid button:focus-visible,.men-mseg button:focus-visible,.men-day:focus-visible{outline:2.5px solid var(--accent);outline-offset:2px}
+@media (prefers-reduced-motion:reduce){.men-hello-ic{animation:none}.men-row.just,.men-row.just .men-mk,.men-row.just .tx b,.men-fx i{animation:none}}
