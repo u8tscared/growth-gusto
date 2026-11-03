@@ -1,4 +1,9 @@
 /* Growth Gusto — area: menage */
+/* Temporary: moved here from notes.js until the rebuilt menage.js lands. */
+function choresDue() {
+  const now = Date.now(); const span = { jour: 0, semaine: 7, mois: 30 };
+  return S.chores.filter((c) => { const last = S.choreLogs.find((l) => l.choreId === c.id); if (!last) return true; if (c.freq === "jour") return last.day !== dayKey(); return now - last.at > (span[c.freq] || 0) * 864e5 - 36e5; });
+}
 VIEWS.menage = {
   render() {
     const due = choresDue(); const done = S.chores.filter((c) => !due.includes(c));
