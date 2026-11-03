@@ -639,7 +639,7 @@ function registerSW() {
    to the foreground. A new v means the code running here is old: with nothing in progress the app reloads silently (caches dropped,
    so the reload is guaranteed fresh); otherwise a toast offers « Mettre à jour ». sessionStorage guards against reload loops:
    one reload attempt per version per session, after which the version is simply adopted. */
-const APP_V = "2026-11-03.2";
+const APP_V = "2026-11-03.3";
 const UPD = {
   running: null, offered: null,
   get: (k, store) => { try { return store.getItem(k); } catch (e) { return null; } },
@@ -680,7 +680,17 @@ function freshness() {
 function toastUndo(msg) { toast(msg); const t = $("#toast"); $("#toastTx").innerHTML = `<span class="tx">${esc(msg)}</span><button data-act="undo">Annuler</button>`; t.style.pointerEvents = "auto"; clearTimeout(t._h); t._h = setTimeout(() => { t.classList.remove("on"); t.style.pointerEvents = ""; S.ui.undo = null; }, 4000); }
 /* ───────────────────────── toast + burst ───────────────────────── */
 const TOAST_CHECK = `<svg viewBox="0 0 24 24"><path d="M6 12.5l4 4 8-9"/></svg>`;
-function toast(msg, kind) { const t = $("#toast"); t.style.pointerEvents = ""; t.classList.toggle("info", kind === "info"); $(".check", t).innerHTML = kind === "info" ? `<svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 0 1 15.5-6.2L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15.5 6.2L3 16"/><path d="M3 21v-5h5"/></svg>` : TOAST_CHECK; $("#toastTx").textContent = msg; t.classList.toggle("err", kind === "err"); const c = $(".check", t); c.classList.remove("draw"); void c.offsetWidth; c.classList.add("draw"); t.classList.add("on"); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove("on"), kind === "err" ? 3800 : 2300); }
+const TOAST_ICONS = { info: `<svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 0 1 15.5-6.2L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15.5 6.2L3 16"/><path d="M3 21v-5h5"/></svg>`, err: `<svg viewBox="0 0 24 24"><path d="M12 6.5v7"/><path d="M12 17.5h.01"/></svg>` };
+/* phone: toasts live at the bottom, just above the tab bar or the sticky CTA (thumb reach for « Annuler », titles stay visible) */
+function toastPlace(t) {
+  if (!window.matchMedia("(max-width:959px)").matches) { t.style.removeProperty("--toastB"); return; }
+  const H = APPH.px || window.innerHeight; let edge = H;
+  const tb = $("#tabbar"); if (tb && !tb.classList.contains("hide") && !document.documentElement.classList.contains("kb")) edge = Math.min(edge, tb.getBoundingClientRect().top);
+  const v = $("#viewport .view"); if (v) $$(".ctabar", v).forEach((c) => { const r = c.getBoundingClientRect(); if (r.height && r.top < H && r.bottom > 0) edge = Math.min(edge, r.top); });
+  const sh = $("#sheet"); if (sh.classList.contains("open")) edge = Math.min(edge, sh.getBoundingClientRect().top);
+  if (edge < H) t.style.setProperty("--toastB", Math.round(H - edge + 10) + "px"); else t.style.removeProperty("--toastB");
+}
+function toast(msg, kind) { const t = $("#toast"); t.style.pointerEvents = ""; t.classList.toggle("info", kind === "info"); $(".check", t).innerHTML = TOAST_ICONS[kind] || TOAST_CHECK; toastPlace(t); $("#toastTx").textContent = msg; t.classList.toggle("err", kind === "err"); const c = $(".check", t); c.classList.remove("draw"); void c.offsetWidth; c.classList.add("draw"); t.classList.add("on"); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove("on"), kind === "err" ? 3800 : 2300); }
 function burst(x = window.innerWidth / 2, y = window.innerHeight / 3) {
   if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
   const b = document.createElement("div"); b.className = "burst"; const cols = ["#7A4DFF", "#4A1FE6", "#9ED7FF", "#C8B6FF", "#2FB985", "#fff"];
