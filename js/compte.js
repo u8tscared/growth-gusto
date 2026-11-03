@@ -145,7 +145,7 @@ Object.assign(IC, {
 /* ───────────── onboarding: 3 short steps ───────────── */
 /* onboarding presets: [name, type id from REL_TYPES (js/releve.js)] */
 const OB_FRIDGES = [["Chambre froide 1", "cfp"], ["Chambre froide 2", "cfp"], ["Frigo du bar", "frigo"], ["Frigo pâtisserie", "frigo"], ["Saladette", "saladette"], ["Congélateur", "congel"], ["Cave à boissons", "cave"], ["Vitrine", "vitrine"]];
-const OB_TYPE_FALLBACK = { frigo: [0, 4, "therm"], cfp: [0, 4, "therm"], congel: [-30, -15, "snow"], saladette: [0, 4, "therm"], cave: [2, 8, "therm"], vitrine: [0, 4, "therm"] };
+const OB_TYPE_FALLBACK = { frigo: [0, 4, "therm"], cfp: [0, 4, "therm"], congel: [-40, -15, "snow"], saladette: [0, 4, "therm"], cave: [2, 8, "therm"], vitrine: [0, 4, "therm"] };
 function ccObType(k) {
   const t = typeof REL_TYPES !== "undefined" ? REL_TYPES.find((x) => x.k === k) : null; const f = OB_TYPE_FALLBACK[k] || OB_TYPE_FALLBACK.frigo;
   return { k, min: t ? t.min : f[0], max: t ? t.max : f[1], ic: t && IC[t.ic] ? t.ic : f[2] };
@@ -154,7 +154,7 @@ const ccDeg = (v) => (v > 0 ? "+" : v < 0 ? "−" : "") + Math.abs(v);
 VIEWS.onboarding = {
   live: false,
   render() {
-    const sug = S.ui.obFr || ["Chambre froide 1", "Chambre froide 2", "Frigo du bar"]; S.ui.obFr = sug;
+    const sug = S.ui.obFr || ["Chambre froide 1", "Chambre froide 2", "Frigo du bar", "Congélateur"]; S.ui.obFr = sug;
     S.ui.obTeam = S.ui.obTeam || []; S.ui.obStep = 0;
     const steps = [
       ["users", "Bonjour ! Quel est votre prénom ?", "Il signe chaque relevé et chaque action au registre."],

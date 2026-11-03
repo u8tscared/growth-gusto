@@ -166,3 +166,10 @@
 .hm-more .ico{width:16px;height:16px}
 @media (prefers-reduced-motion:reduce){.hm-hero::after{animation:none}.hm-list .hm-row,.hm-feed .hm-ev{animation:none}}
 .hm-date span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+
+/* activity feed: an undone action stays visible, struck through */
+.hm-ev.cx .tx b{text-decoration:line-through;text-decoration-thickness:1.5px;text-decoration-color:rgba(14,19,48,.4);color:var(--muted)}
+.hm-ev.cx .hm-av{opacity:.5}
+.hm-cx{display:inline-flex;margin-top:4px;font-size:11px;padding:2px 8px}
+/* a reception in progress is the first thing to resume: the to-do list (its first row) moves right under the hero */
+.hm-grid.rec .hm-todo{order:1}

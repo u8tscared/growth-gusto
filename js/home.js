@@ -12,16 +12,25 @@ function homeChoresDue() {
   return S.chores.filter((c) => { const last = S.choreLogs.find((l) => l.choreId === c.id); if (!last) return true; if (c.freq === "jour") return last.day !== dayKey(); return now - last.at > (span[c.freq] || 0) * 864e5 - 36e5; });
 }
 function homeChoreStats() {
-  const due = homeChoresDue(); const today = dayKey();
-  const doneIds = new Set(S.choreLogs.filter((l) => l.day === today).map((l) => l.choreId));
-  const done = S.chores.filter((c) => doneIds.has(c.id) && !due.includes(c)).length;
+  const due = homeChoresDue(); const dueIds = new Set(due.map((c) => c.id)); let doneIds;
+  if (typeof menToday === "function") {
+    // same source as menage: today's moments + this week's / month's items, so a weekly task done on Monday still counts
+    try { const { groups, week } = menToday(); doneIds = new Set([...groups.ouverture, ...groups.midi, ...groups.fermeture, ...week].filter((o) => o.st === "done" || o.st === "late").map((o) => o.c.id)); } catch (e) {}
+  }
+  if (!doneIds) { const today = dayKey(); doneIds = new Set(S.choreLogs.filter((l) => l.day === today).map((l) => l.choreId)); }
+  const done = S.chores.filter((c) => doneIds.has(c.id) && !dueIds.has(c.id)).length;
   const total = done + due.length; return { due, done, total, pct: total ? Math.round((done / total) * 100) : null };
 }
 function homeInv() {
   if (typeof invProgress === "function") { try { return invProgress(); } catch (e) {} }
   return { n: 0, total: S.products.length, pct: 0 };
 }
-function homeRecLive() { const R = S.rec; return !!(R && !R.done && (R.step > 1 || (R.supplier || "").trim() || (R.lines || []).some((l) => (l.name || "").trim()))); }
+/* reception in progress: the live S.rec, or the draft reception.js keeps per restaurant (gg-rec-draft-<rid>, 18 h) */
+function homeRecDraft() {
+  const R = S.rec; if (R && (!R.rid || R.rid === S.rid)) return R.done ? null : R;
+  try { const d = JSON.parse(localStorage.getItem("gg-rec-draft-" + (S.rid || "")) || "null"); return d && Array.isArray(d.lines) && Date.now() - (d.at || 0) <= 18 * 36e5 ? d : null; } catch (e) { return null; }
+}
+function homeRecLive() { const R = homeRecDraft(); return !!(R && (R.step > 1 || (R.supplier || "").trim() || (R.lines || []).some((l) => (l.name || "").trim()))); }
 const homePlural = (n, w) => `${n} ${w}${n > 1 ? "s" : ""}`;
 function homeDismissed() { try { return localStorage.getItem("gg-home-steps-" + S.rid) === "off"; } catch (e) { return false; } }
 
@@ -37,15 +46,26 @@ function homeTodo(slot, pend) {
   // DLC today / tomorrow
   lots.filter((x) => x.d >= 0).forEach(({ l, d }) => T.push({ p: d === 0 ? 3 : 5, tone: d === 0 ? "bad" : "warn", icon: "clock", title: esc(l.name), sub: `${d === 0 ? "DLC aujourd'hui" : "DLC demain"}${qty(l)}${l.status === "opened" ? " · ouvert" : ""}${where(l)}`, btn: "Voir", attrs: `data-act="lot" data-id="${l.id}"` }));
   // reception in progress
-  if (homeRecLive()) { const n = S.rec.lines.filter((l) => (l.name || "").trim()).length; T.push({ p: 4, tone: "acc", icon: "truck", title: `Réception en cours${S.rec.supplier ? ` · ${esc(S.rec.supplier)}` : ""}`, sub: n ? `${homePlural(n, "produit")} saisi${n > 1 ? "s" : ""}, à valider` : "À terminer", btn: "Reprendre", attrs: `data-go="reception"` }); }
+  if (homeRecLive()) { const R = homeRecDraft(); const n = (R.lines || []).filter((l) => (l.name || "").trim()).length; T.push({ p: -1, tone: "acc", icon: "truck", title: `Réception en cours${R.supplier ? ` · ${esc(R.supplier)}` : ""}`, sub: n ? `${homePlural(n, "produit")} saisi${n > 1 ? "s" : ""}, à valider` : "À terminer", btn: "Reprendre", attrs: `data-go="reception"` }); }
   // cleaning due now
   const due = homeChoresDue();
-  due.slice(0, due.length > 3 ? 2 : 3).forEach((c) => T.push({ p: 6, tone: "ok", icon: "spray", title: esc(c.name), sub: `${c.zone ? `${esc(c.zone)} · ` : ""}${c.freq === "jour" ? "chaque jour" : c.freq === "semaine" ? "cette semaine" : "ce mois-ci"}`, chore: c.id, attrs: `data-act="homeChore" data-id="${c.id}"` }));
+  due.slice(0, due.length > 3 ? 2 : 3).forEach((c) => T.push({ p: 6, tone: "ok", icon: "spray", title: esc(c.name), sub: `${c.zone ? `${esc(c.zone)} · ` : ""}${homeFreqTx(c)}`, chore: c.id, attrs: `data-act="homeChore" data-id="${c.id}"` }));
   if (due.length > 3) T.push({ p: 6.5, tone: "ok", icon: "spray", title: `Ménage · ${due.length - 2} autres tâches`, sub: esc(due.slice(2, 5).map((c) => c.name).join(", ")), btn: "Tout voir", attrs: `data-go="menage"` });
   // monthly inventory near month end
   const inv = homeInv(); const d = new Date(); const left = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate() - d.getDate();
   if (left <= 4 && inv.total && inv.pct < 100) T.push({ p: 7, tone: "acc", icon: "list", title: `Inventaire de ${MONTHS[d.getMonth()]} · ${inv.pct}%`, sub: `${left ? `Fin du mois dans ${homePlural(left, "jour")}` : "Dernier jour du mois"} · ${inv.total - inv.n} à compter`, btn: "Compter", attrs: `data-go="stock"` });
   return T.sort((a, b) => a.p - b.p);
+}
+function homeFreqTx(c) {
+  if (c.freq === "service") {
+    let slot = slotNow();
+    if (typeof menToday === "function") { try { const o = menToday().groups; const open = (x) => x.c.id === c.id && (x.st === "todo" || x.st === "overdue"); slot = o.midi.some(open) ? "midi" : o.fermeture.some(open) ? "soir" : slot; } catch (e) {} }
+    return slot === "midi" ? "après le service du midi" : "après le service du soir";
+  }
+  if (c.freq === "jours") return "aujourd'hui";
+  if (c.freq === "semaine") return "cette semaine";
+  if (c.freq === "mois") return "ce mois-ci";
+  return "chaque jour";
 }
 function homeQty(q) { return String(+q.toFixed(2)).replace(".", ","); }
 function homeTodoRow(t, i) {
@@ -88,7 +108,8 @@ function homeEvTarget(e) {
 function homeFeed(i) {
   const feed = S.events.slice(0, 8);
   const row = (e, k) => { const [ic, col] = HOME_EV[e.type] || ["activity", "#5A6386"]; const tap = homeEvTarget(e);
-    return `<div class="li hm-ev ${tap ? "tap" : ""}" ${tap ? `data-act="homeEv" data-id="${e.id}" role="button" tabindex="0"` : ""} style="--j:${k}"><span class="hm-av">${avatar(e.uid)}<span class="bd" style="background:${col}">${ico(ic)}</span></span><div class="tx"><b>${esc(said(e.uid, e.text))}</b></div><span class="hm-when mono">${when(e.at)}</span></div>`; };
+    const cx = !!e.cancelled;
+    return `<div class="li hm-ev ${tap ? "tap" : ""} ${cx ? "cx" : ""}" ${tap ? `data-act="homeEv" data-id="${e.id}" role="button" tabindex="0"` : ""} style="--j:${k}"><span class="hm-av">${avatar(e.uid)}<span class="bd" style="background:${col}">${ico(ic)}</span></span><div class="tx"><b>${esc(said(e.uid, e.text))}</b>${cx ? `<span class="pill neu hm-cx">Annulé</span>` : ""}</div><span class="hm-when mono">${when(e.at)}</span></div>`; };
   return `<section class="glass pad hm-feedc st" style="--i:${i}" aria-label="Activité de l'équipe"><div class="row"><span class="lbl">Activité de l'équipe</span><span class="avs">${S.members.slice(0, 4).map((m) => avatar(m.id, true)).join("")}</span></div>
     ${feed.length ? `<div class="hm-feed">${feed.map(row).join("")}</div>${S.events.length > 8 ? `<button class="btn ghost sm block" data-go="registre" style="margin-top:4px">Tout le registre${ico("chev")}</button>` : ""}` : `<div class="empty" style="padding:20px 0 8px"><div class="ic">${ico("activity")}</div><b>Rien pour l'instant</b>Chaque relevé, réception ou ouverture apparaîtra ici avec son auteur.</div>`}
   </section>`;
@@ -106,7 +127,7 @@ VIEWS.home = {
     const ch = homeChoreStats(); const inv = homeInv();
     const todo = homeTodo(slot, pend); const urgent = todo.filter((t) => t.tone === "bad").length;
     const TODO_MAX = 6; const cap = S.ui.hmAll ? todo.length : todo.length > TODO_MAX ? TODO_MAX - 1 : TODO_MAX;
-    const fresh = homeSteps().filter((x) => x.done).length < 3;
+    const fresh = homeSteps().filter((x) => x.done).length < 3; const recNow = homeRecLive();
 
     const ringC = +(2 * Math.PI * 42).toFixed(2);
     // fridge chips: alerts first, then still to read, then done; capped so many fridges stay tidy
@@ -145,8 +166,8 @@ VIEWS.home = {
     return `<div class="inner hm">
       <header class="row st hm-head" style="--i:0"><div style="min-width:0"><button class="hm-date" data-act="restoSwitch"><span>${DAYS[now.getDay()].replace(/^./, (c) => c.toUpperCase())} ${now.getDate()} ${MONTHS[now.getMonth()]} · ${esc(S.resto.name)}</span>${ico("down")}</button><div class="title">${greet}${S.me.name ? " " + esc(firstName(S.me.name)) : ""}</div></div><button class="iconbtn" ${typeof ACT.whoami === "function" ? `data-act="whoami" aria-label="Qui êtes-vous ? Changer d'utilisateur"` : `data-go="reglages" aria-label="Réglages"`} style="padding:0">${avatar(S.me.id)}</button></header>
       ${banner()}
-      <div class="hm-grid ${fresh ? "fresh" : ""}">
-        <div class="hm-col hm-l">${hero}${fresh ? stepsCard : ""}${todoCard}${fresh ? "" : stepsCard}</div>
+      <div class="hm-grid ${fresh ? "fresh" : ""} ${recNow ? "rec" : ""}">
+        <div class="hm-col hm-l">${hero}${fresh && !recNow ? stepsCard : ""}${todoCard}${fresh && !recNow ? "" : stepsCard}</div>
         <div class="hm-col hm-r">${qa}${stats}${homeFeed(6)}</div>
       </div></div>`;
   },
