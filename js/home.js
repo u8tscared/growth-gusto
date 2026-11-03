@@ -1,6 +1,7 @@
 /* Growth Gusto — area: home ("Aujourd'hui", le cockpit du cuisinier) */
 Object.assign(IC, {
   arrow: ["M5 12h14", "m12 5 7 7-7 7"],
+  up: ["m18 15-6-6-6 6"],
   activity: ["M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2"],
 });
 
@@ -27,26 +28,26 @@ function homeDismissed() { try { return localStorage.getItem("gg-home-steps-" + 
 /* ── "À faire maintenant": one prioritised list ── */
 function homeTodo(slot, pend) {
   const T = []; const lots = activeLots().map((l) => ({ l, d: daysUntil(dlcOf(l)) })).filter((x) => x.d != null && x.d <= 1).sort((a, b) => a.d - b.d);
-  const qty = (l) => (l.qty ? ` · ${fmt(num(l.qty), num(l.qty) % 1 ? 1 : 0)} ${esc(l.unit || "")}` : "");
+  const qty = (l) => { const q = num(l.qty); return q ? ` · ${homeQty(q)}${l.unit ? " " + esc(l.unit) : ""}` : ""; };
+  const where = (l) => (S.fridges.some((f) => f.id === l.fridgeId) ? ` · ${esc(fridgeName(l.fridgeId))}` : "");
   // fridge out of range today
-  S.fridges.forEach((f) => { const r = readingsFor(dayKey()).find((x) => x.fridgeId === f.id); if (r && r.ok === false) T.push({ p: 0, tone: "bad", icon: "alert", title: `${esc(f.name)} · ${fmt(r.value)} °C`, sub: `Hors seuil · ${esc(r.action || "action corrective à noter")}`, btn: "Voir", attrs: `data-go="frigo" data-id="${f.id}"` }); });
+  S.fridges.forEach((f) => { const r = readingsFor(dayKey()).find((x) => x.fridgeId === f.id); if (r && r.ok === false) T.push({ p: r.action ? 0.5 : 0, tone: r.action ? "warn" : "bad", icon: "alert", title: `${esc(f.name)} · ${fmt(r.value)} °C`, sub: r.action ? `Hors seuil · ${esc(r.action)}` : "Hors seuil · action corrective à noter", btn: r.action ? "Voir" : "Agir", attrs: `data-go="frigo" data-id="${f.id}"` }); });
   // expired lots
-  lots.filter((x) => x.d < 0).forEach(({ l, d }) => T.push({ p: 1, tone: "bad", icon: "trash", title: `${esc(l.name)}${qty(l)}`, sub: `DLC dépassée de ${homePlural(-d, "jour")} · ${esc(fridgeName(l.fridgeId))}`, btn: "Traiter", attrs: `data-act="lot" data-id="${l.id}"` }));
-  // readings due now
-  if (pend.length) T.push({ p: 2, tone: "warn", icon: "therm", title: `Relevé du ${slot} · ${homePlural(pend.length, "frigo")}`, sub: esc(pend.map((f) => f.name).join(", ")), btn: "Relever", attrs: `data-act="homeFridge" data-id="${pend[0].id}"` });
+  lots.filter((x) => x.d < 0).forEach(({ l, d }) => T.push({ p: 1, tone: "bad", icon: "trash", title: esc(l.name), sub: `${d === -1 ? "DLC dépassée depuis hier" : `DLC dépassée depuis ${-d} jours`}${qty(l)}${where(l)}`, btn: "Traiter", attrs: `data-act="lot" data-id="${l.id}"` }));
   // DLC today / tomorrow
-  lots.filter((x) => x.d >= 0).forEach(({ l, d }) => T.push({ p: d === 0 ? 3 : 5, tone: d === 0 ? "bad" : "warn", icon: "clock", title: `${esc(l.name)}${qty(l)}`, sub: `${d === 0 ? "DLC aujourd'hui" : "DLC demain"}${l.status === "opened" ? " · ouvert" : ""} · ${esc(fridgeName(l.fridgeId))}`, btn: "Voir", attrs: `data-act="lot" data-id="${l.id}"` }));
+  lots.filter((x) => x.d >= 0).forEach(({ l, d }) => T.push({ p: d === 0 ? 3 : 5, tone: d === 0 ? "bad" : "warn", icon: "clock", title: esc(l.name), sub: `${d === 0 ? "DLC aujourd'hui" : "DLC demain"}${qty(l)}${l.status === "opened" ? " · ouvert" : ""}${where(l)}`, btn: "Voir", attrs: `data-act="lot" data-id="${l.id}"` }));
   // reception in progress
   if (homeRecLive()) { const n = S.rec.lines.filter((l) => (l.name || "").trim()).length; T.push({ p: 4, tone: "acc", icon: "truck", title: `Réception en cours${S.rec.supplier ? ` · ${esc(S.rec.supplier)}` : ""}`, sub: n ? `${homePlural(n, "produit")} saisi${n > 1 ? "s" : ""}, à valider` : "À terminer", btn: "Reprendre", attrs: `data-go="reception"` }); }
   // cleaning due now
   const due = homeChoresDue();
   due.slice(0, due.length > 3 ? 2 : 3).forEach((c) => T.push({ p: 6, tone: "ok", icon: "spray", title: esc(c.name), sub: `${c.zone ? `${esc(c.zone)} · ` : ""}${c.freq === "jour" ? "chaque jour" : c.freq === "semaine" ? "cette semaine" : "ce mois-ci"}`, chore: c.id, attrs: `data-act="homeChore" data-id="${c.id}"` }));
-  if (due.length > 3) T.push({ p: 6.5, tone: "ok", icon: "spray", title: `Ménage · ${homePlural(due.length - 2, "autre tâche")}`, sub: esc(due.slice(2, 5).map((c) => c.name).join(", ")), btn: "Tout voir", attrs: `data-go="menage"` });
+  if (due.length > 3) T.push({ p: 6.5, tone: "ok", icon: "spray", title: `Ménage · ${due.length - 2} autres tâches`, sub: esc(due.slice(2, 5).map((c) => c.name).join(", ")), btn: "Tout voir", attrs: `data-go="menage"` });
   // monthly inventory near month end
   const inv = homeInv(); const d = new Date(); const left = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate() - d.getDate();
   if (left <= 4 && inv.total && inv.pct < 100) T.push({ p: 7, tone: "acc", icon: "list", title: `Inventaire de ${MONTHS[d.getMonth()]} · ${inv.pct}%`, sub: `${left ? `Fin du mois dans ${homePlural(left, "jour")}` : "Dernier jour du mois"} · ${inv.total - inv.n} à compter`, btn: "Compter", attrs: `data-go="stock"` });
   return T.sort((a, b) => a.p - b.p);
 }
+function homeQty(q) { return String(+q.toFixed(2)).replace(".", ","); }
 function homeTodoRow(t, i) {
   const ic = `<span class="ic ${t.tone === "acc" ? "" : t.tone}">${ico(t.icon)}</span>`;
   if (t.chore) return `<div class="li hm-row ${t.tone}" style="--j:${i}">${ic}<div class="tx"><b>${t.title}</b><em>${t.sub}</em></div><button class="hm-do" ${t.attrs} aria-label="Marquer « ${t.title} » comme fait"><span class="pend"></span>Fait</button></div>`;
@@ -104,9 +105,14 @@ VIEWS.home = {
         const lots = activeLots(); const watch = lots.filter((l) => (daysUntil(dlcOf(l)) ?? 99) <= 3).length;
     const ch = homeChoreStats(); const inv = homeInv();
     const todo = homeTodo(slot, pend); const urgent = todo.filter((t) => t.tone === "bad").length;
+    const TODO_MAX = 6; const cap = S.ui.hmAll ? todo.length : todo.length > TODO_MAX ? TODO_MAX - 1 : TODO_MAX;
     const fresh = homeSteps().filter((x) => x.done).length < 3;
 
     const ringC = +(2 * Math.PI * 42).toFixed(2);
+    // fridge chips: alerts first, then still to read, then done; capped so many fridges stay tidy
+    const frRank = (f) => { const r = rsSlot.find((x) => x.fridgeId === f.id); return r ? (r.ok === false ? 0 : 2) : 1; };
+    const frAll = S.fridges.slice().sort((a, b) => frRank(a) - frRank(b)); const FR_MAX = 6;
+    const frChips = frAll.slice(0, frAll.length > FR_MAX ? FR_MAX - 1 : FR_MAX).map((f) => { const r = rsSlot.find((x) => x.fridgeId === f.id); return `<span class="hm-fr ${r ? (r.ok === false ? "bad" : "ok") : ""}">${r ? (r.ok === false ? ico("alert") : ico("check")) : "<i></i>"}<span class="nm">${esc(f.name)}</span>${r ? `<em class="mono">${fmt(r.value)}°</em>` : ""}</span>`; }).join("") + (frAll.length > FR_MAX ? `<span class="hm-fr more">+${frAll.length - FR_MAX + 1}</span>` : "");
     const hero = `<section class="hero hm-hero st" style="--i:1" data-go="releve" role="button" tabindex="0" aria-label="Ouvrir les relevés">
       <div class="in">
         <div class="ring"><svg viewBox="0 0 100 100"><circle class="tr" cx="50" cy="50" r="42" fill="none" stroke-width="9"/><circle class="br" id="ringBar" cx="50" cy="50" r="42" fill="none" stroke-width="9" stroke-linecap="round" stroke-dasharray="${ringC}" stroke-dashoffset="${ringC}" data-to="${ringC * (1 - (exp ? done / exp : 0))}"/></svg><div class="num"><div><b id="ringPct" data-to="${pct}">0</b><b class="pc">%</b><small>${done} / ${exp}</small></div></div></div>
@@ -115,7 +121,7 @@ VIEWS.home = {
           <span>${!exp ? "Pour démarrer les relevés" : pend.length ? `Prochain : ${esc(pend[0].name)}` : slot === "midi" ? "Prochain relevé ce soir" : "Tous les frigos sont signés"}</span>
         </div>
       </div>
-      ${exp ? `<div class="hm-frs">${S.fridges.map((f) => { const r = rsSlot.find((x) => x.fridgeId === f.id); return `<span class="hm-fr ${r ? (r.ok === false ? "bad" : "ok") : ""}">${r ? (r.ok === false ? ico("alert") : ico("check")) : "<i></i>"}${esc(f.name)}${r ? `<em class="mono">${fmt(r.value)}°</em>` : ""}</span>`; }).join("")}</div>` : ""}
+      ${exp ? `<div class="hm-frs">${frChips}</div>` : ""}
       ${!exp ? `<button class="hm-cta-w" data-go="frigos">${ico("plus")}Ajouter un frigo</button>` : pend.length ? `<button class="hm-cta-w" data-act="homeFridge" data-id="${pend[0].id}"><span>Relever ${esc(pend[0].name)}</span>${ico("arrow")}</button>` : `<span class="hm-cta-w done">${ico("check")}Tout est signé</span>`}
     </section>`;
 
@@ -126,18 +132,18 @@ VIEWS.home = {
     const stats = `<section class="hm-stats st" style="--i:4" aria-label="Chiffres du jour">
       ${stat("En frigo", lots.length, lots.length > 1 ? "produits" : "produit", "frigos")}
       ${stat("DLC", watch, "à surveiller", "frigos", watch ? "warn" : "")}
-      ${stat("Ménage", ch.pct, ch.total ? `${ch.done} / ${ch.total} du jour` : "à configurer", "menage", ch.pct === 100 ? "ok" : "", ch.pct ?? 0)}
-      ${stat("Inventaire", inv.total ? inv.pct : null, inv.total ? MONTHS[now.getMonth()] : "aucun produit", "stock", inv.total && inv.pct === 100 ? "ok" : "", inv.total ? inv.pct : 0)}
+      ${stat("Ménage", ch.pct, ch.total ? `${ch.done} / ${ch.total} faites` : "à configurer", "menage", ch.pct === 100 ? "ok" : "", ch.pct ?? 0)}
+      ${stat("Inventaire", inv.total ? inv.pct : null, inv.total ? MONTHS[now.getMonth()] : "à configurer", "stock", inv.total && inv.pct === 100 ? "ok" : "", inv.total ? inv.pct : 0)}
     </section>`;
 
     const todoCard = `<section class="glass pad hm-todo st" style="--i:3" aria-label="À faire maintenant">
       <div class="row"><span class="lbl">À faire maintenant</span>${todo.length ? `<span class="pill ${urgent ? "bad" : "acc"}">${urgent ? `<span class="dot"></span>${homePlural(urgent, "urgence")}` : homePlural(todo.length, "tâche")}</span>` : ""}</div>
-      ${todo.length ? `<div class="hm-list">${todo.slice(0, 9).map(homeTodoRow).join("")}</div>${todo.length > 9 ? `<p class="note" style="margin:6px 0 0;text-align:center">+ ${todo.length - 9} autres</p>` : ""}` : `<div class="hm-zen"><span class="check draw"><svg viewBox="0 0 24 24"><path d="M6 12.5l4 4 8-9"/></svg></span><b>Tout est à jour</b><span>Relevés, DLC et ménage : rien ne presse.</span></div>`}
+      ${todo.length ? `<div class="hm-list">${todo.slice(0, cap).map(homeTodoRow).join("")}</div>${todo.length > TODO_MAX ? `<button class="hm-more" data-act="homeMore">${S.ui.hmAll ? `Réduire la liste${ico("up")}` : `Voir ${todo.length - cap === 1 ? "la tâche restante" : `les ${todo.length - cap} autres tâches`}${ico("down")}`}</button>` : ""}` : `<div class="hm-zen"><span class="check draw"><svg viewBox="0 0 24 24"><path d="M6 12.5l4 4 8-9"/></svg></span><b>${pend.length ? "Rien d'autre pour l'instant" : "Tout est à jour"}</b><span>${pend.length ? "À part le relevé, rien ne presse." : "Relevés, DLC et ménage : rien ne presse."}</span></div>`}
     </section>`;
 
     const stepsCard = homeStepsCard(fresh ? 3 : 5);
     return `<div class="inner hm">
-      <header class="row st hm-head" style="--i:0"><div style="min-width:0"><button class="hm-date" data-act="restoSwitch">${DAYS[now.getDay()].replace(/^./, (c) => c.toUpperCase())} ${now.getDate()} ${MONTHS[now.getMonth()]} · ${esc(S.resto.name)}${ico("down")}</button><div class="title">${greet}${S.me.name ? " " + esc(firstName(S.me.name)) : ""}</div></div><button class="iconbtn" data-go="reglages" aria-label="Réglages" style="padding:0">${avatar(S.me.id)}</button></header>
+      <header class="row st hm-head" style="--i:0"><div style="min-width:0"><button class="hm-date" data-act="restoSwitch"><span>${DAYS[now.getDay()].replace(/^./, (c) => c.toUpperCase())} ${now.getDate()} ${MONTHS[now.getMonth()]} · ${esc(S.resto.name)}</span>${ico("down")}</button><div class="title">${greet}${S.me.name ? " " + esc(firstName(S.me.name)) : ""}</div></div><button class="iconbtn" ${typeof ACT.whoami === "function" ? `data-act="whoami" aria-label="Qui êtes-vous ? Changer d'utilisateur"` : `data-go="reglages" aria-label="Réglages"`} style="padding:0">${avatar(S.me.id)}</button></header>
       ${banner()}
       <div class="hm-grid ${fresh ? "fresh" : ""}">
         <div class="hm-col hm-l">${hero}${fresh ? stepsCard : ""}${todoCard}${fresh ? "" : stepsCard}</div>
@@ -159,6 +165,8 @@ function countTo(el, from, to, ms) { const t0 = performance.now(); const step = 
 Object.assign(ACT, {
   homeFridge: (a, id) => { SFX.tap(); buzz(6); S.slot = slotNow(); S.open = id || null; go("releve"); },
   homeChore: async (a, id) => {
+    // one tap = one log, even on a frantic double tap (the row re-renders while the write is in flight)
+    const busy = (S.ui.hmBusy ||= {}); if (busy[id] || !homeChoresDue().some((c) => c.id === id)) return; busy[id] = 1; setTimeout(() => { delete busy[id]; }, 1500);
     const row = a.closest(".hm-row"); if (row) row.classList.add("leaving");
     if (typeof ACT.choreDo === "function") return ACT.choreDo(a, id);
     const c = S.chores.find((x) => x.id === id); if (!c) return;
@@ -166,8 +174,10 @@ Object.assign(ACT, {
   },
   homeStarter: async (a) => {
     if (typeof ACT.choreStarter !== "function") return go("menage");
-    a.style.pointerEvents = "none"; await ACT.choreStarter(a);
+    if (S.ui.hmStarting || S.chores.length) return; S.ui.hmStarting = 1; a.style.pointerEvents = "none";
+    try { await ACT.choreStarter(a); } finally { S.ui.hmStarting = 0; }
   },
+  homeMore: () => { S.ui.hmAll = !S.ui.hmAll; SFX.tick(); rerender(); },
   homeStepsOff: () => { try { localStorage.setItem("gg-home-steps-" + S.rid, "off"); } catch (e) {} SFX.close(); rerender(); },
   homeEv: (a, id) => {
     const e = S.events.find((x) => x.id === id); if (!e) return; SFX.tap();
