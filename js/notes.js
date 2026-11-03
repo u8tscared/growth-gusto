@@ -111,18 +111,22 @@ const NOTE_STARTER = [
     "En cas de doute sur un ingrédient, ne pas servir et le dire au client."] },
 ];
 const noteMissingStarter = () => NOTE_STARTER.filter((p) => !S.notes.some((n) => n.seed === p.seed || noteNorm(n.title) === noteNorm(p.title)));
+/* wording follows the device: "Touchez" on touch screens, "Cliquez sur" with a mouse */
+const notePointer = () => { try { return matchMedia("(hover:hover) and (pointer:fine)").matches; } catch (e) { return false; } };
+const noteTap = (what) => (notePointer() ? `Cliquez sur ${what}` : `Touchez ${what}`);
+const noteIOS = () => /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
 const notePlural = (n, w) => `${n} ${w}${n > 1 ? "s" : ""}`;
 
 /* ───────── list ───────── */
 function noteCard(n, i) {
   const k = noteKind(n); const tab = NOTE_TABS.find((t) => t[0] === k); const steps = noteSteps(n); const ings = n.ingredients || []; const al = n.allergens || [];
-  const meta = k === "Recettes" ? [ings.length ? notePlural(ings.length, "ingrédient") : "", n.portions ? notePlural(n.portions, "portion") : "", steps.length ? notePlural(steps.length, "étape") : ""].filter(Boolean).join(" · ")
-    : k === "Procédures" ? (steps.length ? notePlural(steps.length, "étape") : "") : "";
+  const meta = k === "Recettes" ? [ings.length ? notePlural(ings.length, "ingrédient") : "", n.portions ? notePlural(n.portions, "portion") : "", steps.length ? notePlural(steps.length, "étape") : ""].filter(Boolean)
+    : k === "Procédures" ? (steps.length ? [notePlural(steps.length, "étape")] : []) : [];
   const excerpt = k === "Notes" ? String(n.body || "").trim() : k === "Recettes" ? ings.map((g) => g.name).filter(Boolean).join(", ") : noteIntro(n) || steps[0] || "";
   return `<div class="nt-card glass st" style="--i:${Math.min(i + 4, 14)}" role="button" tabindex="0" data-go="fiche" data-id="${esc(n.id)}">
     <div class="nt-thumb k-${k === "Recettes" ? "r" : k === "Procédures" ? "p" : "n"}">${n.photo ? `<img src="${esc(n.photo)}" alt="" loading="lazy">` : ico(tab[1])}</div>
     <div class="nt-cbody"><b class="nt-ctitle">${esc(n.title || "Sans titre")}</b>
-      ${meta ? `<span class="nt-meta">${esc(meta)}</span>` : ""}
+      ${meta.length ? `<span class="nt-meta">${meta.map((m) => `<span>${esc(m)}</span>`).join(" · ")}</span>` : ""}
       ${excerpt ? `<span class="nt-excerpt">${esc(excerpt)}</span>` : ""}
       ${al.length ? `<span class="nt-almini">${ico("alert")}${notePlural(al.length, "allergène")}</span>` : ""}
     </div><span class="nt-chev">${ico("chev")}</span></div>`;
@@ -145,7 +149,7 @@ VIEWS.notes = {
   render() {
     if (!NOTE_TABS.some((t) => t[0] === S.noteCat)) S.noteCat = S.noteCat === "Hygiène" ? "Procédures" : "Recettes";
     const ix = NOTE_TABS.findIndex((t) => t[0] === S.noteCat); const cnt = (k) => S.notes.filter((n) => noteKind(n) === k).length;
-    return `<div class="inner nt-wrap">${topBar("Recettes & procédures", { right: `<button class="btn acc sm" data-act="noteNew">${ico("plus")}Nouvelle</button>` })}
+    return `<div class="inner wide nt-wrap">${topBar("Recettes & procédures", { right: `<button class="btn acc sm" data-act="noteNew">${ico("plus")}Nouvelle</button>` })}
       <div class="seg nt-seg st" style="--i:1" id="ntSeg"><span class="knob" style="width:calc(33.33% - 3px);transform:translateX(${ix * 100}%)"></span>${NOTE_TABS.map(([k, ic, t]) => `<button class="${S.noteCat === k ? "on" : ""}" data-act="noteCat" data-v="${k}">${ico(ic)}<span>${t}</span><em class="mono">${cnt(k)}</em></button>`).join("")}</div>
       <div class="nt-search st" style="--i:2">${ico("search")}<input class="input" id="noteQ" type="search" enterkeyhint="search" autocomplete="off" placeholder="Rechercher une fiche, un ingrédient…" value="${esc(S.noteQ)}"><button class="nt-clear" data-act="noteQClear" aria-label="Effacer" ${S.noteQ ? "" : "hidden"}>${ico("x")}</button></div>
       <div id="noteList" class="nt-list">${noteListHTML()}</div></div>`;
@@ -182,11 +186,11 @@ function noteRefreshScale(id, fromInput) {
   const lab = $("#ntPortLbl"); if (lab) lab.textContent = v >= 2 ? "portions" : "portion";
   const i = $("#ntPort"); if (i) { if (!fromInput) { i.value = noteNum(v); i.classList.remove("bump"); void i.offsetWidth; i.classList.add("bump"); } i.style.width = notePortW(i.value); i.classList.remove("bad"); }
 }
-function noteRunHTML(n, steps) {
+function noteRunHTML(n, steps, intro = "") {
   const R = S.ui.noteRun?.id === n.id ? S.ui.noteRun : { done: [] }; const done = R.done.length; const cur = steps.findIndex((_, i) => !R.done.includes(i));
-  return `<div class="glass pad nt-runbar st" style="--i:3"><div class="hstack" style="justify-content:space-between"><span class="lbl">Étape par étape</span><span class="mono nt-runct"><b>${done}</b> / ${steps.length}</span></div><div class="nt-prog"><i style="width:${steps.length ? (done / steps.length) * 100 : 0}%"></i></div><p class="note nt-runhint" style="margin:8px 0 0">Touchez chaque étape quand elle est faite.</p></div>
-    <ol class="nt-run">${steps.map((s, i) => `<li class="st ${R.done.includes(i) ? "done" : ""} ${i === cur ? "cur" : ""}" style="--i:${Math.min(i + 4, 14)}"><button data-act="noteTick" data-id="${esc(n.id)}" data-v="${i}" aria-pressed="${R.done.includes(i)}"><span class="nt-box">${ico("check")}</span><span class="nt-rnum mono">${i + 1}</span><span class="nt-rtx">${noteTy(esc(s))}</span></button></li>`).join("")}</ol>
-    <div class="glass nt-runend" ${done && done === steps.length ? "" : "hidden"}><div class="check draw">${ico("check")}</div><b class="h3">Procédure terminée</b><span class="note">C'est noté dans le registre.</span><button class="btn soft sm" data-act="noteRunReset" data-id="${esc(n.id)}">${ico("ntReset")}Recommencer</button></div>`;
+  return `<div class="nt-pcols"><div class="nt-pside">${intro}<div class="glass pad nt-runbar st" style="--i:3"><div class="hstack" style="justify-content:space-between"><span class="lbl">Étape par étape</span><span class="mono nt-runct"><b>${done}</b> / ${steps.length}</span></div><div class="nt-prog"><i style="width:${steps.length ? (done / steps.length) * 100 : 0}%"></i></div><p class="note nt-runhint" style="margin:8px 0 0">Cochez chaque étape quand elle est faite.</p></div></div>
+    <div class="nt-pmain"><ol class="nt-run">${steps.map((s, i) => `<li class="st ${R.done.includes(i) ? "done" : ""} ${i === cur ? "cur" : ""}" style="--i:${Math.min(i + 4, 14)}"><button data-act="noteTick" data-id="${esc(n.id)}" data-v="${i}" aria-pressed="${R.done.includes(i)}"><span class="nt-box">${ico("check")}</span><span class="nt-rnum mono">${i + 1}</span><span class="nt-rtx">${noteTy(esc(s))}</span></button></li>`).join("")}</ol>
+    <div class="glass nt-runend" ${done && done === steps.length ? "" : "hidden"}><div class="check draw">${ico("check")}</div><b class="h3">Procédure terminée</b><span class="note">C'est noté dans le registre.</span><button class="btn soft sm" data-act="noteRunReset" data-id="${esc(n.id)}">${ico("ntReset")}Recommencer</button></div></div></div>`;
 }
 VIEWS.fiche = {
   render({ id }) {
@@ -206,11 +210,11 @@ VIEWS.fiche = {
       if (tab === "process") return `<div class="inner wide nt-wrap">${top}${hero}${seg}<div id="ntFBody" class="nt-fbody">${noteProcTabHTML(n)}</div>${noteFilesHTML(n)}</div>`;
       return `<div class="inner wide nt-wrap">${top}${hero}${seg}<div id="ntFBody" class="nt-fbody">${alHTML}<div class="cols nt-cols"><div>
         <div class="glass pad st nt-ingcard" style="--i:3"><span class="lbl">${num(n.portions) ? "Pour combien de portions ?" : "Multiplier la recette"}</span>${noteScalerHTML(n)}
-        ${ings.length ? `<ul class="nt-ings" id="ntIngs">${noteIngHTML(n)}</ul>` : `<p class="note" style="margin:0">Pas encore d'ingrédients. Touchez « Modifier » pour les ajouter.</p>`}</div>
-        </div><div>${stepsHTML || `<div class="glass pad st" style="--i:4"><span class="lbl">Étapes</span><p class="note" style="margin:6px 0 0">Pas encore d'étapes. Touchez « Modifier » pour les écrire.</p></div>`}${introHTML("Conseils du chef", 5)}</div></div></div>${noteFilesHTML(n)}</div>`;
+        ${ings.length ? `<ul class="nt-ings" id="ntIngs">${noteIngHTML(n)}</ul>` : `<p class="note" style="margin:0">Pas encore d'ingrédients. ${noteTap("« Modifier »")} pour les ajouter.</p>`}</div>
+        </div><div>${stepsHTML || `<div class="glass pad st" style="--i:4"><span class="lbl">Étapes</span><p class="note" style="margin:6px 0 0">Pas encore d'étapes. ${noteTap("« Modifier »")} pour les écrire.</p></div>`}${introHTML("Conseils du chef", 5)}</div></div></div>${noteFilesHTML(n)}</div>`;
     }
-    if (k === "Procédures") return `<div class="inner narrow nt-wrap">${top}${hero}${introHTML("Quand et pourquoi", 2)}${steps.length ? noteRunHTML(n, steps) : `<div class="glass empty st" style="--i:3">Aucune étape. Touchez « Modifier » pour les écrire.</div>`}${noteFilesHTML(n)}</div>`;
-    return `<div class="inner narrow nt-wrap">${top}${hero}<div class="glass pad st nt-body" style="--i:2">${n.body ? noteLinkify(noteTy(esc(n.body))) : `<span class="note">Note vide.</span>`}</div>${noteFilesHTML(n)}</div>`;
+    if (k === "Procédures") return `<div class="inner nt-wrap nt-pread">${top}${hero}${steps.length ? noteRunHTML(n, steps, introHTML("Quand et pourquoi", 2)) : `${introHTML("Quand et pourquoi", 2)}<div class="glass empty st" style="--i:3">Aucune étape. ${noteTap("« Modifier »")} pour les écrire.</div>`}${noteFilesHTML(n)}</div>`;
+    return `<div class="inner nt-wrap nt-nread">${top}${hero}<div class="glass pad st nt-body" style="--i:2">${n.body ? noteLinkify(noteTy(esc(n.body))) : `<span class="note">Note vide.</span>`}</div>${noteFilesHTML(n)}</div>`;
   },
   after(v) {
     setTimeout(() => { const b = $('#side .nav[data-go="notes"]'); b && b.classList.add("on"); }, 0);
@@ -255,11 +259,13 @@ VIEWS.note = {
       <button class="btn ghost sm" data-act="noteStepAdd" style="align-self:flex-start">${ico("plus")}Ajouter une étape</button><p class="note" style="margin:0">Astuce : la touche Entrée crée l'étape suivante.</p></div>`;
     const bodyHTML = isN ? `<div class="glass pad st nt-esec" style="--i:3"><span class="lbl">Contenu</span><textarea class="input nt-ebody" data-bind="ui.note.body" placeholder="Écrivez ici…">${esc(N.body)}</textarea></div>`
       : `<div class="glass pad st nt-esec" style="--i:6"><span class="lbl">${isR ? "Conseils du chef" : "Quand et pourquoi"}</span><textarea class="input" style="min-height:96px" data-bind="ui.note.body" placeholder="${isR ? "Dressage, conservation, astuces… (facultatif)" : "Fréquence, matériel, précautions… (facultatif)"}">${esc(N.body)}</textarea></div>`;
-    return `<div class="inner narrow nt-wrap"><div class="top st" style="--i:0"><button class="iconbtn" data-act="noteBack" aria-label="Retour">${ico("back")}</button><span class="h2">${id === "new" ? "Nouvelle fiche" : "Modifier la fiche"}</span>${id !== "new" ? `<button class="iconbtn" data-act="noteDel" aria-label="Supprimer la fiche" style="color:var(--bad)">${ico("trash")}</button>` : ""}</div>
+    const phHTML = !isN || N.photo ? `<div class="st" style="--i:2">${photo}</div>` : "";
+    /* desktop: two columns (ingrédients | étapes), the title stays full width */
+    const colsHTML = isN ? `${phHTML}${bodyHTML}` : isR ? `<div class="nt-ecols"><div>${phHTML}${ingsHTML}</div><div>${stepsHTML}${bodyHTML}</div></div>` : `<div class="nt-ecols"><div>${stepsHTML}</div><div>${phHTML}${bodyHTML}</div></div>`;
+    return `<div class="inner nt-wrap nt-ed ${isN ? "nt-edn" : ""}"><div class="top st" style="--i:0"><button class="iconbtn" data-act="noteBack" aria-label="Retour">${ico("back")}</button><span class="h2">${id === "new" ? "Nouvelle fiche" : "Modifier la fiche"}</span>${id !== "new" ? `<button class="iconbtn" data-act="noteDel" aria-label="Supprimer la fiche" style="color:var(--bad)">${ico("trash")}</button>` : ""}</div>
       <div class="glass pad st nt-esec" style="--i:1"><textarea class="input nt-etitle" rows="1" data-bind="ui.note.title" enterkeyhint="done" placeholder="${isR ? "Nom de la recette" : isN ? "Titre de la note" : "Nom de la procédure"}" aria-label="Titre">${esc(N.title)}</textarea>
         <div class="seg nt-seg" id="ntESeg"><span class="knob" style="width:calc(33.33% - 3px);transform:translateX(${ix * 100}%)"></span>${NOTE_TABS.map(([k, ic]) => `<button class="${N.cat === k ? "on" : ""}" data-act="noteSetCat" data-v="${k}">${ico(ic)}<span>${k === "Recettes" ? "Recette" : k === "Procédures" ? "Procédure" : "Note"}</span></button>`).join("")}</div></div>
-      ${!isN || N.photo ? `<div class="st" style="--i:2">${photo}</div>` : ""}
-      ${isR ? ingsHTML : ""}${isN ? "" : stepsHTML}${bodyHTML}
+      ${colsHTML}
       <div class="ctabar st" style="--i:7"><button class="btn acc block" data-act="noteSave">${ico("check")}Enregistrer</button></div></div>`;
   },
   after(v) {
@@ -571,7 +577,7 @@ VIEWS.noteProc = {
         ${s.c ? `<div class="ntp-ecc"><label><span>Limite critique</span><input class="input" data-bind="ui.np.steps.${i}.c.l" value="${esc(s.c.l || "")}" placeholder="Ex. ≥ +63 °C à cœur"></label><label><span>Surveillance</span><input class="input" data-bind="ui.np.steps.${i}.c.m" value="${esc(s.c.m || "")}" placeholder="Ex. Sonde à cœur, valeur notée"></label><label><span>Action corrective</span><input class="input" data-bind="ui.np.steps.${i}.c.a" value="${esc(s.c.a || "")}" placeholder="Ex. Prolonger la cuisson"></label></div>` : ""}
         <div class="ntp-etools"><button class="ntp-cctog ${s.c ? "on" : ""}" data-act="npCcp" data-v="${i}" aria-pressed="${!!s.c}">${ico(s.c ? "check" : "plus")}Point critique</button><span style="flex:1"></span>
           <button class="iconbtn" data-act="npMove" data-v="${i}" data-id="-1" aria-label="Monter l'étape" ${i === 0 ? "disabled" : ""}>${ico("ntUp")}</button><button class="iconbtn" data-act="npMove" data-v="${i}" data-id="1" aria-label="Descendre l'étape" ${i === L.length - 1 ? "disabled" : ""}>${ico("ntDown")}</button><button class="iconbtn ntp-trash" data-act="npDel" data-v="${i}" aria-label="Supprimer l'étape">${ico("trash")}</button></div></div>`; };
-    return `<div class="inner narrow nt-wrap"><div class="top st" style="--i:0"><button class="iconbtn" data-act="npBack" aria-label="Retour">${ico("back")}</button><span class="h2">Process HACCP</span></div>
+    return `<div class="inner nt-wrap nt-ped"><div class="top st" style="--i:0"><button class="iconbtn" data-act="npBack" aria-label="Retour">${ico("back")}</button><span class="h2">Process HACCP</span></div>
       <p class="sub st" style="--i:1;margin:-6px 0 0">${esc(n.title)} · ${notePlural(L.length, "étape")}</p>
       <div class="ntp-elist">${L.length ? L.map(card).join("") : `<div class="glass empty">Aucune étape. Ajoutez-en depuis la bibliothèque.</div>`}</div>
       <button class="nt-addph st" style="--i:3" data-act="npLib">${ico("plus")}<span>Ajouter une étape</span><em>bibliothèque HACCP</em></button>
@@ -590,32 +596,55 @@ const npRer = (flash) => { S.ui.npFlash = flash; noteRer(); };
 /* ───────── export: printable A4 document ───────── */
 function noteDocHTML(n, P, proposed) {
   const ings = n.ingredients || []; const al = n.allergens || []; let ci = 0; const ccps = [];
-  const flow = P.map((s, i) => { const L = noteLib(s.k); const cc = s.c ? ++ci : 0; if (s.c) ccps.push({ i, cc, s, L }); return `<li class="${s.c ? "ccp" : ""}"><div class="ntd-box"><span class="ntd-n">${i + 1}</span><div class="ntd-tx"><b>${esc(s.t || L.t)}</b>${s.c ? ` <em class="ntd-badge">CCP ${cc}</em>` : ""}${s.x ? `<p>${noteTy(esc(s.x))}</p>` : ""}${s.c && s.c.l ? `<p class="ntd-lim">${noteTy(esc(s.c.l))}</p>` : ""}</div></div></li>`; }).join("");
+  const items = P.map((s, i) => { const L = noteLib(s.k); const cc = s.c ? ++ci : 0; if (s.c) ccps.push({ i, cc, s, L }); return `<li class="${s.c ? "ccp" : ""}"><div class="ntd-box"><span class="ntd-n">${i + 1}</span><div class="ntd-tx"><b>${esc(s.t || L.t)}</b>${s.c ? ` <em class="ntd-badge">CCP ${cc}</em>` : ""}${s.x ? `<p>${noteTy(esc(s.x))}</p>` : ""}${s.c && s.c.l ? `<p class="ntd-lim">${noteTy(esc(s.c.l))}</p>` : ""}</div></div></li>`; });
+  const flow = noteDocFlow(items);
   const today = new Date().toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
   const por = num(n.portions);
   return `<article class="ntd">
     <header class="ntd-h"><div class="ntd-hl"><div class="ntd-k">Fiche process HACCP · diagramme de fabrication</div><h1>${esc(n.title || "Sans titre")}</h1>
       <div class="ntd-meta"><span>${esc(S.resto?.name || "")}</span>${por ? `<span>${noteNum(por)} portion${por >= 2 ? "s" : ""}</span>` : ""}<span>${proposed ? "Process proposé, à valider" : `Version ${n.processV || 1}`}</span><span>Édité le ${today}</span></div></div>
       <div class="ntd-logo">${(() => { try { return logoMark({ mono: "#4A1FE6" }); } catch (e) { return ""; } })()}</div></header>
+    <p class="ntd-legend ntd-muted"><span class="ntd-key"></span> Étape &nbsp; <span class="ntd-key ccp"></span> Point critique (CCP) : limite à respecter, contrôle noté.</p>
+    ${flow}
     <section class="ntd-two"><div><h2>Ingrédients</h2>${ings.length ? `<table class="ntd-t ntd-ing"><tbody>${ings.map((g) => { const s = noteScale(g.qty, g.unit, 1); return `<tr><td>${esc(g.name)}</td><td class="r">${esc(s.q)} ${esc(s.u)}</td></tr>`; }).join("")}</tbody></table>` : `<p class="ntd-muted">Non renseignés.</p>`}</div>
-      <div><h2>Allergènes</h2>${al.length ? `<div class="ntd-al">${al.map((a) => `<span>${esc(noteAllergenLabel(a))}</span>`).join("")}</div>` : `<p class="ntd-muted">Aucun allergène déclaré sur la fiche.</p>`}
-      <h2 style="margin-top:5mm">Légende</h2><p class="ntd-muted"><span class="ntd-key"></span> Étape &nbsp; <span class="ntd-key ccp"></span> Point critique (CCP) : limite à respecter, contrôle noté.</p></div></section>
-    <section><h2>Diagramme de fabrication</h2><ol class="ntd-flow">${flow}</ol></section>
-    <section class="ntd-keep"><h2>Points critiques à maîtriser (CCP)</h2>${ccps.length ? `<table class="ntd-t ntd-ccp"><thead><tr><th>CCP</th><th>Étape</th><th>Limite critique</th><th>Surveillance</th><th>Action corrective</th></tr></thead><tbody>${ccps.map(({ i, cc, s, L }) => `<tr><td class="ntd-c">${cc}</td><td><b>${esc(s.t || L.t)}</b><br><span class="ntd-muted">étape ${i + 1}</span></td><td>${noteTy(esc(s.c.l || "—"))}</td><td>${noteTy(esc(s.c.m || "—"))}</td><td>${noteTy(esc(s.c.a || "—"))}</td></tr>`).join("")}</tbody></table>` : `<p class="ntd-muted">Aucun point critique défini.</p>`}</section>
-    <section class="ntd-sign ntd-keep"><div><span>Établi par</span><i></i><span>Date</span><i></i><span>Signature</span><i class="tall"></i></div><div><span>Vérifié par (responsable)</span><i></i><span>Date</span><i></i><span>Signature</span><i class="tall"></i></div></section>
-    <footer class="ntd-f">${esc(S.resto?.name || "")} · Plan de maîtrise sanitaire · ${esc(n.title || "")}</footer></article>`;
+      <div><h2>Allergènes</h2>${al.length ? `<div class="ntd-al">${al.map((a) => `<span>${esc(noteAllergenLabel(a))}</span>`).join("")}</div>` : `<p class="ntd-muted">Aucun allergène déclaré sur la fiche.</p>`}</div></section>
+    <div class="ntd-end"><section><h2>Points critiques à maîtriser (CCP)</h2>${ccps.length ? `<table class="ntd-t ntd-ccp"><thead><tr><th>CCP</th><th>Étape</th><th>Limite critique</th><th>Surveillance</th><th>Action corrective</th></tr></thead><tbody>${ccps.map(({ i, cc, s, L }) => `<tr><td class="ntd-c">${cc}</td><td><b>${esc(s.t || L.t)}</b><br><span class="ntd-muted">étape ${i + 1}</span></td><td>${noteTy(esc(s.c.l || "—"))}</td><td>${noteTy(esc(s.c.m || "—"))}</td><td>${noteTy(esc(s.c.a || "—"))}</td></tr>`).join("")}</tbody></table>` : `<p class="ntd-muted">Aucun point critique défini.</p>`}</section>
+    <section class="ntd-sign"><div><span>Établi par</span><i></i><span>Date</span><i></i><span>Signature</span><i class="tall"></i></div><div><span>Vérifié par (responsable)</span><i></i><span>Date</span><i></i><span>Signature</span><i class="tall"></i></div></section>
+    <footer class="ntd-f">${esc(S.resto?.name || "")} · Plan de maîtrise sanitaire · ${esc(n.title || "")}</footer></div></article>`;
+}
+/* the flow reads top to bottom: one column up to 8 steps, else two explicit columns (left, then right),
+   each ending without an arrow, with a numbered "suite" marker. The diagram opens the document (page 1);
+   past 22 steps it is cut in even blocks, one per page, with "suite page suivante" markers. */
+function noteDocFlow(items) {
+  const nb = Math.max(1, Math.ceil(items.length / 22)); const BLOCK = Math.ceil(items.length / nb); const blocks = []; for (let i = 0; i < items.length; i += BLOCK) blocks.push(i);
+  const many = blocks.length > 1;
+  return blocks.map((b0, bi) => {
+    const part = items.slice(b0, b0 + BLOCK); const last = bi === blocks.length - 1;
+    const end = last ? "" : `<p class="ntd-next">Suite du diagramme page suivante, à l'étape ${b0 + BLOCK + 1} ↓</p>`;
+    const from = bi ? `<p class="ntd-from">↑ Suite de l'étape ${b0}</p>` : "";
+    const h = `<h2>Diagramme de fabrication${many ? ` <span class="ntd-pg">${bi ? "suite, " : ""}étapes ${b0 + 1} à ${b0 + part.length}</span>` : ""}</h2>`;
+    if (part.length <= 8) return `<section class="ntd-flowsec">${h}${from}<ol class="ntd-flow ntd-one" start="${b0 + 1}">${part.join("")}</ol>${end}</section>`;
+    const k = Math.ceil(part.length / 2); const A = part.slice(0, k), B = part.slice(k);
+    return `<section class="ntd-flowsec">${h}${from}<div class="ntd-cols"><div><ol class="ntd-flow">${A.join("")}</ol><p class="ntd-cont">Suite : étape ${b0 + k + 1}, colonne de droite <b>→</b></p></div><div><p class="ntd-cont ntd-cin"><b>→</b> Suite de l'étape ${b0 + k}</p><ol class="ntd-flow">${B.join("")}</ol></div></div>${end}</section>`;
+  }).join("");
 }
 const noteDocList = (id) => (id === "all" ? S.notes.filter((n) => noteKind(n) === "Recettes" && (n.title || "").trim()).sort((a, b) => String(a.title).localeCompare(String(b.title), "fr")) : S.notes.filter((n) => n.id === id));
 const noteDocProc = (n) => (n.process && n.process.length ? { P: n.process, proposed: false } : { P: noteProcGen(n, noteCooked(n) ? "avance" : "now"), proposed: true });
+function noteDocHow() {
+  if (notePointer()) return "Cliquez sur « Exporter en PDF », puis choisissez « Enregistrer au format PDF » comme imprimante.";
+  if (noteIOS()) return "Touchez « Exporter en PDF », puis le bouton Partager de l'aperçu et « Enregistrer dans Fichiers ».";
+  return "Touchez « Exporter en PDF », puis choisissez « Enregistrer au format PDF » comme imprimante.";
+}
 VIEWS.noteDoc = {
+  hideTabs: true,
   render({ id }) {
     const L = noteDocList(id); const all = id === "all";
     if (!L.length) return `<div class="inner narrow nt-wrap">${topBar(all ? "Tous les process" : "Fiche process")}<div class="glass empty st" style="--i:1"><div class="ic">${ico("ntFlow")}</div><b>Aucune recette</b>Créez une fiche recette pour éditer son process HACCP.</div></div>`;
     const miss = L.filter((n) => !(n.process && n.process.length)).length;
-    return `<div class="inner wide nt-wrap ntd-screen">${topBar(all ? "Tous les process HACCP" : "Fiche process", { right: `<button class="btn acc sm" data-act="notePrint">${ico("printer")}PDF</button>` })}
-      <div class="glass pad ntd-hint st" style="--i:1"><div class="ic">${ico("printer")}</div><div><b>${all ? `${notePlural(L.length, "plat")}, un par page.` : "Prêt à imprimer ou à enregistrer en PDF."}</b><p class="note" style="margin:3px 0 0">Touchez « Exporter en PDF », puis choisissez « Enregistrer au format PDF ». Sur iPhone : touchez le bouton Partager de l'aperçu, puis « Enregistrer dans Fichiers ».</p>${miss ? `<p class="note nt-warn" style="margin:6px 0 0">${miss === 1 ? "1 plat n'a pas encore de process : un process standard est proposé" : `${miss} plats n'ont pas encore de process : un process standard est proposé`}, à valider.</p>` : ""}</div></div>
+    return `<div class="inner wide nt-wrap ntd-screen">${topBar(all ? "Tous les process HACCP" : "Fiche process")}
+      <div class="glass pad ntd-hint st" style="--i:1"><div class="ic">${ico("printer")}</div><div class="ntd-htx"><b>${all ? `${notePlural(L.length, "plat")}, un par page.` : "Prêt à imprimer ou à enregistrer en PDF."}</b><p class="note" style="margin:3px 0 0">${noteDocHow()}</p>${miss ? `<p class="note nt-warn" style="margin:6px 0 0">${miss === 1 ? "1 plat n'a pas encore de process : un process standard est proposé" : `${miss} plats n'ont pas encore de process : un process standard est proposé`}, à valider.</p>` : ""}</div><button class="btn acc ntd-hbtn" data-act="notePrint">${ico("printer")}Exporter en PDF</button></div>
       <div class="ntd-stack st" style="--i:2">${L.map((n) => { const d = noteDocProc(n); return noteDocHTML(n, d.P, d.proposed); }).join("")}</div>
-      <div class="ctabar st" style="--i:3"><button class="btn acc block" data-act="notePrint">${ico("printer")}Exporter en PDF</button></div></div>`;
+      <div class="ctabar ntd-cta st" style="--i:3"><button class="btn acc block" data-act="notePrint">${ico("printer")}Exporter en PDF</button></div></div>`;
   },
   after() { setTimeout(() => { const b = $('#side .nav[data-go="notes"]'); b && b.classList.add("on"); }, 0); },
 };
