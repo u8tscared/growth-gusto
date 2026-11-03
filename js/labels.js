@@ -16,6 +16,8 @@ const lbTestMode = () => S.resto?.printTest !== false;
 const lbDate = (k) => { const d = parseDay(k); return d ? `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${String(d.getFullYear()).slice(2)}` : "–"; };
 function lbParseCode(raw) { const s = String(raw || "").trim(); const m = s.toUpperCase().match(/GG-[0-9A-Z]{4,8}/); return m ? m[0] : s.toUpperCase(); }
 function lbFind(raw) { const code = lbParseCode(raw); const t = String(raw || "").trim(); return S.lots.find((x) => (x.code || "").toUpperCase() === code || x.id === t) || null; }
+/* "2.5" or "2,5" -> "2,5 kg"; empty when no quantity */
+function lbQty(l) { if (l.qty == null || l.qty === "") return ""; const n = num(l.qty); const q = n == null ? String(l.qty) : fmt(n, n % 1 ? (Math.round(n * 10) === n * 10 ? 1 : 2) : 0); return `${q}${l.unit ? ` ${l.unit}` : ""}`; }
 function lbDays(k) {
   const d = daysUntil(k);
   if (d == null) return { d: null, txt: "Sans DLC", cls: "neu" };
@@ -38,15 +40,18 @@ function lbToastUndo(msg) {
   const t = $("#toast"); t.style.pointerEvents = "auto"; clearTimeout(t._h); t._h = setTimeout(() => { t.classList.remove("on"); t.style.pointerEvents = ""; }, 5000);
 }
 /* every lot change goes through here, so the last one can be undone */
-async function lbDo(id, patch, type, text, label) {
+async function lbDo(id, patch, type, text, label, undoTxt) {
   const l = lbLot(id); if (!l) return; const prev = { ...l }; delete prev.id;
   await safe(DB.update("lots", id, patch));
   let evId = null; try { evId = await DB.add("events", { type, text, at: Date.now(), uid: S.me.id, ref: id }); } catch (e) {}
-  S.ui.lbUndo = { id, prev, evId, label, at: Date.now() };
+  S.ui.lbUndo = { id, prev, evId, label, undoTxt: undoTxt || `a annulé une action sur ${l.name}`, at: Date.now() };
 }
+/* one write at a time: a double tap (wet fingers, laggy phone) must never log twice */
+let lbBusy = false;
+const lbOnce = (fn) => async (...a) => { if (lbBusy) return; lbBusy = true; try { await fn(...a); } catch (e) { console.warn(e); } finally { lbBusy = false; } };
 
 /* ───────────── live camera scanner ───────────── */
-const LB = { stream: null, track: null, raf: 0, state: "off", starting: false, torch: false, torchOk: false, hold: false, cv: null, last: 0, lotsRef: null, mode: "one", batch: [], seen: {}, sheetWas: false, resumeAt: 0, lastCode: "" };
+const LB = { stream: null, track: null, raf: 0, state: "off", starting: false, torch: false, torchOk: false, hold: false, cv: null, last: 0, lotsRef: null, mode: "one", batch: [], seen: {}, sheetWas: false, resumeAt: 0, lastCode: "", lastSeen: 0 };
 const lbStageEl = () => $("#viewport .view:not(.leave) #lbStage");
 
 function lbStageMsg() {
@@ -113,11 +118,15 @@ function lbDetected(raw, pts, stage, video, now) {
     if (LB.seen[code] && now - LB.seen[code] < 3500) { LB.seen[code] = now; return; }
     LB.seen[code] = now; lbFlash(stage, lbFind(raw) ? "hit" : "miss"); lbBatchAdd(raw); return;
   }
-  if (code === LB.lastCode && now - LB.resumeAt < 2500) return;
-  LB.lastCode = code; LB.hold = true;
+  /* the same label still in front of the lens after closing its sheet: ignore it until it leaves the frame */
+  const same = code === LB.lastCode && (now - LB.lastSeen < 1200 || now - LB.resumeAt < 1500);
+  if (code === LB.lastCode) LB.lastSeen = now;
+  if (same) return;
+  LB.lastCode = code; LB.lastSeen = now; LB.hold = true;
   const l = lbFind(raw); lbVfTo(stage, video, pts); stage.classList.add(l ? "hit" : "miss");
-  if (l) { SFX.scan(); buzz(18); setTimeout(() => { openLot(l.id); stage.classList.remove("hit"); LB.hold = false; LB.sheetWas = true; }, 520); }
-  else { SFX.err(); buzz([30, 40, 30]); toast(/^GG-/.test(code) ? `Aucun produit avec le code ${code}` : "Ce QR n'est pas une étiquette Growth Gusto", "err"); setTimeout(() => { stage.classList.remove("miss"); lbResetVf(); LB.hold = false; LB.resumeAt = performance.now(); }, 1300); }
+  const still = () => S.route === "scan" && lbStageEl() === stage;
+  if (l) { SFX.scan(); buzz(18); setTimeout(() => { stage.classList.remove("hit"); LB.hold = false; LB.sheetWas = true; LB.lastSeen = performance.now(); if (still()) openLot(l.id); }, 520); }
+  else { SFX.err(); buzz([30, 40, 30]); toast(/^GG-/.test(code) ? `Aucun produit avec le code ${code}` : "Ce QR n'est pas une étiquette Growth Gusto", "err"); setTimeout(() => { stage.classList.remove("miss"); lbResetVf(); LB.hold = false; LB.resumeAt = LB.lastSeen = performance.now(); }, 1300); }
 }
 function lbVfTo(stage, video, pts) {
   const vf = $(".lb-vf", stage); if (!vf) return;
@@ -141,11 +150,11 @@ async function lbBatchAdd(raw) {
   else if (l.status === "out" || l.status === "lost") { SFX.err(); buzz([30, 40, 30]); row = { id: l.id, code, name: l.name, txt: l.status === "lost" ? "Déjà noté jeté" : "Déjà sorti du stock", cls: "bad" }; }
   else if (tgt && l.fridgeId !== tgt) {
     SFX.scan(); buzz(15); const from = fridgeName(l.fridgeId);
-    await lbDo(l.id, { fridgeId: tgt }, "lot", `a rangé ${l.name} dans ${fridgeName(tgt)} (scan, venait de ${from})`, "rangé");
+    await lbDo(l.id, { fridgeId: tgt }, "lot", `a rangé ${l.name} dans ${fridgeName(tgt)} (scan, venait de ${from})`, "rangé", `a annulé le rangement de ${l.name} dans ${fridgeName(tgt)}`);
     row = { id: l.id, code, name: l.name, txt: `Rangé dans ${fridgeName(tgt)}`, cls: "ok", undo: true };
   } else {
     SFX.scan(); buzz(15); const fn = fridgeName(l.fridgeId);
-    await lbDo(l.id, { checkedAt: Date.now(), checkedBy: S.me.id }, "lot", `a contrôlé ${l.name} dans ${fn} (scan)`, "contrôlé");
+    await lbDo(l.id, { checkedAt: Date.now(), checkedBy: S.me.id }, "lot", `a contrôlé ${l.name} dans ${fn} (scan)`, "contrôlé", `a annulé le contrôle de ${l.name}`);
     row = { id: l.id, code, name: l.name, txt: `Bien dans ${fn}`, cls: "ok", undo: true };
   }
   if (l) row.dlc = dlcOf(l);
@@ -156,8 +165,8 @@ function lbRenderBatch(fresh) {
   const n = LB.batch.filter((b) => b.cls === "ok" && !b.undone).length;
   const cnt = $("#lbCount"); if (cnt) { cnt.textContent = n; cnt.parentElement.hidden = !LB.batch.length || LB.mode !== "multi"; if (fresh) { cnt.parentElement.classList.remove("bump"); void cnt.offsetWidth; cnt.parentElement.classList.add("bump"); } }
   const box = $("#lbBatch"); if (!box) return;
-  const u = S.ui.lbUndo; const canUndo = LB.batch[0]?.undo && !LB.batch[0].undone && u && u.id === LB.batch[0].id;
-  box.innerHTML = LB.batch.length ? `<div class="row" style="margin-bottom:2px;min-height:40px"><span class="lbl">${n} produit${n > 1 ? "s" : ""} enregistré${n > 1 ? "s" : ""}</span>${canUndo ? `<button class="btn ghost sm" data-act="lbUndo">${ico("lbUndo")}Annuler le dernier</button>` : ""}</div>
+  const u = S.ui.lbUndo; const canUndo = !!(u && LB.batch.find((b) => b.undo && !b.undone && b.id === u.id));
+  box.innerHTML = LB.batch.length ? `<div class="row" style="margin-bottom:2px;min-height:40px"><span class="lbl">${n} produit${n > 1 ? "s" : ""} enregistré${n > 1 ? "s" : ""}</span>${canUndo ? `<button class="btn ghost sm" data-act="lbUndo" style="white-space:nowrap">${ico("lbUndo")}Annuler</button>` : ""}</div>
     ${LB.batch.slice(0, 40).map((b, i) => `<div class="li lb-brow ${i === 0 && fresh ? "lb-new" : ""} ${b.undone ? "undone" : ""}" ${b.id ? `data-id="${b.id}"` : ""}><span class="ic ${b.cls}">${ico(b.cls === "ok" ? "check" : "alert")}</span><div class="tx"><b>${esc(b.name)}</b><em>${b.undone ? "Annulé" : esc(b.txt)}</em></div>${b.dlc && !b.undone ? dlcPill(b.dlc) : ""}</div>`).join("")}
     <button class="btn soft block" data-act="lbBatchEnd" style="margin-top:10px">${ico("check")}Terminer</button>`
     : `<div class="lb-bempty"><span class="ic">${ico("lbLayers")}</span><div><b>Scannez les produits à la suite</b><span>${lbTarget() ? `Chaque produit est rangé dans ${esc(fridgeName(lbTarget()))}` : "Chaque produit est contrôlé"} dès le bip. Rien à valider.</span></div></div>`;
@@ -165,7 +174,7 @@ function lbRenderBatch(fresh) {
 function lbPatchLists() { const r = $("#viewport .view:not(.leave) #lbRecent"); if (r) r.innerHTML = lotList(activeLots().slice(0, 6), true); }
 function lbPanelHtml() {
   const multi = LB.mode === "multi"; const tgt = lbTarget();
-  return `<div class="seg lb-seg st" style="--i:2"><span class="knob" style="width:calc(50% - 4px);transform:translateX(${multi ? "100%" : "0"})"></span><button class="${multi ? "" : "on"}" data-act="lbMode" data-v="one">${ico("lbOne")}Un produit</button><button class="${multi ? "on" : ""}" data-act="lbMode" data-v="multi">${ico("lbLayers")}Scanner plusieurs</button></div>
+  return `<div class="seg lb-seg st" style="--i:2"><span class="knob" style="width:calc(50% - 4px);transform:translateX(${multi ? "100%" : "0"})"></span><button class="${multi ? "" : "on"}" data-act="lbMode" data-v="one">${ico("qr")}Un produit</button><button class="${multi ? "on" : ""}" data-act="lbMode" data-v="multi">${ico("lbLayers")}Scanner plusieurs</button></div>
     ${multi ? `<div class="glass pad st" style="--i:3"><span class="lbl">Ranger dans</span><div class="chips" style="margin-top:8px;flex-wrap:wrap">${S.fridges.map((f) => `<button class="chip ${tgt === f.id ? "on" : ""}" data-act="lbTarget" data-v="${f.id}">${esc(f.name)}</button>`).join("")}<button class="chip ${tgt === "" ? "on" : ""}" data-act="lbTarget" data-v="">Juste vérifier</button></div>
       <div id="lbBatch" style="margin-top:12px"></div></div>` : ""}
     <div class="glass pad st" style="--i:4;display:flex;flex-direction:column;gap:10px"><div class="hstack"><span class="ic">${ico("keyboard")}</span><div><b class="h3">Douchette ou code</b><div class="sub">Une douchette Bluetooth tape le code ici toute seule</div></div></div>
@@ -188,11 +197,12 @@ VIEWS.scan = {
   after(v) {
     LB.lotsRef = S.lots; LB.hold = false; lbRenderBatch();
     if (!LB.raf) LB.raf = requestAnimationFrame(lbLoop);
-    if (LB.state !== "denied") lbStart(); else lbSetState("denied");
+    if (LB.state === "denied" || LB.state === "nocam" || LB.state === "busy") LB.state = "off";
+    lbStart(); /* always retry: the user may have allowed the camera in the settings meanwhile */
     const i = $("#codeIn", v); if (i && window.matchMedia("(min-width:960px)").matches) setTimeout(() => i.focus({ preventScroll: true }), 400);
   },
 };
-document.addEventListener("visibilitychange", () => { if (document.hidden) lbStop(); else if (S.route === "scan" && lbStageEl()) { if (!LB.raf) LB.raf = requestAnimationFrame(lbLoop); if (LB.state !== "denied") lbStart(); } });
+document.addEventListener("visibilitychange", () => { if (document.hidden) lbStop(); else if (S.route === "scan" && lbStageEl()) { if (!LB.raf) LB.raf = requestAnimationFrame(lbLoop); if (LB.state !== "denied") lbStart(); } else if (lbWake && $("#lbQr")) lbWakeLock(); });
 
 function lookupCode(raw) {
   const code = lbParseCode(raw); if (!code) return;
@@ -204,15 +214,15 @@ function lookupCode(raw) {
 /* ───────────── fiche produit (après scan) ───────────── */
 const LB_ST = { in: ["En frigo", "snow"], opened: ["Ouvert", "scissors"], out: ["Utilisé", "lbDone"], lost: ["Jeté", "trash"] };
 function lbTimeline(l) {
-  const evs = S.events.filter((e) => e.ref === l.id).map((e) => ({ at: e.at, uid: e.uid, type: e.type, text: e.text }));
-  const has = (t) => evs.some((e) => e.type === t);
+  const evs = S.events.filter((e) => e.ref === l.id).map((e) => ({ at: e.at, uid: e.uid, type: e.undoOf != null ? "undo" : e.type, text: e.text, cancelled: !!e.cancelled }));
+  const has = (t) => evs.some((e) => e.type === t && !e.cancelled);
   const rows = [...evs];
   if (l.createdAt) rows.push({ at: l.createdAt, uid: l.uid, type: "in", text: `a rentré ${l.name} dans ${fridgeName(l.fridgeId)}${l.receivedTemp != null && l.receivedTemp !== "" ? ` · ${fmt(num(l.receivedTemp))}°C à réception` : ""}` });
   if (l.openedAt && !has("open")) rows.push({ at: l.openedAt, uid: l.openedBy, type: "open", text: `a ouvert ${l.name}` });
   if (l.outAt && !has(l.status)) rows.push({ at: l.outAt, uid: l.outBy, type: l.status === "lost" ? "lost" : "out", text: l.status === "lost" ? `a jeté ${l.name}` : `a sorti ${l.name}` });
   rows.sort((a, b) => b.at - a.at);
-  const icon = { in: "into", open: "scissors", out: "lbDone", lost: "trash", lot: "move" };
-  return rows.map((e, i) => `<div class="lb-ev ${i === 0 ? "first" : ""}"><span class="lb-evi t-${e.type}">${ico(icon[e.type] || "check")}</span><div class="tx"><b>${esc(said(e.uid, e.text))}</b><em>${esc(when(e.at))}</em></div></div>`).join("");
+  const icon = { in: "into", open: "scissors", out: "lbDone", lost: "trash", lot: "move", undo: "lbUndo" };
+  return rows.map((e, i) => `<div class="lb-ev ${i === 0 ? "first" : ""} ${e.cancelled ? "cancelled" : ""}"><span class="lb-evi t-${e.type}">${ico(icon[e.type] || "check")}</span><div class="tx"><b>${esc(said(e.uid, e.text))}</b><em>${esc(when(e.at))}${e.cancelled ? `<span class="lb-x">Annulé</span>` : ""}</em></div></div>`).join("");
 }
 function openLot(id) {
   const l = lbLot(id); if (!l) { toast("Produit introuvable.", "err"); return; }
@@ -225,7 +235,7 @@ function openLot(id) {
   const u = S.ui.lbUndo; const undo = u && u.id === id && Date.now() - u.at < 15 * 60e3;
   const tile = (act, icon, label, cls = "") => `<button class="lb-tile ${cls}" data-act="${act}" data-id="${id}">${ico(icon)}<span>${label}</span></button>`;
   lbSheet(`<div class="lb-lot">
-    <div class="hstack" style="gap:14px;align-items:flex-start"><button class="lb-qthumb" data-act="lbQr" data-id="${id}" aria-label="Afficher le QR en grand">${qrSvg(l.code || l.id)}<span>${ico("lbFull")}</span></button><div style="flex:1;min-width:0"><div class="h2" style="font-size:21px">${esc(l.name)}</div><div class="sub" style="margin-top:3px">${l.qty ? `${esc(l.qty)} ${esc(l.unit || "")} · ` : ""}${esc(l.supplier || "")}${l.lot ? ` · lot ${esc(l.lot)}` : ""}</div><div class="mono lb-code">${esc(l.code || "")}</div></div></div>
+    <div class="hstack" style="gap:14px;align-items:flex-start"><button class="lb-qthumb" data-act="lbQr" data-id="${id}" aria-label="Afficher le QR en grand">${qrSvg(l.code || l.id)}<span>${ico("lbFull")}</span></button><div style="flex:1;min-width:0"><div class="h2" style="font-size:21px">${esc(l.name)}</div>${(() => { const m = [lbQty(l), l.supplier, l.lot ? `lot ${l.lot}` : ""].filter((x) => x && String(x).trim()); return m.length ? `<div class="sub lb-meta" style="margin-top:3px">${m.map(esc).join(" · ")}</div>` : ""; })()}<div class="mono lb-code">${esc(l.code || "")}</div></div></div>
     <div class="lb-status s-${l.status || "in"}"><span class="lb-si">${ico(stI)}</span><div class="tx"><b>${stT}</b><em>${sub}</em>${active ? `<span class="pill ${D.cls}">${l.status === "opened" ? `Nouvelle DLC ${shortDate(k)} · ` : `DLC ${shortDate(k)} · `}${D.txt}</span>` : ""}</div>${big}</div>
     ${undo ? `<div class="lb-undo"><span>Vous avez ${esc(u.label)} ce produit.</span><button class="btn soft sm" data-act="lbUndo">${ico("lbUndo")}Annuler</button></div>` : ""}
     ${active ? `<div class="grid2">${l.status === "in" ? `<button class="btn soft lb-big" data-act="lotOpen" data-id="${id}">${ico("scissors")}Ouvrir</button>` : `<button class="btn soft lb-big" data-act="lotLabel" data-id="${id}">${ico("printer")}Étiquette</button>`}<button class="btn acc lb-big" data-act="lotOut" data-id="${id}">${ico("lbDone")}Utilisé</button></div>
@@ -237,7 +247,7 @@ function openLot(id) {
 /* ───────────── étiquette 57 × 32 mm ───────────── */
 function lbTagHtml(l) {
   const op = l.status === "opened";
-  return `<div class="lb-tag"><span class="q">${qrSvg(l.code || l.id)}</span><div class="t"><b class="n">${esc(l.name || "")}</b>
+  return `<div class="lb-tag"><span class="q">${qrSvg(l.code || l.id)}</span><div class="t"><b class="n ${(l.name || "").length > 24 ? "n3" : ""}">${esc(l.name || "")}</b>
     <span class="d"><small>${op ? "DLC OUVERT" : "DLC"}</small>${lbDate(dlcOf(l))}</span>
     <span class="m">${op ? `Ouvert ${shortDate(dayKey(new Date(l.openedAt)))} ${hm(l.openedAt)}` : `Reçu ${l.createdAt ? shortDate(dayKey(new Date(l.createdAt))) : "–"}${l.lot ? ` · L.${esc(l.lot)}` : ""}`}</span>
     <span class="c">${esc(l.code || "")}</span></div></div>`;
@@ -246,7 +256,7 @@ function labelHtml(l) { return `<div class="lb-roll">${lbTagHtml(l)}</div>`; }
 function openLabel(ids) {
   const lots = ids.map((i) => lbLot(i)).filter(Boolean); if (!lots.length) return;
   const test = lbTestMode(); const one = lots.length === 1; const pr = S.resto?.printer;
-  lbSheet(`${one ? `<button class="btn ghost sm lb-back" data-act="lot" data-id="${lots[0].id}">${ico("back")}${esc(lots[0].name)}</button>` : ""}
+  lbSheet(`${one ? `<button class="btn ghost sm lb-back" data-act="lot" data-id="${lots[0].id}">${ico("back")}<span class="lb-bk">${esc(lots[0].name)}</span></button>` : ""}
     <div style="text-align:center"><div class="h2" style="font-size:20px">${one ? "Étiquette QR" : `${lots.length} étiquettes`}</div><div class="sub">Étiquette thermique 57 × 32 mm</div></div>
     <div class="lb-feed go" id="prAnim"><div class="lb-mouth"><i></i></div><div class="lb-paper">${lots.map((l) => lbTagHtml(l)).join("")}</div></div>
     ${test ? `<div class="lb-testnote">${ico("sparkle")}<span><b>Mode test sans imprimante.</b> ${one ? "Affichez le QR en grand : un autre téléphone peut le scanner. " : ""}Ou enregistrez l'image pour l'imprimer plus tard, sur n'importe quelle imprimante.</span></div>` : ""}
@@ -270,9 +280,9 @@ async function labelPng(lots) {
     const q = qrcode(0, "M"); q.addData(l.code || l.id); q.make(); const n = q.getModuleCount(); const qs = H - 5 * PX; const s = Math.floor(qs / n); const qx = 2.5 * PX + Math.floor((qs - s * n) / 2), qy = y0 + Math.floor((H - s * n) / 2);
     g.fillStyle = "#000"; for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) if (q.isDark(y, x)) g.fillRect(qx + x * s, qy + y * s, s, s);
     const tx = 5 * PX + qs, tw = W - tx - 2.5 * PX; let y = y0 + 3 * PX;
-    g.textBaseline = "top"; const nm = (l.name || "").toUpperCase(); let fs = 3;
-    for (const f of [3, 2.6, 2.25]) { fs = f; g.font = `800 ${f * PX}px ${SANS}`; if (wrap(nm, tw, 9).length <= 2 && !wrap(nm, tw, 9).some((t) => t.endsWith("…"))) break; }
-    wrap(nm, tw, 2).forEach((t) => { g.fillText(t, tx, y); y += fs * 1.13 * PX; });
+    g.textBaseline = "top"; const nm = (l.name || "").toUpperCase(); let fs = 3, maxL = 2;
+    for (const f of [3, 2.6, 2.25, 2]) { fs = f; maxL = f <= 2.25 ? 3 : 2; g.font = `800 ${f * PX}px ${SANS}`; const w = wrap(nm, tw, 9); if (w.length <= maxL && !w.some((t) => t.endsWith("…"))) break; }
+    wrap(nm, tw, maxL).forEach((t) => { g.fillText(t, tx, y); y += fs * 1.13 * PX; });
     y = y0 + 12.4 * PX; g.font = `700 ${1.7 * PX}px ${SANS}`; g.fillText(l.status === "opened" ? "DLC OUVERT" : "DLC", tx, y);
     g.font = `800 ${4.4 * PX}px ${MONO}`; g.fillText(fit(lbDate(dlcOf(l)), tw), tx, y + 2.1 * PX);
     g.font = `600 ${1.8 * PX}px ${MONO}`; const meta = l.status === "opened" ? `Ouvert ${shortDate(dayKey(new Date(l.openedAt)))} ${hm(l.openedAt)}` : `Reçu ${l.createdAt ? shortDate(dayKey(new Date(l.createdAt))) : "–"}${l.lot ? ` · L.${l.lot}` : ""}`;
@@ -292,9 +302,10 @@ async function lbSaveBlob(blob, filename) {
 }
 
 /* ───────────── QR plein écran (test sans imprimante) ───────────── */
-let lbWake = null;
-function lbQrOpen(id) {
-  const l = lbLot(id); if (!l) return; lbQrClose(true);
+let lbWake = null, lbQrFrom = null;
+function lbWakeLock() { try { navigator.wakeLock && navigator.wakeLock.request("screen").then((w) => (lbWake = w)).catch(() => {}); } catch (e) {} }
+function lbQrOpen(id, fromSheet) {
+  const l = lbLot(id); if (!l) return; lbQrClose(true); lbQrFrom = fromSheet ? id : null;
   const D = lbDays(dlcOf(l)); const o = document.createElement("div"); o.id = "lbQr"; o.className = "lb-qr"; o.setAttribute("role", "dialog"); o.setAttribute("aria-label", "QR en plein écran");
   o.innerHTML = `<button class="lb-qx" data-act="lbQrClose" aria-label="Fermer">${ico("x")}</button>
     <div class="lb-qbox"><div class="lb-qcode">${qrSvg(l.code || l.id)}</div>
@@ -304,11 +315,12 @@ function lbQrOpen(id) {
     <p class="lb-qhint">Scannez ce QR avec un autre téléphone, comme une vraie étiquette.</p>
     <div class="lb-qact"><button class="btn soft" data-act="lotLabel" data-id="${l.id}">${ico("printer")}Étiquette</button><button class="btn" data-act="lbQrClose">Fermer</button></div>`;
   document.body.appendChild(o); requestAnimationFrame(() => requestAnimationFrame(() => o.classList.add("on"))); SFX.sheet(); buzz(8);
-  try { navigator.wakeLock && navigator.wakeLock.request("screen").then((w) => (lbWake = w)).catch(() => {}); } catch (e) {}
+  lbWakeLock();
 }
 function lbQrClose(silent) {
   const o = $("#lbQr"); if (!o) return; o.id = ""; o.classList.remove("on"); setTimeout(() => o.remove(), 320); if (!silent) SFX.close();
   try { lbWake && lbWake.release(); } catch (e) {} lbWake = null;
+  const back = lbQrFrom; lbQrFrom = null; if (!silent && back && lbLot(back)) setTimeout(() => openLot(back), 120);
 }
 document.addEventListener("keydown", (e) => { if (e.key === "Escape" && $("#lbQr")) lbQrClose(); });
 
@@ -317,11 +329,11 @@ const LB_REASONS = ["DLC dépassée", "Abîmé, odeur, aspect", "Rupture de froi
 
 Object.assign(ACT, {
   lot: (a, id) => { SFX.tap(); openLot(id); },
-  lbQr: (a, id) => { closeSheet(true); lbQrOpen(id); },
+  lbQr: (a, id) => { const from = $("#sheet").classList.contains("open"); closeSheet(true); lbQrOpen(id, from); },
   lbQrClose: () => lbQrClose(),
   lotOpen: (a, id) => {
     const l = lbLot(id); if (!l) return;
-    lbSheet(`<button class="btn ghost sm lb-back" data-act="lot" data-id="${id}">${ico("back")}${esc(l.name)}</button>
+    lbSheet(`<button class="btn ghost sm lb-back" data-act="lot" data-id="${id}">${ico("back")}<span class="lb-bk">${esc(l.name)}</span></button>
       <div class="h2" style="font-size:21px">Ouvrir ${esc(l.name)}</div><p class="sub" style="margin:0">À consommer dans combien de jours une fois ouvert ?</p>
       <div class="chips" style="flex-wrap:wrap">${[1, 2, 3, 4, 5, 7].map((d) => `<button class="chip ${d === 3 ? "on" : ""}" data-act="openDays" data-v="${d}">${d} jour${d > 1 ? "s" : ""}</button>`).join("")}</div>
       <div class="lb-status s-opened"><span class="lb-si">${ico("clock")}</span><div class="tx"><b>Nouvelle DLC</b><em>Jamais après la DLC d'origine (${shortDate(l.dlc)})</em></div><div class="lb-cd warn"><b class="mono" id="openDlc" style="font-size:24px">${shortDate(minDay(addDays(dayKey(), 3), l.dlc))}</b></div></div>
@@ -331,48 +343,54 @@ Object.assign(ACT, {
   },
   openDays: (a, id, v) => { S.ui.openDays = +v; $$("[data-act=openDays]").forEach((b) => b.classList.toggle("on", b === a)); const l = lbLot($("[data-act=openOk]").dataset.id); const el = $("#openDlc"); el.textContent = shortDate(minDay(addDays(dayKey(), +v), l.dlc)); el.classList.remove("bump"); void el.offsetWidth; el.classList.add("bump"); SFX.tick(); },
   openPhoto: async () => { const [f] = await pickImage(); if (!f) return; $("#opPh").textContent = "Envoi…"; const { blob } = await shrink(f); S.ui.openPhoto = await upload(blob); $("#opPh").textContent = "Photo ajoutée ✓"; SFX.ok(); },
-  openOk: async (a, id) => {
-    const l = lbLot(id); const dlcOpen = minDay(addDays(dayKey(), S.ui.openDays || 3), l.dlc);
-    await lbDo(id, { status: "opened", openedAt: Date.now(), openedBy: S.me.id, dlcOpen, openPhotoId: S.ui.openPhoto?.id || "", openPhotoUrl: S.ui.openPhoto?.url || "" }, "open", `a ouvert ${l.name} · à consommer avant le ${shortDate(dlcOpen)}`, "ouvert");
+  openOk: lbOnce(async (a, id) => {
+    const l = lbLot(id); if (!l || l.status !== "in") return openLot(id); const dlcOpen = minDay(addDays(dayKey(), S.ui.openDays || 3), l.dlc);
+    await lbDo(id, { status: "opened", openedAt: Date.now(), openedBy: S.me.id, dlcOpen, openPhotoId: S.ui.openPhoto?.id || "", openPhotoUrl: S.ui.openPhoto?.url || "" }, "open", `a ouvert ${l.name} · à consommer avant le ${shortDate(dlcOpen)}`, "ouvert", `a annulé l'ouverture de ${l.name}`);
     SFX.ok(); buzz(12); openLot(id); lbToastUndo(`Ouvert · DLC ${shortDate(dlcOpen)}`);
-  },
-  lotOut: async (a, id) => {
-    const l = lbLot(id); if (!l) return;
-    await lbDo(id, { status: "out", outAt: Date.now(), outBy: S.me.id }, "out", `a utilisé ${l.name} (sorti de ${fridgeName(l.fridgeId)})`, "utilisé");
-    SFX.ok(); buzz(12); openLot(id); lbToastUndo(`${l.name} utilisé`);
-  },
+  }),
+  lotOut: lbOnce(async (a, id) => {
+    const l = lbLot(id); if (!l || !["in", "opened"].includes(l.status)) return;
+    await lbDo(id, { status: "out", outAt: Date.now(), outBy: S.me.id }, "out", `a utilisé ${l.name} (sorti de ${fridgeName(l.fridgeId)})`, "utilisé", `a annulé la sortie de ${l.name}`);
+    SFX.ok(); buzz(12); openLot(id); lbToastUndo("Utilisé, sorti du stock");
+  }),
   lotLost: (a, id) => {
     const l = lbLot(id); if (!l) return; const pre = (daysUntil(dlcOf(l)) ?? 9) < 0 ? LB_REASONS[0] : "";
     S.ui.lbReason = pre;
-    lbSheet(`<button class="btn ghost sm lb-back" data-act="lot" data-id="${id}">${ico("back")}${esc(l.name)}</button>
+    lbSheet(`<button class="btn ghost sm lb-back" data-act="lot" data-id="${id}">${ico("back")}<span class="lb-bk">${esc(l.name)}</span></button>
       <div class="h2" style="font-size:21px">Jeter ${esc(l.name)} ?</div><p class="sub" style="margin:0">Pourquoi ? C'est noté dans le registre des pertes.</p>
       <div class="lb-reasons">${LB_REASONS.map((r) => `<button class="lb-reason ${r === pre ? "on" : ""}" data-act="lbReason" data-v="${esc(r)}"><span class="rd"></span>${r}</button>`).join("")}</div>
       <button class="btn block lb-big lb-trash" data-act="lostOk" data-id="${id}" ${pre ? "" : "disabled"}>${ico("trash")}Jeter le produit</button>`);
   },
   lbReason: (a, id, v) => { S.ui.lbReason = v; $$(".lb-reason").forEach((b) => b.classList.toggle("on", b === a)); $("[data-act=lostOk]").disabled = false; SFX.tick(); },
-  lostOk: async (a, id) => {
-    const l = lbLot(id); if (!l || !S.ui.lbReason) return; const r = S.ui.lbReason;
-    await lbDo(id, { status: "lost", outAt: Date.now(), outBy: S.me.id, lostReason: r }, "lost", `a jeté ${l.name}${l.qty ? ` (${l.qty} ${l.unit || ""})` : ""} · ${r}`, "jeté");
-    SFX.close(); buzz([10, 30, 10]); openLot(id); lbToastUndo(`${l.name} noté en perte`);
-  },
+  lostOk: lbOnce(async (a, id) => {
+    const l = lbLot(id); if (!l || !S.ui.lbReason || !["in", "opened"].includes(l.status)) return; const r = S.ui.lbReason;
+    await lbDo(id, { status: "lost", outAt: Date.now(), outBy: S.me.id, lostReason: r }, "lost", `a jeté ${l.name}${lbQty(l) ? ` (${lbQty(l)})` : ""} · ${r}`, "jeté", `a annulé la mise en perte de ${l.name}`);
+    SFX.close(); buzz([10, 30, 10]); openLot(id); lbToastUndo("Jeté, noté en perte");
+  }),
   lotMoveAsk: (a, id) => {
     const l = lbLot(id); if (!l) return;
-    lbSheet(`<button class="btn ghost sm lb-back" data-act="lot" data-id="${id}">${ico("back")}${esc(l.name)}</button>
+    lbSheet(`<button class="btn ghost sm lb-back" data-act="lot" data-id="${id}">${ico("back")}<span class="lb-bk">${esc(l.name)}</span></button>
       <div class="h2" style="font-size:21px">Ranger dans…</div>
       <div>${S.fridges.map((f) => { const n = activeLots().filter((x) => x.fridgeId === f.id).length; const on = l.fridgeId === f.id; return `<div class="li tap lb-fr ${on ? "on" : ""}" data-act="lotMove" data-id="${id}" data-v="${f.id}"><span class="ic">${ico("snow")}</span><div class="tx"><b>${esc(f.name)}</b><em>${on ? "Il est ici" : `${n} produit${n > 1 ? "s" : ""}`}</em></div>${on ? `<span class="check"><svg viewBox="0 0 24 24"><path d="M6 12.5l4 4 8-9"/></svg></span>` : ico("chev")}</div>`; }).join("") || `<div class="empty">Aucun frigo. Ajoutez-en depuis l'onglet Frigos.</div>`}</div>`);
   },
-  lotMove: async (a, id, v) => {
+  lotMove: lbOnce(async (a, id, v) => {
     const l = lbLot(id); if (!l) return; if (l.fridgeId === v) { openLot(id); return; }
-    await lbDo(id, { fridgeId: v }, "lot", `a rangé ${l.name} dans ${fridgeName(v)}`, "déplacé"); SFX.ok(); buzz(10); openLot(id); lbToastUndo(`Rangé dans ${fridgeName(v)}`);
-  },
-  lbUndo: async () => {
+    await lbDo(id, { fridgeId: v }, "lot", `a rangé ${l.name} dans ${fridgeName(v)}`, "déplacé", `a annulé le déplacement de ${l.name} vers ${fridgeName(v)}`); SFX.ok(); buzz(10); openLot(id); lbToastUndo("Déplacé");
+  }),
+  /* HACCP: an undo never erases the trace. The original entry stays, marked cancelled, and the undo itself is logged. */
+  lbUndo: lbOnce(async () => {
     const u = S.ui.lbUndo; if (!u) return; S.ui.lbUndo = null;
-    try { await DB.set("lots", u.id, u.prev); if (u.evId) await DB.del("events", u.evId).catch(() => {}); } catch (e) { SFX.err(); toast("Impossible d'annuler.", "err"); return; }
+    try {
+      await DB.set("lots", u.id, u.prev);
+      const now = Date.now();
+      if (u.evId) await DB.update("events", u.evId, { cancelled: true, cancelledAt: now, cancelledBy: S.me.id }).catch(() => {});
+      await DB.add("events", { type: "lot", text: u.undoTxt, at: now, uid: S.me.id, ref: u.id, undoOf: u.evId || "" }).catch(() => {});
+    } catch (e) { S.ui.lbUndo = u; SFX.err(); toast("Impossible d'annuler.", "err"); return; }
     const t = $("#toast"); t.classList.remove("on"); t.style.pointerEvents = ""; SFX.close(); buzz(8);
     const b = LB.batch.find((x) => x.id === u.id && !x.undone); if (b) { b.undone = true; lbRenderBatch(); }
     if ($("#sheet").classList.contains("open") && $("#sheetBody .lb-lot")) openLot(u.id);
-    setTimeout(() => toast("Action annulée"), 60);
-  },
+    setTimeout(() => toast("Annulé, c'est noté dans l'historique"), 60);
+  }),
   lotLabel: (a, id) => { lbQrClose(true); SFX.tap(); openLabel([id]); },
   labelsAll: () => openLabel(S.rec.done),
   labelSave: async (a) => {

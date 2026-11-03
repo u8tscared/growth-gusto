@@ -201,3 +201,12 @@
 .lb-step b{font-size:14.5px;letter-spacing:-.01em}
 .lb-soon{display:flex;gap:10px;align-items:flex-start;margin-top:16px;padding:12px 14px;border-radius:16px;background:rgba(184,108,0,.08);font-size:13px;line-height:1.45;color:var(--ink);font-weight:600}
 .lb-soon .ico{width:18px;height:18px;flex:none;color:var(--warn);margin-top:1px}
+
+/* audit trail: cancelled actions stay visible, struck through */
+.lb-ev.cancelled .tx b{text-decoration:line-through;text-decoration-color:rgba(14,19,48,.35);color:var(--muted);font-weight:600}
+.lb-ev.cancelled .lb-evi{opacity:.45}
+.lb-x{display:inline-block;margin-left:8px;padding:1px 7px;border-radius:999px;background:rgba(14,19,48,.07);color:var(--muted);font:800 10.5px/1.6 var(--f);letter-spacing:.04em;text-transform:uppercase;vertical-align:1px}
+.lb-evi.t-undo{background:rgba(14,19,48,.07);color:var(--ink)}
+.lb-back .lb-bk{min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.lb-back{display:inline-flex;max-width:calc(100% + 10px)}
+.lb-tag .n.n3{font-size:calc(2.1 * var(--mm));-webkit-line-clamp:3;line-height:1.1}
