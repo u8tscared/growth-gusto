@@ -19,6 +19,11 @@ const ccHaptics = () => ccLS.raw("gg-haptics") !== "off";
 const ccGerants = () => S.members.filter((m) => m.role === "gerant");
 const ccAgo = (ts) => { if (!ts) return "jamais"; const m = Math.round((Date.now() - ts) / 60000); if (m < 1) return "à l'instant"; if (m < 60) return `il y a ${m} min`; return when(ts); };
 
+/* rapid double taps: one run at a time per action */
+const ccBusy = new Set();
+async function ccOnce(k, fn, hold = 0) { if (ccBusy.has(k)) return; ccBusy.add(k); try { return await fn(); } finally { hold ? setTimeout(() => ccBusy.delete(k), hold) : ccBusy.delete(k); } }
+const ccNeedsLock = () => S.members.length > 1 || S.members.some((m) => m.pinH);
+
 function ccSaveWho() {
   if (!S.rid || !ccLocalMode()) return;
   const w = ccLS.get("gg-who", {}); w[S.rid] = { id: S.me.id, name: S.me.name || "", color: S.me.color || "" }; ccLS.set("gg-who", w);
@@ -41,7 +46,7 @@ function ccOnMembers(rows) {
   const me = rows.find((m) => m.id === S.me.id);
   if (me) { S.me.name = me.name || S.me.name; S.me.color = me.color; S.isOwner = (me.role || "equipe") === "gerant"; ccSaveWho(); }
   else { const pick = rows.find((m) => m.id === "local") || rows.find((m) => m.role === "gerant") || rows[0]; ccBecome(pick, true); }
-  if (!CC.bootLocked) { CC.bootLocked = true; if (ccAutoLock() && rows.length > 1) setTimeout(() => ccLock(), 400); }
+  if (!CC.bootLocked) { CC.bootLocked = true; if (ccAutoLock() && ccNeedsLock()) setTimeout(() => ccLock(), 400); }
 }
 const ccAttach0 = attachResto;
 attachResto = function () { ccAttach0(); if (ccLocalMode() && S.rid && !(DB.listeners[DB.path("members")] || []).includes(ccOnMembers)) DB.watch("members", {}, ccOnMembers); };
@@ -64,7 +69,7 @@ document.addEventListener("click", (e) => {
   if (t || (hb && hb.querySelector(".ava"))) { e.stopPropagation(); e.preventDefault(); SFX.init(); SFX.tap(); ACT.whoami(); }
 }, true);
 ["pointerdown", "keydown", "touchstart"].forEach((ev) => document.addEventListener(ev, () => { CC.last = Date.now(); }, { passive: true, capture: true }));
-setInterval(() => { const n = ccAutoLock(); if (n && !CC.locked && S.resto && S.route !== "onboarding" && S.members.length && Date.now() - CC.last > n * 60000) ccLock(); }, 5000);
+setInterval(() => { const n = ccAutoLock(); if (n && !CC.locked && S.resto && S.route !== "onboarding" && ccNeedsLock() && Date.now() - CC.last > n * 60000) ccLock(); }, 5000);
 document.addEventListener("keydown", (e) => {
   const w = CC.who; const open = CC.locked || ($("#sheet").classList.contains("open") && $("#sheetBody .cc-pin"));
   if (open && w.pick && /^[0-9]$/.test(e.key)) { e.preventDefault(); ACT.ccKey(null, null, e.key); return; }
@@ -74,11 +79,13 @@ document.addEventListener("keydown", (e) => {
     if (id === "obMe" || id === "obName") { e.preventDefault(); ACT.obNext(); }
     else if (id === "obTeamIn") { e.preventDefault(); ACT.obTeamAdd(); }
     else if (id === "ccfName" || id === "ccfPin") { e.preventDefault(); ACT.ccMemberSave(); }
+    else if (id === "newResto") { e.preventDefault(); ACT.restoAdd(); }
+    else if (id === "ccResetIn" && !$("#ccResetGo")?.disabled) { e.preventDefault(); ACT.ccResetOk(); }
   }
 });
 document.addEventListener("input", (e) => {
   const el = e.target;
-  if (el.id === "obName") { const p = $("#obPrev"); if (p) { const n = el.value.trim(); $("b", p).textContent = n || "Votre restaurant"; $(".cc-mono", p).textContent = initials(n || "R"); p.classList.toggle("on", !!n); } }
+  if (el.id === "obName") { const p = $("#obPrev"); if (p) { const n = el.value.trim(); $("b", p).textContent = n || "Votre restaurant"; $(".cc-mono", p).textContent = initials(n || "R"); p.classList.toggle("on", !!n); } ccObFit(); }
   if (el.id === "ccfPin") el.value = el.value.replace(/\D/g, "").slice(0, 4);
   if (el.id === "ccfName" && CC.form) { CC.form.name = el.value; const pv = $("#ccfPrev"); if (pv) pv.innerHTML = ccAva({ id: CC.form.id || "new", name: el.value || "?", color: CC.form.color }, 72); }
   if (el.id === "ccResetIn") { const b = $("#ccResetGo"); if (b) b.toggleAttribute("disabled", el.value.trim().toUpperCase() !== "EFFACER"); }
@@ -136,7 +143,14 @@ Object.assign(IC, {
 });
 
 /* ───────────── onboarding: 3 short steps ───────────── */
-const OB_FRIDGES = ["Chambre froide 1", "Chambre froide 2", "Frigo du bar", "Frigo pâtisserie", "Saladette", "Congélateur"];
+/* onboarding presets: [name, type id from REL_TYPES (js/releve.js)] */
+const OB_FRIDGES = [["Chambre froide 1", "cfp"], ["Chambre froide 2", "cfp"], ["Frigo du bar", "frigo"], ["Frigo pâtisserie", "frigo"], ["Saladette", "saladette"], ["Congélateur", "congel"], ["Cave à boissons", "cave"], ["Vitrine", "vitrine"]];
+const OB_TYPE_FALLBACK = { frigo: [0, 4, "therm"], cfp: [0, 4, "therm"], congel: [-30, -15, "snow"], saladette: [0, 4, "therm"], cave: [2, 8, "therm"], vitrine: [0, 4, "therm"] };
+function ccObType(k) {
+  const t = typeof REL_TYPES !== "undefined" ? REL_TYPES.find((x) => x.k === k) : null; const f = OB_TYPE_FALLBACK[k] || OB_TYPE_FALLBACK.frigo;
+  return { k, min: t ? t.min : f[0], max: t ? t.max : f[1], ic: t && IC[t.ic] ? t.ic : f[2] };
+}
+const ccDeg = (v) => (v > 0 ? "+" : v < 0 ? "−" : "") + Math.abs(v);
 VIEWS.onboarding = {
   live: false,
   render() {
@@ -152,32 +166,37 @@ VIEWS.onboarding = {
       <div class="cc-ob-top st" style="--i:0">${appIcon(40)}<div class="cc-ob-prog" id="obProg"><i class="on"></i><i></i><i></i></div><span class="lbl mono" id="obCount">1/3</span></div>
       <div class="cc-ob-track st" style="--i:1"><div class="cc-ob-rail" id="obRail">
         <section class="cc-ob-pane on" data-pane="0">${head(0)}
-          <input class="input cc-big" id="obMe" placeholder="Votre prénom" autocomplete="given-name" value="${esc(S.me.name || "")}">
+          <input class="input cc-big" id="obMe" placeholder="Votre prénom" autocomplete="given-name" maxlength="40" enterkeyhint="next" value="${esc(S.me.name || "")}">
           <div class="cc-ob-team"><div class="row"><span class="lbl">Vous êtes plusieurs ?</span><span class="pill neu">Facultatif</span></div>
             <div class="cc-ob-list" id="obTeamList">${ccObTeamHTML()}</div>
-            <div class="hstack"><input class="input" id="obTeamIn" placeholder="Prénom d'un collègue" autocomplete="off" style="flex:1"><button class="btn soft sm" style="height:50px" data-act="obTeamAdd">${ico("plus")}Ajouter</button></div>
+            <div class="hstack"><input class="input" id="obTeamIn" placeholder="Son prénom" autocomplete="off" maxlength="40" enterkeyhint="done" style="flex:1;min-width:0"><button class="btn soft sm" style="height:50px" data-act="obTeamAdd">${ico("plus")}Ajouter</button></div>
             <span class="note">Chacun touchera son avatar pour signer. Possible aussi plus tard, dans Équipe.</span></div>
         </section>
-        <section class="cc-ob-pane" data-pane="1">${head(1)}
-          <input class="input cc-big" id="obName" placeholder="Ex. Chemin des Sarments" autocomplete="off">
+        <section class="cc-ob-pane" data-pane="1" inert>${head(1)}
+          <input class="input cc-big" id="obName" placeholder="Ex. Chemin des Sarments" autocomplete="organization" maxlength="80" enterkeyhint="next">
           <div class="cc-ob-prev" id="obPrev"><span class="cc-mono">R</span><div><b>Votre restaurant</b><em>Registre HACCP · relevés · stock</em></div></div>
         </section>
-        <section class="cc-ob-pane" data-pane="2">${head(2)}
-          <div class="chips cc-ob-chips">${OB_FRIDGES.map((n) => `<button class="chip ${sug.includes(n) ? "on" : ""}" data-act="obToggle" data-n="${esc(n)}">${ico(n.includes("Congél") ? "snow" : "therm")}${esc(n)}</button>`).join("")}</div>
-          <span class="note">Vous pourrez en ajouter, les renommer et régler les seuils ensuite.</span>
+        <section class="cc-ob-pane" data-pane="2" inert>${head(2)}
+          <div class="cc-ob-frs">${OB_FRIDGES.map(([n, k]) => { const t = ccObType(k); const on = sug.includes(n); return `<button class="cc-fr ${on ? "on" : ""}" data-act="obToggle" data-n="${esc(n)}" aria-pressed="${on}"><span class="cc-fr-ic">${ico(t.ic)}</span><span class="cc-fr-tx"><b>${esc(n)}</b><em class="mono">${ccDeg(t.min)} à ${ccDeg(t.max)} °C</em></span><span class="cc-fr-ck">${ico("check")}</span></button>`; }).join("")}</div>
+          <span class="note" id="obFrNote">${ccObFrNote(sug.length)}</span>
         </section>
       </div></div>
       <div class="cc-ob-cta st" style="--i:2"><button class="btn soft cc-ob-back" data-act="obPrev" aria-label="Retour" hidden>${ico("back")}</button><button class="btn acc block" data-act="obNext" id="obNextBtn">Continuer${ico("chev")}</button><button class="btn acc block" data-act="obCreate" id="obGo" hidden>${ico("sparkle")}Créer mon restaurant</button></div>
-      ${DB.mode === "local" ? `<p class="note st" style="--i:3;text-align:center;margin:0">Vos données restent sur cet appareil. Pensez à les sauvegarder dans Réglages.</p>` : ""}
+      ${DB.mode === "local" ? `<p class="note st cc-ob-foot" style="--i:3"><span>Vos données restent sur cet appareil.</span><button class="cc-link" data-act="ccImport">${ico("upload")}Restaurer une sauvegarde</button></p>` : ""}
     </div>`;
   },
-  after(v) { setTimeout(() => { const i = $("#obMe", v); if (i && !i.value && window.matchMedia("(min-width:960px)").matches) i.focus({ preventScroll: true }); }, 450); },
+  after(v) { ccObFit(v); setTimeout(() => { const i = $("#obMe", v); if (i && !i.value && window.matchMedia("(min-width:960px)").matches) i.focus({ preventScroll: true }); }, 450); },
 };
+function ccObFrNote(n) { return n ? `${n} équipement${n > 1 ? "s" : ""} · vous pourrez en ajouter et régler les seuils ensuite.` : "Rien de coché : vous ajouterez vos équipements plus tard."; }
+/* the track takes the height of the visible step, so short steps don't leave a blank card */
+function ccObFit(v) { v = v || $("#viewport .view:not(.leave)"); const tr = v && $(".cc-ob-track", v); if (!tr) return; const p = $(`.cc-ob-pane[data-pane="${S.ui.obStep || 0}"]`, tr); if (p) tr.style.height = p.offsetHeight + 28 + "px"; }
+window.addEventListener("resize", debounce(() => { if (S.route === "onboarding") ccObFit(); }, 120));
 function ccObTeamHTML() { return (S.ui.obTeam || []).map((t, i) => `<span class="cc-mate">${ccAva({ id: "t" + i, name: t.name, color: PALETTE[(i + 1) % PALETTE.length] }, 28)}${esc(t.name)}<button data-act="obTeamDel" data-v="${i}" aria-label="Retirer ${esc(t.name)}">${ico("x")}</button></span>`).join(""); }
 function ccObGo(n) {
   const v = $("#viewport .view:not(.leave)"); if (!v || !$("#obRail", v)) return; S.ui.obStep = n;
   $("#obRail", v).style.transform = `translateX(calc(${-n} * (100% + 28px)))`;
-  $$(".cc-ob-pane", v).forEach((p) => p.classList.toggle("on", +p.dataset.pane === n));
+  $$(".cc-ob-pane", v).forEach((p) => { const on = +p.dataset.pane === n; p.classList.toggle("on", on); p.toggleAttribute("inert", !on); });
+  ccObFit(v);
   $$("#obProg i", v).forEach((d, i) => d.classList.toggle("on", i <= n));
   $("#obCount", v).textContent = `${n + 1}/3`;
   $(".cc-ob-back", v).hidden = n === 0; $("#obNextBtn", v).hidden = n === 2; $("#obGo", v).hidden = n !== 2;
@@ -197,9 +216,9 @@ VIEWS.equipe = {
   render() {
     const canManage = myRole() === "gerant"; const ms = ccMembers(); const local = ccLocalMode();
     const ev = S.events.slice(0, 8);
-    const row = (x) => { const mine = S.events.filter((e) => e.uid === x.id); const last = mine[0]; return `<div class="li tap cc-mrow" data-act="ccMember" data-id="${x.id}">${ccAva(x, 44)}<div class="tx"><b>${esc(x.name || nameOf(x.id))}${x.id === S.me.id ? ` <span class="cc-you">vous</span>` : ""}${x.pinH ? ` <span class="cc-lk" title="Protégé par un code">${ico("lock")}</span>` : ""}</b><em>${mine.length ? `${mine.length} action${mine.length > 1 ? "s" : ""} · ${ccAgo(last.at)}` : "Aucune action pour l'instant"}</em></div><span class="pill ${x.role === "gerant" ? "acc" : x.role === "chef" ? "warn" : "neu"}">${ROLES[x.role] || "Équipe"}</span>${ico("chev")}</div>`; };
+    const row = (x) => { const mine = S.events.filter((e) => e.uid === x.id); const last = mine[0]; return `<div class="li tap cc-mrow" data-act="ccMember" data-id="${x.id}">${ccAva(x, 44)}<div class="tx"><b><span class="cc-nm">${esc(x.name || nameOf(x.id))}</span>${x.id === S.me.id ? `<span class="cc-you">vous</span>` : ""}${x.pinH ? ` <span class="cc-lk" title="Protégé par un code">${ico("lock")}</span>` : ""}</b><em>${mine.length ? `${mine.length} action${mine.length > 1 ? "s" : ""} · ${ccAgo(last.at)}` : "Aucune action"}</em></div><span class="pill ${x.role === "gerant" ? "acc" : x.role === "chef" ? "warn" : "neu"}">${ROLES[x.role] || "Équipe"}</span>${ico("chev")}</div>`; };
     return `<div class="inner narrow">${topBar("Équipe", { right: canManage && local ? `<button class="btn acc sm" data-act="ccMemberNew">${ico("plus")}Ajouter</button>` : "" })}
-      ${local ? `<div class="cc-hero st" style="--i:1"><span class="cc-hero-ic">${ico("users")}</span><div style="flex:1;min-width:0"><b>Qui signe ?</b><span>Touchez votre avatar pour signer à votre nom.</span></div><button class="btn sm cc-hero-btn" data-act="whoami">${ico("swap")}Changer</button></div>` : ""}
+      ${local ? `<div class="cc-hero st" style="--i:1"><span class="cc-hero-ic">${ico("users")}</span><div style="flex:1;min-width:0"><b>Qui signe ?</b><span>Chacun signe à son nom.</span></div><button class="btn sm cc-hero-btn" data-act="whoami">${ico("swap")}Changer</button></div>` : ""}
       <div class="glass pad st" style="--i:2"><div class="row" style="margin-bottom:2px"><span class="lbl">${ms.length} personne${ms.length > 1 ? "s" : ""}</span>${!canManage ? `<span class="note">Seul un gérant peut modifier l'équipe</span>` : ""}</div>
         ${ms.length ? ms.map(row).join("") : `<div class="empty">Personne pour l'instant.</div>`}
         ${canManage && local ? `<button class="li tap cc-addrow" data-act="ccMemberNew"><span class="cc-ava plus" style="--s:44px">${ico("plus")}</span><div class="tx"><b>Ajouter un équipier</b><em>Prénom, rôle, couleur et code facultatif</em></div></button>` : ""}</div>
@@ -225,7 +244,7 @@ function ccMemberSheet(id) {
 function ccFormSheet() {
   const F = CC.form; const isNew = !F.id; const m = F.id ? ccMember(F.id) : null; const canRole = myRole() === "gerant";
   openSheet(`<div class="cc-fhead"><span id="ccfPrev">${ccAva({ id: F.id || "new", name: F.name || "?", color: F.color }, 72)}</span><div class="h2">${isNew ? "Nouvel équipier" : "Modifier le profil"}</div></div>
-    <label class="field"><span>Prénom</span><input class="input" id="ccfName" value="${esc(F.name)}" placeholder="Ex. Léa" autocomplete="off"></label>
+    <label class="field"><span>Prénom</span><input class="input" id="ccfName" value="${esc(F.name)}" placeholder="Ex. Léa" autocomplete="off" maxlength="40" enterkeyhint="done"></label>
     ${canRole ? `<div class="field"><span>Rôle</span><div class="cc-seg">${Object.entries(ROLES).map(([k, t]) => `<button class="${F.role === k ? "on" : ""}" data-act="ccFormRole" data-v="${k}">${t}</button>`).join("")}</div></div>` : ""}
     <div class="field"><span>Couleur</span><div class="cc-swatches">${PALETTE.map((c) => `<button class="${F.color === c ? "on" : ""}" style="--c:${c}" data-act="ccFormColor" data-v="${c}" aria-label="Couleur"></button>`).join("")}</div></div>
     <label class="field"><span>Code à 4 chiffres <em class="cc-opt">facultatif</em></span><input class="input mono cc-pinin" id="ccfPin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off" placeholder="${m && m.pinH ? "Code actif, inchangé" : "Aucun code"}"></label>
@@ -264,7 +283,7 @@ VIEWS.reglages = {
         ${!lb || Date.now() - lb > 7 * 864e5 ? `<div class="banner" style="margin-top:12px">${ico("alert")}<span>Sauvegardez chaque semaine : si le téléphone est perdu ou vidé, le fichier permet de tout récupérer.</span></div>` : ""}
         <div class="grid2 cc-g2" style="margin-top:12px"><button class="btn acc" data-act="ccExport">${ico("download")}Sauvegarder</button><button class="btn soft" data-act="ccImport">${ico("upload")}Restaurer</button></div>
       </div>
-      ${gerant ? `<div class="glass pad st" style="--i:5"><div class="li tap" data-act="ccReset"><span class="ic bad">${ico("trash")}</span><div class="tx"><b style="color:var(--bad)">Tout effacer</b><em>Supprime toutes les données de cet appareil</em></div>${ico("chev")}</div></div>` : ""}` : ""}
+      ${gerant ? `<div class="glass pad st" style="--i:5"><div class="li tap" data-act="ccReset"><span class="ic bad">${ico("trash")}</span><div class="tx"><b style="color:var(--bad)">Tout effacer</b><em>Vide cet appareil, définitivement</em></div>${ico("chev")}</div></div>` : ""}` : ""}
       <div class="cc-about st" style="--i:6">${appIcon(40)}<div><b>Growth Gusto</b><span>Version 1.0 · novembre 2026</span></div></div></div>`;
   },
 };
@@ -277,11 +296,23 @@ function ccStats(data) {
   const keys = Object.keys(data || {}); const cnt = (c) => keys.filter((k) => k.endsWith("/" + c)).reduce((s, k) => s + Object.keys(data[k] || {}).length, 0);
   return { restos: Object.keys(data.restos || {}).length, readings: cnt("readings"), lots: cnt("lots"), events: cnt("events"), members: cnt("members") };
 }
+/* keep only what the app can load: restos/{rid} objects and restos/{rid}/{collection} maps of objects */
+function ccCleanBackup(data) {
+  const isObj = (o) => !!o && typeof o === "object" && !Array.isArray(o);
+  if (!isObj(data) || !isObj(data.restos)) return null;
+  const out = { restos: {} };
+  Object.entries(data.restos).forEach(([rid, r]) => { if (isObj(r) && /^[\w-]{1,64}$/.test(rid)) out.restos[rid] = { ...r, name: String(r.name || "Établissement").slice(0, 80) }; });
+  if (!Object.keys(out.restos).length) return null;
+  Object.entries(data).forEach(([k, v]) => { const m = /^restos\/([\w-]{1,64})\/([A-Za-z]{1,32})$/.exec(k); if (!m || !out.restos[m[1]] || !isObj(v)) return; const col = {}; Object.entries(v).forEach(([id, d]) => { if (isObj(d)) col[id] = d; }); out[k] = col; });
+  return out;
+}
 async function ccImportFile(file) {
+  const bad = (msg) => { SFX.err(); buzz([30, 50, 30]); toast(msg || "Fichier non reconnu", "err"); };
+  if (file.size > 30 * 1024 * 1024) { bad("Fichier trop lourd"); return; }
   let obj; try { obj = JSON.parse(await file.text()); } catch (e) { obj = null; }
-  const data = obj && obj.app === "growth-gusto" ? obj.data : obj && obj.restos ? obj : null;
-  if (!data || typeof data !== "object" || !data.restos || typeof data.restos !== "object") { SFX.err(); toast("Ce fichier n'est pas une sauvegarde Growth Gusto.", "err"); return; }
-  S.ui.ccImport = { data, prefs: (obj && obj.prefs) || {} }; const st = ccStats(data); const names = Object.values(data.restos).map((r) => r && r.name).filter(Boolean);
+  const data = ccCleanBackup(obj && obj.app === "growth-gusto" ? obj.data : obj);
+  if (!data) { bad(); return; }
+  const pr = obj && typeof obj.prefs === "object" && obj.prefs ? obj.prefs : {}; S.ui.ccImport = { data, prefs: { rid: typeof pr.rid === "string" ? pr.rid : null, who: pr.who && typeof pr.who === "object" ? pr.who : null, ghosts: pr.ghosts && typeof pr.ghosts === "object" ? pr.ghosts : null } }; const st = ccStats(data); const names = Object.values(data.restos).map((r) => r && r.name).filter(Boolean);
   openSheet(`<div style="text-align:center"><span class="ic" style="width:56px;height:56px;border-radius:20px;margin:0 auto">${ico("upload")}</span><div class="h2" style="margin-top:10px;font-size:21px">Restaurer cette sauvegarde ?</div><p class="sub" style="margin:6px 0 0">${obj && obj.exportedAt ? `Faite le ${shortDate(dayKey(new Date(obj.exportedAt)))} à ${hm(obj.exportedAt)}` : esc(file.name)}</p></div>
     <div class="cc-impsum"><b>${esc(names.join(", ") || "Établissement")}</b><div class="cc-kpis"><div><b class="mono">${st.readings}</b><span>relevés</span></div><div><b class="mono">${st.lots}</b><span>produits</span></div><div><b class="mono">${st.members}</b><span>personnes</span></div></div></div>
     <div class="banner">${ico("alert")}<span>Les données actuelles de cet appareil seront remplacées par celles du fichier.</span></div>
@@ -293,11 +324,10 @@ setTimeout(() => { let f = null; try { f = sessionStorage.getItem("gg-flash"); s
 /* ───────────── menu Plus ───────────── */
 VIEWS.more = {
   render() {
-    const pend = S.fridges.length * 2 - todayStats().done; const urg = urgentCount();
+    const ts = todayStats(S.slot || slotNow()); const pend = ts.exp - ts.done; const urg = urgentCount();
     const groups = [
-      ["Au quotidien", [["releve", "therm", "Relevés", pend > 0 && S.fridges.length ? pend : 0], ["frigos", "snow", "Frigos", 0], ["scan", "scan", "Scanner", 0], ["reception", "truck", "Réception", 0], ["lots", "tag", "Produits", urg], ["etiquettes", "tag", "Étiquettes", 0]]],
+      ["Au quotidien", [["releve", "therm", "Relevés", pend > 0 && S.fridges.length ? pend : 0], ["frigos", "snow", "Frigos", 0], ["scan", "scan", "Scanner", urg], ["reception", "truck", "Réception", 0], ["menage", "spray", "Ménage", 0], ["notes", "book", "Recettes", 0]]],
       ["Gestion", [["stock", "box", "Stock", 0], ["tickets", "receipt", "Tickets Z", 0], ["registre", "shield", "Registre", 0]]],
-      ["Cuisine", [["notes", "book", "Recettes", 0], ["menage", "spray", "Ménage", 0]]],
       ["Restaurant", [["equipe", "users", "Équipe", 0], ["imprimante", "printer", "Imprimante", 0], ["reglages", "sliders", "Réglages", 0]]],
     ];
     let k = 2;
@@ -312,7 +342,7 @@ VIEWS.more = {
 /* ───────────── actions ───────────── */
 Object.assign(ACT, {
   /* onboarding */
-  obToggle: (a) => { const n = a.dataset.n; const s = S.ui.obFr; const i = s.indexOf(n); i >= 0 ? s.splice(i, 1) : s.push(n); a.classList.toggle("on"); a.classList.remove("bump"); void a.offsetWidth; a.classList.add("bump"); SFX.tick(); buzz(5); },
+  obToggle: (a) => { const n = a.dataset.n; const s = S.ui.obFr; const i = s.indexOf(n); i >= 0 ? s.splice(i, 1) : s.push(n); const on = i < 0; a.classList.toggle("on", on); a.setAttribute("aria-pressed", on); a.classList.remove("bump"); void a.offsetWidth; a.classList.add("bump"); const nt = $("#obFrNote"); if (nt) nt.textContent = ccObFrNote(s.length); SFX.tick(); buzz(5); },
   obNext: () => {
     const n = S.ui.obStep || 0;
     if (n === 0) { const el = $("#obMe"); if (!el.value.trim()) { ccShake(el); el.focus(); return; } }
@@ -320,13 +350,14 @@ Object.assign(ACT, {
     SFX.tap(); buzz(5); ccObGo(Math.min(2, n + 1));
   },
   obPrev: () => { SFX.tap(); ccObGo(Math.max(0, (S.ui.obStep || 0) - 1)); },
-  obTeamAdd: () => { const el = $("#obTeamIn"); const n = (el.value || "").trim(); if (!n) { ccShake(el); return; } if (S.ui.obTeam.length >= 12) return; S.ui.obTeam.push({ name: n, role: "equipe" }); el.value = ""; $("#obTeamList").innerHTML = ccObTeamHTML(); const last = $("#obTeamList .cc-mate:last-child"); last && last.classList.add("pop"); SFX.ok(); buzz(6); el.focus(); },
-  obTeamDel: (a, id, v) => { S.ui.obTeam.splice(+v, 1); $("#obTeamList").innerHTML = ccObTeamHTML(); SFX.close(); },
+  obTeamAdd: () => { const el = $("#obTeamIn"); const n = (el.value || "").trim(); if (!n) { ccShake(el); return; } if (S.ui.obTeam.length >= 12) { toast("12 personnes maximum ici : ajoutez les autres dans Équipe."); return; }
+    const me = ($("#obMe")?.value || "").trim().toLowerCase(); if (n.toLowerCase() === me || S.ui.obTeam.some((t) => t.name.toLowerCase() === n.toLowerCase())) { ccShake(el); toast("Ce prénom est déjà dans la liste.", "err"); return; } S.ui.obTeam.push({ name: n, role: "equipe" }); el.value = ""; $("#obTeamList").innerHTML = ccObTeamHTML(); const last = $("#obTeamList .cc-mate:last-child"); last && last.classList.add("pop"); SFX.ok(); buzz(6); el.focus(); ccObFit(); },
+  obTeamDel: (a, id, v) => { S.ui.obTeam.splice(+v, 1); $("#obTeamList").innerHTML = ccObTeamHTML(); ccObFit(); SFX.close(); },
   obCreate: async () => {
     const meEl = $("#obMe"), nameEl = $("#obName");
     const me = meEl ? meEl.value.trim() : S.me.name; if (meEl && !me) { ccObGo(0); ccShake(meEl); return; }
     const name = (nameEl.value || "").trim(); if (!name) { ccObGo(1); ccShake(nameEl); return; }
-    const pending = ($("#obTeamIn")?.value || "").trim(); if (pending) S.ui.obTeam.push({ name: pending, role: "equipe" });
+    const pending = ($("#obTeamIn")?.value || "").trim(); if (pending && !S.ui.obTeam.some((t) => t.name.toLowerCase() === pending.toLowerCase())) S.ui.obTeam.push({ name: pending, role: "equipe" });
     if (me) { S.me.name = me; S.me.color = S.me.color || PALETTE[0]; S.profiles[S.me.id] = { ...(S.profiles[S.me.id] || {}), ...S.me }; try { localStorage.setItem("gg-name", me); } catch (e) {} }
     const rid = "r" + Date.now().toString(36); const prev = S.rid; S.rid = rid;
     const go1 = $("#obGo"); go1 && go1.setAttribute("disabled", "");
@@ -335,7 +366,8 @@ Object.assign(ACT, {
       attachedRid = null; memberChecked = true; attachResto();
       await DB.set("members", S.me.id, { role: "gerant", joinedAt: Date.now(), ...(S.me.name ? { name: S.me.name } : {}), color: S.me.color || PALETTE[0] });
       for (const [i, t] of (S.ui.obTeam || []).entries()) { const id = "m" + Date.now().toString(36) + i + Math.random().toString(36).slice(2, 5); await DB.set("members", id, { role: t.role || "equipe", name: t.name, color: PALETTE[(i + 1) % PALETTE.length], joinedAt: Date.now() + i + 1, by: S.me.id }); }
-      for (const [i, n] of S.ui.obFr.entries()) await DB.add("fridges", { name: n, min: n.includes("Congél") ? -25 : 0, max: n.includes("Congél") ? -18 : 4, order: i, createdAt: Date.now() });
+      const frs = OB_FRIDGES.filter(([n]) => S.ui.obFr.includes(n));
+      for (const [i, [n, k]] of frs.entries()) { const t = ccObType(k); await DB.add("fridges", { name: n, type: t.k, min: t.min, max: t.max, order: i, createdAt: Date.now() + i }); }
       await logEvent("team", `a créé ${name}`);
       if ((S.ui.obTeam || []).length) await logEvent("team", `a ajouté ${S.ui.obTeam.map((t) => t.name).join(", ")} à l'équipe`);
       S.resto = { id: rid, name }; ccSaveWho(); S.ui.obTeam = [];
@@ -373,9 +405,11 @@ Object.assign(ACT, {
   ccFormRole: (a, id, v) => { CC.form.role = v; $$(".cc-seg button").forEach((b) => b.classList.toggle("on", b.dataset.v === v)); SFX.tick(); },
   ccFormColor: (a, id, v) => { CC.form.color = v; $$(".cc-swatches button").forEach((b) => b.classList.toggle("on", b.dataset.v === v)); const pv = $("#ccfPrev"); if (pv) pv.innerHTML = ccAva({ id: CC.form.id || "new", name: $("#ccfName").value || "?", color: v }, 72); SFX.tick(); buzz(4); },
   ccFormClearPin: (a) => { CC.form.clearPin = !CC.form.clearPin; a.classList.toggle("on", CC.form.clearPin); SFX.tick(); },
-  ccMemberSave: async () => {
+  ccMemberSave: () => ccOnce("memberSave", ACT.ccMemberSave0),
+  ccMemberSave0: async () => {
     const F = CC.form; if (!F) return; const nEl = $("#ccfName"); if (!nEl) return; const name = (nEl.value || "").trim(); const pin = ($("#ccfPin").value || "").trim();
     if (!name) { ccShake(nEl); nEl.focus(); return; }
+    if (S.members.some((m) => m.id !== F.id && (m.name || "").trim().toLowerCase() === name.toLowerCase())) { ccShake(nEl); toast(`Il y a déjà un ${name} : ajoutez une initiale.`, "err"); return; }
     if (pin && !/^\d{4}$/.test(pin)) { ccShake($("#ccfPin")); toast("Le code doit faire 4 chiffres.", "err"); return; }
     if (F.id) {
       const m = ccMember(F.id); if (!m) return;
@@ -398,7 +432,8 @@ Object.assign(ACT, {
   ccMemberDel: (a, id) => { const m = ccMember(id); if (!m) return; if (m.role === "gerant" && ccGerants().length < 2) { SFX.err(); toast("Il faut au moins un gérant dans l'équipe.", "err"); return; }
     openSheet(`<div style="text-align:center"><div style="display:flex;justify-content:center">${ccAva(m, 64)}</div><div class="h2" style="margin-top:10px;font-size:21px">Retirer ${esc(firstName(m.name))} ?</div><p class="sub" style="margin:6px auto 0;max-width:34ch">Son profil disparaît de ce téléphone. Ses relevés et actions restent au registre, à son nom.</p></div>
       <button class="btn danger block" data-act="ccMemberDelOk" data-id="${id}">${ico("trash")}Retirer</button><button class="btn ghost block" data-act="sheetClose">Annuler</button>`); },
-  ccMemberDelOk: async (a, id) => { const m = ccMember(id); if (!m || id === S.me.id) return; const g = ccLS.get("gg-ghosts", {}); (g[S.rid] ||= {})[id] = { name: m.name || "", color: ccColor(m) }; ccLS.set("gg-ghosts", g); S.profiles[id] = { name: m.name, color: ccColor(m) };
+  ccMemberDelOk: (a, id) => ccOnce("memberDel", () => ACT.ccMemberDel0(a, id)),
+  ccMemberDel0: async (a, id) => { const m = ccMember(id); if (!m || id === S.me.id) return; const g = ccLS.get("gg-ghosts", {}); (g[S.rid] ||= {})[id] = { name: m.name || "", color: ccColor(m) }; ccLS.set("gg-ghosts", g); S.profiles[id] = { name: m.name, color: ccColor(m) };
     await safe(DB.del("members", id)); await logEvent("team", `a retiré ${firstName(m.name)} de l'équipe`); closeSheet(true); SFX.close(); toast(`${firstName(m.name)} a été retiré`); },
   role: (a, id) => ACT.ccMemberEdit(a, id),
 
@@ -409,7 +444,8 @@ Object.assign(ACT, {
     ${S.members.length < 2 ? `<p class="note" style="margin:0">Ajoutez des équipiers pour en profiter pleinement.</p>` : ""}`); },
   ccAutoLockSet: (a, id, v) => { try { localStorage.setItem("gg-autolock", String(+v)); } catch (e) {} CC.last = Date.now(); closeSheet(true); SFX.ok(); toast(+v ? `Verrouillage après ${v} min` : "Verrouillage désactivé"); rerender(); },
   ccLockNow: () => ccLock(),
-  ccExport: async () => {
+  ccExport: () => ccOnce("export", ACT.ccExport0, 1500),
+  ccExport0: async () => {
     const data = JSON.parse(JSON.stringify(DB.local)); const st = ccStats(data);
     const payload = { app: "growth-gusto", kind: "sauvegarde", version: 1, exportedAt: Date.now(), by: S.me.name || "", stats: st, prefs: { rid: S.rid, who: ccLS.get("gg-who", {}), ghosts: ccLS.get("gg-ghosts", {}) }, data };
     const ok = await ccSaveFile(`growth-gusto-sauvegarde-${dayKey()}.json`, new Blob([JSON.stringify(payload)], { type: "application/json" }));
@@ -417,7 +453,7 @@ Object.assign(ACT, {
   },
   ccImport: () => { $("#ccImportPick").click(); },
   ccImportOk: () => {
-    const I = S.ui.ccImport; if (!I) return;
+    const I = S.ui.ccImport; if (!I) return; S.ui.ccImport = null;
     Object.keys(DB.local).forEach((k) => delete DB.local[k]); Object.assign(DB.local, JSON.parse(JSON.stringify(I.data)));
     try {
       localStorage.setItem("gg-local", JSON.stringify(DB.local));
@@ -436,13 +472,15 @@ Object.assign(ACT, {
     if (($("#ccResetIn")?.value || "").trim().toUpperCase() !== "EFFACER") { ccShake($("#ccResetIn")); return; }
     Object.keys(DB.local).forEach((k) => delete DB.local[k]);
     ["gg-local", "gg-rid", "gg-who", "gg-ghosts", "gg-name", "gg-lastbackup", "gg-autolock"].forEach((k) => { try { localStorage.removeItem(k); } catch (e) {} });
+    ["ccResetGo"].forEach((x) => $("#" + x)?.setAttribute("disabled", ""));
+    try { PHOTOS.urls && Object.values(PHOTOS.urls).forEach((u) => { try { URL.revokeObjectURL(u); } catch (e) {} }); window.indexedDB && indexedDB.deleteDatabase("gg-photos"); } catch (e) {}
     closeSheet(true); SFX.close(); ccReload("reset");
   },
 
   /* établissements */
   restoSwitch: () => {
-    openSheet(`<div class="h2" style="font-size:20px">Établissements</div>${S.restos.map((r) => `<div class="li tap" data-act="restoPick" data-id="${r.id}"><span class="cc-mono sm">${esc(initials(r.name))}</span><div class="tx"><b>${esc(r.name)}</b><em>${r.id === S.rid ? "Ouvert" : "Changer"}</em></div>${r.id === S.rid ? `<span class="check"><svg viewBox="0 0 24 24"><path d="M6 12.5l4 4 8-9"/></svg></span>` : ico("chev")}</div>`).join("")}
-      <div class="hstack"><input class="input" id="newResto" placeholder="Nom du nouvel établissement" style="flex:1"><button class="btn acc sm" style="height:50px" data-act="restoAdd">Ajouter</button></div>`);
+    openSheet(`<div class="h2" style="font-size:20px">Établissements</div>${S.restos.map((r) => `<div class="li tap" data-act="restoPick" data-id="${r.id}"><span class="cc-mono sm">${esc(initials(r.name))}</span><div class="tx"><b>${esc(r.name)}</b><em>${r.id === S.rid ? "Ouvert en ce moment" : "Toucher pour ouvrir"}</em></div>${r.id === S.rid ? `<span class="check"><svg viewBox="0 0 24 24"><path d="M6 12.5l4 4 8-9"/></svg></span>` : ico("chev")}</div>`).join("")}
+      ${myRole() === "gerant" ? `<div class="hstack"><input class="input" id="newResto" placeholder="Nouvel établissement" maxlength="60" enterkeyhint="done" style="flex:1;min-width:0"><button class="btn acc" data-act="restoAdd">${ico("plus")}Ajouter</button></div><span class="note">Chaque établissement a ses frigos, son équipe et son registre.</span>` : ""}`);
   },
   restoPick: (a, id) => {
     if (id === S.rid) { closeSheet(); return; }
@@ -450,9 +488,11 @@ Object.assign(ACT, {
     S.rid = id; S.resto = S.restos.find((r) => r.id === id); attachedRid = null; memberChecked = false;
     ["fridges", "readings", "lots", "products", "counts", "receptions", "events", "notes", "chores", "choreLogs", "tickets", "members"].forEach((k) => (S[k] = []));
     if (ccLocalMode()) { const w = ccLS.get("gg-who", {})[id]; S.me = w && w.id ? { id: w.id, name: w.name || "", color: w.color || undefined } : carry; }
-    attachResto(); closeSheet(); S.history = []; go("home", {}, { replace: true }); toast(`${S.resto.name}`);
+    attachResto(); closeSheet(); S.history = []; go("home", {}, { replace: true }); toast(`${S.resto.name} ouvert`);
   },
-  restoAdd: async () => { const n = ($("#newResto").value || "").trim(); if (!n) { ccShake($("#newResto")); return; } const rid = "r" + Date.now().toString(36); await safe(DB.set("restos", rid, { name: n, createdAt: Date.now(), by: S.me.id })); if (!S.restos.find((r) => r.id === rid)) S.restos.push({ id: rid, name: n }); const me = { ...S.me }; ACT.restoPick(null, rid); setTimeout(() => { DB.set("members", me.id, { role: "gerant", joinedAt: Date.now(), ...(me.name ? { name: me.name } : {}), ...(me.color ? { color: me.color } : {}) }).catch(() => {}); }, 300); SFX.ok(); },
+  restoAdd: () => ccOnce("restoAdd", ACT.restoAdd0),
+  restoAdd0: async () => { const n = ($("#newResto").value || "").trim(); if (!n) { ccShake($("#newResto")); return; } const rid = "r" + Date.now().toString(36); await safe(DB.set("restos", rid, { name: n, createdAt: Date.now(), by: S.me.id })); if (!S.restos.find((r) => r.id === rid)) S.restos.push({ id: rid, name: n }); const me = { ...S.me }; const g = ccLS.get("gg-who", {}); g[rid] = { id: me.id, name: me.name || "", color: me.color || "" }; ccLS.set("gg-who", g);
+    ACT.restoPick(null, rid); await DB.set("members", me.id, { role: "gerant", joinedAt: Date.now(), ...(me.name ? { name: me.name } : {}), ...(me.color ? { color: me.color } : {}) }).catch(() => {}); S.isOwner = true; await logEvent("team", `a créé ${n}`); renderChrome(); SFX.done(); burst(); },
   restoRename: () => { openSheet(`<div class="h2" style="font-size:20px">Nom du restaurant</div><input class="input" id="rn" value="${esc(S.resto.name)}"><button class="btn acc block" data-act="restoRenameOk">Enregistrer</button>`); },
   meRename: () => { openSheet(`<div class="h2" style="font-size:20px">Votre prénom</div><input class="input" id="mn" value="${esc(S.me.name)}" autocomplete="given-name"><button class="btn acc block" data-act="meRenameOk">Enregistrer</button>`); },
   meRenameOk: async () => { const n = ($("#mn").value || "").trim(); if (!n) return; S.me.name = n; S.profiles[S.me.id] = { ...(S.profiles[S.me.id] || {}), name: n }; if (S.me.id === "local") { try { localStorage.setItem("gg-name", n); } catch (e) {} } ccSaveWho(); await DB.update("members", S.me.id, { name: n }).catch(() => DB.set("members", S.me.id, { role: myRole(), joinedAt: Date.now(), name: n }).catch(() => {})); closeSheet(true); SFX.ok(); renderChrome(); rerender(); },

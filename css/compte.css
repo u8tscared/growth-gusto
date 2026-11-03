@@ -187,3 +187,56 @@
   #side .me:hover{background:var(--glass-hi)}
 }
 @media (max-height:700px){.cc-ob-ill{width:52px;height:52px;border-radius:18px}.cc-ob-q{font-size:22px}}
+
+/* ───────── QA pass: onboarding fit, fridge tiles, tap targets, long names ───────── */
+.cc-ob{justify-content:flex-start;padding-top:max(8px,min(5vh,40px))}
+.cc-ob-track{transition:height .5s var(--spring)}
+.cc-ob-rail{align-items:flex-start}
+.cc-ob-frs{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.cc-fr{all:unset;box-sizing:border-box;cursor:pointer;position:relative;display:flex;align-items:center;gap:10px;min-height:60px;padding:10px 10px 10px 10px;border-radius:18px;background:rgba(255,255,255,.55);border:1.5px solid rgba(14,19,48,.08);transition:transform .2s var(--spring),background .25s,border-color .25s,box-shadow .25s;-webkit-tap-highlight-color:transparent}
+.cc-fr:active{transform:scale(.95)}
+.cc-fr:focus-visible{outline:2.5px solid var(--accent);outline-offset:2px}
+.cc-fr-ic{width:36px;height:36px;flex:none;border-radius:12px;display:grid;place-items:center;background:rgba(14,19,48,.06);color:var(--muted);transition:background .25s,color .25s}
+.cc-fr-ic .ico{width:19px;height:19px}
+.cc-fr-tx{min-width:0;flex:1}
+.cc-fr-tx b{display:block;font-size:13.5px;font-weight:800;letter-spacing:-.015em;line-height:1.2;color:var(--ink)}
+.cc-fr-tx em{display:block;font-style:normal;font-size:11px;font-weight:600;color:var(--muted);margin-top:2px}
+.cc-fr-ck{position:absolute;top:-6px;right:-6px;width:22px;height:22px;border-radius:50%;display:grid;place-items:center;background:var(--accent);color:#fff;box-shadow:0 0 0 2.5px #fff;transform:scale(0);transition:transform .35s var(--spring)}
+.cc-fr-ck .ico{width:12px;height:12px;stroke-width:3}
+.cc-fr.on{background:#fff;border-color:var(--accent);box-shadow:0 10px 22px -14px rgba(74,31,230,.7)}
+.cc-fr.on .cc-fr-ic{background:linear-gradient(150deg,#8F63FF,#4A1FE6);color:#fff}
+.cc-fr.on .cc-fr-ck{transform:scale(1)}
+.cc-fr.bump{animation:ccBump .35s var(--spring)}
+@keyframes ccBump{40%{transform:scale(.94)}}
+@media (max-width:360px){.cc-ob-frs{grid-template-columns:1fr}}
+.cc-ob-foot{display:flex;flex-direction:column;align-items:center;gap:2px;text-align:center;margin:0}
+.cc-link{all:unset;cursor:pointer;display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:0 12px;border-radius:12px;color:var(--accent);font-weight:800;font-size:13.5px}
+.cc-link .ico{width:16px;height:16px}
+.cc-link:hover{background:rgba(74,31,230,.07)}
+.cc-link:focus-visible{outline:2.5px solid var(--accent)}
+/* 44px hit areas without growing the visuals */
+.cc-mate button{position:relative}
+.cc-mate button::after{content:"";position:absolute;inset:-8px}
+.cc-who-foot .btn.sm,.cc-hero-btn.btn.sm,.top .btn.sm,.cc-mrow~.btn.sm,.glass .row .btn.ghost.sm{min-height:44px}
+.cc-seg button{min-height:44px;box-sizing:border-box;display:grid;place-items:center;padding:0 4px}
+.cc-swatches{grid-template-columns:repeat(8,minmax(0,44px));gap:0;justify-content:space-between;max-width:420px}
+.cc-swatches button{max-width:none;width:44px;height:44px;aspect-ratio:auto;border-radius:50%;background:radial-gradient(circle closest-side,var(--c) 0 calc(100% - 5px),transparent calc(100% - 4px));box-shadow:none}
+.cc-swatches button.on{transform:none;background:radial-gradient(circle closest-side,var(--c) 0 calc(100% - 9px),#fff calc(100% - 8px) calc(100% - 5px),var(--c) calc(100% - 4px) calc(100% - 1px),transparent 100%)}
+@media (max-width:370px){.cc-swatches{grid-template-columns:repeat(4,44px);gap:6px 14px;justify-content:start}}
+/* long names */
+.cc-hero div>span{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;overflow-wrap:anywhere}
+.cc-who-head .lbl{max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cc-mrow .tx{min-width:0}
+.cc-mrow .tx b{min-width:0}
+.cc-nm{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cc-you,.cc-lk{flex:none}
+.cc-mhead>div{flex:1}
+.cc-mhead .h2{overflow-wrap:anywhere;line-height:1.15}
+.cc-cele .title{max-width:16ch;overflow-wrap:anywhere}
+.cc-cele .sub{max-width:32ch}
+/* menu Plus: always rows of three */
+@media (min-width:600px){.cc-grid{grid-template-columns:repeat(3,1fr)}}
+/* switcher: centred rows, so 2 or 3 people never sit in a lopsided grid */
+.cc-who-grid{display:flex;flex-wrap:wrap;justify-content:center;gap:8px}
+.cc-who-grid .cc-tile{width:calc((100% - 16px) / 3)}
+@media (min-width:600px){.cc-who-grid .cc-tile{width:calc((100% - 24px) / 4)}}
