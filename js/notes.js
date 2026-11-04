@@ -12,15 +12,17 @@ Object.assign(IC, {
 TAB_OF.fiche = "more";
 
 const NOTE_TABS = [["Recettes", "ntChef", "Recettes"], ["Procédures", "shield", "Procédures"], ["Notes", "ntNote", "Notes"]];
-const NOTE_ALLERGENS = [["gluten", "Gluten"], ["crustaces", "Crustacés"], ["oeufs", "Œufs"], ["poissons", "Poissons"], ["arachides", "Arachides"], ["soja", "Soja"], ["lait", "Lait"], ["fruits_coque", "Fruits à coque"], ["celeri", "Céleri"], ["moutarde", "Moutarde"], ["sesame", "Sésame"], ["sulfites", "Sulfites"], ["lupin", "Lupin"], ["mollusques", "Mollusques"]];
+/* the 14 regulated allergens come from core (ALLERGENS); v1/v2 recipes stored "fruits_coque": read as "fruitscoque" */
+const NOTE_ALLERGENS = (typeof ALLERGENS !== "undefined" ? ALLERGENS : []).map((a) => [a.id, a.t]);
+const noteAlId = (k) => (k === "fruits_coque" ? "fruitscoque" : String(k || ""));
 const NOTE_UNITS = ["g", "kg", "ml", "cl", "L", "pièce", "c. à s.", "c. à c.", "pincée", "botte", "feuille"];
 const noteKind = (n) => (n.cat === "Recettes" ? "Recettes" : n.cat === "Hygiène" || n.cat === "Procédures" ? "Procédures" : "Notes");
 const noteSplit = (t) => String(t || "").split(/\n+/).map((s) => s.replace(/^\s*(\d+\s*[.)\-–:]|[-•*·])\s*/, "").trim()).filter(Boolean);
 const noteSteps = (n) => (Array.isArray(n.steps) ? n.steps.map((s) => String(s || "").trim()).filter(Boolean) : noteKind(n) === "Notes" ? [] : noteSplit(n.body));
 const noteIntro = (n) => (Array.isArray(n.steps) || noteKind(n) === "Notes" ? String(n.body || "").trim() : "");
-const noteAllergenLabel = (k) => NOTE_ALLERGENS.find((a) => a[0] === k)?.[1] || k;
+const noteAllergenLabel = (k) => NOTE_ALLERGENS.find((a) => a[0] === noteAlId(k))?.[1] || k;
 const noteNorm = (s) => String(s || "").toLowerCase().replace(/œ/g, "oe").replace(/æ/g, "ae").normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[’']/g, " ").trim();
-const noteHay = (n) => noteNorm([n.title, n.body, ...(n.steps || []), ...(n.ingredients || []).map((g) => g.name), ...(n.allergens || []).map(noteAllergenLabel)].join(" "));
+const noteHay = (n) => noteNorm([n.title, n.body, ...(n.steps || []), ...(n.ingredients || []).map((g) => g.name), ...(noteKind(n) === "Recettes" && typeof recipeAllergens === "function" ? recipeAllergens(n) : n.allergens || []).map(noteAllergenLabel), n.carte ? "carte " + (NOTE_CARTE_CATS.find((c) => c[0] === n.carteCat)?.[1] || "") : ""].join(" "));
 const noteMatch = (n, q) => { const h = noteHay(n); return q.split(/\s+/).filter(Boolean).every((w) => h.includes(w)); };
 function noteNum(v) { if (v >= 100) return String(Math.round(v)); const d = v >= 10 ? 1 : 2; return String(+v.toFixed(d)).replace(".", ","); }
 /* quantities: "200", "1,5", "1/2", "1 1/2", "½", ranges "2-3" / "2 à 3", and a text tail "200 env." */
@@ -119,7 +121,7 @@ const notePlural = (n, w) => `${n} ${w}${n > 1 ? "s" : ""}`;
 
 /* ───────── list ───────── */
 function noteCard(n, i) {
-  const k = noteKind(n); const tab = NOTE_TABS.find((t) => t[0] === k); const steps = noteSteps(n); const ings = n.ingredients || []; const al = n.allergens || [];
+  const k = noteKind(n); const tab = NOTE_TABS.find((t) => t[0] === k); const steps = noteSteps(n); const ings = n.ingredients || []; const al = k === "Recettes" ? recipeAllergens(n) : [];
   const meta = k === "Recettes" ? [ings.length ? notePlural(ings.length, "ingrédient") : "", n.portions ? notePlural(n.portions, "portion") : "", steps.length ? notePlural(steps.length, "étape") : ""].filter(Boolean)
     : k === "Procédures" ? (steps.length ? [notePlural(steps.length, "étape")] : []) : [];
   const excerpt = k === "Notes" ? String(n.body || "").trim() : k === "Recettes" ? ings.map((g) => g.name).filter(Boolean).join(", ") : noteIntro(n) || steps[0] || "";
@@ -128,7 +130,7 @@ function noteCard(n, i) {
     <div class="nt-cbody"><b class="nt-ctitle">${esc(n.title || "Sans titre")}</b>
       ${meta.length ? `<span class="nt-meta">${meta.map((m) => `<span>${esc(m)}</span>`).join(" · ")}</span>` : ""}
       ${excerpt ? `<span class="nt-excerpt">${esc(excerpt)}</span>` : ""}
-      ${al.length ? `<span class="nt-almini">${ico("alert")}${notePlural(al.length, "allergène")}</span>` : ""}
+      ${k === "Recettes" ? noteCardFoot(n) : ""}
     </div><span class="nt-chev">${ico("chev")}</span></div>`;
 }
 function noteListHTML() {
@@ -166,7 +168,8 @@ VIEWS.notes = {
 const notePortCur = (n) => { const base = num(n.portions); const P = S.ui.notePortions?.[n.id]; return P ?? (base && base > 0 ? base : 1); };
 function noteIngHTML(n) {
   const base = num(n.portions); const k = base && base > 0 ? notePortCur(n) / base : notePortCur(n);
-  return (n.ingredients || []).map((g) => { const s = noteScale(g.qty, g.unit, k); return `<li><span class="nt-iname">${esc(g.name)}</span><span class="nt-lead"></span><b class="nt-iqty mono">${esc(s.q)}${s.u ? `<small>${esc(s.u)}</small>` : ""}</b></li>`; }).join("");
+  return (n.ingredients || []).map((g) => { const s = noteScale(g.qty, g.unit, k); const L = noteIngLink(g); const ga = noteIngAl(g);
+    return `<li class="${L ? "lk" : ""}"><span class="nt-iname">${L ? `<i class="nt-ilk" title="${L.t === "p" ? "Suivi en stock" : "Sous-recette"}">${ico(L.t === "p" ? "box" : "ntChef")}</i>` : ""}<span>${esc(g.name)}${ga.on.length || ga.sug.length ? `<em class="nt-ial">${esc([...ga.on.map(noteAllergenLabel), ...ga.sug.map((x) => noteAllergenLabel(x) + " ?")].join(" · "))}</em>` : ""}</span></span><span class="nt-lead"></span><b class="nt-iqty mono">${esc(s.q)}${s.u ? `<small>${esc(s.u)}</small>` : ""}</b></li>`; }).join("");
 }
 const notePortW = (s) => `${Math.max(1, String(s).length) + 0.3}ch`;
 function noteScalerHTML(n) {
@@ -197,21 +200,21 @@ VIEWS.fiche = {
     const n = S.notes.find((x) => x.id === id);
     if (!n) return `<div class="inner narrow nt-wrap">${topBar("Fiche")}<div class="glass empty st" style="--i:1"><div class="ic">${ico("book")}</div><b>Fiche introuvable</b>Elle a peut-être été supprimée.</div></div>`;
     const k = noteKind(n); const steps = noteSteps(n); const intro = noteIntro(n); const ings = n.ingredients || []; const al = n.allergens || [];
-    const pill = k === "Recettes" ? `<span class="pill acc">${ico("ntChef")}Recette</span>` : k === "Procédures" ? `<span class="pill ok">${ico("shield")}Procédure</span>` : `<span class="pill neu">${ico("ntNote")}Note</span>`;
+    const pill = k === "Recettes" ? `<span class="nt-pills"><span class="pill acc">${ico("ntChef")}Recette</span>${n.carte ? `<span class="pill ok">${ico("ntMenu")}À la carte · ${esc(noteCarteCat(n.carteCat))}${num(n.price) ? ` · ${esc(noteEur(n.price))}` : ""}</span>` : ""}</span>` : k === "Procédures" ? `<span class="pill ok">${ico("shield")}Procédure</span>` : `<span class="pill neu">${ico("ntNote")}Note</span>`;
     const hero = `<div class="nt-hero st ${n.photo ? "has-ph" : ""}" style="--i:1">${n.photo ? `<div class="nt-photo"><img src="${esc(n.photo)}" alt=""></div>` : ""}<div class="nt-htx">${pill}<h1 class="nt-title">${esc(n.title || "Sans titre")}</h1><span class="who">${avatar(n.uid, true)}${esc(firstName(nameOf(n.uid)))} · modifié ${when(n.updatedAt || n.at)}</span></div></div>`;
     const top = `<div class="top st" style="--i:0"><button class="iconbtn" data-act="back" aria-label="Retour">${ico("back")}</button><span class="h2"></span><button class="btn soft sm" data-act="noteEdit" data-id="${esc(n.id)}">${ico("edit")}Modifier</button></div>`;
     const stepsHTML = steps.length ? `<div class="glass pad st" style="--i:4"><span class="lbl">Étapes</span><ol class="nt-steps">${steps.map((s, i) => `<li><span class="nt-snum mono">${i + 1}</span><span>${noteTy(esc(s))}</span></li>`).join("")}</ol></div>` : "";
     const introHTML = (lbl, i) => (intro ? `<div class="glass pad st nt-intro" style="--i:${i}"><span class="lbl">${lbl}</span><p>${noteTy(esc(intro))}</p></div>` : "");
     if (k === "Recettes") {
-      const alHTML = al.length ? `<div class="glass pad st nt-alcard has" style="--i:2"><span class="lbl">${ico("alert")}${notePlural(al.length, "allergène")}</span><div class="nt-als">${al.map((a) => `<span class="nt-al on">${esc(noteAllergenLabel(a))}</span>`).join("")}</div></div>`
-        : `<div class="glass pad st nt-alcard" style="--i:2"><span class="lbl">Allergènes</span><p class="note" style="margin:6px 0 0">Aucun allergène indiqué. Vérifiez la fiche avant de servir un client allergique.</p></div>`;
+      const alHTML = noteAlCardHTML(n);
       const tab = S.ui.noteTab?.[n.id] === "process" ? "process" : "fiche"; const PL = (n.process || []).length;
       const seg = `<div class="seg nt-seg nt-fseg st" style="--i:2"><span class="knob" style="width:calc(50% - 4px);transform:translateX(${tab === "process" ? 100 : 0}%)"></span><button class="${tab === "fiche" ? "on" : ""}" data-act="noteFTab" data-id="${esc(n.id)}" data-v="fiche">${ico("ntChef")}<span>Fiche recette</span></button><button class="${tab === "process" ? "on" : ""}" data-act="noteFTab" data-id="${esc(n.id)}" data-v="process">${ico("ntFlow")}<span>Process HACCP</span>${PL ? `<em class="mono">${PL}</em>` : `<em class="ntp-todo">à faire</em>`}</button></div>`;
       if (tab === "process") return `<div class="inner wide nt-wrap">${top}${hero}${seg}<div id="ntFBody" class="nt-fbody">${noteProcTabHTML(n)}</div>${noteFilesHTML(n)}</div>`;
       return `<div class="inner wide nt-wrap">${top}${hero}${seg}<div id="ntFBody" class="nt-fbody">${alHTML}<div class="cols nt-cols"><div>
         <div class="glass pad st nt-ingcard" style="--i:3"><span class="lbl">${num(n.portions) ? "Pour combien de portions ?" : "Multiplier la recette"}</span>${noteScalerHTML(n)}
         ${ings.length ? `<ul class="nt-ings" id="ntIngs">${noteIngHTML(n)}</ul>` : `<p class="note" style="margin:0">Pas encore d'ingrédients. ${noteTap("« Modifier »")} pour les ajouter.</p>`}</div>
-        </div><div>${stepsHTML || `<div class="glass pad st" style="--i:4"><span class="lbl">Étapes</span><p class="note" style="margin:6px 0 0">Pas encore d'étapes. ${noteTap("« Modifier »")} pour les écrire.</p></div>`}${introHTML("Conseils du chef", 5)}</div></div></div>${noteFilesHTML(n)}</div>`;
+        </div><div>${stepsHTML || `<div class="glass pad st" style="--i:4"><span class="lbl">Étapes</span><p class="note" style="margin:6px 0 0">Pas encore d'étapes. ${noteTap("« Modifier »")} pour les écrire.</p></div>`}${introHTML("Conseils du chef", 5)}${noteCostHTML(n)}</div></div></div>${noteFilesHTML(n)}
+        <div class="ctabar nt-usebar st" style="--i:9">${noteLastUseHTML(n)}<button class="btn acc block" data-act="noteUse" data-id="${esc(n.id)}">${ico("ntUse")}Utiliser la recette</button></div></div>`;
     }
     if (k === "Procédures") return `<div class="inner nt-wrap nt-pread">${top}${hero}${steps.length ? noteRunHTML(n, steps, introHTML("Quand et pourquoi", 2)) : `${introHTML("Quand et pourquoi", 2)}<div class="glass empty st" style="--i:3">Aucune étape. ${noteTap("« Modifier »")} pour les écrire.</div>`}${noteFilesHTML(n)}</div>`;
     return `<div class="inner nt-wrap nt-nread">${top}${hero}<div class="glass pad st nt-body" style="--i:2">${n.body ? noteLinkify(noteTy(esc(n.body))) : `<span class="note">Note vide.</span>`}</div>${noteFilesHTML(n)}</div>`;
@@ -233,14 +236,14 @@ VIEWS.fiche = {
 /* ───────── editor ───────── */
 function noteDraft(id) {
   const n = S.notes.find((x) => x.id === id);
-  if (!n) { const cat = S.ui.noteNewCat || "Recettes"; return { _id: id, title: "", cat, body: "", ingredients: cat === "Recettes" ? [{ name: "", qty: "", unit: "g" }] : [], steps: cat === "Notes" ? [] : [""], portions: cat === "Recettes" ? 4 : "", allergens: [], photo: "" }; }
+  if (!n) { const cat = S.ui.noteNewCat || "Recettes"; return { _id: id, title: "", cat, body: "", ingredients: cat === "Recettes" ? [{ name: "", qty: "", unit: "g" }] : [], steps: cat === "Notes" ? [] : [""], portions: cat === "Recettes" ? 4 : "", allergens: [], alNo: [], carte: false, carteCat: "plat", price: "", photo: "" }; }
   const d = JSON.parse(JSON.stringify(n)); d._id = id; d.cat = noteKind(n);
   if (!Array.isArray(d.steps)) { if (d.cat === "Notes") d.steps = []; else { d.steps = noteSplit(d.body); d.body = ""; } }
   if (d.cat !== "Notes" && !d.steps.length) d.steps = [""];
-  d.ingredients ||= []; d.allergens ||= []; d.photo ||= ""; d.portions ??= "";
+  d.ingredients ||= []; d.allergens = [...new Set((d.allergens || []).map(noteAlId))]; d.alNo ||= []; d.photo ||= ""; d.portions ??= ""; d.carte = !!d.carte; d.carteCat ||= "plat"; d.price ??= "";
   ["id", "updatedAt", "uid", "at"].forEach((key) => delete d[key]); return d;
 }
-const noteSnap = (N) => JSON.stringify({ t: (N.title || "").trim(), c: N.cat, b: (N.body || "").trim(), i: (N.ingredients || []).filter((g) => String(g.name || "").trim()), s: (N.steps || []).filter((s) => s.trim()), p: String(N.portions ?? ""), a: [...(N.allergens || [])].sort(), ph: N.photo || "" });
+const noteSnap = (N) => JSON.stringify({ t: (N.title || "").trim(), c: N.cat, b: (N.body || "").trim(), i: (N.ingredients || []).filter((g) => String(g.name || "").trim()), s: (N.steps || []).filter((s) => s.trim()), p: String(N.portions ?? ""), a: [...(N.allergens || [])].sort(), no: [...(N.alNo || [])].sort(), k: N.cat === "Recettes" ? [!!N.carte, N.carte ? N.carteCat : "", String(N.price ?? "").trim()] : 0, ph: N.photo || "" });
 VIEWS.note = {
   live: false,
   render({ id }) {
@@ -251,10 +254,11 @@ VIEWS.note = {
       : `<button class="nt-addph" data-act="notePhoto" ${S.ui.notePhBusy ? "disabled" : ""}>${ico(S.ui.notePhBusy ? "clock" : "camera")}<span>${S.ui.notePhBusy ? "Préparation de la photo…" : "Ajouter une photo"}</span><em>facultatif</em></button>`;
     const ingsHTML = `<div class="glass pad st nt-esec" style="--i:3"><div class="nt-ehead"><span class="lbl">Ingrédients</span>
         <label class="nt-eport"><span>Pour</span><input class="input mono nt-eportin" data-bind="ui.note.portions" inputmode="decimal" autocomplete="off" value="${esc(N.portions)}" placeholder="4" aria-label="Nombre de portions"><span>portions</span></label></div>
-      <div class="nt-erows">${N.ingredients.map((g, i) => `<div class="nt-erow"><input class="input nt-n" data-bind="ui.note.ingredients.${i}.name" data-nkey="ing" data-i="${i}" value="${esc(g.name)}" placeholder="Ingrédient" aria-label="Ingrédient ${i + 1}" enterkeyhint="next"><input class="input mono nt-q" data-bind="ui.note.ingredients.${i}.qty" data-nkey="ing" data-i="${i}" inputmode="decimal" value="${esc(g.qty)}" placeholder="Qté" aria-label="Quantité" enterkeyhint="next"><input class="input nt-u" list="ntUnits" data-bind="ui.note.ingredients.${i}.unit" data-nkey="ing" data-i="${i}" value="${esc(g.unit)}" placeholder="g" aria-label="Unité" enterkeyhint="next"><button class="iconbtn nt-del" data-act="noteIngDel" data-v="${i}" aria-label="Retirer l'ingrédient">${ico("x")}</button></div>`).join("")}</div>
+      <div class="nt-erows">${N.ingredients.map((g, i) => `<div class="nt-erow"><input class="input nt-n" data-bind="ui.note.ingredients.${i}.name" data-nkey="ing" data-i="${i}" value="${esc(g.name)}" placeholder="Ingrédient" aria-label="Ingrédient ${i + 1}" enterkeyhint="next"><input class="input mono nt-q" data-bind="ui.note.ingredients.${i}.qty" data-nkey="ing" data-i="${i}" inputmode="decimal" value="${esc(g.qty)}" placeholder="Qté" aria-label="Quantité" enterkeyhint="next"><input class="input nt-u" list="ntUnits" data-bind="ui.note.ingredients.${i}.unit" data-nkey="ing" data-i="${i}" value="${esc(g.unit)}" placeholder="g" aria-label="Unité" enterkeyhint="next"><button class="iconbtn nt-del" data-act="noteIngDel" data-v="${i}" aria-label="Retirer l'ingrédient">${ico("x")}</button>${noteELinkHTML(g, i)}</div>`).join("")}</div>
       <datalist id="ntUnits">${NOTE_UNITS.map((u) => `<option value="${esc(u)}">`).join("")}</datalist>
       <button class="btn ghost sm" data-act="noteIngAdd" style="align-self:flex-start">${ico("plus")}Ajouter un ingrédient</button></div>
-      <div class="glass pad st nt-esec" style="--i:4"><span class="lbl">Allergènes présents</span><div class="nt-als nt-alsed">${NOTE_ALLERGENS.map(([key, t]) => `<button class="nt-al ${N.allergens.includes(key) ? "on" : ""}" data-act="noteAl" data-v="${key}" aria-pressed="${N.allergens.includes(key)}">${ico(N.allergens.includes(key) ? "check" : "plus")}${t}</button>`).join("")}</div></div>`;
+      <div class="glass pad st nt-esec" style="--i:4"><span class="lbl">Allergènes</span><p class="note" style="margin:0">Ceux des ingrédients liés au stock s'ajoutent tout seuls. Touchez un allergène pour l'ajouter ou le confirmer.</p><div class="nt-als nt-alsed" id="ntAlEd">${noteAlEdHTML(N)}</div></div>
+      ${noteCarteEdHTML(N)}`;
     const stepsHTML = `<div class="glass pad st nt-esec" style="--i:5"><span class="lbl">Étapes</span><div class="nt-esteps">${N.steps.map((s, i) => `<div class="nt-estep"><span class="nt-snum mono">${i + 1}</span><textarea class="input" rows="1" data-bind="ui.note.steps.${i}" data-nkey="step" data-i="${i}" enterkeyhint="next" placeholder="${i === 0 ? (isR ? "Ex. Mélanger le sucre, le sel et les baies roses." : "Ex. Débrancher la machine.") : "Étape suivante"}" aria-label="Étape ${i + 1}">${esc(s)}</textarea><button class="iconbtn nt-del" data-act="noteStepDel" data-v="${i}" aria-label="Retirer l'étape">${ico("x")}</button></div>`).join("")}</div>
       <button class="btn ghost sm" data-act="noteStepAdd" style="align-self:flex-start">${ico("plus")}Ajouter une étape</button><p class="note" style="margin:0">Astuce : la touche Entrée crée l'étape suivante.</p></div>`;
     const bodyHTML = isN ? `<div class="glass pad st nt-esec" style="--i:3"><span class="lbl">Contenu</span><textarea class="input nt-ebody" data-bind="ui.note.body" placeholder="Écrivez ici…">${esc(N.body)}</textarea></div>`
@@ -283,6 +287,8 @@ VIEWS.note = {
       const ins = $$("input", t.closest(".nt-erow")); const k = ins.indexOf(t); if (k < ins.length - 1) { ins[k + 1].focus(); return; }
       const L = S.ui.note.ingredients; if (i === L.length - 1) L.push({ name: "", qty: "", unit: "g" }); S.ui.noteFocus = `.nt-n[data-i="${i + 1}"]`; noteRer();
     });
+    const alRe = debounce(() => { const g = $("#ntAlEd", v); if (g && S.ui.note) g.innerHTML = noteAlEdHTML(S.ui.note); }, 250);
+    $$(".nt-erow .nt-n", v).forEach((t) => t.addEventListener("input", alRe));
     if (S.ui.noteFocus) { const f = $(S.ui.noteFocus, v); S.ui.noteFocus = null; if (f) { f.focus({ preventScroll: true }); f.scrollIntoView({ block: "center", behavior: "smooth" }); } }
   },
 };
@@ -358,7 +364,13 @@ Object.assign(ACT, {
   noteIngDel: (a, id, v) => { S.ui.note.ingredients.splice(+v, 1); SFX.close(); noteRer(); },
   noteStepAdd: () => { const L = S.ui.note.steps; L.push(""); S.ui.noteFocus = `[data-nkey=step][data-i="${L.length - 1}"]`; SFX.tick(); noteRer(); },
   noteStepDel: (a, id, v) => { S.ui.note.steps.splice(+v, 1); if (!S.ui.note.steps.length) S.ui.note.steps.push(""); SFX.close(); noteRer(); },
-  noteAl: (a, id, v) => { const L = S.ui.note.allergens; const on = !L.includes(v); if (on) L.push(v); else L.splice(L.indexOf(v), 1); a.classList.toggle("on", on); a.setAttribute("aria-pressed", on); a.innerHTML = ico(on ? "check" : "plus") + esc(noteAllergenLabel(v)); SFX.tick(); buzz(5); },
+  noteAl: (a, id, v) => {
+    const N = S.ui.note; const L = N.allergens; const D = noteAlDetail(N)[v];
+    if (D && D.from.length && !L.includes(v)) { SFX.tap(); toast(`Vient de : ${D.from.join(", ")}`); return; }
+    const on = !L.includes(v); if (on) { L.push(v); N.alNo = (N.alNo || []).filter((x) => x !== v); } else { L.splice(L.indexOf(v), 1); if (D && D.sug.length) (N.alNo ||= []).push(v); }
+    const g = $("#ntAlEd"); if (g) g.innerHTML = noteAlEdHTML(N); const b = g && $(`[data-v="${v}"]`, g); if (b && on) b.classList.add("pop");
+    SFX.tick(); buzz(5);
+  },
   notePhoto: async () => {
     const [f] = await pickImage(); if (!f) return; const N = S.ui.note; S.ui.notePhBusy = true; noteRer();
     try { const r = await notePhotoUrl(f); if (S.ui.note === N) { N.photo = r.url; N.photoId = r.id; SFX.ok(); } } catch (e) { console.warn(e); if (S.ui.note === N) { SFX.err(); toast("Photo illisible. Essayez une autre image.", "err"); } }
@@ -380,9 +392,10 @@ Object.assign(ACT, {
     if (!title) { SFX.err(); buzz(30); toast("Donnez un titre à la fiche.", "err"); const t = $(".nt-etitle"); if (t) { t.focus(); t.classList.remove("shake"); void t.offsetWidth; t.classList.add("shake"); } return; }
     if (isR && !(por > 0 && por <= 9999)) { SFX.err(); buzz(30); toast("Indiquez les portions.", "err"); const t = $(".nt-eportin"); if (t) { t.scrollIntoView({ block: "center", behavior: "smooth" }); t.focus({ preventScroll: true }); t.classList.remove("shake"); void t.offsetWidth; t.classList.add("shake"); } return; }
     const d = { title, cat: N.cat, body: String(N.body || "").trim(), updatedAt: Date.now(), uid: S.me.id,
-      ingredients: isR ? (N.ingredients || []).filter((g) => String(g.name || "").trim()).map((g) => ({ name: String(g.name).trim(), qty: String(g.qty ?? "").trim(), unit: String(g.unit ?? "").trim() })) : [],
+      ingredients: isR ? (N.ingredients || []).filter((g) => String(g.name || "").trim() || g.productId || g.noteId).map((g) => noteIngClean(g)) : [],
       steps: isN ? [] : (N.steps || []).map((s) => String(s || "").trim()).filter(Boolean),
       allergens: isR ? N.allergens || [] : [], portions: isR ? Math.round(por * 100) / 100 : 1, photo: N.photo || "", photoId: N.photoId || "" };
+    if (isR) { const pr = num(N.price); Object.assign(d, { alNo: (N.alNo || []).filter((x) => !d.allergens.includes(x)), carte: !!N.carte, carteCat: N.carteCat || "plat", price: pr > 0 ? Math.round(pr * 100) / 100 : null }); }
     a.disabled = true;
     try {
       let nid = id;
@@ -595,7 +608,7 @@ const npRer = (flash) => { S.ui.npFlash = flash; noteRer(); };
 
 /* ───────── export: printable A4 document ───────── */
 function noteDocHTML(n, P, proposed) {
-  const ings = n.ingredients || []; const al = n.allergens || []; let ci = 0; const ccps = [];
+  const ings = n.ingredients || []; const al = recipeAllergens(n); let ci = 0; const ccps = [];
   const items = P.map((s, i) => { const L = noteLib(s.k); const cc = s.c ? ++ci : 0; if (s.c) ccps.push({ i, cc, s, L }); return `<li class="${s.c ? "ccp" : ""}"><div class="ntd-box"><span class="ntd-n">${i + 1}</span><div class="ntd-tx"><b>${esc(s.t || L.t)}</b>${s.c ? ` <em class="ntd-badge">CCP ${cc}</em>` : ""}${s.x ? `<p>${noteTy(esc(s.x))}</p>` : ""}${s.c && s.c.l ? `<p class="ntd-lim">${noteTy(esc(s.c.l))}</p>` : ""}</div></div></li>`; });
   const flow = noteDocFlow(items);
   const today = new Date().toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
@@ -664,7 +677,7 @@ function noteProcListHTML() {
   const R = S.notes.filter((n) => noteKind(n) === "Recettes"); const has = S.notes.some((n) => n.seed === "bourguignon" || noteNorm(n.title) === "boeuf bourguignon");
   const ex = !has && R.length < 3 ? `<div class="glass nt-starter nt-exrow st" style="--i:4"><div class="ic acc">${ico("ntChef")}</div><div style="flex:1;min-width:0"><b class="h3">Exemple : Bœuf bourguignon</b><p class="note" style="margin:3px 0 0">Une fiche complète pour 8 portions, avec son process HACCP de la réception au service.</p></div><button class="btn soft sm" data-act="noteExample">${ico("plus")}Ajouter</button></div>` : "";
   const all = R.length ? `<div class="glass nt-procall st" style="--i:3"><div class="ic">${ico("ntFlow")}</div><div style="flex:1;min-width:0"><b>Process HACCP</b><span class="note">${R.filter((n) => n.process && n.process.length).length} / ${R.length} plat${R.length > 1 ? "s" : ""} avec un process</span></div><button class="btn soft sm" data-go="noteDoc" data-id="all">${ico("printer")}Tout exporter</button></div>` : "";
-  return all + ex;
+  return noteCarteRowHTML() + all + ex + noteExRowHTML();
 }
 
 Object.assign(ACT, {
@@ -740,5 +753,404 @@ Object.assign(ACT, {
     closeSheet(true); const n = S.notes.find((x) => x.id === id); if (!n || !(n.files || []).some((x) => x.id === v)) return;
     try { await safe(DB.update("notes", id, { files: (n.files || []).filter((x) => x.id !== v) })); } catch (e) { return; }
     NOTE_FILES.del(v).catch(() => {}); SFX.close(); toast("Document retiré");
+  },
+});
+
+
+/* ═════════ V3 · allergènes, carte, utilisation de la recette ═════════
+   Recipe doc fields (all optional, backward compatible):
+   ingredients[i]: {name, qty, unit, productId?, noteId? (sous-recette), free? (lien retiré à la main)}
+   allergens: own allergens (core ids) · alNo: suggestions refused by the chef
+   carte: bool · carteCat: entree|plat|dessert|partage|boisson · price: prix de vente TTC
+   portions: portions per batch (fournée). Stock: "moves" docs {kind:"recette", qty<0, ref: note id, use, batches}. */
+Object.assign(IC, {
+  ntMenu: ["M5 3h11a3 3 0 0 1 3 3v15H8a3 3 0 0 1-3-3Z", "M9 8h6", "M9 12h6", "M9 16h3"],
+  ntUse: ["M4 10h16v7a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3Z", "M2 10h20", "M9 6.5V3", "M15 6.5V3", "M12 7V3"],
+  ntLink: ["M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71", "M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"],
+  ntFilter: ["M3 5h18", "M6 12h12", "M10 19h4"],
+});
+TAB_OF.noteCarte = "more";
+
+const NOTE_CARTE_CATS = [["partage", "À partager"], ["entree", "Entrée"], ["plat", "Plat"], ["dessert", "Dessert"], ["boisson", "Boisson"]];
+const NOTE_CARTE_PL = { partage: "À partager", entree: "Entrées", plat: "Plats", dessert: "Desserts", boisson: "Boissons" };
+const noteCarteCat = (k) => NOTE_CARTE_CATS.find((c) => c[0] === k)?.[1] || "Plat";
+const noteEur = (v) => `${(Math.round(v * 100) / 100).toFixed(2).replace(".", ",")} €`;
+const noteAlOrder = (ids) => NOTE_ALLERGENS.map((a) => a[0]).filter((k) => ids.includes(k));
+
+/* ───────── ingredient links ───────── */
+function noteIngLink(g) {
+  if (g && g.productId) { const p = S.products.find((x) => x.id === g.productId); if (p) return { t: "p", p }; }
+  if (g && g.noteId) { const n = S.notes.find((x) => x.id === g.noteId); if (n) return { t: "n", n }; }
+  return null;
+}
+const noteSing = (s) => noteNorm(s).replace(/\s+/g, " ").split(" ").map((w) => (w.length > 3 ? w.replace(/(s|x)$/, "") : w)).join(" ");
+function noteFindProduct(name) { const k = noteSing(name); if (!k) return null; return S.products.find((p) => noteSing(p.name) === k) || null; }
+function noteIngClean(g) {
+  const o = { name: String(g.name || "").trim(), qty: String(g.qty ?? "").trim(), unit: String(g.unit ?? "").trim() };
+  const L = noteIngLink(g);
+  if (L && L.t === "p") o.productId = L.p.id; else if (L && L.t === "n") o.noteId = L.n.id;
+  else if (g.free) o.free = true; else { const p = noteFindProduct(o.name); if (p) o.productId = p.id; } /* same name as a stock product: linked automatically */
+  if (!o.name) o.name = L ? (L.t === "p" ? L.p.name : L.n.title) : "";
+  return o;
+}
+
+/* ───────── allergens: guesses from a name (only the obvious ones, always shown as « à confirmer ») ───────── */
+const NOTE_GUESS = [
+  ["lait", /\b(beurre|creme|lait|laitier|fromage|comte|emmental|gruyere|parmesan|mozzarella|burrata|chevre|roquefort|bleu d auvergne|brie|camembert|tomme|reblochon|raclette|morbier|mimolette|cantal|feta|ricotta|mascarpone|yaourt|bechamel|chantilly|lactose)s?\b/, /\b(lait|creme) de coco\b|\bcreme de (cassis|marron|mure|peche|framboise|balsamique)\b|\bbeurre de cacahuete/],
+  ["gluten", /\b(farine|pain|baguette|brioche|chapelure|panure|panko|biscuit|biscotte|pates?|feuillete|brisee|sablee|semoule|boulgour|ble|seigle|orge|epeautre|avoine|croutons?|tagliatelles?|spaghettis?|penne|ravioles?|gnocchis?|couscous|biere|seitan)s?\b/, /\bpate (de fruit|d amande)|\bpate (de|du) (porc|campagne|foie)/],
+  ["oeufs", /\b(oeufs?|jaunes? d oeuf|blancs? d oeuf|mayonnaise|meringue)\b/],
+  ["poissons", /\b(poissons?|saumon|thon|cabillaud|morue|anchois|sardines?|maquereau|truite|dorade|merlu|colin|sole|haddock|lotte|bar|eglefin|hareng|surimi|nuoc mam)\b/],
+  ["crustaces", /\b(crevettes?|gambas|homard|langoustines?|langouste|crabe|tourteau|ecrevisses?|araignee de mer)\b/],
+  ["mollusques", /\b(huitres?|moules?|coquillages?|calamars?|encornets?|seiches?|poulpe|saint jacques?|bulots?|palourdes?|coques|bigorneaux|escargots?|praires?|couteaux de mer|noix de saint jacques)\b/],
+  ["fruitscoque", /\b(noix|noisettes?|amandes?|pistaches?|cajou|pecan|macadamia|praline|pralin|nougat|frangipane)\b/, /\bnoix de (coco|muscade|saint jacques?|veau|beurre)\b|\bbeurre noisette\b/],
+  ["arachides", /\b(arachides?|cacahuetes?)\b/],
+  ["soja", /\b(soja|tofu|edamame|miso|tamari)\b/],
+  ["celeri", /\bceleris?\b/],
+  ["moutarde", /\bmoutardes?\b/],
+  ["sesame", /\b(sesame|tahini|tahin)\b/],
+  ["sulfites", /\b(vins?|vinaigres?|vinaigrette|porto|madere|xeres|cidre|champagne|cremant|fruits secs)\b/, /\bvin (sans sulfites?)\b/],
+  ["lupin", /\blupin\b/],
+];
+function noteAlGuess(name) { const h = " " + noteNorm(name).replace(/[-_/]/g, " ") + " "; return NOTE_GUESS.filter(([, re, no]) => re.test(h) && !(no && no.test(h) && !re.test(h.replace(new RegExp(no.source, "g"), " ")))).map((g) => g[0]); }
+/* per ingredient: allergens it brings (recorded) and the ones only guessed */
+function noteIngAl(g, seen) {
+  const L = noteIngLink(g);
+  if (L && L.t === "p") { const rec = (L.p.allergens || []).map(noteAlId); return rec.length ? { on: rec, sug: [] } : { on: [], sug: L.p.allergensNone ? [] : noteAlGuess(L.p.name + " " + (g.name || "")) }; }
+  if (L && L.t === "n") { if (seen && seen.has(L.n.id)) return { on: [], sug: [] }; const D = noteAlDetail(L.n, seen); const ids = Object.keys(D); return { on: ids.filter((k) => D[k].own || D[k].from.length), sug: ids.filter((k) => !D[k].own && !D[k].from.length && D[k].sug.length) }; }
+  return { on: [], sug: noteAlGuess(g.name) };
+}
+/* id → {own, from:[ingredient names], sug:[ingredient names]}; refused suggestions (alNo) are dropped */
+function noteAlDetail(n, seen = new Set()) {
+  const M = {}; const E = (k) => (M[k] ||= { own: false, from: [], sug: [] }); const no = new Set((n.alNo || []).map(noteAlId));
+  (n.allergens || []).forEach((k) => (E(noteAlId(k)).own = true));
+  const S2 = new Set(seen); if (n.id || n._id) S2.add(n.id || n._id);
+  (n.ingredients || []).forEach((g) => {
+    const nm = String(g.name || "").trim() || noteIngLink(g)?.p?.name || noteIngLink(g)?.n?.title || ""; if (!nm && !g.productId && !g.noteId) return;
+    const A = noteIngAl(g, S2); A.on.forEach((k) => { const e = E(k); if (!e.from.includes(nm)) e.from.push(nm); });
+    A.sug.forEach((k) => { if (!no.has(k)) { const e = E(k); if (!e.sug.includes(nm)) e.sug.push(nm); } });
+  });
+  Object.keys(M).forEach((k) => { if (!M[k].own && !M[k].from.length && !M[k].sug.length) delete M[k]; });
+  return M;
+}
+/* allergen ids of a recipe: own + linked products + sub-recipes. withSuggested adds the guesses still to confirm. */
+function recipeAllergens(note, withSuggested = false) {
+  if (!note) return []; const D = noteAlDetail(note);
+  return noteAlOrder(Object.keys(D).filter((k) => D[k].own || D[k].from.length || (withSuggested && D[k].sug.length)));
+}
+const noteAlToConfirm = (n) => { const D = noteAlDetail(n); return noteAlOrder(Object.keys(D).filter((k) => !D[k].own && !D[k].from.length && D[k].sug.length)); };
+function noteCardFoot(n) {
+  const al = recipeAllergens(n); const q = noteAlToConfirm(n);
+  return `<span class="nt-cfoot">${n.carte ? `<span class="nt-carpill">${ico("ntMenu")}${esc(noteCarteCat(n.carteCat))}</span>` : ""}${al.length ? `<span class="nt-almini">${ico("alert")}${esc(al.map(noteAllergenLabel).join(", "))}</span>` : ""}${q.length ? `<span class="nt-almini q">${notePlural(q.length, "allergène")} à confirmer</span>` : ""}${!al.length && !q.length ? `<span class="nt-almini none">${(n.ingredients || []).length ? "Sans allergène" : "Allergènes non renseignés"}</span>` : ""}</span>`;
+}
+
+/* ───────── read view: allergen card ───────── */
+function noteAlCardHTML(n) {
+  const D = noteAlDetail(n); const on = noteAlOrder(Object.keys(D).filter((k) => D[k].own || D[k].from.length)); const q = noteAlToConfirm(n);
+  const off = NOTE_ALLERGENS.filter(([k]) => !on.includes(k) && !q.includes(k)).map((a) => a[1]);
+  const src = (k) => (D[k].from.length ? D[k].from.join(", ") : "indiqué sur la fiche");
+  const empty = !(n.ingredients || []).length && !on.length;
+  return `<div class="glass pad st nt-alcard ${on.length ? "has" : ""}" style="--i:2">
+    <div class="nt-alhead"><span class="lbl">${ico("alert")}${on.length ? `${notePlural(on.length, "allergène")} dans ce plat` : "Allergènes"}</span><button class="btn ghost sm" data-go="noteCarte">${ico("ntMenu")}Tableau de la carte</button></div>
+    ${on.length ? `<div class="nt-albig">${on.map((k, i) => `<div class="nt-alb st" style="--i:${i + 3}"><b>${esc(noteAllergenLabel(k))}</b><span>${esc(src(k))}</span></div>`).join("")}</div>` : `<p class="note" style="margin:8px 0 0">${empty ? "Aucun allergène renseigné. Ajoutez les ingrédients ou cochez les allergènes dans « Modifier »." : q.length ? "Aucun allergène confirmé pour l'instant." : "Aucun allergène réglementaire dans ce plat."}</p>`}
+    ${q.length ? `<div class="nt-alq"><span class="nt-alqh">${ico("sparkle")}À confirmer, d'après le nom des ingrédients</span>${q.map((k) => `<div class="nt-alqr"><span><b>${esc(noteAllergenLabel(k))} ?</b><em>${esc(D[k].sug.join(", "))}</em></span><button class="btn soft sm" data-act="noteAlNo" data-id="${esc(n.id)}" data-v="${k}">Non</button><button class="btn acc sm" data-act="noteAlOk" data-id="${esc(n.id)}" data-v="${k}">${ico("check")}Oui</button></div>`).join("")}</div>` : ""}
+    ${on.length || q.length ? `<p class="nt-aloff"><b>Sans :</b> ${esc(off.join(", ").toLowerCase())}.</p>` : ""}</div>`;
+}
+
+/* ───────── editor: allergen grid, ingredient link line, carte block ───────── */
+function noteAlEdHTML(N) {
+  const D = noteAlDetail(N); const own = N.allergens || [];
+  return NOTE_ALLERGENS.map(([k, t]) => {
+    const d = D[k]; const st = own.includes(k) ? "on" : d && d.from.length ? "from" : d && d.sug.length ? "sug" : "";
+    const sub = st === "from" ? d.from.join(", ") : st === "sug" ? `${d.sug.join(", ")} ?` : st === "on" && d && d.from.length ? d.from.join(", ") : "";
+    return `<button class="nt-al ${st === "on" || st === "from" ? "on" : ""} ${st}" data-act="noteAl" data-v="${k}" aria-pressed="${st === "on" || st === "from"}">${ico(st === "on" || st === "from" ? "check" : st === "sug" ? "alert" : "plus")}<span class="nt-alt"><span>${t}</span>${sub ? `<em>${esc(sub)}</em>` : ""}</span></button>`;
+  }).join("");
+}
+function noteELinkHTML(g, i) {
+  const L = noteIngLink(g);
+  if (L) { const A = noteIngAl(g); const al = [...A.on.map(noteAllergenLabel), ...A.sug.map((x) => noteAllergenLabel(x) + " ?")];
+    return `<div class="nt-elink on"><button class="nt-elk" data-act="noteLink" data-v="${i}">${ico(L.t === "p" ? "box" : "ntChef")}<span><b>${esc(L.t === "p" ? L.p.name : L.n.title)}</b><em>${L.t === "p" ? `Stock · ${esc(L.p.unit || "")}` : "Sous-recette"}${al.length ? ` · ${esc(al.join(", "))}` : ""}</em></span></button><button class="iconbtn nt-eunl" data-act="noteLinkFree" data-v="${i}" aria-label="Retirer le lien">${ico("x")}</button></div>`; }
+  const sug = !g.free && String(g.name || "").trim() ? noteFindProduct(g.name) : null;
+  return `<div class="nt-elink"><button class="nt-elk" data-act="noteLink" data-v="${i}">${ico("ntLink")}<span>${sug ? `Lier à « ${esc(sug.name)} »` : "Lier au stock"}</span></button></div>`;
+}
+function noteCarteEdHTML(N) {
+  return `<div class="glass pad st nt-esec nt-ecarte" style="--i:5"><button class="nt-ctog ${N.carte ? "on" : ""}" data-act="noteCarteTog" aria-pressed="${!!N.carte}"><span class="ic">${ico("ntMenu")}</span><span class="nt-ctx"><b>À la carte</b><em>Le plat apparaît dans le tableau des allergènes pour les clients.</em></span><span class="nt-sw"><i></i></span></button>
+    ${N.carte ? `<div class="nt-ccats">${NOTE_CARTE_CATS.map(([k, t]) => `<button class="chip ${N.carteCat === k ? "on" : ""}" data-act="noteCarteCatSet" data-v="${k}">${t}</button>`).join("")}</div>
+    <label class="nt-eprice"><span>Prix de vente</span><input class="input mono" data-bind="ui.note.price" inputmode="decimal" autocomplete="off" value="${esc(N.price ?? "")}" placeholder="12,50" aria-label="Prix de vente TTC"><span>€ TTC</span></label>` : ""}</div>`;
+}
+function noteLinkListHTML(i, q) {
+  const k = noteNorm(q); const g = S.ui.note?.ingredients?.[i] || {}; const self = S.ui.note?._id;
+  const P = S.products.filter((p) => !k || noteNorm(p.name).includes(k) || k.split(" ").every((w) => noteNorm(p.name).includes(w))).slice(0, 40);
+  const R = S.notes.filter((n) => noteKind(n) === "Recettes" && n.id !== self && (!k || noteNorm(n.title).includes(k))).slice(0, 12);
+  const row = (v, ic, t, sub, on) => `<button class="nt-lrow ${on ? "on" : ""}" data-act="noteLinkSet" data-id="${i}" data-v="${v}"><span class="ic">${ico(ic)}</span><span><b>${esc(t)}</b><em>${esc(sub)}</em></span>${on ? ico("check") : ""}</button>`;
+  const pal = (p) => { const a = (p.allergens || []).map(noteAllergenLabel); return [p.zone || "", p.unit || "", a.length ? a.join(", ") : ""].filter(Boolean).join(" · "); };
+  return `${P.length ? `<span class="lbl">Produits du stock</span>${P.map((p) => row("p:" + p.id, "box", p.name, pal(p), g.productId === p.id)).join("")}` : S.products.length ? `<p class="note">Aucun produit « ${esc(q)} » dans le stock.</p>` : `<div class="nt-lempty"><b>Le stock est vide</b><span class="note">Ajoutez vos produits dans Stock pour les lier aux recettes.</span></div>`}
+    ${R.length ? `<span class="lbl" style="margin-top:6px">Sous-recettes</span>${R.map((n) => row("n:" + n.id, "ntChef", n.title, notePlural(recipeAllergens(n).length, "allergène"), g.noteId === n.id)).join("")}` : ""}`;
+}
+
+/* ───────── units, cost ───────── */
+function noteUnitKey(u) {
+  const l = noteNorm(u).replace(/\.$/, "").trim();
+  if (["g", "gr", "gramme", "grammes"].includes(l)) return ["m", 1]; if (["kg", "kilo", "kilos"].includes(l)) return ["m", 1000];
+  if (l === "ml") return ["v", 1]; if (l === "cl") return ["v", 10]; if (l === "dl") return ["v", 100]; if (["l", "litre", "litres"].includes(l)) return ["v", 1000];
+  if (["", "piece", "pieces", "pc", "pcs", "u", "unite", "unites"].includes(l)) return ["u", 1];
+  return ["x:" + l.replace(/s$/, ""), 1];
+}
+/* v in unit `from` → unit `to`, or null when they cannot be compared (cuillère vs kg…) */
+function noteConv(v, from, to) { const a = noteUnitKey(from), b = noteUnitKey(to); if (a[0] !== b[0]) return null; return (v * a[1]) / b[1]; }
+const noteQtyVal = (q) => { const p = noteParse(q); return p ? p.v.reduce((x, y) => x + y, 0) / p.v.length : null; };
+/* food cost of one batch and one portion, from the linked products' prices (€ per stock unit) */
+function recipeCost(note, seen = new Set()) {
+  let batch = 0, known = 0, missing = 0; if (!note) return { batch: 0, portion: 0, complete: false, known: 0, missing: 0 }; seen = new Set(seen); seen.add(note.id);
+  (note.ingredients || []).forEach((g) => {
+    const L = noteIngLink(g); const v = noteQtyVal(g.qty); if (v == null) { if (L) missing++; return; }
+    if (L && L.t === "p" && num(L.p.price) > 0) { const q = noteConv(v, g.unit, L.p.unit); if (q != null) { batch += q * num(L.p.price); known++; return; } }
+    if (L && L.t === "n" && !seen.has(L.n.id)) { const c = recipeCost(L.n, seen); const sp = num(L.n.portions) || 1; const k = noteUnitKey(g.unit)[0] === "u" || /portion/.test(noteNorm(g.unit)) ? v / sp : /fourn/.test(noteNorm(g.unit)) ? v : null; if (k != null && c.known) { batch += c.batch * k; known++; return; } }
+    missing++;
+  });
+  const por = num(note.portions) || 1; return { batch, portion: batch / por, complete: !missing && known > 0, known, missing };
+}
+function noteCostHTML(n) {
+  const c = recipeCost(n); if (!c.known) return "";
+  const pr = num(n.price); const ht = pr ? pr / 1.1 : 0; const ratio = ht ? (c.portion / ht) * 100 : 0;
+  return `<div class="glass pad st nt-cost" style="--i:6"><span class="lbl">${ico("euro")}Coût matière</span>
+    <div class="nt-costrow"><div><b class="mono">${noteEur(c.portion)}</b><em>par portion</em></div><div><b class="mono">${noteEur(c.batch)}</b><em>la fournée</em></div>${pr ? `<div class="${ratio > 35 ? "warn" : "ok"}"><b class="mono">${Math.round(ratio)} %</b><em>du prix HT</em></div>` : ""}</div>
+    <p class="note" style="margin:0">${c.missing ? `Estimation : ${notePlural(c.missing, "ingrédient")} sans prix ou non lié au stock. ` : ""}D'après les prix du stock${pr ? `, prix de vente ${noteEur(pr)} TTC (TVA 10 %)` : ""}.</p></div>`;
+}
+
+/* ───────── utiliser la recette: deduct from stock ───────── */
+function noteUses(n) {
+  const G = {}; (S.moves || []).filter((m) => m.ref === n.id && m.kind === "recette").forEach((m) => { const k = m.use || m.at; (G[k] ||= { at: m.at, by: m.uid, batches: m.batches, n: 0 }).n++; });
+  return Object.values(G).sort((a, b) => b.at - a.at);
+}
+function noteLastUseHTML(n) {
+  const U = noteUses(n); if (!U.length) return ""; const u = U[0]; const b = num(u.batches);
+  return `<p class="nt-lastuse">${ico("clock")}Utilisée ${when(u.at)}${b ? ` · ${b === Math.round(b) ? notePlural(b, "fournée") : noteNum(b) + " fournée"}` : ""} · ${esc(firstName(nameOf(u.by)))}${U.length > 1 ? ` · ${U.length} fois en tout` : ""}</p>`;
+}
+const noteBatches = (n, U) => { const por = num(n.portions) || 1; return U.mode === "p" ? U.v / por : U.v; };
+function noteUsePlan(n, k) {
+  const rows = [], skip = [];
+  (n.ingredients || []).forEach((g) => {
+    const L = noteIngLink(g); const nm = g.name || (L && L.t === "p" ? L.p.name : "");
+    if (!L) { skip.push({ name: nm, why: "texte libre" }); return; }
+    if (L.t === "n") { skip.push({ name: nm, why: "sous-recette, préparée à part" }); return; }
+    const v = noteQtyVal(g.qty); if (v == null) { skip.push({ name: nm, why: "quantité manquante" }); return; }
+    const q = noteConv(v * k, g.unit, L.p.unit); if (q == null) { skip.push({ name: nm, why: `unité « ${g.unit} » ≠ ${L.p.unit} du stock` }); return; }
+    let lvl = null; if (typeof stockLevel === "function") { try { const x = stockLevel(L.p.id); lvl = x == null || isNaN(+x) ? null : +x; } catch (e) {} }
+    const ex = rows.find((r) => r.p.id === L.p.id); if (ex) { ex.q += q; ex.names.push(nm); return; }
+    rows.push({ p: L.p, q, lvl, names: [nm] });
+  });
+  return { rows, skip };
+}
+const noteQ3 = (v) => Math.round(v * 1000) / 1000;
+function noteUseHTML() {
+  const U = S.ui.noteUse; const n = S.notes.find((x) => x.id === U?.id); if (!n) return "";
+  const por = num(n.portions) || 1; const k = noteBatches(n, U); const { rows, skip } = noteUsePlan(n, k); const totP = Math.round(k * por * 100) / 100;
+  const quick = U.mode === "b" ? [0.5, 1, 2, 3, 5] : [...new Set([1, Math.max(1, Math.round(por / 2)), por, por * 2, por * 3])].sort((a, b) => a - b);
+  const lbl = U.mode === "b" ? (U.v >= 2 ? "fournées" : "fournée") : U.v >= 2 ? "portions" : "portion";
+  const list = rows.length ? `<ul class="nt-ulist">${rows.map((r, i) => { const after = r.lvl != null ? r.lvl - r.q : null; return `<li class="st" style="--i:${i}"><span class="nt-uname"><b>${esc(r.p.name)}</b>${after != null ? `<em class="${after < 0 ? "bad" : ""}">Stock ${noteNum(Math.max(0, r.lvl))} → <b>${noteNum(Math.max(0, after))}</b> ${esc(r.p.unit || "")}${after < 0 ? " · insuffisant" : ""}</em>` : `<em>Stock théorique non disponible</em>`}</span><b class="nt-uq mono">−${noteNum(r.q)}<small>${esc(r.p.unit || "")}</small></b></li>`; }).join("")}</ul>`
+    : `<div class="nt-lempty"><b>Aucun ingrédient lié au stock</b><span class="note">Liez les ingrédients aux produits du stock dans « Modifier » pour les déduire en un geste.</span></div>`;
+  return `<div class="h2" style="font-size:20px">Utiliser la recette</div><p class="sub" style="margin:0">${esc(n.title)} · ${notePlural(por, "portion")} par fournée</p>
+    <div class="seg nt-useg"><span class="knob" style="width:calc(50% - 4px);transform:translateX(${U.mode === "p" ? 100 : 0}%)"></span><button class="${U.mode === "b" ? "on" : ""}" data-act="noteUseMode" data-v="b">Fournées</button><button class="${U.mode === "p" ? "on" : ""}" data-act="noteUseMode" data-v="p">Portions</button></div>
+    <div class="nt-scaler nt-uscal"><button class="iconbtn nt-step" data-act="noteUseStep" data-v="-1" aria-label="Moins">${ico("minus")}</button><span class="nt-pval"><b class="mono" id="ntUseV">${noteNum(U.v)}</b><span>${lbl}</span></span><button class="iconbtn nt-step" data-act="noteUseStep" data-v="1" aria-label="Plus">${ico("plus")}</button></div>
+    <div class="nt-quick">${quick.map((x) => `<button class="chip ${x === U.v ? "on" : ""}" data-act="noteUseSet" data-v="${x}">${noteNum(x)}</button>`).join("")}</div>
+    <p class="nt-utot">${U.mode === "b" ? `Soit <b>${noteNum(totP)} portions</b>` : `Soit <b>${noteNum(Math.round(k * 100) / 100)} fournée${k >= 2 ? "s" : ""}</b>`}. Ce qui sera retiré du stock :</p>
+    ${list}
+    ${skip.length ? `<p class="note nt-uskip">Non déduits : ${skip.map((x) => `${esc(x.name)} (${esc(x.why)})`).join(", ")}.</p>` : ""}
+    <div class="grid2 nt-useact"><button class="btn soft" data-act="sheetClose">Annuler</button><button class="btn acc" data-act="noteUseGo" ${rows.length ? "" : "disabled"}>${ico("check")}Déduire du stock</button></div>`;
+}
+function noteUsePaint() { const b = $("#sheetBody"); if (b && S.ui.noteUse) { b.innerHTML = noteUseHTML(); $$(".st", b).forEach((e) => (e.style.animation = "none")); } }
+
+/* ───────── list rows: carte + examples ───────── */
+function noteCarteRowHTML() {
+  const C = S.notes.filter((n) => noteKind(n) === "Recettes" && n.carte); const q = C.filter((n) => noteAlToConfirm(n).length).length;
+  return `<button class="glass nt-carterow st" style="--i:3" data-go="noteCarte"><span class="ic">${ico("ntMenu")}</span><span class="nt-crtx"><b>Carte & allergènes</b><em>${C.length ? `${notePlural(C.length, "plat")} à la carte${q ? ` · ${q} à vérifier` : ""} · tableau client à imprimer` : "Le tableau des 14 allergènes de votre carte, prêt à montrer au client"}</em></span><span class="nt-chev">${ico("chev")}</span></button>`;
+}
+function noteExamples() {
+  const ing = (L) => L.map(([name, qty, unit]) => ({ name, qty, unit }));
+  return [
+    { seed: "croquettes", title: "Croquettes de jambon", cat: "Recettes", portions: 10, carte: true, carteCat: "partage", price: 9, allergens: ["gluten", "lait", "oeufs"],
+      body: "Assiette de 4 croquettes. Se congèlent crues, panées : frire directement sans décongeler.",
+      ingredients: ing([["Jambon blanc", "400", "g"], ["Beurre", "100", "g"], ["Farine", "120", "g"], ["Lait entier", "1", "L"], ["Œufs", "3", "pièce"], ["Chapelure", "250", "g"], ["Muscade", "1", "pincée"], ["Huile de friture", "", ""]]),
+      steps: ["Faire fondre le beurre, ajouter la farine et cuire 2 min sans coloration.", "Verser le lait chaud en fouettant, cuire 5 min jusqu'à une béchamel très épaisse. Muscade, sel, poivre.", "Ajouter le jambon haché fin. Débarrasser en bac filmé au contact, refroidir en cellule.", "Façonner les croquettes, les passer dans l'œuf battu puis la chapelure.", "Frire à 180 °C, 3 à 4 min, jusqu'à coloration dorée. Égoutter et servir aussitôt."] },
+    { seed: "planche", title: "Planche de charcuterie", cat: "Recettes", portions: 2, carte: true, carteCat: "partage", price: 18, allergens: ["sulfites", "lait", "gluten"],
+      body: "Planche pour 2. Trancher la charcuterie au dernier moment, à la trancheuse propre.",
+      ingredients: ing([["Jambon cru", "80", "g"], ["Saucisson sec", "80", "g"], ["Terrine de campagne", "100", "g"], ["Comté", "80", "g"], ["Pain de campagne", "150", "g"], ["Cornichons", "40", "g"], ["Beurre demi-sel", "20", "g"]]),
+      steps: ["Sortir le fromage 30 min avant le service.", "Trancher le jambon cru et le saucisson finement.", "Couper la terrine en tranches de 1 cm et le comté en bâtonnets.", "Dresser sur la planche avec les cornichons, le beurre et le pain grillé."] },
+  ];
+}
+function noteExRowHTML() {
+  const miss = noteExamples().filter((e) => !S.notes.some((n) => n.seed === e.seed || noteNorm(n.title) === noteNorm(e.title)));
+  const R = S.notes.filter((n) => noteKind(n) === "Recettes").length; if (!miss.length || R >= 6) return "";
+  return `<div class="glass nt-starter nt-exrow st" style="--i:5"><div class="ic acc">${ico("ntMenu")}</div><div style="flex:1;min-width:0"><b class="h3">Exemples de la carte</b><p class="note" style="margin:3px 0 0">${miss.map((e) => esc(e.title)).join(" · ")}, avec leurs allergènes. Liés à votre stock quand le produit existe.</p></div><button class="btn soft sm" data-act="noteExCarte">${ico("plus")}Ajouter</button></div>`;
+}
+
+/* ───────── vue « Carte & allergènes » ───────── */
+const noteCarteList = () => S.notes.filter((n) => noteKind(n) === "Recettes" && n.carte).sort((a, b) => NOTE_CARTE_CATS.findIndex((c) => c[0] === a.carteCat) - NOTE_CARTE_CATS.findIndex((c) => c[0] === b.carteCat) || String(a.title).localeCompare(String(b.title), "fr"));
+const noteCarteGroups = (L) => NOTE_CARTE_CATS.map(([k]) => [k, L.filter((n) => (NOTE_CARTE_CATS.some((c) => c[0] === n.carteCat) ? n.carteCat : "plat") === k)]).filter((g) => g[1].length);
+/* status of a dish for a client allergic to `sel`: ok / q (to check) / no (contains) */
+function noteSafe(n, sel) {
+  const on = recipeAllergens(n); const q = noteAlToConfirm(n); const bad = sel.filter((k) => on.includes(k));
+  if (bad.length) return { s: "no", bad }; const qq = sel.filter((k) => q.includes(k));
+  if (qq.length) return { s: "q", bad: qq }; if (!(n.ingredients || []).length && !on.length) return { s: "q", bad: [], empty: true };
+  return { s: "ok", bad: [] };
+}
+function noteMatrixHTML(L, sel) {
+  return `<div class="nt-mwrap"><table class="nt-mx"><thead><tr><th class="nt-mdish">Plat</th>${NOTE_ALLERGENS.map(([k, t]) => `<th class="${sel.includes(k) ? "sel" : ""}"><span>${t}</span></th>`).join("")}</tr></thead>
+    <tbody>${noteCarteGroups(L).map(([c, G]) => `<tr class="nt-mcat"><td colspan="15"><span>${esc(NOTE_CARTE_PL[c])}</span></td></tr>${G.map((n) => { const on = recipeAllergens(n), q = noteAlToConfirm(n); return `<tr><td class="nt-mdish"><button data-go="fiche" data-id="${esc(n.id)}">${esc(n.title)}</button></td>${NOTE_ALLERGENS.map(([k, t]) => `<td class="${sel.includes(k) ? "sel" : ""}">${on.includes(k) ? `<i class="nt-dot" title="${esc(t)}"></i>` : q.includes(k) ? `<i class="nt-dot q" title="${esc(t)} à confirmer">?</i>` : ""}</td>`).join("")}</tr>`; }).join("")}`).join("")}</tbody></table></div>`;
+}
+function noteCarteBody() {
+  const L = noteCarteList(); const sel = S.ui.noteAlSel || [];
+  if (!L.length) return "";
+  const qn = L.filter((n) => noteAlToConfirm(n).length).length;
+  let res = "";
+  if (sel.length) {
+    const R = L.map((n) => ({ n, r: noteSafe(n, sel) })); const ok = R.filter((x) => x.r.s === "ok"), q = R.filter((x) => x.r.s === "q"), no = R.filter((x) => x.r.s === "no");
+    const item = ({ n, r }, i) => `<button class="nt-sres ${r.s} st" style="--i:${Math.min(i, 12)}" data-go="fiche" data-id="${esc(n.id)}"><span class="nt-sic">${ico(r.s === "ok" ? "check" : r.s === "q" ? "alert" : "x")}</span><span class="nt-stx"><b>${esc(n.title)}</b><em>${esc(noteCarteCat(n.carteCat))}${r.s === "no" ? ` · contient ${esc(r.bad.map(noteAllergenLabel).join(", ").toLowerCase())}` : r.s === "q" ? (r.empty ? " · fiche sans ingrédients" : ` · ${esc(r.bad.map(noteAllergenLabel).join(", ").toLowerCase())} à confirmer`) : ""}</em></span></button>`;
+    res = `<div class="nt-sres-h st" style="--i:1"><b class="mono">${ok.length}</b> plat${ok.length > 1 ? "s" : ""} sans ${esc(sel.map(noteAllergenLabel).join(", ").toLowerCase())}${q.length ? ` · <span class="w">${q.length} à vérifier</span>` : ""}</div>
+      <div class="nt-sgrid">${ok.map(item).join("")}${ok.length ? "" : `<div class="glass empty"><b>Aucun plat sûr</b>Proposez au chef d'adapter un plat, sans contamination croisée.</div>`}</div>
+      ${q.length ? `<span class="lbl">À vérifier en cuisine</span><div class="nt-sgrid">${q.map(item).join("")}</div>` : ""}
+      ${no.length ? `<details class="nt-sno"><summary>${notePlural(no.length, "plat")} à éviter</summary><div class="nt-sgrid">${no.map(item).join("")}</div></details>` : ""}`;
+  }
+  return `<div class="glass pad nt-filter st" style="--i:2"><div class="nt-fh"><div><b class="h3">Que peut manger un client allergique à… ?</b><p class="note" style="margin:2px 0 0">Choisissez une ou plusieurs allergies.</p></div>${sel.length ? `<button class="btn ghost sm" data-act="noteAlSelClear">${ico("x")}Effacer</button>` : ""}</div>
+      <div class="nt-fchips">${NOTE_ALLERGENS.map(([k, t]) => `<button class="nt-fchip ${sel.includes(k) ? "on" : ""}" data-act="noteAlSel" data-v="${k}" aria-pressed="${sel.includes(k)}">${t}</button>`).join("")}</div>
+      ${res ? `<div class="nt-sres-wrap">${res}</div>` : ""}</div>
+    <div class="glass pad nt-mcard st" style="--i:3"><div class="nt-fh"><div><b class="h3">Tableau des allergènes</b><p class="note" style="margin:2px 0 0">${notePlural(L.length, "plat")} à la carte${qn ? ` · <span class="nt-warn">${qn} avec des allergènes à confirmer (?)</span>` : ""}</p></div></div>
+      ${noteMatrixHTML(L, sel)}
+      <p class="note nt-mleg"><i class="nt-dot"></i> contient &nbsp; <i class="nt-dot q">?</i> à confirmer sur la fiche</p></div>`;
+}
+VIEWS.noteCarte = {
+  render() {
+    const L = noteCarteList(); const others = S.notes.filter((n) => noteKind(n) === "Recettes" && !n.carte).length;
+    const top = topBar("Carte & allergènes", { right: L.length ? `<button class="btn acc sm nt-cprint" data-act="noteCartePrint">${ico("printer")}<span>Imprimer</span></button>` : "" });
+    const empty = `<div class="glass empty st" style="--i:2"><div class="ic">${ico("ntMenu")}</div><b>Aucun plat à la carte</b>Sur chaque fiche recette, activez « À la carte » et choisissez sa catégorie : entrée, plat, dessert, à partager ou boisson. Le tableau des allergènes se remplit tout seul.
+      <div style="margin-top:14px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap">${others ? `<button class="btn acc sm" data-act="noteCarteAdd">${ico("plus")}Choisir les plats</button>` : `<button class="btn acc sm" data-act="noteNew" data-v="Recettes">${ico("plus")}Créer une recette</button>`}${noteExRowHTML() ? `<button class="btn soft sm" data-act="noteExCarte">${ico("sparkle")}Ajouter les exemples</button>` : ""}</div></div>`;
+    return `<div class="inner wide nt-wrap nt-carte">${top}
+      <p class="sub st" style="--i:1;margin:-6px 0 0">Information obligatoire : les 14 allergènes de chaque plat, à montrer au client sur simple demande.</p>
+      <div id="ntCarteBody" class="nt-cbody2">${L.length ? noteCarteBody() : empty}</div>
+      ${L.length && others ? `<button class="nt-addph st" style="--i:5" data-act="noteCarteAdd">${ico("plus")}<span>Ajouter des plats à la carte</span><em>${notePlural(others, "recette")}</em></button>` : ""}
+      ${L.length ? `<div class="ctabar nt-cprintbar st" style="--i:6"><button class="btn acc block" data-act="noteCartePrint">${ico("printer")}Imprimer le tableau client</button></div>` : ""}</div>`;
+  },
+  after() { setTimeout(() => { const b = $('#side .nav[data-go="notes"]'); b && b.classList.add("on"); }, 0); },
+};
+function noteCartePaint() { const b = $("#ntCarteBody"); if (!b) return; b.innerHTML = noteCarteBody(); $$(".nt-filter.st, .nt-mcard.st", b).forEach((e) => (e.style.animation = "none")); }
+/* printable A4: the regulatory table for clients */
+function noteCarteDocHTML() {
+  const L = noteCarteList(); const today = new Date().toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
+  const head = `<tr><th class="ntc-d">Nos plats</th>${NOTE_ALLERGENS.map(([k, t]) => `<th class="ntc-a"><span>${t}</span></th>`).join("")}</tr>`;
+  const body = noteCarteGroups(L).map(([c, G]) => `<tr class="ntc-cat"><td colspan="15">${esc(NOTE_CARTE_PL[c])}</td></tr>${G.map((n) => { const on = recipeAllergens(n, true); return `<tr><td class="ntc-d">${esc(n.title)}</td>${NOTE_ALLERGENS.map(([k]) => `<td class="ntc-a">${on.includes(k) ? "●" : ""}</td>`).join("")}</tr>`; }).join("")}`).join("");
+  return `<article class="ntd ntc-doc"><header class="ntd-h"><div class="ntd-hl"><div class="ntd-k">Information des consommateurs · allergènes</div><h1>${esc(S.resto?.name || "Notre carte")}</h1>
+      <div class="ntd-meta"><span>Allergènes présents dans nos plats</span><span>Mis à jour le ${today}</span></div></div>
+      <div class="ntd-logo">${(() => { try { return logoMark({ mono: "#4A1FE6" }); } catch (e) { return ""; } })()}</div></header>
+    <table class="ntc-t"><thead>${head}</thead><tbody>${body}</tbody></table>
+    <p class="ntc-leg">● : le plat contient cet allergène ou des produits qui en contiennent.</p>
+    <p class="ntc-law">Liste des 14 allergènes à déclaration obligatoire (règlement UE n° 1169/2011, annexe II ; décret n° 2015-447). Nos plats sont préparés dans une cuisine où tous ces allergènes sont présents : des traces restent possibles. Une allergie ou une intolérance ? Parlez-en à notre équipe avant de commander.</p>
+    <footer class="ntd-f">${esc(S.resto?.name || "")} · Tableau des allergènes · ${today}</footer></article>`;
+}
+
+Object.assign(ACT, {
+  /* allergen suggestions on the read view */
+  noteAlOk: async (a, id, v) => {
+    const n = S.notes.find((x) => x.id === id); if (!n || a.disabled) return; a.disabled = true;
+    try { await safe(DB.update("notes", id, { allergens: [...new Set([...(n.allergens || []).map(noteAlId), v])], alNo: (n.alNo || []).filter((x) => x !== v), updatedAt: Date.now() })); } catch (e) { a.disabled = false; return; }
+    await logEvent("note", `a confirmé l'allergène ${noteAllergenLabel(v).toLowerCase()} sur « ${n.title} »`, { ref: id });
+    const row = a.closest(".nt-alqr"); if (row) row.classList.add("bye"); SFX.ok(); buzz(8); toast(`${noteAllergenLabel(v)} : confirmé`); setTimeout(rerender, row ? 240 : 60);
+  },
+  noteAlNo: async (a, id, v) => {
+    const n = S.notes.find((x) => x.id === id); if (!n || a.disabled) return; a.disabled = true;
+    try { await safe(DB.update("notes", id, { alNo: [...new Set([...(n.alNo || []), v])], updatedAt: Date.now() })); } catch (e) { a.disabled = false; return; }
+    await logEvent("note", `a écarté l'allergène ${noteAllergenLabel(v).toLowerCase()} sur « ${n.title} »`, { ref: id });
+    SFX.close(); toast(`${noteAllergenLabel(v)} : non`); setTimeout(rerender, 60);
+  },
+  /* editor: links */
+  noteLink: (a, id, v) => {
+    const i = +v; const g = S.ui.note.ingredients[i]; if (!g) return; const q = String(g.name || "").trim(); const blur = document.activeElement; if (blur && blur.blur) blur.blur();
+    openSheet(`<div class="h2" style="font-size:20px">Lier « ${esc(q || "l'ingrédient")} »</div><p class="sub" style="margin:0">Ses allergènes s'ajoutent à la fiche et « Utiliser la recette » le retire du stock.</p>
+      <div class="nt-search">${ico("search")}<input class="input" id="ntLinkQ" type="search" autocomplete="off" placeholder="Chercher un produit…" value="${esc(q)}"></div>
+      <div class="nt-llist" id="ntLinkL">${noteLinkListHTML(i, q)}</div>
+      ${g.productId || g.noteId ? `<button class="btn soft block" data-act="noteLinkFree" data-v="${i}">${ico("x")}Garder en texte libre</button>` : ""}`, (b) => {
+      const inp = $("#ntLinkQ", b); const L = $("#ntLinkL", b);
+      inp.addEventListener("input", debounce(() => { L.innerHTML = noteLinkListHTML(i, inp.value); }, 120));
+      if (q && !L.querySelector(".nt-lrow")) { inp.value = ""; L.innerHTML = noteLinkListHTML(i, ""); }
+    });
+  },
+  noteLinkSet: (a, id, v) => {
+    const g = S.ui.note.ingredients[+id]; if (!g) return; const [t, x] = v.split(":"); delete g.productId; delete g.noteId; delete g.free;
+    if (t === "p") { const p = S.products.find((y) => y.id === x); g.productId = x; if (!String(g.name || "").trim() && p) g.name = p.name; if (p && !String(g.qty || "").trim() && noteUnitKey(g.unit)[0] !== noteUnitKey(p.unit)[0]) g.unit = p.unit === "kg" ? "g" : p.unit === "L" ? "cl" : p.unit; }
+    else { const n = S.notes.find((y) => y.id === x); g.noteId = x; if (!String(g.name || "").trim() && n) g.name = n.title; if (!String(g.qty || "").trim()) { g.qty = "1"; g.unit = "portion"; } }
+    closeSheet(true); SFX.ok(); buzz(6); noteRer();
+  },
+  noteLinkFree: (a, id, v) => { const g = S.ui.note.ingredients[+v]; if (!g) return; delete g.productId; delete g.noteId; g.free = true; closeSheet(true); SFX.close(); noteRer(); },
+  noteCarteTog: () => { const N = S.ui.note; N.carte = !N.carte; if (N.carte && !N.carteCat) N.carteCat = "plat"; SFX.tick(); buzz(6); noteRer(); },
+  noteCarteCatSet: (a, id, v) => { S.ui.note.carteCat = v; $$(".nt-ccats .chip").forEach((c) => c.classList.toggle("on", c.dataset.v === v)); SFX.tick(); buzz(4); },
+  /* utiliser la recette */
+  noteUse: (a, id) => {
+    const n = S.notes.find((x) => x.id === id); if (!n) return; const base = num(n.portions) || 1; const P = S.ui.notePortions?.[id];
+    S.ui.noteUse = P && P !== base ? { id, mode: "p", v: P } : { id, mode: "b", v: 1 }; SFX.tap(); openSheet(noteUseHTML());
+  },
+  noteUseMode: (a, id, v) => {
+    const U = S.ui.noteUse; if (!U || U.mode === v) return; const n = S.notes.find((x) => x.id === U.id); const por = num(n?.portions) || 1;
+    U.v = v === "p" ? Math.max(1, Math.round(U.v * por * 100) / 100) : Math.max(0.5, Math.round((U.v / por) * 2) / 2); U.mode = v; SFX.tick(); buzz(4); noteUsePaint();
+  },
+  noteUseStep: (a, id, v) => {
+    const U = S.ui.noteUse; if (!U) return; const st = U.mode === "b" ? (U.v < 1 || (U.v === 1 && +v < 0) ? 0.5 : 1) : 1;
+    let nx = +v > 0 ? Math.floor(U.v / st + 1e-9) * st + st : Math.ceil(U.v / st - 1e-9) * st - st; nx = Math.round(nx * 100) / 100;
+    const min = U.mode === "b" ? 0.5 : 1; if (nx < min || nx > 9999) { SFX.err(); buzz(20); return; }
+    U.v = nx; SFX.tick(); buzz(4); noteUsePaint(); const e = $("#ntUseV"); if (e) e.classList.add("bump");
+  },
+  noteUseSet: (a, id, v) => { const U = S.ui.noteUse; if (!U) return; U.v = +v; SFX.tick(); buzz(4); noteUsePaint(); },
+  noteUseGo: async (a) => {
+    const U = S.ui.noteUse; const n = S.notes.find((x) => x.id === U?.id); if (!n || a.disabled || S.ui.noteUseBusy) return;
+    const k = noteBatches(n, U); const { rows } = noteUsePlan(n, k); if (!rows.length) return; a.disabled = true; S.ui.noteUseBusy = true;
+    const use = "u" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5); const at = Date.now(); const ids = [];
+    try {
+      for (const r of rows) {
+        const doc = { productId: r.p.id, name: r.p.name, qty: -noteQ3(r.q), unit: r.p.unit || "", kind: "recette", ref: n.id, refType: "note", use, batches: Math.round(k * 100) / 100, at, uid: S.me.id, by: S.me.name || "" };
+        const mid = typeof stockMove === "function" ? await stockMove(doc) : await safe(DB.add("moves", doc)); if (typeof mid === "string") ids.push(mid);
+      }
+    } catch (e) { console.warn(e); }
+    const por = num(n.portions) || 1; const totP = Math.round(k * por * 100) / 100;
+    let evId = null; try { evId = await DB.add("events", { type: "note", text: `a utilisé la recette « ${n.title} » : ${U.mode === "b" ? notePlural(noteNum(k), "fournée") + `, ${noteNum(totP)} portions` : notePlural(noteNum(totP), "portion")}, ${notePlural(rows.length, "produit")} retiré${rows.length > 1 ? "s" : ""} du stock`, at, uid: S.me.id, ref: n.id, use }); } catch (e) {}
+    S.ui.noteUseBusy = false; S.ui.noteUseUndo = { use, ids, evId, title: n.title }; S.ui.noteUse = null;
+    closeSheet(true); const r = a.getBoundingClientRect(); SFX.done(); buzz(14); burst(r.left + r.width / 2, r.top);
+    toastUndo(`Stock mis à jour : ${notePlural(rows.length, "produit")}`); const ub = $("#toastTx button"); if (ub) ub.dataset.act = "noteUseUndo";
+    setTimeout(() => { if (S.route === "fiche") rerender(); }, 120);
+  },
+  noteUseUndo: async () => {
+    const u = S.ui.noteUseUndo; if (!u) return; S.ui.noteUseUndo = null;
+    const ids = [...new Set([...u.ids, ...(S.moves || []).filter((m) => m.use === u.use).map((m) => m.id)])];
+    for (const id of ids) await DB.del("moves", id).catch(() => {});
+    if (u.evId) await DB.del("events", u.evId).catch(() => {});
+    $("#toast").classList.remove("on"); SFX.close(); toast("Utilisation annulée, stock rétabli"); setTimeout(() => { if (S.route === "fiche") rerender(); }, 120);
+  },
+  /* carte view */
+  noteAlSel: (a, id, v) => { const L = (S.ui.noteAlSel ||= []); const on = !L.includes(v); if (on) L.push(v); else L.splice(L.indexOf(v), 1); SFX.tick(); buzz(5); noteCartePaint(); const b = $(`.nt-fchip[data-v="${v}"]`); if (b && on) b.classList.add("pop"); },
+  noteAlSelClear: () => { S.ui.noteAlSel = []; SFX.close(); noteCartePaint(); },
+  noteCartePrint: () => {
+    const L = noteCarteList(); if (!L.length) return; const q = L.filter((n) => noteAlToConfirm(n).length);
+    if (q.length && !S.ui.noteCarteQOk) { openSheet(`<div class="h2" style="font-size:20px">${notePlural(q.length, "plat")} à vérifier</div><p class="sub" style="margin:0">Des allergènes ne sont pas encore confirmés : ${esc(q.map((n) => n.title).join(", "))}. Par prudence, ils sont imprimés comme présents.</p><div class="grid2"><button class="btn soft" data-act="sheetClose">Vérifier d'abord</button><button class="btn acc" data-act="noteCartePrintGo">${ico("printer")}Imprimer</button></div>`); return; }
+    ACT.noteCartePrintGo();
+  },
+  noteCartePrintGo: () => {
+    closeSheet(true); notePrintCleanup(); const box = document.createElement("div"); box.id = "ntPrint"; box.innerHTML = noteCarteDocHTML(); document.body.appendChild(box);
+    document.documentElement.classList.add("nt-printing"); notePrintCleanup.t = document.title; document.title = `Allergènes - ${S.resto?.name || "carte"}`.replace(/[\/\\:]/g, "-");
+    SFX.print ? SFX.print() : SFX.tap(); buzz(8); logEvent("note", "a imprimé le tableau des allergènes de la carte"); setTimeout(() => { try { window.print(); } catch (e) {} }, 80);
+  },
+  noteCarteAdd: () => {
+    const R = S.notes.filter((n) => noteKind(n) === "Recettes" && !n.carte).sort((a, b) => String(a.title).localeCompare(String(b.title), "fr"));
+    openSheet(`<div class="h2" style="font-size:20px">Ajouter à la carte</div><p class="sub" style="margin:0">Choisissez la catégorie de chaque plat.</p>
+      <div class="nt-cadd">${R.map((n) => `<div class="nt-caddr"><b>${esc(n.title)}</b><div class="nt-ccats">${NOTE_CARTE_CATS.map(([k, t]) => `<button class="chip" data-act="noteCarteSet" data-id="${esc(n.id)}" data-v="${k}">${t}</button>`).join("")}</div></div>`).join("")}</div>`);
+  },
+  noteCarteSet: async (a, id, v) => {
+    const n = S.notes.find((x) => x.id === id); if (!n || a.disabled) return; a.disabled = true;
+    try { await safe(DB.update("notes", id, { carte: true, carteCat: v, updatedAt: Date.now() })); } catch (e) { a.disabled = false; return; }
+    await logEvent("note", `a mis « ${n.title} » à la carte (${noteCarteCat(v).toLowerCase()})`, { ref: id });
+    const row = a.closest(".nt-caddr"); SFX.ok(); buzz(8); if (row) { row.classList.add("bye"); setTimeout(() => { row.remove(); if (!$(".nt-caddr")) closeSheet(); }, 260); }
+    setTimeout(() => { if (S.route === "noteCarte") rerender(); }, 300);
+  },
+  noteExCarte: async (a) => {
+    if (a.disabled) return; a.disabled = true; const t = Date.now(); let n = 0;
+    const miss = noteExamples().filter((e) => !S.notes.some((x) => x.seed === e.seed || noteNorm(x.title) === noteNorm(e.title)));
+    try { for (const e of miss) { const d = { ...e, ingredients: e.ingredients.map(noteIngClean), uid: S.me.id, at: t + n, updatedAt: t + n, photo: "", files: [] }; const id = await safe(DB.add("notes", d)); await logEvent("note", `a ajouté la fiche « ${d.title} »`, { ref: id }); n++; } } catch (e) { a.disabled = false; return; }
+    SFX.done(); buzz(14); const r = a.getBoundingClientRect(); burst(r.left + r.width / 2, r.top); toast(`${notePlural(n, "fiche")} ajoutée${n > 1 ? "s" : ""}`); S.noteCat = "Recettes"; setTimeout(rerender, 80);
   },
 });
