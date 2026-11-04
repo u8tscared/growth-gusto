@@ -9,7 +9,7 @@
 .tk-chart{width:100%;height:150px;margin-top:6px}
 .tk-chart svg{display:block;overflow:visible}
 .tk-grid{stroke:var(--line);stroke-dasharray:3 4}
-.tk-base{stroke:rgba(14,19,48,.14)}
+.tk-base{stroke:rgb(var(--k) / .14)}
 .tk-y{font:600 10.5px var(--mono);fill:var(--faint)}
 .tk-x{font:700 11px var(--f);fill:var(--faint)}
 .tk-x.td{fill:var(--ink)}
@@ -17,13 +17,13 @@
 .tk-b{fill:#C9BCFF;transform-box:fill-box;transform-origin:bottom;animation:tkGrow .7s var(--spring) both;transition:fill .25s}
 .tk-b.on{fill:var(--accent)}
 .nost .tk-b{animation:none}
-.tk-b0{fill:rgba(14,19,48,.14)}
+.tk-b0{fill:rgb(var(--k) / .14)}
 .tk-b0.has{fill:#C9BCFF}
 .tk-hit{fill:transparent;cursor:pointer}
 @keyframes tkGrow{from{transform:scaleY(0)}to{transform:scaleY(1)}}
 @media (prefers-reduced-motion:reduce){.tk-b{animation:none}}
 
-.tk-seg button.on{background:#fff;box-shadow:0 6px 16px -8px rgba(40,30,120,.4)}
+.tk-seg button.on{background:var(--raised);box-shadow:0 6px 16px -8px rgba(40,30,120,.4)}
 .tk-seg button{min-height:24px;padding:12px 6px}
 .tk-cons .li{padding:9px 0}
 .tk-q{font-weight:700;font-size:15px;white-space:nowrap}
@@ -74,7 +74,7 @@
 .tk-ca{position:relative}
 .tk-ca .input{height:64px;font-size:30px;font-weight:700;padding-right:46px;letter-spacing:-.04em}
 .tk-ca b{position:absolute;right:16px;top:50%;transform:translateY(-50%);font-size:22px;color:var(--faint)}
-.tk-px{all:unset;cursor:pointer;position:absolute;top:4px;right:4px;width:26px;height:26px;border-radius:50%;display:grid;place-items:center;background:rgba(14,19,48,.62);color:#fff}
+.tk-px{all:unset;cursor:pointer;position:absolute;top:4px;right:4px;width:26px;height:26px;border-radius:50%;display:grid;place-items:center;background:rgb(var(--k) / .62);color:#fff}
 .tk-px .ico{width:14px;height:14px}
 .tk-px::before{content:"";position:absolute;inset:-9px}
 
@@ -83,7 +83,7 @@
 .tk-sheetca b{font-size:24px;letter-spacing:-.04em}
 .tk-shots{display:flex;gap:8px;overflow-x:auto}
 .tk-shots img{height:180px;border-radius:14px;flex:none}
-.tk-cost.part{background:rgba(14,19,48,.05)}
+.tk-cost.part{background:rgb(var(--k) / .05)}
 .tk-cost span small{display:block;font-size:11.5px;color:var(--muted);font-weight:600}
 .tk-edit .ctabar{margin-top:6px}
 
@@ -110,7 +110,7 @@
 
 /* saisie: the save bar sits on a frosted backing so it never reads over the text below */
 .tk-ed-grid,.tk-ed-l,.tk-ed-r{display:contents}
-.tk-edit .ctabar{padding:8px;border-radius:26px;background:rgba(255,255,255,.66);-webkit-backdrop-filter:blur(20px) saturate(1.8);backdrop-filter:blur(20px) saturate(1.8);border:1px solid var(--edge);filter:none;box-shadow:0 18px 40px -16px rgba(40,30,120,.35)}
+.tk-edit .ctabar{padding:8px;border-radius:26px;background:rgb(var(--w) / .66);-webkit-backdrop-filter:blur(20px) saturate(1.8);backdrop-filter:blur(20px) saturate(1.8);border:1px solid var(--edge);filter:none;box-shadow:0 18px 40px -16px rgba(40,30,120,.35)}
 .tk-edit .ctabar .btn{height:54px}
 @media (min-width:960px){
   .inner.narrow.tk-edit{max-width:1080px}
@@ -138,7 +138,7 @@
 .tk-part b{font-size:13.5px;font-weight:800;letter-spacing:-.01em;white-space:nowrap}
 .tk-part em{font-style:normal;font-size:11.5px;font-weight:650;color:var(--faint);display:flex;align-items:center;gap:3px;white-space:nowrap}
 .tk-part em .ico{width:12px;height:12px}
-.tk-part.on{background:var(--ink);color:#fff;border-color:var(--ink);box-shadow:0 10px 22px -12px rgba(14,19,48,.6)}
+.tk-part.on{background:var(--ink-bg);color:var(--on-ink);border-color:var(--ink-bg);box-shadow:0 10px 22px -12px rgb(var(--sk) / .6)}
 .tk-part.on em{color:rgba(255,255,255,.7)}
 .tk-part.all{border-style:dashed;border-color:rgba(74,31,230,.3)}
 .tk-part.all.on{border-style:solid}
@@ -165,7 +165,7 @@
 .tk-dupf{flex-basis:100%;display:flex;align-items:center;gap:8px;padding:6px 6px 6px 10px;border-radius:12px;background:rgba(184,108,0,.09);color:var(--warn);font-size:12.5px;font-weight:700;animation:rise .3s var(--ease) both}
 .tk-dupf .ico{width:15px;height:15px;flex:none}
 .tk-dupf span{flex:1;min-width:0}
-.tk-dupf button{all:unset;cursor:pointer;min-height:36px;padding:0 12px;border-radius:10px;background:#fff;color:var(--ink);font-weight:800;font-size:12.5px;white-space:nowrap;box-shadow:0 0 0 1px var(--line) inset}
+.tk-dupf button{all:unset;cursor:pointer;min-height:36px;padding:0 12px;border-radius:10px;background:var(--solid);color:var(--ink);font-weight:800;font-size:12.5px;white-space:nowrap;box-shadow:0 0 0 1px var(--line) inset}
 .tk-dupf.kept{background:rgba(74,31,230,.07);color:var(--accent)}
 .tk-line.tap{cursor:pointer;border-radius:12px}
 .tk-pb{display:inline-block;font-size:10.5px;font-weight:800;padding:1px 6px;border-radius:6px;background:rgba(74,31,230,.1);color:var(--accent);margin-right:4px}
@@ -178,8 +178,8 @@
 .tk-covl{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
 .tk-avg{font-size:12.5px;font-weight:650;color:var(--muted)}
 .tk-avg b{color:var(--ink);font-weight:750}
-.tk-vatt{all:unset;box-sizing:border-box;cursor:pointer;display:flex;align-items:center;gap:10px;min-height:48px;padding:0 12px;border-radius:14px;background:rgba(14,19,48,.04);font-size:13.5px;font-weight:750;transition:background .2s}
-.tk-vatt:hover{background:rgba(14,19,48,.07)}
+.tk-vatt{all:unset;box-sizing:border-box;cursor:pointer;display:flex;align-items:center;gap:10px;min-height:48px;padding:0 12px;border-radius:14px;background:rgb(var(--k) / .04);font-size:13.5px;font-weight:750;transition:background .2s}
+.tk-vatt:hover{background:rgb(var(--k) / .07)}
 .tk-vatt:focus-visible{outline:2.5px solid var(--accent)}
 .tk-vtl{flex:1;min-width:0}
 .tk-vtl em{font-style:normal;color:var(--faint);font-weight:650;margin-left:4px;font-size:12px}
@@ -231,7 +231,7 @@
 .tk-recap .tk-mv{animation:rise .4s var(--ease) both}
 .tk-recap .tk-mv:nth-child(2){animation-delay:60ms}.tk-recap .tk-mv:nth-child(3){animation-delay:120ms}.tk-recap .tk-mv:nth-child(n+4){animation-delay:180ms}
 .tk-sfin{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px}
-.tk-sfin span{display:flex;flex-direction:column;gap:2px;padding:9px 12px;border-radius:14px;background:rgba(14,19,48,.04)}
+.tk-sfin span{display:flex;flex-direction:column;gap:2px;padding:9px 12px;border-radius:14px;background:rgb(var(--k) / .04)}
 .tk-sfin em{font-style:normal;font-size:11.5px;font-weight:750;color:var(--faint)}
 .tk-sfin b{font-size:16px;font-weight:750}
 .tk-sstock{display:flex;flex-direction:column;gap:6px}

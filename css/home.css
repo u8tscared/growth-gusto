@@ -28,19 +28,19 @@
 .hm-kick .ico{width:14px;height:14px}
 .hm-frs{display:flex;flex-wrap:wrap;gap:6px}
 .hm-frs::-webkit-scrollbar{display:none}
-.hm-fr{flex:none;display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:750;padding:6px 10px 6px 8px;border-radius:999px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);white-space:nowrap}
+.hm-fr{flex:none;display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:750;padding:6px 10px 6px 8px;border-radius:999px;background:rgba(255,255,255,.12);border:1px solid rgb(var(--hl) / calc(.2 * var(--hla)));white-space:nowrap}
 .hm-fr i{width:12px;height:12px;border-radius:50%;border:1.6px dashed rgba(255,255,255,.75)}
 .hm-fr .ico{width:13px;height:13px}
 .hm-fr em{font-style:normal;opacity:.75;font-size:11px}
 .hm-fr.ok{background:rgba(255,255,255,.24)}
 .hm-fr.bad{background:rgba(255,92,120,.38);border-color:rgba(255,180,190,.6)}
-.hm-cta-w{all:unset;box-sizing:border-box;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:9px;min-height:54px;padding:0 18px;border-radius:18px;background:#fff;color:var(--accent);font-size:15.5px;font-weight:800;letter-spacing:-.015em;box-shadow:0 14px 28px -14px rgba(10,0,80,.6),inset 0 -2px 0 rgba(74,31,230,.08);transition:transform .18s var(--spring)}
+.hm-cta-w{all:unset;box-sizing:border-box;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:9px;min-height:54px;padding:0 18px;border-radius:18px;background:#fff;color:#4A1FE6;font-size:15.5px;font-weight:800;letter-spacing:-.015em;box-shadow:0 14px 28px -14px rgba(10,0,80,.6),inset 0 -2px 0 rgba(74,31,230,.08);transition:transform .18s var(--spring)}
 .hm-cta-w span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .hm-cta-w .ico{width:19px;height:19px;flex:none}
 .hm-cta-w:active{transform:scale(.96)}
 .hm-cta-w .ico:last-child{transition:transform .3s var(--spring)}
 .hm-cta-w:hover .ico:last-child{transform:translateX(3px)}
-.hm-cta-w.done{background:rgba(255,255,255,.16);color:#fff;box-shadow:none;border:1px solid rgba(255,255,255,.25);cursor:default}
+.hm-cta-w.done{background:rgba(255,255,255,.16);color:#fff;box-shadow:none;border:1px solid rgb(var(--hl) / calc(.25 * var(--hla)));cursor:default}
 @media (min-width:960px){
   .hm-hero{padding:26px 26px 22px;gap:20px}
   .hm-hero .ring{width:132px;height:132px}
@@ -58,11 +58,11 @@
 .hm-qa button:active{transform:scale(.94)}
 .hm-qa button:hover{box-shadow:var(--sh-lg)}
 .hm-qa button:focus-visible{outline:2.5px solid var(--accent);outline-offset:2px}
-.hm-qa .qi{position:relative;width:50px;height:50px;border-radius:17px;display:grid;place-items:center;color:#fff;flex:none;box-shadow:0 10px 18px -10px var(--qc,#4A1FE6),inset 0 1px 0 rgba(255,255,255,.35)}
+.hm-qa .qi{position:relative;width:50px;height:50px;border-radius:17px;display:grid;place-items:center;color:#fff;flex:none;box-shadow:0 10px 18px -10px var(--qc,#4A1FE6),inset 0 1px 0 rgb(var(--hl) / calc(.35 * var(--hla)))}
 .hm-qa .qi .ico{width:24px;height:24px}
 .hm-qa .qi .ico path[fill]{opacity:.35}
 .hm-qa .ql{font-size:13.5px;font-weight:800;letter-spacing:-.02em}
-.hm-qa .bdg{position:absolute;top:-6px;right:-8px;min-width:20px;height:20px;padding:0 5px;box-sizing:border-box;border-radius:999px;background:var(--bad);color:#fff;font-size:11px;font-weight:700;display:grid;place-items:center;border:2px solid #fff}
+.hm-qa .bdg{position:absolute;top:-6px;right:-8px;min-width:20px;height:20px;padding:0 5px;box-sizing:border-box;border-radius:999px;background:var(--bad);color:#fff;font-size:11px;font-weight:700;display:grid;place-items:center;border:2px solid var(--solid)}
 .hm-qa .c1 .qi{--qc:#2F5BFF;background:linear-gradient(150deg,#6FA0FF,#3B4DF0 60%,#4A1FE6)}
 .hm-qa .c2 .qi{--qc:#E0752F;background:linear-gradient(150deg,#FFB067,#F07A2E 60%,#D9601F)}
 .hm-qa .c3 .qi{--qc:#4A1FE6;background:linear-gradient(150deg,#9C74FF,#5B2BFF 55%,#3B16D9)}
@@ -79,7 +79,7 @@
 .hm-stat .sv{font-size:24px;font-weight:700;letter-spacing:-.04em;line-height:1.1}
 .hm-stat .sv small{font-size:13px;margin-left:1px;opacity:.7}
 .hm-stat .ss{font-size:11.5px;color:var(--muted);font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.hm-stat .sb{height:4px;border-radius:4px;background:rgba(14,19,48,.07);overflow:hidden;margin:3px 0 1px}
+.hm-stat .sb{height:4px;border-radius:4px;background:rgb(var(--k) / .07);overflow:hidden;margin:3px 0 1px}
 .hm-stat .sb i{display:block;height:100%;width:0;border-radius:inherit;background:linear-gradient(90deg,var(--accent-2),var(--accent));transition:width 1.1s .3s var(--ease)}
 .hm-stat .sb i.on,.nost .hm-stat .sb i{width:var(--w)}
 .hm-stat.warn .sv{color:var(--warn)}
@@ -122,8 +122,8 @@
 .hm-prog i{display:block;height:100%;width:0;border-radius:inherit;background:linear-gradient(90deg,#9C74FF,var(--accent));box-shadow:0 0 12px rgba(122,77,255,.6);transition:width 1.2s .35s var(--ease)}
 .hm-prog i.on,.nost .hm-prog i{width:var(--w)}
 .hm-step{min-height:58px}
-.hm-num{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;flex:none;font-size:12.5px;font-weight:800;color:var(--muted);background:rgba(14,19,48,.06)}
-.hm-step.next .hm-num{background:var(--accent);color:#fff;box-shadow:0 0 0 5px rgba(74,31,230,.14)}
+.hm-num{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;flex:none;font-size:12.5px;font-weight:800;color:var(--muted);background:rgb(var(--k) / .06)}
+.hm-step.next .hm-num{background:var(--accent-solid);color:#fff;box-shadow:0 0 0 5px rgba(74,31,230,.14)}
 .hm-step.next .tx b{color:var(--accent)}
 .hm-step.ok .tx b{color:var(--muted);text-decoration:line-through;text-decoration-color:rgba(90,99,134,.4)}
 .hm-step > .ico{width:18px;height:18px;color:var(--faint);flex:none}
@@ -135,7 +135,7 @@
 .hm-ev.tap{padding:11px 10px}
 .hm-av{position:relative;flex:none}
 .hm-av .ava{width:34px;height:34px;font-size:12px}
-.hm-av .bd{position:absolute;right:-4px;bottom:-4px;width:18px;height:18px;border-radius:50%;display:grid;place-items:center;color:#fff;border:2px solid #fff}
+.hm-av .bd{position:absolute;right:-4px;bottom:-4px;width:18px;height:18px;border-radius:50%;display:grid;place-items:center;color:#fff;border:2px solid var(--solid)}
 .hm-av .bd .ico{width:10px;height:10px;stroke-width:2.4}
 .hm-av .bd .ico path[fill]{display:none}
 .hm-ev .tx b{white-space:normal;font-weight:650;font-size:13.5px;line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;padding-top:1px}
@@ -168,7 +168,7 @@
 .hm-date span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
 
 /* activity feed: an undone action stays visible, struck through */
-.hm-ev.cx .tx b{text-decoration:line-through;text-decoration-thickness:1.5px;text-decoration-color:rgba(14,19,48,.4);color:var(--muted)}
+.hm-ev.cx .tx b{text-decoration:line-through;text-decoration-thickness:1.5px;text-decoration-color:rgb(var(--k) / .4);color:var(--muted)}
 .hm-ev.cx .hm-av{opacity:.5}
 .hm-cx{display:inline-flex;margin-top:4px;font-size:11px;padding:2px 8px}
 /* a reception in progress is the first thing to resume: the to-do list (its first row) moves right under the hero */
@@ -203,15 +203,15 @@
 .hm-shift .tx em{font-style:normal;font-size:12px;font-weight:650;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .hm-shift-avs{display:flex;flex:none;padding-left:6px}
 .hm-shift-avs .ic{width:42px;height:42px;border-radius:15px;margin-left:-6px;color:var(--ok);background:rgba(7,138,94,.1)}
-.hm-sa{position:relative;margin-left:-8px;border-radius:50%;box-shadow:0 0 0 2.5px #fff;display:grid}
+.hm-sa{position:relative;margin-left:-8px;border-radius:50%;box-shadow:0 0 0 2.5px var(--solid);display:grid}
 .hm-sa .ava{width:34px;height:34px;font-size:12px}
-.hm-sa::after{content:"";position:absolute;right:-1px;bottom:-1px;width:10px;height:10px;border-radius:50%;background:var(--ok);box-shadow:0 0 0 2px #fff}
+.hm-sa::after{content:"";position:absolute;right:-1px;bottom:-1px;width:10px;height:10px;border-radius:50%;background:var(--ok);box-shadow:0 0 0 2px var(--solid)}
 .hm-sa.in::after{animation:hmLive 2.4s ease-in-out infinite}
 .hm-sa.pause::after{background:var(--warn)}
 .hm-sa.pause .ava{opacity:.65}
-.hm-sa.more{width:34px;height:34px;place-items:center;background:rgba(14,19,48,.08);font-size:11.5px;font-weight:700;color:var(--muted)}
+.hm-sa.more{width:34px;height:34px;place-items:center;background:rgb(var(--k) / .08);font-size:11.5px;font-weight:700;color:var(--muted)}
 .hm-sa.more::after{display:none}
-@keyframes hmLive{0%,100%{box-shadow:0 0 0 2px #fff,0 0 0 2px rgba(7,138,94,.5)}50%{box-shadow:0 0 0 2px #fff,0 0 0 6px rgba(7,138,94,0)}}
+@keyframes hmLive{0%,100%{box-shadow:0 0 0 2px var(--solid),0 0 0 2px rgba(7,138,94,.5)}50%{box-shadow:0 0 0 2px var(--solid),0 0 0 6px rgba(7,138,94,0)}}
 .hm-punch{flex:none;min-height:44px}
 .hm-punch .ico{width:17px;height:17px}
 .hm-dash{all:unset;box-sizing:border-box;cursor:pointer;order:5;display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:22px;background:var(--glass);border:1px solid var(--edge);box-shadow:var(--sh);min-height:62px;transition:transform .2s var(--spring),box-shadow .2s}
