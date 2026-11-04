@@ -34,7 +34,34 @@ const auCleanCode = (v) => { v = String(v || ""); const m = /invite=([A-Za-z0-9-
 const auEmailOk = (v) => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(String(v || "").trim());
 const auPwScore = (p) => { p = String(p || ""); if (!p) return 0; let s = p.length >= 8 ? 1 : 0; if (s && /[a-z]/.test(p) && /[A-Z]/.test(p)) s++; if (s && /\d/.test(p)) s++; if (s && (/[^A-Za-z0-9]/.test(p) || p.length >= 14)) s++; return Math.max(p.length >= 8 ? 1 : 0, s); };
 const AU_PW_TX = ["Au moins 8 caractères", "Correct", "Bien", "Solide", "Excellent"];
-const auG = `<svg class="au-g" viewBox="0 0 48 48" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.6 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="m6.3 14.7 6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>`;
+const AU_G = `<svg class="au-g" viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>`;
+/* « Cuisine vivante » drawing kit: hand-tuned strokes, one weight family, no icon-font look */
+const auSv = (d, w = 20, sw = 2) => `<svg viewBox="0 0 24 24" width="${w}" height="${w}" fill="none" stroke="currentColor" stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${d}</svg>`;
+const AU_SVG = {
+  back: auSv('<path d="M19 12H5M11 6l-6 6 6 6"/>', 20, 2.2),
+  x: auSv('<path d="M6 6l12 12M18 6 6 18"/>', 20, 2.2),
+  mail: auSv('<rect x="3" y="5" width="18" height="14" rx="3"/><path d="m4 7 8 6 8-6"/>'),
+  arrow: auSv('<path d="M5 12h14M13 6l6 6-6 6"/>'),
+  arrowS: auSv('<path d="M5 12h14M13 6l6 6-6 6"/>', 16),
+  play: auSv('<circle cx="12" cy="12" r="9"/><path d="m10 8.5 5 3.5-5 3.5z" fill="currentColor"/>'),
+  phone: auSv('<rect x="6" y="2.5" width="12" height="19" rx="2.5"/><path d="M11 18.5h2"/>'),
+  eye: auSv('<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/>'),
+  eyeOff: auSv('<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/><path d="M4 4l16 16"/>'),
+  ok: `<svg viewBox="0 0 12 12" width="12" height="12" aria-hidden="true" focusable="false"><path d="M2.5 6.2 5 8.6l4.6-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+  cloche: `<svg viewBox="0 0 32 32" width="26" height="26" fill="none" stroke="#1B1530" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M6 20h20a10 10 0 0 0-20 0Z" fill="#fff"/><path d="M4 23h24"/><path d="M16 8v2"/><circle cx="16" cy="7" r="1.6" fill="#1B1530"/></svg>`,
+};
+const AU_DOTS = `<span class="au-dots" aria-hidden="true"><i></i><i></i><i></i></span>`;
+const AU_DOTS_IN = `<span class="au-dots in" aria-hidden="true"><i></i><i></i><i></i></span>`;
+const AU_SEAL = `<svg class="au-sealsvg" viewBox="0 0 72 72" aria-hidden="true" focusable="false"><circle class="disc" cx="36" cy="36" r="30"/><circle class="ring" cx="36" cy="36" r="34" fill="none" stroke-width="3"/><path d="M24 37l8 8 16-17" fill="none" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+/* the brand mark (exact artwork), with a gradient id unique to each copy */
+const auMark = (id) => `<svg class="au-mark" viewBox="0 0 512 512" aria-hidden="true" focusable="false"><defs><linearGradient id="auLg${id}" x1="0" y1="0" x2="1" y2="1" gradientTransform="rotate(-15 .5 .5)"><stop offset="0" stop-color="#8F63FF"/><stop offset=".55" stop-color="#4A1FE6"/><stop offset="1" stop-color="#2F1BC4"/></linearGradient></defs><rect width="512" height="512" rx="143.36" fill="url(#auLg${id})"/><svg x="97.28" y="97.28" width="317.44" height="317.44" viewBox="0 0 100 100"><path d="M86 16H50A34 34 0 0 0 25.96 74.04" fill="none" stroke="#fff" stroke-width="14"/><path d="M40.5 83.5 80 44M52 42h30v30" fill="none" stroke="#fff" stroke-width="12.5"/></svg></svg>`;
+const auReduce = () => { try { return window.matchMedia("(prefers-reduced-motion: reduce)").matches; } catch (e) { return false; } };
+const auFrHTML = (n, lo, hi, on) => `<i class="au-frk" aria-hidden="true">${on ? AU_SVG.ok : ""}</i>${esc(n)}<em>${lo}/${hi} °C</em>`;
+/* camera framing of the kitchen (x, y, w, h in the 800×840 drawing) for each kind of step */
+const AUK_FOCUS = {
+  desk: { welcome: [0, 0, 800, 840], soon: [0, 0, 800, 840], form: [0, 0, 800, 840], busy: [0, 0, 800, 840], done: [30, 260, 540, 560] },
+  phone: { welcome: [30, 70, 600, 430], soon: [30, 70, 600, 430], form: [170, 250, 460, 200], busy: [420, 320, 300, 180], done: [80, 250, 380, 380] },
+};
 Object.assign(IC, {
   auMail: ["r:2,4,20,16,3", "m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"],
   auEye: ["M2.06 12.35a1 1 0 0 1 0-.7 10.75 10.75 0 0 1 19.88 0 1 1 0 0 1 0 .7 10.75 10.75 0 0 1-19.88 0", "c:12,12,3"],
@@ -177,33 +204,170 @@ const AUTH = {
     document.body.appendChild(b); requestAnimationFrame(() => b.classList.add("on"));
   },
 
-  /* ───────────── overlay ───────────── */
+  /* ───────────── overlay: « Cuisine vivante » — the form on the left, a living kitchen on the right (on top on phones) ───────────── */
   mount() {
     let el = $("#au"); if (el) return el;
     el = document.createElement("div"); el.id = "au"; el.className = "au"; el.setAttribute("role", "dialog"); el.setAttribute("aria-modal", "true"); el.setAttribute("aria-label", "Bienvenue sur Growth Gusto");
-    el.innerHTML = `<div class="au-bg" aria-hidden="true"><i></i><i></i><i></i><i></i><b class="au-spot"></b></div>
-      <div class="au-scroll"><div class="au-wrap">
-        <section class="au-hero" aria-hidden="false">
-          <div class="au-brand">${appIcon(40)}<b>Growth Gusto</b></div>
-          <h1 class="au-h1">Votre cuisine,<br><span class="au-grad">parfaitement maîtrisée.</span></h1>
-          <p class="au-lead">Relevés HACCP, étiquettes, stock, allergènes, équipe et finances. Une seule app, pensée pour le coup de feu.</p>
-          <div class="au-stage" aria-hidden="true">${this.stageHTML()}</div>
-          <ul class="au-feats" aria-label="Fonctions"><li>${ico("therm")}Relevés en 10 s</li><li>${ico("shield")}Registre prêt pour le contrôle</li><li>${ico("auOff")}Marche sans réseau</li></ul>
-        </section>
-        <section class="au-card" id="auCard" aria-live="polite"><div class="au-pane" id="auPane"></div></section>
+    el.innerHTML = `<div class="au-scroll" id="auScroll"><div class="au-app">
+        <main class="au-auth" id="auAuth">
+          <div class="au-brand">${auMark("a")}<span class="au-wm">Growth Gusto</span></div>
+          <div class="au-deck" id="auDeck"><div class="au-pane" id="auPane" aria-live="polite"></div></div>
+          <p class="au-fine au-fine-d">Données hébergées en France et chiffrées.</p>
+        </main>
+        <aside class="au-stage" id="auStage" aria-hidden="true">
+          <div class="au-sbrand">${auMark("b")}<span class="au-wm">Growth Gusto</span></div>
+          <div class="auk" id="auk">${this.stageHTML()}</div>
+          <div class="auk-night"></div>
+        </aside>
+        <button class="au-xf" data-act="auClose" aria-label="Fermer">${AU_SVG.x}</button>
       </div></div>`;
     document.body.appendChild(el);
-    /* desktop: the light follows the pointer, the preview cards lean towards it */
-    el.addEventListener("pointermove", (e) => { if (e.pointerType !== "mouse") return; const r = el.getBoundingClientRect(); el.style.setProperty("--mx", ((e.clientX - r.left) / r.width).toFixed(3)); el.style.setProperty("--my", ((e.clientY - r.top) / r.height).toFixed(3)); }, { passive: true });
+    const fr = $("#aukFridge", el), pr = $("#aukPrinter", el);
+    fr && fr.addEventListener("click", () => fr.classList.toggle("open"));
+    pr && pr.addEventListener("click", () => this.print());
     return el;
   },
+  /* the kitchen of Chemin des Sarments: fridge with its thermometer, label printer, sauce pot, oysters, and the ticket rail */
   stageHTML() {
-    const spark = [38, 52, 44, 61, 58, 72, 66, 80, 74, 88].map((v, i) => `${i * 12 + 4},${(56 - (v - 30) * 0.8).toFixed(1)}`).join(" ");
-    return `<div class="au-mock m1"><span class="au-mic ok">${ico("therm")}</span><div><em>Chambre froide</em><b class="mono">1,8 °C</b></div><span class="pill ok"><span class="dot"></span>Conforme</span></div>
-      <div class="au-mock m2"><div class="au-mrow"><span class="au-mic">${ico("book")}</span><div><em>Fiche recette</em><b>Croquettes de jambon</b></div></div><div class="au-al"><span>Gluten</span><span>Lait</span><span>Œufs</span></div></div>
-      <div class="au-mock m3"><div><em>Ticket Z · hier</em><b class="mono">2 486 €</b></div><svg viewBox="0 0 117 60" aria-hidden="true"><polyline points="${spark}" fill="none" stroke="url(#auSp)" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/><defs><linearGradient id="auSp" x1="0" x2="1"><stop offset="0" stop-color="#9ED7FF"/><stop offset="1" stop-color="#7A4DFF"/></linearGradient></defs></svg></div>
-      <div class="au-mock m4"><span class="au-mic warn">${ico("clock")}</span><div><em>DLC demain</em><b>Fines de claire n°3</b></div></div>`;
+    const k = 'class="auk-ink"';
+    return `<svg viewBox="0 0 800 840" aria-hidden="true" focusable="false">
+      <defs><pattern id="aukTiles" width="48" height="32" patternUnits="userSpaceOnUse"><rect width="48" height="32" fill="#4C1FEA"/><path d="M0 .75H48M.75 0V32" stroke="#5A30F4" stroke-width="1.5"/></pattern></defs>
+      <rect x="-400" y="-200" width="1600" height="1100" fill="url(#aukTiles)"/>
+      <rect x="-400" y="480" width="1600" height="520" fill="#3A10D8"/>
+      <g><rect x="300" y="504" width="900" height="294" fill="#3A10D8" ${k}/>
+        <rect x="330" y="530" width="200" height="86" rx="10" fill="#4318E0" ${k} style="stroke-width:2.5"/><rect x="550" y="530" width="200" height="86" rx="10" fill="#4318E0" ${k} style="stroke-width:2.5"/>
+        <rect x="330" y="636" width="200" height="140" rx="10" fill="#4318E0" ${k} style="stroke-width:2.5"/><rect x="550" y="636" width="200" height="140" rx="10" fill="#4318E0" ${k} style="stroke-width:2.5"/>
+        <rect x="504" y="660" width="10" height="44" rx="5" fill="#E7E3F1" ${k} style="stroke-width:2.5"/><rect x="566" y="660" width="10" height="44" rx="5" fill="#E7E3F1" ${k} style="stroke-width:2.5"/>
+        <rect x="400" y="548" width="60" height="10" rx="5" fill="#E7E3F1" ${k} style="stroke-width:2.5"/><rect x="620" y="548" width="60" height="10" rx="5" fill="#E7E3F1" ${k} style="stroke-width:2.5"/>
+        <rect x="-400" y="796" width="1600" height="200" fill="#2C0CB0"/><path d="M-400 797H1200" ${k}/>
+        <rect x="290" y="480" width="920" height="26" rx="6" fill="#F3E6CF" ${k}/><path d="M296 499H1200" stroke="#E2D0B0" stroke-width="5"/></g>
+      <g fill="#3A10D8" opacity=".55"><ellipse cx="402" cy="481" rx="74" ry="6"/><ellipse cx="566" cy="481" rx="74" ry="6"/><ellipse cx="716" cy="481" rx="86" ry="6"/></g>
+      <g id="aukFridge">
+        <rect x="70" y="140" width="230" height="660" rx="18" fill="#FFFDF8" ${k}/><rect x="280" y="150" width="14" height="640" rx="6" fill="#EDE4D3"/>
+        <rect x="80" y="150" width="210" height="116" rx="10" fill="#FFFDF8" ${k} style="stroke-width:2.5"/><rect x="250" y="176" width="10" height="66" rx="5" fill="#1B1530"/><path d="M100 176h40" ${k} style="stroke-width:2.5;stroke:#D7CCB8"/>
+        <g><rect x="80" y="276" width="210" height="514" rx="10" fill="#FFF4D9" ${k} style="stroke-width:2.5"/><rect id="aukLight" x="92" y="284" width="186" height="80" rx="8" fill="#FFFBEF"/>
+          <rect x="140" y="286" width="90" height="8" rx="4" fill="#F6B93B" ${k} style="stroke-width:2"/><path d="M84 404h202M84 530h202M84 656h202" ${k}/>
+          <rect x="98" y="350" width="104" height="54" rx="6" fill="#E7E3F1" ${k} style="stroke-width:2.5"/><rect x="94" y="342" width="112" height="12" rx="4" fill="#C9C3DA" ${k} style="stroke-width:2.5"/>
+          <rect x="120" y="366" width="40" height="22" rx="3" fill="#fff" ${k} style="stroke-width:2"/><path d="M126 373h22M126 381h14" stroke="#1B1530" stroke-width="2" stroke-linecap="round"/>
+          <path d="M232 404v-44l8-12v-14h12v14l8 12v44z" fill="#23935C" ${k} style="stroke-width:2.5"/>
+          <rect x="96" y="470" width="120" height="60" rx="5" fill="#E8B26A" ${k} style="stroke-width:2.5"/><path d="M96 490h120M96 510h120" stroke="#1B1530" stroke-width="2"/><rect x="118" y="478" width="76" height="14" rx="2" fill="#fff" stroke="#1B1530" stroke-width="2"/>
+          <path d="M232 530c0-26 10-40 20-46 10 6 20 20 20 46z" fill="#23935C" ${k} style="stroke-width:2.5"/><path d="M252 486v44" stroke="#1A7448" stroke-width="2.5"/>
+          <path d="M104 656v-34l70-18v52z" fill="#F6B93B" ${k} style="stroke-width:2.5"/><circle cx="140" cy="636" r="5" fill="#D99A1E"/><circle cx="158" cy="624" r="3.5" fill="#D99A1E"/>
+          <rect x="196" y="616" width="70" height="40" rx="6" fill="#EF5A3C" ${k} style="stroke-width:2.5"/><path d="M206 630h50" stroke="#fff" stroke-width="3" stroke-linecap="round"/></g>
+        <g id="aukDoor">
+          <g id="aukDoorB"><rect x="80" y="276" width="210" height="514" rx="10" fill="#F2EADB" ${k} style="stroke-width:2.5"/><rect x="96" y="330" width="178" height="40" rx="6" fill="#FFFDF8" ${k} style="stroke-width:2.5"/><rect x="96" y="470" width="178" height="40" rx="6" fill="#FFFDF8" ${k} style="stroke-width:2.5"/><rect x="96" y="610" width="178" height="40" rx="6" fill="#FFFDF8" ${k} style="stroke-width:2.5"/></g>
+          <g id="aukDoorF"><rect x="80" y="276" width="210" height="514" rx="10" fill="#FFFDF8" ${k} style="stroke-width:2.5"/><rect x="250" y="300" width="10" height="140" rx="5" fill="#1B1530"/>
+            <rect x="104" y="306" width="128" height="78" rx="12" fill="#1B1530"/><rect id="aukLcd" x="110" y="312" width="116" height="66" rx="8" fill="#241C40"/>
+            <rect x="121" y="322" width="8" height="38" rx="4" fill="none" stroke="#9EF5C4" stroke-width="2"/><rect id="aukMerc" x="123" y="330" width="4" height="30" rx="2" fill="#9EF5C4"/><circle cx="125" cy="364" r="6" fill="#9EF5C4"/>
+            <text id="aukT" x="214" y="355" text-anchor="end" font-family="JetBrains Mono, ui-monospace, monospace" font-weight="700" font-size="30" fill="#9EF5C4">3,2</text>
+            <text id="aukTs" x="214" y="370" text-anchor="end" font-family="JetBrains Mono, ui-monospace, monospace" font-weight="500" font-size="9" letter-spacing="1" fill="#9EF5C4" opacity=".7">°C · OK</text>
+            <text x="104" y="404" font-family="JetBrains Mono, ui-monospace, monospace" font-weight="700" font-size="9" letter-spacing="1.6" fill="#8A8499">FRIGO 2 · POSITIF</text>
+            <g transform="translate(0 130) rotate(-4 150 520)"><rect x="104" y="470" width="96" height="112" rx="4" fill="#F6B93B" ${k} style="stroke-width:2.5"/>
+              <text x="116" y="496" font-family="Bricolage Grotesque, ui-sans-serif, sans-serif" font-weight="700" font-size="13" fill="#1B1530">Relevés</text>
+              <path d="M116 516l4 4 7-8M116 538l4 4 7-8M116 560l4 4 7-8" fill="none" stroke="#1B1530" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M134 516h50M134 538h40M134 560h46" stroke="#1B1530" stroke-width="2" stroke-linecap="round" opacity=".55"/>
+              <circle cx="152" cy="470" r="9" fill="#EF5A3C" ${k} style="stroke-width:2.5"/></g></g></g>
+      </g>
+      <g id="aukPrinter"><rect x="336" y="418" width="132" height="62" rx="14" fill="#FFFDF8" ${k}/><rect x="336" y="452" width="132" height="28" fill="#EDE4D3"/><rect x="336" y="418" width="132" height="62" rx="14" fill="none" ${k}/>
+        <rect x="352" y="414" width="100" height="9" rx="4.5" fill="#1B1530"/><circle cx="354" cy="440" r="4" fill="#23935C"/><rect x="366" y="436" width="40" height="8" rx="4" fill="#EDE4D3"/><circle class="auk-btnp" cx="446" cy="442" r="9" fill="#5B2BFF" stroke="#1B1530" stroke-width="2.5"/></g>
+      <g id="aukPot"><g class="auk-steam"><path d="M540 380c-8-10 8-18 0-30"/><path d="M566 376c-8-10 8-18 0-30"/><path d="M592 380c-8-10 8-18 0-30"/></g>
+        <rect x="488" y="420" width="18" height="12" rx="5" fill="#C8432A" ${k} style="stroke-width:2.5"/><rect x="626" y="420" width="18" height="12" rx="5" fill="#C8432A" ${k} style="stroke-width:2.5"/>
+        <path d="M500 410h132v54a16 16 0 0 1-16 16H516a16 16 0 0 1-16-16z" fill="#EF5A3C" ${k}/><path d="M510 446h112" stroke="#C8432A" stroke-width="5" stroke-linecap="round"/><path d="M610 424v40" stroke="#FF8A6F" stroke-width="5" stroke-linecap="round"/>
+        <g id="aukLid"><path d="M494 410c0-14 32-24 72-24s72 10 72 24z" fill="#E7E3F1" ${k}/><rect x="554" y="372" width="24" height="14" rx="6" fill="#F6B93B" ${k} style="stroke-width:2.5"/></g></g>
+      <g id="aukBoard"><rect x="640" y="464" width="156" height="16" rx="6" fill="#E8B26A" ${k}/><path d="M650 472h136" stroke="#D49A4E" stroke-width="2"/>
+        <g id="aukOyster"><path d="M650 464c-2-14 8-24 26-24 14 0 26 8 28 24z" fill="#C9C3DA" ${k} style="stroke-width:2.5"/><path d="M658 462c2-8 8-12 18-12s16 4 20 12" fill="#F8F4FF" stroke="#1B1530" stroke-width="2"/>
+          <path class="auk-top auk-ink" d="M650 462c4-16 18-26 34-24 10 1 18 8 20 20-6-4-14-6-20-4-10-6-22-2-34 8z" fill="#9D94BC" style="stroke-width:2.5"/><path d="M714 464l12-18a14 14 0 0 1 8 18z" fill="#F6B93B" ${k} style="stroke-width:2.5"/></g>
+        <g id="aukKnife"><path d="M700 464h40v-6c-20 0-30-8-40-2z" fill="#F4F2FA" ${k} style="stroke-width:2.5"/><path d="M706 461c10-3 20-1 30 0" stroke="#C9C3DA" stroke-width="2" fill="none"/><rect x="738" y="455" width="48" height="10" rx="5" fill="#1B1530"/><circle cx="752" cy="460" r="1.8" fill="#F3E6CF"/><circle cx="768" cy="460" r="1.8" fill="#F3E6CF"/></g></g>
+    </svg>
+    <div class="auk-rail"></div>
+    <div class="auk-ticket" style="left:356px"><div class="auk-tk">Relevé · 07:42</div><div class="auk-tt">Frigo 2</div><div class="auk-tv">3,2<small> °C</small></div><div class="auk-ts"><i></i>Conforme · Léa</div></div>
+    <div class="auk-ticket" style="left:504px;width:140px"><div class="auk-tk">Livraison · 06:10</div><div class="auk-tt">Marée Atlantique</div><div class="auk-tl">Huîtres n°3<br>4 bourriches</div><div class="auk-ts"><i class="w"></i>Reçue à 4,1 °C</div></div>
+    <div class="auk-ticket" style="left:660px;width:120px"><div class="auk-tk">Contrôle</div><div class="auk-tt">Cahier HACCP</div><div class="auk-tv s">100<small> %</small></div><div class="auk-tp"><b></b></div></div>
+    <div class="auk-slot"><div class="auk-dlc printed" id="aukDlc"><div class="auk-dh"><span>GG · LOT 0412</span><i></i></div><div class="auk-dp" id="aukDlcP">Sauce tomate maison</div><div class="auk-dk">DLC</div><div class="auk-dd" id="aukDlcD">07/11</div><div class="auk-dm" id="aukDlcM">Par Léa · 07:40</div><div class="auk-bc"></div></div></div>
+    <div class="auk-stamp" id="aukStamp"><div><b>Prêt</b><span>pour le<br>contrôle</span></div></div>
+    <div class="auk-cap"><b>Chemin des Sarments</b><br>Bordeaux · 42 couverts</div>`;
   },
+
+  /* ── the kitchen reacts: camera framing per step, label printer, thermometer, stamp ── */
+  sceneKey() {
+    const s = this.ui.screen;
+    if (s === "welcomeDone" || (s === "import" && this.ui.imp && this.ui.imp.done)) return "done";
+    if (s === "busy") return "busy";
+    if (s === "welcome" || s === "soon") return s;
+    return "form";
+  },
+  cam(instant) {
+    const st = $("#auStage"), sc = $("#auk"); if (!st || !sc) return;
+    const k = this.sceneKey(), desk = window.matchMedia("(min-width:960px)").matches, vh = window.innerHeight;
+    const F = AUK_FOCUS[desk ? "desk" : "phone"][k];
+    let W, H;
+    if (desk) { st.style.removeProperty("--sh"); W = st.clientWidth; H = st.clientHeight; }
+    else {
+      W = st.clientWidth || window.innerWidth - 20;
+      if (W >= 600) H = Math.round(Math.min(vh * (k === "form" ? 0.26 : 0.42), W * (k === "form" ? 0.32 : 0.62)));
+      else H = k === "welcome" ? Math.round(Math.min(300, Math.max(176, vh * 0.3))) : k === "done" ? Math.round(Math.min(420, Math.max(220, vh * 0.46))) : k === "busy" ? Math.round(Math.min(330, Math.max(200, vh * 0.36))) : vh < 700 ? 124 : 152;
+      st.style.setProperty("--sh", H + "px");
+    }
+    if (!W || !H) return;
+    const [fx, fy, fw, fh] = F; const s = Math.max(W / fw, H / fh, W / 800, H / 840);
+    let tx = W / 2 - (fx + fw / 2) * s, ty = H / 2 - (fy + fh / 2) * s;
+    tx = Math.min(0, Math.max(W - 800 * s, tx)); ty = Math.min(0, Math.max(H - 840 * s, ty));
+    if (instant) sc.style.transition = "none";
+    sc.style.transform = `translate(${tx.toFixed(1)}px,${ty.toFixed(1)}px) scale(${s.toFixed(4)})`;
+    if (instant) { void sc.offsetWidth; sc.style.transition = ""; }
+  },
+  /* what the label printer prints for the current step: first the person's first name, then the restaurant */
+  labelTx() {
+    const U = this.ui, s = U.screen, u = this.user;
+    const me = firstName((u && u.displayName) || (U.create && U.create.me) || (U.tab === "up" ? U.name : "") || "");
+    if (s === "email") return U.tab === "up" ? ["Compte cuisine", `Par ${me || "…"}`] : ["Compte cuisine", "Retour en cuisine"];
+    if (s === "reset") return ["Nouveau mot de passe", U.sent ? "Lien envoyé" : "Lien par e-mail"];
+    if (s === "setup") return [me ? `Cuisine de ${me}` : "Votre cuisine", `Par ${me || "vous"}`];
+    if (s === "create") { const C = U.create || {}; const n = ($("#auRName")?.value ?? C.name ?? "").trim(); const t = (AU_TYPES.find((x) => x[0] === C.type) || AU_TYPES[0])[1]; return [n || "Votre restaurant", `Par ${me || "vous"} · ${t}`]; }
+    if (s === "join") { const inv = U.join && U.join.inv; return inv ? [inv.restoName || "Votre équipe", `Rôle ${(AU_ROLES[inv.role] || AU_ROLES.equipe).t}`] : ["Invitation", "Code à 8 caractères"]; }
+    if (s === "import") { const sm = this.localSummary(); return [sm.names[0] || "Données du téléphone", `${sm.docs} éléments`]; }
+    if (s === "welcomeDone") return this._lbl || ["Votre restaurant", "Prêt"];
+    return ["Sauce tomate maison", "Par Léa · 07:40"];
+  },
+  labelSync() {
+    const P = $("#aukDlcP"), M = $("#aukDlcM"), D = $("#aukDlcD"); if (!P) return false;
+    const [p, m] = this.labelTx(), d = new Date(), dlc = new Date(Date.now() + 3 * 864e5), dd = (x) => String(x.getDate()).padStart(2, "0") + "/" + String(x.getMonth() + 1).padStart(2, "0");
+    const changed = !this._lbl || this._lbl[0] !== p;
+    P.textContent = p; M.textContent = m.includes("·") || m.startsWith("Par Léa") ? m : `${m} · ${dd(d)}`; D.textContent = dd(dlc); this._lbl = [p, m];
+    return changed;
+  },
+  print() {
+    const d = $("#aukDlc"); if (!d) return;
+    if (auReduce()) { d.className = "auk-dlc printed"; return; }
+    d.className = "auk-dlc"; void d.offsetWidth; d.className = "auk-dlc printing";
+    clearTimeout(this._pt); this._pt = setTimeout(() => { d.className = "auk-dlc printed"; }, 1120);
+  },
+  therm(reset) {
+    const T = $("#aukT"), Mc = $("#aukMerc"), L = $("#aukLcd"), Ts = $("#aukTs"), St = $("#aukStamp"); if (!T) return;
+    cancelAnimationFrame(this._raf);
+    if (reset) { T.textContent = "3,2"; Mc.style.transform = "scaleY(.42)"; L.style.fill = ""; Ts.textContent = "°C · OK"; St.classList.remove("on"); this._dropped = false; return; }
+    if (this._dropped) return; this._dropped = true;
+    const from = 7.8, to = 3.2, dur = auReduce() ? 1 : 1000, t0 = performance.now();
+    Mc.style.transition = "none"; Mc.style.transform = "scaleY(1)"; Ts.textContent = "°C · …"; L.style.fill = "#3A1E2E";
+    requestAnimationFrame(() => { Mc.style.transition = ""; Mc.style.transform = "scaleY(.42)"; });
+    const tick = (t) => {
+      const p = Math.min(1, (t - t0) / dur), e = 1 - Math.pow(1 - p, 3);
+      T.textContent = (from + (to - from) * e).toFixed(1).replace(".", ",");
+      if (p < 1) this._raf = requestAnimationFrame(tick);
+      else { Ts.textContent = "°C · OK"; L.style.fill = "#11402B"; St.classList.add("on"); buzz(14); }
+    };
+    this._raf = requestAnimationFrame(tick);
+  },
+  scene(first) {
+    if (!$("#auk")) return;
+    const s = this.ui.screen, k = this.sceneKey(), entered = this._sc !== s; this._sc = s;
+    this.cam(first);
+    const fr = $("#aukFridge"); fr && fr.classList.remove("open");
+    if (k !== "done") this.therm(true);
+    if (k === "done") { if (s !== "welcomeDone") this.labelSync(); setTimeout(() => this.therm(false), auReduce() ? 0 : 280); return; }
+    const changed = this.labelSync();
+    if (["email", "reset", "setup", "create", "join", "import"].includes(s) && (entered || changed)) { clearTimeout(this._pq); this._pq = setTimeout(() => this.print(), auReduce() || first ? 0 : 380); }
+  },
+
   show(screen, opts = {}) {
     const el = this.mount(); const first = !el.classList.contains("on");
     if (opts.push !== false && !first && this.ui.screen !== screen && !["busy"].includes(this.ui.screen)) this.ui.back.push(this.ui.screen);
@@ -216,6 +380,7 @@ const AUTH = {
   hide() {
     const el = $("#au"); if (!el) return;
     el.classList.remove("on"); el.classList.add("off"); document.documentElement.classList.remove("au-open");
+    cancelAnimationFrame(this._raf); clearTimeout(this._pt); clearTimeout(this._pq); this._sc = null; this._painted = null; this._lbl = null; this._dropped = false;
     setTimeout(() => { el.remove(); }, 520); this.inApp = false;
   },
   openWelcome(opt = {}) {
@@ -223,116 +388,132 @@ const AUTH = {
     if (opt.tab) this.ui.tab = opt.tab;
     this.mount(); this.show(opt.screen || "welcome", { push: false }); SFX.sheet();
   },
-  /* height-animated pane swap: the card glides to its new height while the content cross-fades */
+  /* screen swap: the old step lifts away while the new one rises in, line by line; a repaint of the same step only cross-fades */
   paint(first) {
-    const pane = $("#auPane"), card = $("#auCard"); if (!pane) return;
-    const h0 = card.offsetHeight; const html = this.screenHTML();
-    pane.classList.remove("in"); pane.innerHTML = html; void pane.offsetWidth; pane.classList.add("in");
-    if (!first && h0 && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      const h1 = card.offsetHeight; if (Math.abs(h1 - h0) > 2) { card.style.height = h0 + "px"; void card.offsetWidth; card.style.height = h1 + "px"; clearTimeout(card._t); card._t = setTimeout(() => { card.style.height = ""; }, 460); }
+    const pane = $("#auPane"); if (!pane) return;
+    const s = this.ui.screen, same = !first && this._painted === s, reduce = auReduce();
+    if (!first && !same && !reduce && pane.childElementCount) {
+      const old = pane.cloneNode(true); old.removeAttribute("id"); old.removeAttribute("aria-live"); old.setAttribute("aria-hidden", "true"); old.className = "au-pane au-leave"; old.inert = true;
+      $$("[id],[for]", old).forEach((n) => { n.removeAttribute("id"); n.removeAttribute("for"); });
+      $$("form", old).forEach((f) => f.removeAttribute("data-au"));
+      old.style.top = pane.offsetTop + "px"; old.style.left = pane.offsetLeft + "px"; old.style.width = pane.offsetWidth + "px";
+      pane.parentNode.appendChild(old); setTimeout(() => old.remove(), 240);
     }
-    this.after();
+    pane.classList.toggle("au-swap", same); pane.classList.toggle("au-later", !first && !same);
+    pane.innerHTML = this.screenHTML(); this._painted = s;
+    if (!first && !same) { const sc = $("#auScroll"), a = $("#auAuth"); [sc, a].forEach((x) => { if (x && x.scrollTop > 0) x.scrollTo({ top: 0, behavior: reduce ? "auto" : "smooth" }); }); }
+    this.after(); this.scene(first);
   },
   after() {
     const s = this.ui.screen, desk = window.matchMedia("(min-width:960px)").matches;
     const f = { email: this.ui.tab === "up" && !this.ui.name ? "#auName" : "#auEmail", reset: "#auREmail", create: "#auRName", join: "#auCode" }[s];
     if (f && (desk || s === "join")) setTimeout(() => { const i = $(f); if (i && !i.value) i.focus({ preventScroll: true }); }, 380);
-    if (s === "email" || s === "reset") this.validate();
+    if (s === "email" || s === "reset" || s === "create") this.validate();
     if (s === "join") this.codeCells();
     if (s === "create") this.createPrev();
+    /* the segmented control's knob slides from the previous tab */
+    const sg = $("#au .au-seg");
+    if (sg) { const to = this.ui.tab === "up" ? "up" : "in"; if (this._seg && this._seg !== to && !auReduce()) { sg.dataset.mode = this._seg; void sg.offsetWidth; } sg.dataset.mode = to; this._seg = to; } else this._seg = null;
   },
-  backBtn() { return this.ui.back.length ? `<button class="au-back" data-act="auBack" aria-label="Retour">${ico("back")}</button>` : this.inApp ? `<button class="au-back" data-act="auClose" aria-label="Fermer">${ico("x")}</button>` : ""; },
+  backBtn() { return this.ui.back.length ? `<button class="au-back" data-act="auBack" aria-label="Retour">${AU_SVG.back}</button>` : this.inApp ? `<button class="au-back" data-act="auClose" aria-label="Fermer">${AU_SVG.x}</button>` : ""; },
   errHTML() { return this.ui.err ? `<div class="au-err" role="alert">${ico("alert")}<span>${esc(this.ui.err)}</span></div>` : ""; },
 
   screenHTML() {
     const U = this.ui, s = U.screen, busy = (k) => (U.busy === k ? " au-busy" : "");
-    const spin = `<span class="au-spin" aria-hidden="true"></span>`;
+    const dots = AU_DOTS;
+    const top = (right = "") => { const b = this.backBtn(); return b || right ? `<div class="au-top st" style="--i:0">${b || "<span></span>"}${right}</div>` : ""; };
+    const head = (t, sub, i = 1) => `<h2 class="au-h2 st" style="--i:${i}">${t}</h2>${sub ? `<p class="au-sub st" style="--i:${i + 1}">${sub}</p>` : ""}`;
+    const okI = `<i class="au-ok" aria-hidden="true">${AU_SVG.ok}</i>`;
     if (s === "welcome") {
       const inv = auLS.get("gg-invite"), last = auLS.get("gg-last");
-      return `${inv ? `<div class="au-invite st" style="--i:0">${ico("users")}<div><b>Vous êtes invité dans une équipe</b><span>Connectez-vous pour la rejoindre · code <span class="mono">${esc(auFmtCode(inv))}</span></span></div></div>` : ""}
-        <div class="au-head st" style="--i:0">${this.inApp ? this.backBtn() : ""}<div><div class="au-t">${inv ? "Rejoindre l'équipe" : "Bienvenue"}</div><div class="au-s">${this.inApp && DB.mode === "local" ? "Créez votre compte : vos données vous suivent sur tous vos appareils." : "Connectez-vous ou découvrez l'app en 1 minute."}</div></div></div>
+      const lede = this.inApp && DB.mode === "local" ? "Créez votre compte : vos données vous suivent sur tous vos appareils." : inv ? "Connectez-vous pour rejoindre l'équipe. Relevés, étiquettes et planning, partagés en direct." : "Températures, étiquettes DLC, livraisons et équipe, tenues au propre pour le contrôle sanitaire.";
+      const lastTag = `<em class="au-last">Dernière fois</em>`;
+      return `${inv ? `<div class="au-invite st" style="--i:0"><span class="au-invic">${ico("users")}</span><div><b>Vous êtes invité dans une équipe</b><span>Connectez-vous pour la rejoindre · code <span class="au-mono">${esc(auFmtCode(inv))}</span></span></div></div>` : `<p class="au-eyebrow st" style="--i:0"><span class="au-dot"></span>Utilisé en cuisine, du coup de feu à la fermeture</p>`}
+        <h1 class="au-h1 st" style="--i:1">${inv ? "Votre brigade<br><em>vous attend.</em>" : "Tout est relevé.<br><em>Vous, cuisinez.</em>"}</h1>
+        <p class="au-lede st" style="--i:2">${lede}</p>
         ${this.errHTML()}
-        <div class="au-btns">
-          <button class="au-btn au-google st${busy("google")}" style="--i:1" data-act="auGoogle">${auG}<span>Continuer avec Google</span>${last === "google" ? `<em class="au-last">Dernière fois</em>` : ""}${spin}</button>
-          <button class="au-btn au-mailb st" style="--i:2" data-act="auEmail">${ico("auMail")}<span>Continuer avec un e-mail</span>${last === "email" ? `<em class="au-last">Dernière fois</em>` : ""}</button>
-          <div class="au-or st" style="--i:3"><span>ou</span></div>
-          ${DB.mode === "demo" ? "" : `<button class="au-btn au-demob st" style="--i:4" data-act="auDemo"><span class="au-demo-ic">${ico("auPlay")}</span><span class="au-demo-l"><b>Essayer la démo</b><em>Un vrai restaurant, déjà rempli. Rien n'est enregistré.</em></span>${ico("chev")}</button>`}
+        <div class="au-stack st" style="--i:3">
+          <button class="au-tac au-btn au-google${busy("google")}" data-act="auGoogle"><span class="au-bl">${AU_G}Continuer avec Google</span>${last === "google" ? lastTag : ""}${dots}</button>
+          <button class="au-tac au-btn au-primary au-mailb" data-act="auEmail"><span class="au-bl">${AU_SVG.mail}Continuer avec un e-mail</span>${last === "email" ? lastTag : ""}</button>
         </div>
-        ${this.inApp ? "" : `<button class="au-link st" style="--i:5" data-act="auLocal">${ico("auPhone")}${this.hasLocal() ? `Continuer avec les données de ce téléphone` : `Continuer sans compte <span>(sur cet appareil)</span>`}</button>`}`;
+        ${DB.mode === "demo" ? "" : `<button class="au-demo st" style="--i:4" data-act="auDemo"><span class="au-demo-ic" aria-hidden="true">${AU_SVG.cloche}</span><span class="au-demo-l"><b>Essayer la démo</b><span>Un vrai restaurant déjà rempli, rien n'est enregistré.</span></span><span class="au-arr" aria-hidden="true">${AU_SVG.arrow}</span></button>`}
+        ${this.inApp ? "" : `<button class="au-ghost st" style="--i:5" data-act="auLocal">${this.hasLocal() ? "Continuer avec les données de ce téléphone" : "Continuer sans compte"}${AU_SVG.arrowS}</button>`}
+        <p class="au-fine au-fine-m st" style="--i:6">Données hébergées en France et chiffrées.</p>`;
     }
     if (s === "soon") {
-      return `<div class="au-head">${this.backBtn()}<div><div class="au-t">Les comptes arrivent</div><div class="au-s">Nous finalisons la connexion sécurisée.</div></div></div>
-        <div class="au-soon st" style="--i:1"><span class="au-soon-ic">${ico("auCloud")}</span><p>Très bientôt : un compte pour votre restaurant, synchronisé sur tous vos appareils, et votre équipe invitée en un lien.</p><p class="au-soon-s">En attendant, essayez la démo, ou utilisez l'app sur cet appareil : vous pourrez tout importer dans votre compte ensuite.</p></div>
-        <div class="au-btns"><button class="btn acc block st" style="--i:2" data-act="auDemo">${ico("auPlay")}Essayer la démo</button>${this.inApp ? "" : `<button class="btn soft block st" style="--i:3" data-act="auLocal">${ico("auPhone")}Continuer sur cet appareil</button>`}</div>`;
+      return `${top()}${head("Les comptes arrivent.", "Nous finalisons la connexion sécurisée.")}
+        <div class="au-note st" style="--i:3"><p>Très bientôt : un compte pour votre restaurant, synchronisé sur tous vos appareils, et votre équipe invitée en un lien.</p><p class="au-note-s">En attendant, essayez la démo, ou utilisez l'app sur cet appareil : vous pourrez tout importer dans votre compte ensuite.</p></div>
+        <div class="au-stack st" style="--i:4"><button class="au-tac au-primary" data-act="auDemo"><span class="au-bl">${AU_SVG.play}Essayer la démo</span></button>${this.inApp ? "" : `<button class="au-tac" data-act="auLocal"><span class="au-bl">${AU_SVG.phone}Continuer sur cet appareil</span></button>`}</div>`;
     }
     if (s === "email") {
-      const up = U.tab === "up";
-      return `<div class="au-head">${this.backBtn()}<div><div class="au-t">${up ? "Créer votre compte" : auLS.get("gg-last-email") ? "Bon retour" : "Se connecter"}</div><div class="au-s">${up ? "30 secondes, et votre restaurant est prêt." : "Avec l'e-mail de votre compte."}</div></div></div>
-        <div class="seg au-seg" role="tablist"><span class="au-segi" style="transform:translateX(${up ? "100%" : "0"})"></span><button role="tab" aria-selected="${!up}" class="${up ? "" : "on"}" data-act="auTab" data-v="in">Connexion</button><button role="tab" aria-selected="${up}" class="${up ? "on" : ""}" data-act="auTab" data-v="up">Créer un compte</button></div>
+      const up = U.tab === "up", back = !!auLS.get("gg-last-email");
+      return `${top(`<div class="au-seg" role="tablist" aria-label="Mode" data-mode="${up ? "up" : "in"}"><span class="au-segi" aria-hidden="true"></span><button role="tab" aria-selected="${!up}" class="${up ? "" : "on"}" data-act="auTab" data-v="in">Connexion</button><button role="tab" aria-selected="${up}" class="${up ? "on" : ""}" data-act="auTab" data-v="up">Créer un compte</button></div>`)}
+        ${head(up ? "Ouvrons votre cuisine." : back ? "Bon retour en cuisine." : "Entrez en cuisine.", up ? "30 secondes, et votre cahier HACCP tient tout seul." : back ? "Vos relevés du jour vous attendent." : "Avec l'e-mail de votre compte.")}
         ${this.errHTML()}
-        <form class="au-form" data-au="email" novalidate>
-          ${up ? `<label class="au-f"><span>Prénom</span><div class="au-in"><input class="input" id="auName" autocomplete="given-name" maxlength="40" placeholder="Marceau" value="${esc(U.name)}" enterkeyhint="next"><i class="au-ok">${ico("check")}</i></div></label>` : ""}
-          <label class="au-f"><span>E-mail</span><div class="au-in"><input class="input" id="auEmail" type="email" inputmode="email" autocomplete="${up ? "email" : "username"}" autocapitalize="off" spellcheck="false" placeholder="vous@restaurant.fr" value="${esc(U.email || auLS.get("gg-last-email") || "")}" enterkeyhint="next"><i class="au-ok">${ico("check")}</i></div><em class="au-hint" id="auEmailH"></em></label>
-          <label class="au-f"><span>Mot de passe</span><div class="au-in"><input class="input" id="auPw" type="${U.show ? "text" : "password"}" autocomplete="${up ? "new-password" : "current-password"}" minlength="8" placeholder="${up ? "8 caractères minimum" : "Votre mot de passe"}" value="${esc(U.pw)}" enterkeyhint="go"><button type="button" class="au-eye" data-act="auEye" aria-label="${U.show ? "Masquer" : "Afficher"} le mot de passe">${ico(U.show ? "auEyeOff" : "auEye")}</button></div>
-            ${up ? `<div class="au-meter" id="auMeter" aria-hidden="true"><i></i><i></i><i></i><i></i></div><em class="au-hint" id="auPwH">${AU_PW_TX[0]}</em>` : ""}</label>
-          <button class="btn acc block au-submit${busy("email")}" type="submit" id="auGo"><span>${up ? "Créer mon compte" : "Se connecter"}</span>${spin}</button>
-        </form>
-        ${up ? `<p class="au-fine">En créant un compte, vous devenez gérant de votre restaurant. Vous pourrez inviter votre équipe ensuite.</p>` : `<button class="au-link au-forgot" data-act="auForgot">Mot de passe oublié ?</button>`}`;
+        <form class="au-form st" style="--i:3" data-au="email" novalidate>
+          ${up ? `<label class="au-f${this._seg === "in" ? " au-grow" : ""}"><span class="au-lbl">Prénom</span><div class="au-in"><input class="au-input" id="auName" autocomplete="given-name" maxlength="40" placeholder="Marceau" value="${esc(U.name)}" enterkeyhint="next">${okI}</div></label>` : ""}
+          <label class="au-f"><span class="au-lbl">E-mail</span><div class="au-in"><input class="au-input" id="auEmail" type="email" inputmode="email" autocomplete="${up ? "email" : "username"}" autocapitalize="off" spellcheck="false" placeholder="chef@votre-restaurant.fr" value="${esc(U.email || auLS.get("gg-last-email") || "")}" enterkeyhint="next">${okI}</div><em class="au-hint" id="auEmailH" aria-live="polite"></em></label>
+          <div class="au-f"><div class="au-lrow"><label class="au-lbl" for="auPw">Mot de passe</label>${up ? "" : `<button type="button" class="au-forgot" data-act="auForgot">Mot de passe oublié ?</button>`}</div>
+            <div class="au-in"><input class="au-input" id="auPw" type="${U.show ? "text" : "password"}" autocomplete="${up ? "new-password" : "current-password"}" minlength="8" placeholder="${up ? "8 caractères minimum" : "Votre mot de passe"}" value="${esc(U.pw)}" enterkeyhint="go">${okI}<button type="button" class="au-eye" data-act="auEye" aria-label="${U.show ? "Masquer" : "Afficher"} le mot de passe">${U.show ? AU_SVG.eyeOff : AU_SVG.eye}</button></div>
+            ${up ? `<div class="au-meter" id="auMeter" data-s="0" aria-hidden="true"><i></i><i></i><i></i><i></i></div><div class="au-mrow"><span>Solidité</span><em class="au-hint" id="auPwH">${AU_PW_TX[0]}</em></div>` : ""}</div>
+          <button class="au-tac au-primary au-submit${busy("email")}" type="submit" id="auGo"><span class="au-bl">${up ? "Créer mon compte" : "Se connecter"}</span>${dots}</button>
+          <p class="au-legal">${up ? "En créant un compte, vous devenez gérant de votre restaurant. Vous inviterez votre équipe ensuite." : "Protégé par chiffrement. Vos données restent en France."}</p>
+        </form>`;
     }
     if (s === "reset") {
-      if (U.sent) return `<div class="au-head">${this.backBtn()}<div><div class="au-t">Vérifiez vos e-mails</div><div class="au-s">Un lien vient de partir.</div></div></div>
-        <div class="au-done st" style="--i:1"><span class="au-check"><svg viewBox="0 0 24 24"><path d="M6 12.5l4 4 8-9"/></svg></span><p>Ouvrez le message envoyé à <b>${esc(U.email)}</b> et choisissez un nouveau mot de passe. Pensez aux courriers indésirables.</p></div>
-        <button class="btn acc block st" style="--i:2" data-act="auBackToIn">Revenir à la connexion</button>`;
-      return `<div class="au-head">${this.backBtn()}<div><div class="au-t">Mot de passe oublié</div><div class="au-s">On vous envoie un lien pour en choisir un nouveau.</div></div></div>
+      if (U.sent) return `${top()}<div class="au-seal st" style="--i:1">${AU_SEAL}</div>${head("Vérifiez vos e-mails.", `Un lien vient de partir vers <b>${esc(U.email)}</b>. Choisissez-y un nouveau mot de passe, et pensez aux courriers indésirables.`, 2)}
+        <div class="au-stack st" style="--i:4"><button class="au-tac au-primary" data-act="auBackToIn"><span class="au-bl">Revenir à la connexion</span></button></div>`;
+      return `${top()}${head("Mot de passe oublié ?", "On vous envoie un lien pour en choisir un nouveau.")}
         ${this.errHTML()}
-        <form class="au-form" data-au="reset" novalidate><label class="au-f"><span>E-mail</span><div class="au-in"><input class="input" id="auREmail" type="email" inputmode="email" autocomplete="username" autocapitalize="off" spellcheck="false" placeholder="vous@restaurant.fr" value="${esc(U.email || auLS.get("gg-last-email") || "")}" enterkeyhint="send"><i class="au-ok">${ico("check")}</i></div></label>
-        <button class="btn acc block au-submit${busy("reset")}" type="submit" id="auRGo"><span>Envoyer le lien</span>${spin}</button></form>`;
+        <form class="au-form st" style="--i:3" data-au="reset" novalidate><label class="au-f"><span class="au-lbl">E-mail</span><div class="au-in"><input class="au-input" id="auREmail" type="email" inputmode="email" autocomplete="username" autocapitalize="off" spellcheck="false" placeholder="chef@votre-restaurant.fr" value="${esc(U.email || auLS.get("gg-last-email") || "")}" enterkeyhint="send">${okI}</div></label>
+        <button class="au-tac au-primary au-submit${busy("reset")}" type="submit" id="auRGo"><span class="au-bl">Envoyer le lien</span>${dots}</button></form>`;
     }
-    if (s === "busy") return `<div class="au-busyp"><span class="au-ring">${appIcon(64)}</span><div class="au-t">${esc(U.busyTx || "Connexion…")}</div></div>`;
-    const who = this.user ? `<div class="au-who st" style="--i:0">${this.user.photoURL ? `<img src="${esc(this.user.photoURL)}" alt="" referrerpolicy="no-referrer">` : `<span class="au-wi">${esc(initials(this.user.displayName || this.user.email || "?"))}</span>`}<div><b>${esc(this.user.displayName || firstName(String(this.user.email || "").split("@")[0]))}</b><span>${esc(this.user.email || "")}</span></div><button class="au-link sm" data-act="auSwitch">Changer</button></div>` : "";
+    if (s === "busy") return `<div class="au-busyp"><span class="au-busym st" style="--i:0">${auMark("c")}</span><h2 class="au-h2 st" style="--i:1">${esc(U.busyTx || "Connexion…")}</h2><span class="au-bdots st" style="--i:2" aria-hidden="true"><i></i><i></i><i></i></span></div>`;
+    const who = this.user ? `<div class="au-who st" style="--i:0">${this.user.photoURL ? `<img src="${esc(this.user.photoURL)}" alt="" referrerpolicy="no-referrer">` : `<span class="au-wi">${esc(initials(this.user.displayName || this.user.email || "?"))}</span>`}<div><b>${esc(this.user.displayName || firstName(String(this.user.email || "").split("@")[0]))}</b><span>${esc(this.user.email || "")}</span></div><button class="au-chg" data-act="auSwitch">Changer</button></div>` : "";
     if (s === "setup") {
-      return `${who}<div class="au-head"><div><div class="au-t">${this.user && this.user.displayName ? `Bienvenue, ${esc(firstName(this.user.displayName))}` : "Bienvenue"}</div><div class="au-s">Votre restaurant est-il déjà sur Growth Gusto ?</div></div></div>
+      const me = this.user && this.user.displayName ? firstName(this.user.displayName) : "";
+      return `${who}${head(me ? `Bienvenue, ${esc(me)}.` : "Bienvenue.", "Votre restaurant est-il déjà sur Growth Gusto ?")}
         <div class="au-choices">
-          <button class="au-choice st" style="--i:1" data-act="auCreate"><span class="au-cic">${ico("store")}</span><span><b>Créer mon restaurant</b><em>Je suis gérant, je démarre</em></span>${ico("chev")}</button>
-          <button class="au-choice st" style="--i:2" data-act="auJoinOpen"><span class="au-cic alt">${ico("users")}</span><span><b>Rejoindre une équipe</b><em>J'ai un code ou un lien d'invitation</em></span>${ico("chev")}</button>
+          <button class="au-choice st" style="--i:3" data-act="auCreate"><span class="au-cic">${ico("store")}</span><span class="au-ctx"><b>Créer mon restaurant</b><span>Je suis gérant, je démarre</span></span><span class="au-arr" aria-hidden="true">${AU_SVG.arrow}</span></button>
+          <button class="au-choice st" style="--i:4" data-act="auJoinOpen"><span class="au-cic alt">${ico("users")}</span><span class="au-ctx"><b>Rejoindre une équipe</b><span>J'ai un code ou un lien d'invitation</span></span><span class="au-arr" aria-hidden="true">${AU_SVG.arrow}</span></button>
         </div>`;
     }
     if (s === "create") {
       const C = (U.create ||= { name: "", type: "bistrot", frs: ["Chambre froide", "Frigo de service 1", "Frigo de service 2", "Congélateur"], me: "" });
       const needName = !(this.user && this.user.displayName);
-      return `<div class="au-head">${this.backBtn()}<div><div class="au-t">Votre restaurant</div><div class="au-s">Tout se modifie ensuite dans Réglages.</div></div></div>
+      return `${top()}${head("Créons votre restaurant.", "Tout se modifie ensuite dans Réglages.")}
         ${this.errHTML()}
-        <form class="au-form" data-au="create" novalidate>
-          ${needName ? `<label class="au-f"><span>Votre prénom</span><div class="au-in"><input class="input" id="auRMe" autocomplete="given-name" maxlength="40" placeholder="Il signe vos relevés" value="${esc(C.me)}"><i class="au-ok">${ico("check")}</i></div></label>` : ""}
-          <label class="au-f"><span>Nom du restaurant</span><div class="au-in"><input class="input" id="auRName" autocomplete="organization" maxlength="80" placeholder="Ex. Chemin des Sarments" value="${esc(C.name)}"><i class="au-ok">${ico("check")}</i></div></label>
-          <div class="au-f"><span>Type</span><div class="au-chips" role="radiogroup">${AU_TYPES.map(([k, t]) => `<button type="button" class="chip ${C.type === k ? "on" : ""}" role="radio" aria-checked="${C.type === k}" data-act="auType" data-v="${k}">${t}</button>`).join("")}</div></div>
-          <div class="au-f"><span>Vos équipements froids</span><div class="au-chips">${AU_FRIDGES.map(([n, , lo, hi]) => `<button type="button" class="chip au-fr ${C.frs.includes(n) ? "on" : ""}" aria-pressed="${C.frs.includes(n)}" data-act="auFr" data-v="${esc(n)}">${C.frs.includes(n) ? ico("check") : ""}${esc(n)}<em class="mono">${lo}/${hi}°</em></button>`).join("")}</div></div>
-          <div class="au-prev" id="auPrev"><span class="au-pm">R</span><div><b>Votre restaurant</b><em></em></div><span class="pill acc">Essai</span></div>
-          <button class="btn acc block au-submit${busy("create")}" type="submit"><span>${ico("sparkle")}Créer mon restaurant</span>${spin}</button>
+        <form class="au-form st" style="--i:3" data-au="create" novalidate>
+          ${needName ? `<label class="au-f"><span class="au-lbl">Votre prénom</span><div class="au-in"><input class="au-input" id="auRMe" autocomplete="given-name" maxlength="40" placeholder="Il signe vos relevés" value="${esc(C.me)}">${okI}</div></label>` : ""}
+          <label class="au-f"><span class="au-lbl">Nom du restaurant</span><div class="au-in"><input class="au-input" id="auRName" autocomplete="organization" maxlength="80" placeholder="Chemin des Sarments" value="${esc(C.name)}">${okI}</div></label>
+          <div class="au-f"><span class="au-lbl" id="auTypeL">Type de cuisine</span><div class="au-chips" role="radiogroup" aria-labelledby="auTypeL">${AU_TYPES.map(([k, t]) => `<button type="button" class="au-chip ${C.type === k ? "on" : ""}" role="radio" aria-checked="${C.type === k}" data-act="auType" data-v="${k}">${t}</button>`).join("")}</div></div>
+          <div class="au-f"><span class="au-lbl" id="auFrL">Vos équipements froids</span><div class="au-chips" role="group" aria-labelledby="auFrL">${AU_FRIDGES.map(([n, , lo, hi]) => `<button type="button" class="au-chip au-fr ${C.frs.includes(n) ? "on" : ""}" aria-pressed="${C.frs.includes(n)}" data-act="auFr" data-v="${esc(n)}">${auFrHTML(n, lo, hi, C.frs.includes(n))}</button>`).join("")}</div></div>
+          <div class="au-prev" id="auPrev" aria-live="polite"><div class="au-pvh"><span class="au-pm">R</span><div class="au-pvn"><b>Votre restaurant</b><em></em></div><span class="au-pvtag">Aperçu</span></div><div class="au-pvl"></div></div>
+          <button class="au-tac au-primary au-submit${busy("create")}" type="submit"><span class="au-bl">Créer mon restaurant</span>${dots}</button>
         </form>`;
     }
     if (s === "join") {
       const J = (U.join ||= { code: "", inv: null, err: "", loading: false });
       const inv = J.inv; const exp = inv ? Math.max(0, Math.ceil((inv.expiresAt - Date.now()) / 864e5)) : 0;
-      return `<div class="au-head">${this.backBtn()}<div><div class="au-t">Rejoindre une équipe</div><div class="au-s">Le gérant vous a donné un code à 8 caractères.</div></div></div>
-        <form class="au-form" data-au="join" novalidate>
+      return `${top()}${head("Rejoindre une équipe.", "Le gérant vous a donné un code à 8 caractères.")}
+        <form class="au-form st" style="--i:3" data-au="join" novalidate>
           <label class="au-codebox" for="auCode"><input id="auCode" class="au-codein" inputmode="text" autocapitalize="characters" autocomplete="one-time-code" spellcheck="false" maxlength="40" value="${esc(J.code)}" aria-label="Code d'invitation"><span class="au-cells" aria-hidden="true">${Array.from({ length: 8 }, (_, i) => `<i data-i="${i}"></i>${i === 3 ? "<b>–</b>" : ""}`).join("")}</span></label>
-          <div class="au-jstate" id="auJState">${J.loading ? `<div class="au-jload">${spin}Recherche de l'invitation…</div>` : J.err ? `<div class="au-err" role="alert">${ico("alert")}<span>${esc(J.err)}</span></div>` : inv ? `<div class="au-jcard st" style="--i:0"><span class="au-pm">${esc(initials(inv.restoName || "R"))}</span><div><b>${esc(inv.restoName || "Restaurant")}</b><em>Invité par ${esc(inv.createdByName || "le gérant")} · rôle ${esc((AU_ROLES[inv.role] || AU_ROLES.equipe).t)}</em></div><span class="pill ok">${exp > 1 ? `${exp} jours` : "Valable"}</span></div>` : `<p class="au-fine">Vous pouvez aussi coller le lien reçu par message.</p>`}</div>
-          <button class="btn acc block au-submit${busy("join")}" type="submit" ${inv ? "" : "disabled"}><span>${inv ? `Rejoindre ${esc(inv.restoName || "l'équipe")}` : "Rejoindre"}</span>${spin}</button>
+          <div class="au-jstate" id="auJState">${J.loading ? `<div class="au-jload">${AU_DOTS_IN}Recherche de l'invitation…</div>` : J.err ? `<div class="au-err" role="alert">${ico("alert")}<span>${esc(J.err)}</span></div>` : inv ? `<div class="au-jcard"><span class="au-pm">${esc(initials(inv.restoName || "R"))}</span><div><b>${esc(inv.restoName || "Restaurant")}</b><em>Invité par ${esc(inv.createdByName || "le gérant")} · rôle ${esc((AU_ROLES[inv.role] || AU_ROLES.equipe).t)}</em></div><span class="au-jexp">${exp > 1 ? `${exp} jours` : "Valable"}</span></div>` : `<p class="au-fine">Vous pouvez aussi coller le lien reçu par message.</p>`}</div>
+          <button class="au-tac au-primary au-submit${busy("join")}" type="submit" ${inv ? "" : "disabled"}><span class="au-bl">${inv ? `Rejoindre ${esc(inv.restoName || "l'équipe")}` : "Rejoindre"}</span>${dots}</button>
         </form>`;
     }
     if (s === "import") {
       const I = U.imp || {}; const sm = this.localSummary();
-      if (I.done) return `<div class="au-done st" style="--i:0"><span class="au-check big"><svg viewBox="0 0 24 24"><path d="M6 12.5l4 4 8-9"/></svg></span><div class="au-t">Tout est dans votre compte</div><p>${I.n} élément${I.n > 1 ? "s" : ""} importé${I.n > 1 ? "s" : ""}${I.skipped ? ` · ${I.skipped} ignoré${I.skipped > 1 ? "s" : ""}` : ""}. Vos données restent aussi sur ce téléphone.</p></div><button class="btn acc block st" style="--i:1" data-act="auImportGo">Ouvrir mon restaurant${ico("chev")}</button>`;
-      return `${who}<div class="au-head"><div><div class="au-t">Vos données sont sur ce téléphone</div><div class="au-s">Importez-les dans votre compte : rien n'est perdu.</div></div></div>
+      if (I.done) return `<div class="au-seal st" style="--i:0">${AU_SEAL}</div>${head("Tout est dans votre compte.", `${I.n} élément${I.n > 1 ? "s" : ""} importé${I.n > 1 ? "s" : ""}${I.skipped ? ` · ${I.skipped} ignoré${I.skipped > 1 ? "s" : ""}` : ""}. Vos données restent aussi sur ce téléphone.`)}<div class="au-stack st" style="--i:3"><button class="au-tac au-primary" data-act="auImportGo"><span class="au-bl">Ouvrir mon restaurant${AU_SVG.arrowS}</span></button></div>`;
+      return `${who}${head("Vos données sont sur ce téléphone.", "Importez-les dans votre compte : rien n'est perdu.")}
         ${this.errHTML()}
-        <div class="au-imp st" style="--i:1"><div class="au-imph"><span class="au-pm">${esc(initials(sm.names[0] || "R"))}</span><div><b>${esc(sm.names.join(", ") || "Votre restaurant")}</b><em>${sm.docs} éléments enregistrés ici</em></div></div>
-          <div class="au-kpis"><div><b class="mono">${sm.readings}</b><span>relevés</span></div><div><b class="mono">${sm.lots}</b><span>lots</span></div><div><b class="mono">${sm.products}</b><span>produits</span></div><div><b class="mono">${sm.members}</b><span>personnes</span></div></div>
+        <div class="au-imp st" style="--i:3"><div class="au-imph"><span class="au-pm">${esc(initials(sm.names[0] || "R"))}</span><div><b>${esc(sm.names.join(", ") || "Votre restaurant")}</b><em>${sm.docs} éléments enregistrés ici</em></div></div>
+          <div class="au-kpis"><div><b>${sm.readings}</b><span>relevés</span></div><div><b>${sm.lots}</b><span>lots</span></div><div><b>${sm.products}</b><span>produits</span></div><div><b>${sm.members}</b><span>personnes</span></div></div>
           ${I.running ? `<div class="au-prog"><i style="width:${Math.round((I.p || 0) * 100)}%"></i></div><em class="au-hint">Import en cours… ${Math.round((I.p || 0) * 100)} %</em>` : ""}</div>
-        <div class="au-btns"><button class="btn acc block st${I.running ? " au-busy" : ""}" style="--i:2" data-act="auImport"><span>${ico("auCloud")}Importer les données de ce téléphone dans mon compte</span>${spin}</button>
-        ${I.running ? "" : `<button class="btn ghost block st" style="--i:3" data-act="auImportSkip">Plus tard</button>`}</div>`;
+        <div class="au-stack st" style="--i:4"><button class="au-tac au-primary au-tall${I.running ? " au-busy" : ""}" data-act="auImport"><span class="au-bl">Importer les données de ce téléphone dans mon compte</span>${dots}</button>
+        ${I.running ? "" : `<button class="au-ghost" data-act="auImportSkip">Plus tard</button>`}</div>`;
     }
-    if (s === "welcomeDone") return `<div class="au-done"><span class="au-ring">${appIcon(84)}</span><div class="au-t">${esc(U.doneTx || "C'est prêt !")}</div><p>${esc(U.doneSub || "")}</p></div>`;
+    if (s === "welcomeDone") return `<div class="au-seal st" style="--i:0">${AU_SEAL}</div>${head(esc(U.doneTx || "C'est prêt !"), esc(U.doneSub || ""))}<div class="au-opening st" style="--i:3"><span>Ouverture de votre cuisine</span><i><b></b></i></div>`;
     return "";
   },
 
@@ -344,8 +525,8 @@ const AUTH = {
       const up = this.ui.tab === "up", e = $("#auEmail"), p = $("#auPw"), n = $("#auName");
       if (n) mark(n, n.value.trim().length >= 2);
       if (e && p && p.value) e.dataset.touched = "1";
-      if (e) { const ok = auEmailOk(e.value); mark(e, ok); const h = $("#auEmailH"); if (h) h.textContent = e.value && !ok && e.dataset.touched ? "Vérifiez l'adresse e-mail" : ""; e.closest(".au-f").classList.toggle("bad", !!(e.value && !ok && e.dataset.touched)); }
-      if (p && up) { const sc = auPwScore(p.value); const m = $("#auMeter"); if (m) { m.dataset.s = p.value ? sc : 0; } const h = $("#auPwH"); if (h) h.textContent = p.value ? (p.value.length < 8 ? `Encore ${8 - p.value.length} caractère${8 - p.value.length > 1 ? "s" : ""}` : AU_PW_TX[sc]) : AU_PW_TX[0]; mark(p, p.value.length >= 8); }
+      if (e) { const ok = auEmailOk(e.value); mark(e, ok); const h = $("#auEmailH"); if (h) h.textContent = e.value && !ok && e.dataset.touched ? (e.value.includes("@") ? "Cette adresse semble incomplète." : "Il manque le @ dans l'adresse.") : ""; e.closest(".au-f").classList.toggle("bad", !!(e.value && !ok && e.dataset.touched)); }
+      if (p && up) { const sc = auPwScore(p.value); const m = $("#auMeter"); if (m) { m.dataset.s = p.value ? (p.value.length < 8 ? "x" : sc) : 0; } const h = $("#auPwH"); if (h) h.textContent = p.value ? (p.value.length < 8 ? `Encore ${8 - p.value.length} caractère${8 - p.value.length > 1 ? "s" : ""}` : AU_PW_TX[sc]) : AU_PW_TX[0]; mark(p, p.value.length >= 8); }
     }
     if (s === "reset") { const e = $("#auREmail"); mark(e, e && auEmailOk(e.value)); }
     if (s === "create") { mark($("#auRName"), ($("#auRName")?.value || "").trim().length >= 2); mark($("#auRMe"), ($("#auRMe")?.value || "").trim().length >= 2); }
@@ -432,10 +613,15 @@ const AUTH = {
   /* ───────────── create a restaurant ───────────── */
   createPrev() {
     const C = this.ui.create; if (!C) return; const p = $("#auPrev"); if (!p) return;
-    const n = ($("#auRName")?.value || C.name || "").trim();
-    $(".au-pm", p).textContent = initials(n || "R"); $("b", p).textContent = n || "Votre restaurant";
-    $("em", p).textContent = `${(AU_TYPES.find((t) => t[0] === C.type) || AU_TYPES[0])[1]} · ${C.frs.length} équipement${C.frs.length > 1 ? "s" : ""} froid${C.frs.length > 1 ? "s" : ""}`;
+    const n = ($("#auRName")?.value || C.name || "").trim(), t = (AU_TYPES.find((x) => x[0] === C.type) || AU_TYPES[0])[1];
+    const pm = $(".au-pm", p), ini = initials(n || "R");
+    if (pm.textContent !== ini) { pm.textContent = ini; pm.classList.remove("au-pop"); void pm.offsetWidth; pm.classList.add("au-pop"); }
+    $("b", p).textContent = n || "Votre restaurant"; $("b", p).classList.toggle("empty", !n);
+    $("em", p).textContent = `${t} · ${C.frs.length} équipement${C.frs.length > 1 ? "s" : ""} froid${C.frs.length > 1 ? "s" : ""}`;
+    const rows = AU_FRIDGES.filter(([f]) => C.frs.includes(f)).slice(0, 3);
+    $(".au-pvl", p).innerHTML = rows.length ? rows.map(([f, , lo, hi], i) => `<div class="au-pvr"><span class="t">${["07:30", "07:35", "07:40"][i]}</span><span class="n">${esc(f)}</span><span class="s">${lo}/${hi} °C</span></div>`).join("") + (C.frs.length > 3 ? `<div class="au-pvr more">+ ${C.frs.length - 3} autre${C.frs.length - 3 > 1 ? "s" : ""} à relever</div>` : "") : `<div class="au-pvr more">Aucun équipement froid pour l'instant</div>`;
     p.classList.toggle("on", !!n);
+    this.labelSync();
   },
   async createSubmit() {
     const C = this.ui.create, nEl = $("#auRName"), mEl = $("#auRMe");
@@ -460,8 +646,8 @@ const AUTH = {
   },
   celebrate(t, sub, rid) {
     this.ui.doneTx = t; this.ui.doneSub = sub; this.show("welcomeDone", { push: false });
-    SFX.done(); buzz([12, 40, 12, 40, 30]); setTimeout(() => burst(window.innerWidth / 2, window.innerHeight * 0.45), 180);
-    setTimeout(() => this.enter(rid), 1500);
+    SFX.done(); buzz([12, 40, 12, 40, 30]); /* the kitchen answers: the thermometer drops to 3,2 °C, then the « Prêt pour le contrôle » stamp lands */
+    setTimeout(() => this.enter(rid), auReduce() ? 1200 : 2100);
   },
 
   /* ───────────── join with an invite ───────────── */
@@ -484,7 +670,7 @@ const AUTH = {
     } catch (x) { if (J.code !== code) return; J.err = this.msg(x); }
     J.loading = false; this.paint();
   },
-  paintJoin() { if (this.ui.screen !== "join") return; const st = $("#auJState"); const J = this.ui.join; if (st && J.loading) st.innerHTML = `<div class="au-jload"><span class="au-spin"></span>Recherche de l'invitation…</div>`; },
+  paintJoin() { if (this.ui.screen !== "join") return; const st = $("#auJState"); const J = this.ui.join; if (st && J.loading) st.innerHTML = `<div class="au-jload">${AU_DOTS_IN}Recherche de l'invitation…</div>`; },
   codeCells() {
     const i = $("#auCode"); if (!i) return; const v = auCleanCode(i.value);
     $$(".au-cells i").forEach((c, k) => { c.textContent = v[k] || ""; c.classList.toggle("f", !!v[k]); c.classList.toggle("cur", k === v.length && document.activeElement === i); });
@@ -539,7 +725,7 @@ const AUTH = {
         this.restos.push(P.rid); auLS.set("gg-rid-c", P.rid);
       }
       auLS.set("gg-imp-" + u.uid, "1");
-      Object.assign(I, { running: false, done: true, n, skipped, rid: plan[0] && plan[0].rid }); SFX.done(); burst(); this.paint();
+      Object.assign(I, { running: false, done: true, n, skipped, rid: plan[0] && plan[0].rid }); SFX.done(); this.paint();
     } catch (x) { console.warn("import", x); I.running = false; this.ui.err = this.msg(x) + " Rien n'a été effacé de ce téléphone."; SFX.err(); this.paint(); }
   },
 
@@ -663,11 +849,13 @@ document.addEventListener("input", (e) => {
   if (t.id === "auRMe") AUTH.ui.create.me = t.value;
   if (t.id === "auEmail" || t.id === "auREmail") AUTH.ui.email = t.value;
   if (t.id === "auPw") AUTH.ui.pw = t.value;
-  if (t.id === "auName") AUTH.ui.name = t.value;
+  if (t.id === "auName") { AUTH.ui.name = t.value; AUTH.labelSync(); }
   if (AUTH.ui.err && t.closest(".au-form")) { AUTH.ui.err = ""; const er = $("#au .au-err"); if (er) { er.classList.add("bye"); setTimeout(() => er.remove(), 260); } }
   AUTH.validate();
 });
 document.addEventListener("focusout", (e) => { const t = e.target; if (t && t.id === "auEmail" && t.value) { t.dataset.touched = "1"; AUTH.validate(); } if (t && t.id === "auCode") setTimeout(() => AUTH.codeCells(), 0); });
+/* the kitchen keeps its framing when the window or the phone rotates */
+window.addEventListener("resize", () => { if (!$("#au.on")) return; cancelAnimationFrame(AUTH._rz); AUTH._rz = requestAnimationFrame(() => AUTH.cam(true)); }, { passive: true });
 document.addEventListener("focusin", (e) => { if (e.target && e.target.id === "auCode") AUTH.codeCells(); });
 document.addEventListener("keydown", (e) => { if (e.key === "Escape" && $("#au.on") && AUTH.inApp && !$("#sheet.open")) { e.stopPropagation(); ACT.auClose(); } }, true);
 
@@ -676,7 +864,7 @@ Object.assign(ACT, {
   auGoogle: () => { SFX.tap(); buzz(5); AUTH.google(); },
   auEmail: () => { SFX.tap(); buzz(5); AUTH.ui.err = ""; if (!AUTH.cfg) { AUTH.show("soon"); return; } AUTH.show("email"); },
   auTab: (a, id, v) => { if (AUTH.ui.tab === v) return; SFX.tick(); buzz(4); const em = $("#auEmail"), pw = $("#auPw"), nm = $("#auName"); if (em) AUTH.ui.email = em.value; if (pw) AUTH.ui.pw = pw.value; if (nm) AUTH.ui.name = nm.value; AUTH.ui.tab = v; AUTH.ui.err = ""; AUTH.paint(); },
-  auEye: () => { const p = $("#auPw"); if (!p) return; AUTH.ui.show = !AUTH.ui.show; p.type = AUTH.ui.show ? "text" : "password"; const b = $("#au .au-eye"); if (b) { b.innerHTML = ico(AUTH.ui.show ? "auEyeOff" : "auEye"); b.setAttribute("aria-label", (AUTH.ui.show ? "Masquer" : "Afficher") + " le mot de passe"); } SFX.tick(); p.focus({ preventScroll: true }); },
+  auEye: () => { const p = $("#auPw"); if (!p) return; AUTH.ui.show = !AUTH.ui.show; p.type = AUTH.ui.show ? "text" : "password"; const b = $("#au .au-eye"); if (b) { b.innerHTML = AUTH.ui.show ? AU_SVG.eyeOff : AU_SVG.eye; b.setAttribute("aria-label", (AUTH.ui.show ? "Masquer" : "Afficher") + " le mot de passe"); } SFX.tick(); p.focus({ preventScroll: true }); },
   auForgot: () => { SFX.tap(); const e = $("#auEmail"); if (e) AUTH.ui.email = e.value; AUTH.ui.sent = false; AUTH.ui.err = ""; AUTH.show("reset"); },
   auBackToIn: () => { SFX.tap(); AUTH.ui.sent = false; AUTH.ui.tab = "in"; AUTH.ui.back = AUTH.ui.back.filter((x) => x !== "reset" && x !== "email"); AUTH.show("email"); },
   auBack: () => { SFX.tap(); const p = AUTH.ui.back.pop(); AUTH.ui.err = ""; if (p) AUTH.show(p, { push: false }); },
@@ -686,7 +874,7 @@ Object.assign(ACT, {
   auSwitch: async () => { SFX.tap(); try { await AUTH.auth.signOut(); } catch (e) {} AUTH.user = null; auLS.set("gg-mode", "out"); AUTH.ui.back = []; AUTH.show("welcome", { push: false }); },
   auCreate: () => { SFX.tap(); buzz(5); AUTH.ui.err = ""; AUTH.show("create"); },
   auType: (a, id, v) => { AUTH.ui.create.type = v; $$("#au [data-act=auType]").forEach((b) => { const on = b.dataset.v === v; b.classList.toggle("on", on); b.setAttribute("aria-checked", on); }); SFX.tick(); buzz(4); AUTH.createPrev(); },
-  auFr: (a, id, v) => { const C = AUTH.ui.create; const i = C.frs.indexOf(v); i >= 0 ? C.frs.splice(i, 1) : C.frs.push(v); const on = i < 0; a.classList.toggle("on", on); a.setAttribute("aria-pressed", on); const f = AU_FRIDGES.find((x) => x[0] === v); a.innerHTML = `${on ? ico("check") : ""}${esc(v)}<em class="mono">${f[2]}/${f[3]}°</em>`; SFX.tick(); buzz(4); AUTH.createPrev(); },
+  auFr: (a, id, v) => { const C = AUTH.ui.create; const i = C.frs.indexOf(v); i >= 0 ? C.frs.splice(i, 1) : C.frs.push(v); const on = i < 0; a.classList.toggle("on", on); a.setAttribute("aria-pressed", on); const f = AU_FRIDGES.find((x) => x[0] === v); a.innerHTML = auFrHTML(v, f[2], f[3], on); SFX.tick(); buzz(4); AUTH.createPrev(); },
   auJoinOpen: () => {
     SFX.tap(); closeSheet(true);
     if (!AUTH.user) { if (DB.mode === "demo") { toast("Créez d'abord votre compte.", "info"); return; } AUTH.openWelcome(); return; }
