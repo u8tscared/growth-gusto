@@ -108,11 +108,11 @@ const AUTH = {
   async resume() {
     try { await this.sdk(); } catch (e) { this.ui.err = "Connexion impossible pour l'instant. Vérifiez le réseau, puis réessayez."; this.show("welcome"); return; }
     if (auLS.sget("gg-redirect")) {
-      auLS.sdel("gg-redirect");
+      auLS.sdel("gg-redirect"); this._wasRedirect = true;
       try { const r = await this.auth.getRedirectResult(); if (r && r.user) auLS.set("gg-last", "google"); } catch (e) { this.ui.err = this.msg(e); }
     }
     const u = await this.firstUser();
-    if (!u) { this.show("welcome"); return; }
+    if (!u) { if (this._wasRedirect && !this.ui.err) this.ui.err = "Google n'a pas pu finir la connexion dans l'app installée sur l'iPhone. Continuez avec votre e-mail, ou ouvrez le lien dans Safari."; this.show("welcome"); return; }
     await this.signedIn(u);
   },
   firstUser() { return new Promise((res) => { const un = this.auth.onAuthStateChanged((u) => { try { un(); } catch (e) {} res(u); }); }); },
