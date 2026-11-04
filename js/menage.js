@@ -242,10 +242,11 @@ function menRow(o, showDay) {
   const sub = dn ? `<span class="men-who">${esc(menBy(l))} · ${when(l.at)}${o.st === "late" ? " · en retard" : ""}</span>` : [showDay ? menWhenTx(o) : "", c.zone, c.notes].filter(Boolean).map(esc).join(" · ");
   const per = !showDay && (c.freq === "semaine" || c.freq === "mois") ? `<span class="men-tag">${c.freq === "mois" ? "Mensuel" : "Hebdo"}</span>` : "";
   const tags = `${per}${o.slot ? `<span class="men-tag">${menSlotTx(o.slot)}</span>` : ""}${c.who && !dn ? `<span class="men-tag who">${esc(firstName(c.who))}</span>` : ""}${c.photo && !dn ? `<span class="men-tag ph" title="Photo obligatoire">${ico("camera")}</span>` : ""}${o.st === "overdue" ? `<span class="pill bad"><span class="dot"></span>En retard</span>` : ""}`;
+  const gd = !dn ? `<button class="men-ph gd" data-act="menGuide" data-id="${c.id}" aria-label="Comment faire : ${esc(c.name)}">${ico("book")}</button>` : "";
   const right = dn ? (menHasPic(l) ? `<button class="men-ph" data-act="menLog" data-id="${l.id}" aria-label="Voir la photo">${menImg(l)}</button>` : `<button class="men-ph add" data-act="menPhotoAdd" data-id="${l.id}" aria-label="Ajouter une photo de preuve">${ico("camera")}</button>`) : "";
   const act = canDo ? `data-act="menDo" data-v="${k}" aria-label="Marquer « ${esc(c.name)} » comme fait"` : dn ? `data-act="menLog" data-id="${l.id}" aria-label="Détails de « ${esc(c.name)} »"` : `data-act="menHist" data-id="${c.id}"`;
   return `<div class="men-row ${o.st} ${just ? "just" : ""}" ${act} role="button" tabindex="0">
-    ${menMark(o.st)}<div class="tx"><b>${esc(c.name)}</b><em>${sub}</em></div><span class="men-tags">${tags}</span>${right}${just ? `<span class="men-fx" aria-hidden="true">${"<i></i>".repeat(8)}</span>` : ""}</div>`;
+    ${menMark(o.st)}<div class="tx"><b>${esc(c.name)}</b><em>${sub}</em></div><span class="men-tags">${tags}</span>${gd}${right}${just ? `<span class="men-fx" aria-hidden="true">${"<i></i>".repeat(8)}</span>` : ""}</div>`;
 }
 
 /* week */
@@ -313,6 +314,7 @@ function menEditorHtml() {
     <div class="field"><span>Fréquence</span><div class="chips men-wrap">${MEN_FREQS.map(([k, t]) => `<button class="chip ${d.freq === k ? "on" : ""}" data-act="menEdFreq" data-v="${k}">${t}</button>`).join("")}</div>${sub}</div>
     ${d.freq !== "service" ? `<div class="field"><span>Moment</span><div class="men-mseg">${MEN_MO.map((k) => `<button class="${d.moment === k ? "on" : ""}" data-act="menEdSet" data-id="moment" data-v="${k}" aria-pressed="${d.moment === k}">${ico(MEN_MOMENTS[k].ic)}<span>${k === "midi" ? "Après le midi" : MEN_MOMENTS[k].t}</span></button>`).join("")}</div></div>` : ""}
     <label class="field"><span>Produit et méthode <i class="men-opt">facultatif</i></span><input class="input" data-bind="ui.men.notes" value="${esc(d.notes)}" placeholder="Ex. Dégraissant + rinçage à l'eau claire" autocomplete="off"></label>
+    <label class="field"><span>Comment faire <i class="men-opt">une étape par ligne</i></span><textarea class="input men-steps" rows="6" data-bind="ui.men.stepsTx" placeholder="1 étape par ligne">${esc(d.stepsTx || "")}</textarea>${d._gen ? `<em class="men-gd-flag">${ico("alert")}Notice générale proposée : adaptez-la à votre méthode.</em>` : ""}</label>
     <div class="field"><span>Responsable <i class="men-opt">facultatif</i></span><div class="chips men-wrap"><button class="chip ${!d.who ? "on" : ""}" data-act="menEdSet" data-id="who" data-v="">Toute l'équipe</button>${d.who ? `<button class="chip on" data-act="menEdSet" data-id="who" data-v="${esc(d.who)}">${esc(d.who)}</button>` : ""}${names.map((n) => `<button class="chip" data-act="menEdSet" data-id="who" data-v="${esc(n)}">${esc(n)}</button>`).join("")}${d._whoIn ? "" : `<button class="chip" data-act="menEdWho">${ico("plus")}Autre</button>`}</div>
       ${d._whoIn ? `<div class="hstack"><input class="input" id="menWhoIn" placeholder="Prénom" autocomplete="off" style="flex:1"><button class="btn acc sm" style="height:50px" data-act="menEdWhoOk">Ajouter</button></div>` : ""}</div>
     <button class="men-sw ${d.photo ? "on" : ""}" data-act="menEdPhoto" role="switch" aria-checked="${!!d.photo}"><span class="ic">${ico("camera")}</span><span class="tx"><b>Photo obligatoire</b><em>Une photo de preuve est demandée au pointage</em></span><i></i></button>
@@ -393,6 +395,8 @@ Object.assign(ACT, {
     const [cid, day, slot] = v.split("|"); const raw = S.chores.find((x) => x.id === cid); if (!raw) return; const c = menNorm(raw);
     const occ = menOccOn(c, day).find((o) => o.slot === (slot || "")); if (occ && menLogFor(occ)) return; // already checked
     if (!menSigner()) { toast("Choisissez d'abord qui signe"); ACT.menSigner(); return; }
+    if (M.gdPass !== v && !menGdOff().includes(c.id)) { SFX.tap(); openSheet(menGuideSheet(c, v)); return; } // « comment faire » first, until « ne plus afficher »
+    M.gdPass = null;
     M.busy[v] = Date.now();
     try { await menDoIt(a, v, c, slot); } finally { delete M.busy[v]; }
   },
@@ -415,6 +419,7 @@ Object.assign(ACT, {
     const c = id ? S.chores.find((x) => x.id === id) : null; const n = c ? menNorm(c) : null;
     S.ui.men = n ? { _id: n.id, name: n.name, zone: n.zone || "", freq: n.freq, moment: n.moment, days: [...n.days], wday: n.wday == null ? null : +n.wday, mday: n.mday == null ? null : +n.mday, who: n.who || "", notes: n.notes || "", photo: !!n.photo }
       : { name: "", zone: "Cuisine", freq: "jour", moment: "fermeture", days: [], wday: null, mday: null, who: "", notes: "", photo: false };
+    if (n) { const g = menGuideOf(n); S.ui.men.stepsTx = g.steps.join("\n"); S.ui.men._gen = g.generic; S.ui.men._libTx = (Array.isArray(n.steps) && n.steps.length ? g.lib.steps : g.steps).join("\n"); } else { S.ui.men.stepsTx = ""; S.ui.men._libTx = ""; }
     openSheet(menEditorHtml()); if (!id) setTimeout(() => $("#menName")?.focus(), 450);
   },
   menEdSet: (a, id, v) => { S.ui.men[id] = v; SFX.tick(); menEdRedraw(); },
@@ -431,6 +436,7 @@ Object.assign(ACT, {
     if (!d.name) { SFX.err(); const i = $("#menName"); if (i) { i.classList.remove("shake"); void i.offsetWidth; i.classList.add("shake"); i.focus(); } return; }
     if (d.freq === "jours" && !d.days.length) { SFX.err(); toast("Choisissez au moins un jour", "err"); return; }
     const doc = { name: d.name, zone: d.zone || "", freq: d.freq, moment: d.freq === "service" ? "midi" : d.moment, days: d.freq === "jours" ? d.days : [], wday: d.freq === "semaine" ? d.wday : null, mday: d.freq === "mois" ? d.mday : null, who: d.who || "", notes: (d.notes || "").trim(), photo: !!d.photo };
+    { const tx = String(d.stepsTx || "").split("\n").map((x) => x.replace(/^\s*\d+[.)-]?\s*/, "").trim()).filter(Boolean); doc.steps = tx.join("\n") === String(d._libTx || "").split("\n").map((x) => x.trim()).filter(Boolean).join("\n") ? [] : tx; }
     if (d._id) await safe(DB.update("chores", d._id, doc)); else await safe(DB.add("chores", { ...doc, createdAt: Date.now() }));
     await logEvent("chore", `a ${d._id ? "modifié" : "ajouté"} la tâche de ménage « ${d.name} »`);
     closeSheet(true); SFX.ok(); toast(d._id ? "Tâche mise à jour" : "Tâche ajoutée");
@@ -470,3 +476,60 @@ const MEN_STARTER = [
   ["Hotte et filtres", "Cuisine", "fermeture", "semaine", { wday: 6 }, "Filtres au lave-vaisselle ou bain dégraissant"],
   ["Dégivrage du congélateur", "Chambre froide", "ouverture", "mois", { mday: 1 }, "Produits en glacière, dégivrer, désinfecter, sécher", true],
 ];
+
+/* ── « Comment faire » : one how-to notice per cleaning task ──
+   Shown when a task is tapped (like a bank app's tip), with « Ne plus afficher pour cette tâche ». The text comes from the task's own
+   steps (editable in the task sheet) or, failing that, from this HACCP library matched on the task name; with no match, a general
+   method is shown and flagged as « à compléter ». */
+const MEN_GUIDES = [
+  { k: ["plan de travail", "plans de travail", "surface"], product: "Détergent-désinfectant alimentaire (norme EN 1276)", steps: ["Débarrasser le plan : aliments, ustensiles, papiers.", "Retirer miettes et déchets avec une raclette ou un papier à usage unique.", "Appliquer le détergent-désinfectant avec une lavette propre, frotter.", "Laisser agir le temps indiqué sur le bidon (souvent 5 minutes).", "Rincer à l'eau claire si l'étiquette le demande.", "Laisser sécher à l'air, ou essuyer avec un papier à usage unique."], safety: "Gants. Ne jamais mélanger la javel avec un autre produit." },
+  { k: ["sanitaire", "toilette", "wc", "lave-main", "lave main"], product: "Détartrant WC + désinfectant sanitaires", steps: ["Aérer et mettre les gants réservés aux sanitaires.", "Verser le détartrant dans la cuvette et le laisser agir.", "Désinfecter du plus propre au plus sale : lavabo, robinet, poignées, chasse d'eau, cuvette en dernier.", "Frotter la cuvette à la brosse, tirer la chasse.", "Recharger savon, papier toilette et essuie-mains.", "Laver le sol, du fond vers la porte."], safety: "Le matériel des sanitaires ne va jamais en cuisine." },
+  { k: ["planche", "ustensile", "couteau", "bac gn", "vaisselle"], product: "Détergent vaisselle + désinfectant, ou lave-vaisselle cycle chaud", steps: ["Retirer les restes alimentaires.", "Prélaver à l'eau chaude.", "Laver au détergent avec une brosse propre.", "Rincer à l'eau claire.", "Désinfecter en respectant le temps de contact, ou passer au lave-vaisselle.", "Rincer, puis laisser sécher à l'air sur un égouttoir.", "Ranger à l'abri de la poussière."], safety: "Une planche rayée en profondeur se remplace : les bactéries s'y logent." },
+  { k: ["trancheuse", "robot", "mixeur", "cutter", "hachoir"], product: "Détergent-désinfectant alimentaire", steps: ["Débrancher l'appareil.", "Démonter les pièces amovibles : lame, protège-lame, bol, couvercle.", "Retirer les résidus.", "Laver chaque pièce au détergent, rincer.", "Désinfecter, respecter le temps de contact, rincer.", "Laisser sécher, puis remonter.", "Vérifier que tout est bien remonté avant de rebrancher."], safety: "Appareil débranché. Gants anti-coupure pour manipuler la lame." },
+  { k: ["plonge", "evier", "bac", "siphon"], product: "Détergent + désinfectant, détartrant si besoin", steps: ["Vider les bacs et retirer les déchets des crépines.", "Frotter cuves, rebords et robinets au détergent.", "Rincer.", "Désinfecter, respecter le temps de contact.", "Détartrer si des traces blanches apparaissent.", "Rincer et laisser sécher."] },
+  { k: ["lave-vaisselle", "lave vaisselle", "machine a laver"], product: "Eau claire + dégraissant", steps: ["Éteindre la machine et la vidanger.", "Retirer les filtres et les rincer sous l'eau.", "Dégraisser les filtres si besoin.", "Démonter les bras de lavage et déboucher les buses.", "Essuyer l'intérieur et le joint de porte.", "Tout remonter.", "Laisser la porte ouverte la nuit pour sécher."], safety: "Machine éteinte et refroidie. Gants." },
+  { k: ["sol"], product: "Détergent sol dilué dans l'eau tiède", steps: ["Retirer ce qui est posé au sol.", "Faire un balayage humide (pas de balai sec en cuisine).", "Laver avec le détergent, du fond vers la sortie.", "Pousser l'eau à la raclette vers le siphon.", "Rincer la serpillière et le seau.", "Laisser sécher, poser le panneau « sol glissant »."], safety: "Jamais de sol lavé pendant la production." },
+  { k: ["poubelle", "dechet"], product: "Détergent-désinfectant", steps: ["Fermer les sacs et les sortir au local poubelles.", "Laver le bac au détergent : intérieur, couvercle, pédale.", "Désinfecter, respecter le temps de contact.", "Rincer et laisser sécher.", "Mettre un sac neuf.", "Se laver les mains."] },
+  { k: ["poignee", "interrupteur", "bouton", "point de contact"], product: "Spray désinfectant + papier à usage unique", steps: ["Pulvériser le désinfectant sur le papier, pas directement sur les interrupteurs.", "Essuyer les poignées : portes, frigos, placards.", "Essuyer les interrupteurs et les boutons du four et de la hotte.", "Essuyer les robinets.", "Changer de papier à chaque zone, le jeter."] },
+  { k: ["salle", "table", "chaise"], product: "Désinfectant de surface + détergent sol", steps: ["Débarrasser les tables.", "Nettoyer et désinfecter les tables.", "Essuyer assises et dossiers des chaises.", "Monter les chaises sur les tables.", "Aspirer, puis laver le sol.", "Redescendre les chaises une fois le sol sec."] },
+  { k: ["bar", "comptoir", "tireuse", "cafe", "machine a cafe"], product: "Nettoyant machine à café + désinfectant", steps: ["Purger la buse vapeur et l'essuyer avec un chiffon dédié.", "Retirer les porte-filtres, nettoyer le groupe (brossette ou pastille), rincer.", "Faire tremper les filtres.", "Nettoyer les becs de la tireuse à l'eau claire.", "Vider et laver les égouttoirs.", "Désinfecter le comptoir."] },
+  { k: ["four", "plaque", "piano", "plancha", "grill"], product: "Dégraissant four", steps: ["Éteindre et laisser tiédir.", "Retirer grilles et plaques, les faire tremper.", "Appliquer le dégraissant sur les surfaces tièdes.", "Laisser agir le temps indiqué.", "Frotter, puis rincer abondamment à l'eau claire.", "Sécher et remettre grilles et plaques."], safety: "Gants et lunettes. Bien ventiler." },
+  { k: ["friteuse", "huile"], product: "Filtre à huile + testeur d'huile", steps: ["Éteindre et laisser tiédir l'huile.", "Filtrer l'huile (filtre papier ou chinois).", "Nettoyer la cuve et les résistances.", "Contrôler l'huile : couleur, odeur, ou testeur (changer au-delà de 24 % de composés polaires).", "Remettre l'huile filtrée ou la remplacer.", "Noter la date si l'huile est changée."], safety: "Jamais d'eau dans l'huile chaude." },
+  { k: ["degivr", "congel"], product: "Détergent-désinfectant, glacière", steps: ["Mettre les produits en glacière ou dans un autre congélateur.", "Débrancher, poser un bac pour l'eau.", "Laisser dégivrer, sans objet pointu.", "Laver parois et joints au détergent-désinfectant.", "Rincer et bien sécher.", "Rebrancher, attendre −18 °C.", "Remettre les produits."], safety: "Produits hors froid 30 minutes au maximum." },
+  { k: ["chambre froide", "frigo", "refrigerateur", "clayette", "vitrine"], product: "Détergent-désinfectant alimentaire", steps: ["Sortir les produits dans une autre enceinte froide.", "Jeter les produits périmés ou sans étiquette.", "Retirer les clayettes.", "Laver parois, clayettes et joints au détergent-désinfectant.", "Rincer et sécher.", "Remettre les produits couverts et étiquetés, les plus anciens devant.", "Vérifier la température."], safety: "Produits hors froid 30 minutes au maximum." },
+  { k: ["hotte", "filtre"], product: "Bain dégraissant chaud ou lave-vaisselle", steps: ["Éteindre la hotte.", "Démonter les filtres.", "Les passer au lave-vaisselle ou dans un bain dégraissant chaud.", "Dégraisser l'intérieur de la hotte.", "Rincer et sécher les filtres.", "Remonter les filtres."], safety: "Gants. Attention aux bords coupants." },
+];
+const MEN_GD_BASE = { product: "Détergent-désinfectant alimentaire", steps: ["Retirer aliments et objets de la zone.", "Nettoyer au détergent pour enlever les salissures.", "Rincer à l'eau claire.", "Désinfecter, respecter le temps de contact.", "Rincer si l'étiquette le demande.", "Laisser sécher à l'air."], generic: true };
+const menNoAcc = (s) => String(s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+function menGuideOf(c) {
+  const n = menNoAcc(`${c.name} ${c.zone || ""}`);
+  const lib = MEN_GUIDES.find((g) => g.k.some((k) => menNoAcc(c.name).includes(k))) || MEN_GUIDES.find((g) => g.k.some((k) => n.includes(k))) || MEN_GD_BASE;
+  const own = Array.isArray(c.steps) && c.steps.filter(Boolean).length ? c.steps.filter(Boolean) : null;
+  return { product: c.notes || lib.product || "", steps: own || lib.steps, safety: lib.safety || "", generic: !own && !!lib.generic, lib };
+}
+/* « ne plus afficher » choices: per restaurant and per person, on this device */
+const menGdKey = () => `${S.rid || ""}|${(S.me && S.me.id) || ""}`;
+function menGdOff() { try { return JSON.parse(localStorage.getItem("gg-men-gd-off") || "{}")[menGdKey()] || []; } catch (e) { return []; } }
+function menGdSetOff(cid, off) {
+  try { const all = JSON.parse(localStorage.getItem("gg-men-gd-off") || "{}"); const L = new Set(all[menGdKey()] || []); off ? L.add(cid) : L.delete(cid); all[menGdKey()] = [...L]; localStorage.setItem("gg-men-gd-off", JSON.stringify(all)); } catch (e) {}
+}
+function menGuideSheet(c, v) {
+  const g = menGuideOf(c); const off = menGdOff().includes(c.id);
+  const meta = [c.zone, menFreqTx(c)].filter(Boolean).map(esc).join(" · ");
+  return `<div class="men-gd">
+    <div class="men-gd-hd"><span class="men-gd-ic">${ico("book")}</span><div class="tx"><span class="lbl">Comment faire</span><b>${esc(c.name)}</b>${meta ? `<em>${meta}</em>` : ""}</div></div>
+    ${g.product ? `<div class="men-gd-prod">${ico("menDrop")}<div><span class="lbl">Produit</span><p>${esc(g.product)}</p></div></div>` : ""}
+    <ol class="men-gd-steps">${g.steps.map((s, i) => `<li class="st" style="--i:${i}"><span class="mono">${i + 1}</span><p>${esc(s)}</p></li>`).join("")}</ol>
+    ${g.safety ? `<div class="men-gd-safe">${ico("alert")}<p>${esc(g.safety)}</p></div>` : ""}
+    ${g.generic ? `<div class="men-gd-gen"><p>Méthode générale : aucune notice précise pour cette tâche.</p><button class="btn soft sm" data-act="menGdEdit" data-id="${c.id}">${ico("edit")}Écrire la notice</button></div>` : ""}
+    <label class="men-gd-hide"><input type="checkbox" id="menGdHide" data-act="menGdToggle" data-id="${c.id}" ${off ? "checked" : ""}><i aria-hidden="true">${menCheckSvg}</i><span>Ne plus afficher pour cette tâche</span></label>
+    <div class="men-sfoot">${v ? `<div class="grid2"><button class="btn soft" data-act="sheetClose">Plus tard</button><button class="btn acc" data-act="menGdOk" data-v="${esc(v)}">${ico("check")}C'est fait</button></div>` : `<button class="btn acc block" data-act="sheetClose">J'ai compris</button>`}</div>
+  </div>`;
+}
+Object.assign(ACT, {
+  menGuide: (a, id) => { const raw = S.chores.find((x) => x.id === id); if (!raw) return; SFX.sheet ? SFX.sheet() : SFX.tap(); openSheet(menGuideSheet(menNorm(raw))); },
+  menGdToggle: (a, id) => { menGdSetOff(id, !!a.checked); SFX.tick(); buzz(4); },
+  menGdOk: (a, id, v) => { closeSheet(true); M.gdPass = v; const row = $(`.men-row[data-v="${CSS.escape(v)}"]`); return ACT.menDo(row || a, null, v); },
+  menGdEdit: (a, id) => { closeSheet(true); setTimeout(() => ACT.menEdit(a, id), 280); },
+  menGdReset: () => { try { const all = JSON.parse(localStorage.getItem("gg-men-gd-off") || "{}"); delete all[menGdKey()]; localStorage.setItem("gg-men-gd-off", JSON.stringify(all)); } catch (e) {} SFX.tick(); toast("Les notices s'afficheront à nouveau"); },
+});

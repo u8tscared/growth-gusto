@@ -31,6 +31,11 @@ const debounce = (fn, ms) => { let t; return (...a) => { clearTimeout(t); t = se
 
 /* ───────────────────────── icons (hand-drawn set, 24 grid, 1.8 stroke) ───────────────────────── */
 const IC = {
+  star: ["M11.52 2.3a.53.53 0 0 1 .95 0l2.31 4.68a2.12 2.12 0 0 0 1.6 1.16l5.16.76a.53.53 0 0 1 .3.9l-3.74 3.64a2.12 2.12 0 0 0-.61 1.88l.88 5.14a.53.53 0 0 1-.77.56l-4.62-2.43a2.12 2.12 0 0 0-1.97 0L6.4 21.01a.53.53 0 0 1-.77-.56l.88-5.14a2.12 2.12 0 0 0-.61-1.88L2.16 9.8a.53.53 0 0 1 .3-.9l5.16-.76a2.12 2.12 0 0 0 1.6-1.16z"],
+  cal: ["M8 2v4", "M16 2v4", "r:3,4,18,18,2", "M3 10h18"],
+  calcheck: ["M8 2v4", "M16 2v4", "r:3,4,18,18,2", "M3 10h18", "m9 16 2 2 4-4"],
+  euro: ["M4 10h12", "M4 14h9", "M19 6a7.7 7.7 0 0 0-5.2-2A7.9 7.9 0 0 0 6 12c0 4.4 3.5 8 7.8 8 2 0 3.8-.8 5.2-2"],
+  dash: ["r:3,3,7,9,1", "r:14,3,7,5,1", "r:14,12,7,9,1", "r:3,16,7,5,1"],
   home: ["M15 21v-7a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v7", "M3 10a2 2 0 0 1 .7-1.53l7-6a2 2 0 0 1 2.6 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"],
   snow: ["M2 12h20", "M12 2v20", "m20 16-4-4 4-4", "m4 8 4 4-4 4", "m16 4-4 4-4-4", "m8 20 4-4 4 4"],
   therm: ["M14 4v10.54a4 4 0 1 1-4 0V4a2 2 0 0 1 4 0Z", "M12 9v6.5", "f:M12 14.5a3 3 0 1 0 .01 0z"],
@@ -186,11 +191,30 @@ async function safe(p, msg = "Impossible d'enregistrer. Vérifiez la connexion e
 const S = {
   me: { id: "local", name: "" }, isOwner: true, cap: {}, rid: null, restos: [], resto: null, ready: false,
   fridges: [], readings: [], lots: [], products: [], counts: [], receptions: [], events: [], notes: [], chores: [], choreLogs: [], tickets: [], members: [],
+  moves: [], staff: [], shifts: [], punches: [], obligations: [], oblLogs: [], feedback: [], expenses: [],
   profiles: {}, route: "home", params: {}, history: [], slot: slotNow(), open: null, temp: {}, ui: {},
   rec: null, tz: null, zone: null, stockTab: "inv", noteCat: "Toutes", noteQ: "", regFilter: "all", slow: false, dbErr: null,
 };
 try { S.me.name = localStorage.getItem("gg-name") || ""; S.rid = localStorage.getItem("gg-rid"); SFX.on = localStorage.getItem("gg-sound") !== "off"; } catch (e) {}
 
+/* the 14 regulated allergens (EU 1169/2011, annex II), shared by recipes, products, reception and stock */
+const ALLERGENS = [
+  { id: "gluten", t: "Gluten", s: "Céréales contenant du gluten (blé, seigle, orge, avoine…)" },
+  { id: "crustaces", t: "Crustacés", s: "Crevettes, crabes, homard, langoustines…" },
+  { id: "oeufs", t: "Œufs", s: "Œufs et produits à base d'œufs" },
+  { id: "poissons", t: "Poissons", s: "Poissons et produits à base de poisson" },
+  { id: "arachides", t: "Arachides", s: "Cacahuètes et produits dérivés" },
+  { id: "soja", t: "Soja", s: "Soja et produits à base de soja" },
+  { id: "lait", t: "Lait", s: "Lait et produits laitiers (y compris lactose)" },
+  { id: "fruitscoque", t: "Fruits à coque", s: "Amandes, noisettes, noix, cajou, pécan, pistaches…" },
+  { id: "celeri", t: "Céleri", s: "Céleri et produits à base de céleri" },
+  { id: "moutarde", t: "Moutarde", s: "Moutarde et produits à base de moutarde" },
+  { id: "sesame", t: "Sésame", s: "Graines de sésame et produits dérivés" },
+  { id: "sulfites", t: "Sulfites", s: "Anhydride sulfureux et sulfites > 10 mg/kg (vin, vinaigre…)" },
+  { id: "lupin", t: "Lupin", s: "Lupin et produits à base de lupin" },
+  { id: "mollusques", t: "Mollusques", s: "Huîtres, moules, coquillages, calamars…" },
+];
+const allergenOf = (id) => ALLERGENS.find((a) => a.id === id);
 const ROLES = { gerant: "Gérant", chef: "Chef", equipe: "Équipe" };
 const ZONES = ["Réserve sèche", "Chambre froide 1", "Chambre froide 2", "Bar", "Congélateur"];
 const UNITS = ["kg", "g", "L", "pièce", "bourriche", "colis", "botte"];
@@ -266,6 +290,15 @@ function attachResto() {
   w("choreLogs", { order: "at", dir: "desc", limit: 400 }, "choreLogs");
   w("tickets", { order: "at", dir: "desc", limit: 60 }, "tickets");
   w("members", {}, "members", ensureMember);
+  /* V3 shared collections (see tools/BRIEF.md « V3 data contract ») */
+  w("moves", { order: "at", dir: "desc", limit: 5000 }, "moves");
+  w("staff", {}, "staff");
+  w("shifts", {}, "shifts");
+  w("punches", { order: "at", dir: "desc", limit: 4000 }, "punches");
+  w("obligations", {}, "obligations");
+  w("oblLogs", { order: "at", dir: "desc", limit: 1000 }, "oblLogs");
+  w("feedback", { order: "at", dir: "desc", limit: 1000 }, "feedback");
+  w("expenses", { order: "at", dir: "desc", limit: 3000 }, "expenses");
 }
 let memberChecked = false;
 function ensureMember() {
@@ -287,12 +320,13 @@ const onData = debounce(() => { loadProfiles(); refresh(); renderChrome(); }, 60
 /* ───────────────────────── chrome: side nav + tab bar ───────────────────────── */
 const NAV = [
   ["home", "home", "Aujourd'hui"], ["releve", "therm", "Relevés"], ["frigos", "snow", "Frigos"], ["scan", "scan", "Scanner"], ["reception", "truck", "Réception"],
-  ["sep", "", "Gestion"], ["stock", "box", "Stock & inventaire"], ["tickets", "receipt", "Tickets de caisse"], ["registre", "shield", "Registre HACCP"],
-  ["sep", "", "Cuisine"], ["notes", "book", "Recettes & procédures"], ["menage", "spray", "Planning ménage"],
-  ["sep", "", "Restaurant"], ["equipe", "users", "Équipe"], ["imprimante", "printer", "Imprimante"], ["reglages", "sliders", "Réglages"],
+  ["sep", "", "Cuisine"], ["notes", "book", "Recettes & allergènes"], ["menage", "spray", "Planning ménage"],
+  ["sep", "", "Gestion"], ["dashboard", "dash", "Tableau de bord"], ["finance", "euro", "Finances"], ["stock", "box", "Stock & inventaire"], ["tickets", "receipt", "Tickets de caisse"], ["registre", "shield", "Registre HACCP"], ["obligations", "calcheck", "Obligations & contrôles"],
+  ["sep", "", "Équipe"], ["pointeuse", "clock", "Pointeuse"], ["planning", "cal", "Planning"], ["equipe", "users", "Équipe & salaires"], ["avis", "star", "Avis & retours"],
+  ["sep", "", "Restaurant"], ["imprimante", "printer", "Imprimante"], ["reglages", "sliders", "Réglages"],
 ];
 const TABS = [["home", "home", "Accueil"], ["frigos", "snow", "Frigos"], ["scan", "scan", ""], ["stock", "box", "Stock"], ["more", "grid", "Plus"]];
-const TAB_OF = { home: "home", frigos: "frigos", frigo: "frigos", releve: "home", scan: "scan", stock: "stock", reception: "more", tickets: "more", registre: "more", notes: "more", note: "more", menage: "more", equipe: "more", imprimante: "more", reglages: "more", more: "more" };
+const TAB_OF = { home: "home", frigos: "frigos", frigo: "frigos", releve: "home", scan: "scan", stock: "stock", reception: "more", tickets: "more", registre: "more", notes: "more", note: "more", menage: "more", equipe: "more", imprimante: "more", reglages: "more", more: "more", dashboard: "more", finance: "more", obligations: "more", pointeuse: "more", planning: "more", avis: "more" };
 function urgentCount() { return activeLots().filter((l) => (daysUntil(dlcOf(l)) ?? 99) <= 1).length; }
 function renderChrome() {
   const side = $("#side");
@@ -673,7 +707,7 @@ function registerSW() {
    to the foreground. A new v means the code running here is old: with nothing in progress the app reloads silently (caches dropped,
    so the reload is guaranteed fresh); otherwise a toast offers « Mettre à jour ». sessionStorage guards against reload loops:
    one reload attempt per version per session, after which the version is simply adopted. */
-const APP_V = "2026-11-03.7";
+const APP_V = "2026-11-04.1";
 const UPD = {
   running: null, offered: null,
   get: (k, store) => { try { return store.getItem(k); } catch (e) { return null; } },
