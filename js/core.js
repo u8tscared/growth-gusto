@@ -164,7 +164,7 @@ const DB = {
     if (this.mode === "db") {
       if (col === "restos" && this.uid) return this.watchMyRestos(cb);
       let q = this.db.collection(path); if (opts.order) q = q.orderBy(opts.order, opts.dir || "asc"); if (opts.limit) q = q.limit(opts.limit);
-      const timer = setTimeout(() => { S.slow = true; refresh(); }, 10000);
+      const timer = setTimeout(() => { if (S.slow) return; S.slow = true; refresh(); }, 10000); /* one banner + one re-render for all the watches, not one each */
       /* a listener opened a moment before a new membership reaches the server is refused once: retry a few times, then report */
       let un = null, dead = false; const t0 = Date.now();
       const start = (n) => { un = q.onSnapshot((snap) => { if (!snap.metadata.fromCache) { clearTimeout(timer); S.slow = false; } cb(snap.docs.map((d) => ({ id: d.id, ...d.data() }))); }, (e) => {
@@ -478,8 +478,8 @@ const SCRL = { touch: 0, last: 0, pend: false, t: 0 };
 /* busy = a finger is on the screen (removing the touched node would cancel the gesture on iOS), or the page moved in the last 350 ms (momentum).
    Taps are unaffected: the click that acts on them arrives after touchend. */
 function scrollBusy() { return SCRL.touch > 0 || performance.now() - SCRL.last < 350; }
-function scrollSettle() { clearTimeout(SCRL.t); SCRL.t = setTimeout(() => { if (scrollBusy()) return scrollSettle(); if (SCRL.pend) { SCRL.pend = false; refresh(); } }, 380); }
-document.addEventListener("touchstart", (e) => { SCRL.touch = e.touches.length; const t = e.touches[0]; if (e.touches.length === 1 && t) { SCRL.x0 = t.clientX; SCRL.y0 = t.clientY; SCRL.dist = 0; SCRL.scrolled = performance.now() - SCRL.last < 120; SCRL.t0 = performance.now(); } }, { passive: true, capture: true });
+function scrollSettle() { clearTimeout(SCRL.t); SCRL.t = setTimeout(() => { if (scrollBusy()) return scrollSettle(); if (SCRL.pendR) { SCRL.pendR = false; rerender(); } else if (SCRL.pend) { SCRL.pend = false; refresh(); } }, 380); }
+document.addEventListener("touchstart", (e) => { SCRL.touch = e.touches.length; const t = e.touches[0]; if (e.touches.length === 1) SCRL.touch = 1; if (e.touches.length === 1 && t) { SCRL.x0 = t.clientX; SCRL.y0 = t.clientY; SCRL.dist = 0; SCRL.scrolled = performance.now() - SCRL.last < 120; SCRL.t0 = performance.now(); } }, { passive: true, capture: true });
 document.addEventListener("touchmove", (e) => { const t = e.touches[0]; if (t && SCRL.x0 != null) SCRL.dist = Math.max(SCRL.dist || 0, Math.hypot(t.clientX - SCRL.x0, t.clientY - SCRL.y0)); }, { passive: true, capture: true });
 /* a finger that scrolled (or stopped a momentum scroll) must never "tap" what was under it: iOS can still send a click after such a gesture */
 document.addEventListener("click", (e) => {
@@ -487,7 +487,9 @@ document.addEventListener("click", (e) => {
   if ((SCRL.dist || 0) > 12 || SCRL.scrolled) { const tgt = e.target.closest && e.target.closest("[data-go],[data-act],[data-tab],a,button,[role=button]"); if (tgt && !tgt.closest("input,textarea,select,label")) { e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation(); } }
   SCRL.t0 = 0;
 }, true);
-const scrlEnd = (e) => { SCRL.touch = e && e.touches ? e.touches.length : 0; if (SCRL.pend) scrollSettle(); };
+const scrlEnd = (e) => { SCRL.touch = e && e.touches ? e.touches.length : 0; if (SCRL.pend || SCRL.pendR) scrollSettle(); };
+/* a re-render can detach the touched node (its touchend then never reaches document): pointerup/cancel and a fresh single touch also reset */
+window.addEventListener("pointerup", () => { SCRL.touch = 0; if (SCRL.pend || SCRL.pendR) scrollSettle(); }, { passive: true, capture: true }); window.addEventListener("pointercancel", () => { SCRL.touch = 0; }, { passive: true, capture: true });
 document.addEventListener("touchend", scrlEnd, { passive: true, capture: true }); document.addEventListener("touchcancel", scrlEnd, { passive: true, capture: true });
 document.addEventListener("scroll", () => { SCRL.last = performance.now(); if (SCRL.touch > 0) SCRL.scrolled = true; if (SCRL.pend) scrollSettle(); }, { passive: true, capture: true });
 function refresh(force) {
@@ -597,7 +599,7 @@ window.addEventListener("resize", appHeight); window.addEventListener("orientati
 /* on-screen keyboard (iOS): lift the sheet above it and keep the focused field visible */
 (function kbLift() {
   const vv = window.visualViewport; if (!vv) return;
-  const upd = () => { const de = document.documentElement; const kb = Math.max(0, (APPH.px || window.innerHeight) - vv.height - vv.offsetTop); const ae = document.activeElement; const typing = !!(ae && ae.matches && ae.matches("input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]),textarea,select,[contenteditable]")); const on = kb > 80 && typing; /* iOS 26 Safari also shrinks visualViewport when its toolbar moves: only a focused field means a keyboard */ de.style.setProperty("--kb", (on ? kb : 0) + "px"); de.style.setProperty("--vvh", vv.height + "px"); de.classList.toggle("kb", on); };
+  const upd = () => { const de = document.documentElement; const kb = Math.max(0, (document.body.clientHeight || APPH.px || window.innerHeight) - vv.height - vv.offsetTop); const ae = document.activeElement; const typing = !!(ae && ae.matches && ae.matches("input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]),textarea,select,[contenteditable]")); const on = kb > 80 && typing; /* iOS 26 Safari also shrinks visualViewport when its toolbar moves: only a focused field means a keyboard */ de.style.setProperty("--kb", (on ? kb : 0) + "px"); de.style.setProperty("--vvh", vv.height + "px"); de.classList.toggle("kb", on); };
   upd();
   vv.addEventListener("resize", upd); vv.addEventListener("scroll", upd); document.addEventListener("focusin", () => setTimeout(upd, 50)); document.addEventListener("focusout", () => setTimeout(upd, 50));
   document.addEventListener("focusin", (e) => { const t = e.target; if (t.matches && t.matches("input,textarea,select") && t.closest("#sheet")) setTimeout(() => { try { t.scrollIntoView({ block: "nearest", behavior: "smooth" }); } catch (x) {} }, 320); });
@@ -803,7 +805,7 @@ function registerSW() {
    to the foreground. A new v means the code running here is old: with nothing in progress the app reloads silently (caches dropped,
    so the reload is guaranteed fresh); otherwise a toast offers « Mettre à jour ». sessionStorage guards against reload loops:
    one reload attempt per version per session, after which the version is simply adopted. */
-const APP_V = "2026-11-04.11";
+const APP_V = "2026-11-04.12";
 const UPD = {
   running: null, offered: null,
   get: (k, store) => { try { return store.getItem(k); } catch (e) { return null; } },
@@ -854,7 +856,7 @@ const TOAST_ICONS = { info: `<svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 0 1 1
 const PHONE_MQ = window.matchMedia("(max-width:959px)");
 const safeTop = () => { const v = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--sat")); return isNaN(v) ? 0 : v; };
 function bottomEdge() {
-  const H = APPH.px || window.innerHeight; let edge = H;
+  const H = document.body.clientHeight || APPH.px || window.innerHeight; let edge = H; /* the app box, not Safari's moving viewport */
   const tb = $("#tabbar"); if (tb && !tb.classList.contains("hide") && !document.documentElement.classList.contains("kb")) edge = Math.min(edge, tb.getBoundingClientRect().top);
   const v = $("#viewport .view:not(.leave)"); if (v) $$(".ctabar", v).forEach((c) => { const r = c.getBoundingClientRect(); if (r.height && r.top < H && r.bottom > 0) edge = Math.min(edge, r.top); });
   return { H, edge };
@@ -898,7 +900,7 @@ document.addEventListener("input", (e) => {
   if (el.dataset.cnt) saveCount(el.dataset.cnt, el.value);
 });
 document.addEventListener("change", (e) => { const el = e.target; if (el.tagName === "SELECT" && el.dataset.bind) setPath(el.dataset.bind, el.value); if (el.dataset.rer) { setPath(el.dataset.bind, el.value); el.blur(); setTimeout(rerender, 30); } });
-const rerender = () => { const v = $("#viewport .view:not(.leave)"); if (!v) return; const st = v.scrollTop; v.classList.add("nost"); v.innerHTML = renderRoute(); v.scrollTop = st; afterRender(v); };
+const rerender = () => { if (scrollBusy()) { SCRL.pendR = true; scrollSettle(); return; } SCRL.pendR = false; const v = $("#viewport .view:not(.leave)"); if (!v) return; const st = v.scrollTop; v.classList.add("nost"); v.innerHTML = renderRoute(); v.scrollTop = st; afterRender(v); };
 
 /* ───────────────────────── actions ───────────────────────── */
 document.addEventListener("submit", (e) => { const f = e.target; if (f.dataset.form === "code") { e.preventDefault(); lookupCode($("#codeIn").value); } });

@@ -198,7 +198,7 @@ const AUTH = {
   leaveDemo() { auLS.sdel("gg-demo"); SFX.close(); document.documentElement.classList.add("au-leaving"); setTimeout(() => location.reload(), 260); },
   demoBar() {
     if ($("#auDemo")) return;
-    document.documentElement.classList.add("au-demo");
+    document.documentElement.classList.add("au-demomode");
     const b = document.createElement("div"); b.id = "auDemo"; b.className = "au-dbar"; b.setAttribute("role", "status");
     b.innerHTML = `<span class="au-demo-dot" aria-hidden="true"></span><span class="au-demo-tx"><b>Mode démo</b><span><i class="au-sep"> · </i>rien n'est enregistré</span></span><button class="au-demo-cta" data-act="auDemoSignup">Créer mon compte</button><button class="au-demo-x" data-act="auDemoLeave" aria-label="Quitter la démo">${ico("x")}</button>`;
     document.body.appendChild(b); requestAnimationFrame(() => b.classList.add("on"));

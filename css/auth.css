@@ -47,7 +47,7 @@
 }
 
 /* ───────── overlay shell ───────── */
-.au{position:fixed;inset:0;z-index:60;overflow:hidden;background:var(--c-canvas);color:var(--c-ink);font:400 16px/1.5 var(--f-t);font-feature-settings:normal;letter-spacing:0;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;opacity:0;transition:opacity .45s var(--au-out)}
+.au{position:absolute;inset:0;z-index:60;overflow:hidden;background:var(--c-canvas);color:var(--c-ink);font:400 16px/1.5 var(--f-t);font-feature-settings:normal;letter-spacing:0;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;opacity:0;transition:opacity .45s var(--au-out)}
 .au.on{opacity:1}
 .au.off{opacity:0;pointer-events:none;transition:opacity .4s var(--au-out)}
 .au.off .au-pane{transform:translateY(10px);transition:transform .4s var(--au-out)}
@@ -497,7 +497,7 @@ html.au-open #app,html.au-open #tabbar{visibility:hidden}
 .au-acct .ic.bad{background:rgba(212,42,72,.1);color:var(--bad)}
 
 /* ───────── demo bar ───────── */
-.au-dbar{position:fixed;z-index:45;left:50%;top:calc(env(safe-area-inset-top,0px) + 8px);display:flex;align-items:center;gap:8px;padding:4px 4px 4px 12px;border-radius:999px;background:rgba(14,19,48,.88);-webkit-backdrop-filter:blur(16px) saturate(1.4);backdrop-filter:blur(16px) saturate(1.4);color:#fff;font-size:12.5px;font-weight:700;box-shadow:0 14px 30px -14px rgba(14,19,48,.7);transform:translate(-50%,-160%);transition:transform .7s var(--spring);white-space:nowrap;max-width:calc(100vw - 24px)}
+.au-dbar{position:absolute;z-index:45;left:50%;top:calc(env(safe-area-inset-top,0px) + 8px);display:flex;align-items:center;gap:8px;padding:4px 4px 4px 12px;border-radius:999px;background:rgba(14,19,48,.88);-webkit-backdrop-filter:blur(16px) saturate(1.4);backdrop-filter:blur(16px) saturate(1.4);color:#fff;font-size:12.5px;font-weight:700;box-shadow:0 14px 30px -14px rgba(14,19,48,.7);transform:translate(-50%,-160%);transition:transform .7s var(--spring);white-space:nowrap;max-width:calc(100vw - 24px)}
 .au-dbar.on{transform:translate(-50%,0)}
 .au-demo-dot{width:8px;height:8px;border-radius:50%;background:#B9A2FF;box-shadow:0 0 0 0 rgba(185,162,255,.7);animation:auDot 2s infinite;flex:none}
 @keyframes auDot{70%{box-shadow:0 0 0 7px rgba(185,162,255,0)}100%{box-shadow:0 0 0 0 rgba(185,162,255,0)}}
@@ -509,17 +509,17 @@ html.au-open #app,html.au-open #tabbar{visibility:hidden}
 .au-demo-cta:active{transform:scale(.94)}
 .au-demo-x{all:unset;cursor:pointer;width:32px;height:32px;border-radius:50%;display:grid;place-items:center;background:rgba(255,255,255,.12);flex:none}
 .au-demo-x .ico{width:15px;height:15px}
-html.au-demo .view{padding-top:calc(env(safe-area-inset-top,0px) + 58px)}
+html.au-demomode .view{padding-top:calc(env(safe-area-inset-top,0px) + 58px)}
 
 @media (min-width:960px){
   .au-dbar{left:auto;right:24px;transform:translateY(-160%);top:16px}
   .au-dbar.on{transform:none}
-  html.au-demo .view{padding-top:calc(env(safe-area-inset-top,0px) + 64px)}
+  html.au-demomode .view{padding-top:calc(env(safe-area-inset-top,0px) + 64px)}
 }
 html.au-leaving body{opacity:0;transition:opacity .25s}
 
 /* ───────── offline pill (accounts) ───────── */
-.au-net{position:fixed;z-index:44;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 96px);display:flex;align-items:center;gap:8px;padding:8px 14px;border-radius:999px;background:rgba(184,108,0,.95);color:#fff;font-size:12.5px;font-weight:750;box-shadow:0 12px 26px -12px rgba(120,70,0,.7);transform:translate(-50%,40px);opacity:0;pointer-events:none;transition:transform .5s var(--spring),opacity .3s;white-space:nowrap;max-width:calc(100vw - 24px)}
+.au-net{position:absolute;z-index:44;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 96px);display:flex;align-items:center;gap:8px;padding:8px 14px;border-radius:999px;background:rgba(184,108,0,.95);color:#fff;font-size:12.5px;font-weight:750;box-shadow:0 12px 26px -12px rgba(120,70,0,.7);transform:translate(-50%,40px);opacity:0;pointer-events:none;transition:transform .5s var(--spring),opacity .3s;white-space:nowrap;max-width:calc(100vw - 24px)}
 .au-net .ico{width:16px;height:16px;flex:none}
 .au-net span{overflow:hidden;text-overflow:ellipsis}
 .au-net.on{transform:translate(-50%,0);opacity:1}
