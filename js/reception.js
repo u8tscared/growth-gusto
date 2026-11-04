@@ -32,7 +32,7 @@ function recState() {
 }
 /* ───────── draft: an unfinished reception survives a reload, a closed app or a dead battery ───────── */
 const recDraftKey = () => `gg-rec-draft-${S.rid || ""}`;
-const REC_DRAFT_KEEP = ["step", "supplier", "bl", "lines", "cur", "edit", "stash", "lastFridge", "lastUnit", "back3", "rid"];
+const REC_DRAFT_KEEP = ["step", "supplier", "bl", "lines", "cur", "edit", "stash", "lastFridge", "lastUnit", "back3", "rid", "amount", "priceOpen"];
 function recDraftClear() { try { localStorage.removeItem(recDraftKey()); } catch (e) {} }
 const recDraftSave = debounce(() => {
   const R = S.rec; if (!S.rid || (R && R.rid && R.rid !== S.rid)) return;
@@ -284,7 +284,7 @@ function recStep3() {
   const undecided = bad.filter((L) => !L.decision).length;
   return {
     top: recTop("Contrôle"),
-    main: `${head}${bad.length ? `<div class="rec-callout">${ico("alert")}<span>${bad.length === 1 ? "1 produit n'est pas conforme : décidez avant de valider." : `${bad.length} produits ne sont pas conformes : décidez avant de valider.`}</span></div>` : `<div class="rec-callout ok">${ico("check")}<span>Tout est conforme. Validez pour ranger.</span></div>`}<div class="rec-ctls">${order.map(([L, i]) => recCtl(L, i)).join("")}</div>`,
+    main: `${head}${bad.length ? `<div class="rec-callout">${ico("alert")}<span>${bad.length === 1 ? "1 produit n'est pas conforme : décidez avant de valider." : `${bad.length} produits ne sont pas conformes : décidez avant de valider.`}</span></div>` : `<div class="rec-callout ok">${ico("check")}<span>Tout est conforme. Validez pour ranger.</span></div>`}<div class="rec-ctls">${order.map(([L, i]) => recCtl(L, i)).join("")}</div>${recCostCard()}`,
     cta: `<div class="ctabar rec-cta"><button class="btn soft" data-act="recGo" data-v="2">Modifier</button><button class="btn acc" data-act="recSave" ${undecided ? `data-off="1"` : ""}>${undecided ? `${ico("alert")}Décider (${undecided})` : `${ico("check")}Valider la réception`}</button></div>`,
   };
 }
@@ -316,6 +316,31 @@ function recCtl(L, i) {
   </div>`;
 }
 
+/* montant de la livraison (HT) + prix par produit : alimente Finances (achats, food cost) et le prix des produits */
+const recEur = (v) => (v == null || isNaN(v) ? "–" : Number(v).toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €");
+const recMoney = (v) => { const s = String(v ?? "").replace(/[\s  €]/g, ""); return num(s.includes(",") && s.includes(".") ? s.replace(/\./g, "") : s); };
+function recPriceFor(L) {
+  const p = S.products.find((x) => recNorm(x.name) === recNorm(L.name));
+  if (p && +p.price > 0 && (!p.unit || !L.unit || p.unit === L.unit)) return +p.price;
+  for (const r of S.receptions.slice().sort((a, b) => b.at - a.at)) for (const x of r.lines || []) if (recNorm(x.name) === recNorm(L.name) && x.price > 0 && (x.unit || "") === (L.unit || "")) return +x.price;
+  return null;
+}
+function recLineSum(R) { let s = 0; (R.lines || []).forEach((L) => { if (L.decision === "refuse") return; const p = recMoney(L.price), q = num(L.qty); if (p > 0 && q > 0) s += p * q; }); return Math.round(s * 100) / 100; }
+function recSumHtml(R) { const sum = recLineSum(R); const amt = recMoney(R.amount); return sum > 0 ? `<span>Somme des prix : <b class="mono">${recEur(sum)}</b></span>${amt == null || Math.abs(amt - sum) > 0.004 ? `<button class="btn ghost sm" data-act="recUseSum">Utiliser</button>` : `<span class="pill ok">${ico("check")}Identique</span>`}` : ""; }
+function recCostCard() {
+  const R = recState(); const kept = R.lines.map((L, i) => [L, i]).filter(([L]) => L.decision !== "refuse"); if (!kept.length) return "";
+  kept.forEach(([L]) => { if (L.price == null) { const p = recPriceFor(L); L.price = p ? fmt(p, 2) : ""; } });
+  const open = !!R.priceOpen; const nPriced = kept.filter(([L]) => recMoney(L.price) > 0).length;
+  return `<div class="glass pad rec-cost" id="recCost">
+    <div class="row"><span class="lbl">Montant de la livraison</span><i class="rec-opt">facultatif</i></div>
+    <label class="rec-amt"><input class="input mono" id="recAmt" data-bind="rec.amount" data-recamt="1" value="${esc(R.amount || "")}" inputmode="decimal" placeholder="0,00" autocomplete="off" enterkeyhint="done" aria-label="Montant total HT du bon de livraison"><b>€ HT</b></label>
+    <div class="rec-sumln" id="recSumLn">${recSumHtml(R)}</div>
+    <button class="rec-pt ${open ? "on" : ""}" data-act="recPriceToggle" aria-expanded="${open}"><span class="ic">${ico("recTag")}</span><span class="tx"><b>Prix par produit</b><em>${nPriced ? `${nPriced}/${kept.length} renseigné${nPriced > 1 ? "s" : ""} · retenus pour la prochaine fois` : "Facultatif · le coût des recettes se calcule tout seul"}</em></span>${ico("down", "chv")}</button>
+    ${open ? `<div class="rec-prices">${kept.map(([L, i]) => `<label class="rec-pr"><span class="tx"><b>${esc(L.name)}</b><em>${L.qty ? recQtyTx(L.qty, L.unit) : "quantité non notée"}</em></span><span class="rec-pin"><input class="input mono" data-bind="rec.lines.${i}.price" data-recprice="${i}" value="${esc(L.price || "")}" inputmode="decimal" placeholder="0,00" autocomplete="off" enterkeyhint="done" aria-label="Prix HT par ${esc(L.unit || "unité")} pour ${esc(L.name)}"><small>€/${esc(({ bourriche: "bourr.", "pièce": "pce" })[L.unit] || L.unit || "u.")}</small></span></label>`).join("")}</div>` : ""}
+    <p class="note" style="margin:0">Le total HT du bon : il compte dans les achats et le food cost des Finances.</p>
+  </div>`;
+}
+
 /* step 4 — validé */
 function recDoneView(anim) {
   const R = recState(); const lots = R.done.map((id) => S.lots.find((l) => l.id === id)).filter(Boolean);
@@ -323,7 +348,7 @@ function recDoneView(anim) {
   return `<div class="inner narrow rec rec-donev"><div class="top"><button class="iconbtn" data-go="home" aria-label="Accueil">${ico("x")}</button><span class="h2">Réception validée</span></div>${recProg(4)}
     <div class="rec-stage ${anim}">
       <div class="rec-hero"><div class="rec-seal"><span class="r1"></span><span class="r2"></span><svg viewBox="0 0 24 24"><path d="M6 12.5l4 4 8-9"/></svg></div>
-        <div class="title">C'est rangé&nbsp;!</div><p class="sub">${esc(R.supplier)} · ${R.lines.length} produit${R.lines.length > 1 ? "s" : ""} contrôlé${R.lines.length > 1 ? "s" : ""} à ${hm(R.savedAt || Date.now())}</p></div>
+        <div class="title">C'est rangé&nbsp;!</div><p class="sub">${esc(R.supplier)} · ${R.lines.length} produit${R.lines.length > 1 ? "s" : ""} contrôlé${R.lines.length > 1 ? "s" : ""} à ${hm(R.savedAt || Date.now())}${R.savedAmt ? ` · <b class="mono">${recEur(R.savedAmt)}</b> HT` : ""}</p></div>
       <div class="rec-tiles"><div class="ok"><b class="mono">${lots.length}</b><span>en frigo</span></div><div class="${res.length ? "warn" : ""}"><b class="mono">${res.length}</b><span>avec réserve</span></div><div class="${ref.length ? "bad" : ""}"><b class="mono">${ref.length}</b><span>refusé${ref.length > 1 ? "s" : ""}</span></div></div>
       ${lots.length ? `<div class="glass pad"><div class="row"><span class="lbl">Étiquettes QR à coller</span><span class="pill acc">${lots.length}</span></div>${lotList(lots, true)}</div>` : ""}
       ${ref.length ? `<div class="glass pad rec-refl"><span class="lbl">Repart avec le livreur</span>${ref.map((L) => `<div class="li"><span class="ic bad">${ico("x")}</span><div class="tx"><b>${esc(L.name)}</b><em>${esc(L.reason || "Refusé")}</em></div></div>`).join("")}</div>` : ""}
@@ -348,6 +373,7 @@ function recHistSheet(r) {
   openSheet(`<div class="rec-hs-h">${recAv(r.supplier)}<div><div class="h2" style="font-size:20px">${esc(r.supplier || "Livraison")}</div><div class="sub">${DAYS[d.getDay()]} ${shortDate(dayKey(d))} à ${hm(r.at)} · ${esc(nameOf(r.uid))}${recBl(r.bl) ? ` · BL ${esc(recBl(r.bl))}` : ""}</div></div></div>
     <div class="rec-hs">${ls.map((L) => { const t = L.temp; const hot = t != null && L.tmax != null && t > L.tmax; const state = L.refused ? "bad" : L.ok === false || L.reserve ? "warn" : "ok";
       return `<div class="li"><span class="ic ${state}">${ico(L.refused ? "x" : state === "warn" ? "alert" : "check")}</span><div class="tx"><b>${esc(L.name)}${L.qty ? ` · ${recQtyTx(L.qty, L.unit)}` : ""}</b><em><span class="mono" style="color:${hot ? "var(--bad)" : "inherit"}">${t != null ? `${fmt(t)} °C` : L.type === "sec" || L.tmax == null ? "sec" : "– °C"}</span> · DLC ${L.dlc ? shortDate(L.dlc) : "–"}${L.refused ? "" : ` · ${esc(fridgeName(L.fridgeId))}`}${L.lot ? ` · lot ${esc(L.lot)}` : ""}</em>${L.refused || L.reason ? `<em style="color:${L.refused ? "var(--bad)" : "var(--warn)"};font-weight:700">${L.refused ? "Refusé" : "Réserve"}${L.reason ? ` : ${esc(L.reason)}` : ""}</em>` : ""}</div>${L.photoUrl ? `<a class="thumb" style="width:46px;height:46px;border-radius:12px" href="${esc(L.photoUrl)}" target="_blank" rel="noopener"><img src="${esc(L.photoUrl)}" alt="Étiquette"></a>` : ""}</div>`; }).join("")}</div>
+    <div class="rec-hamt"><span class="ic">${ico("euro")}</span><div class="tx"><b>${r.amountHT > 0 ? `${recEur(r.amountHT)} HT` : "Montant non saisi"}</b><em>${r.amountHT > 0 ? "Compté dans les achats des Finances" : "Ajoutez-le pour suivre vos achats et le food cost"}</em></div><button class="btn soft sm" data-act="recAmtEdit" data-id="${r.id}">${ico(r.amountHT > 0 ? "edit" : "plus")}${r.amountHT > 0 ? "Modifier" : "Ajouter"}</button></div>
     ${lots.length ? `<button class="btn acc block" data-act="recHistLabels" data-id="${r.id}">${ico("printer")}Étiquettes (${lots.length})</button>` : ""}
     <button class="btn soft block" data-act="sheetClose">Fermer</button>`);
 }
@@ -386,6 +412,7 @@ document.addEventListener("input", (e) => {
   const el = e.target; if (!S.rec || S.route !== "reception") return; recDraftSave();
   if (el.dataset.recname) { S.rec.cur.memo = null; const s = $("#recSugs"); if (s) s.innerHTML = recSugsHtml(recSuggest(el.value)); const m = $(".rec-memo"); m && m.remove(); }
   else if (el.dataset.rect) { if (el.value.includes(".")) { const c = el.selectionStart; el.value = el.value.replace(/\./g, ","); S.rec.cur.temp = el.value; try { el.setSelectionRange(c, c); } catch (x) {} } recTFit(el); recPaintTemp(); }
+  else if (el.dataset.recprice != null || el.dataset.recamt) { if (el.dataset.recprice != null) { const L = S.rec.lines[+el.dataset.recprice]; if (L) L.priceTouched = true; } const s = $("#recSumLn"); if (s) s.innerHTML = recSumHtml(S.rec); }
   else if (el.dataset.recsup) { const b = $("#recSupGo"); const v = el.value.trim(); if (b) { b.innerHTML = `${v ? `Continuer avec ${esc(v)}` : "Continuer"}${ico("chev")}`; v ? b.removeAttribute("data-off") : b.setAttribute("data-off", "1"); } const cb = $("#recSupCta"); if (cb) cb.hidden = !v && !!$(".rec-sup"); $$(".rec-sup.on").forEach((x) => x.classList.remove("on")); }
 });
 /* typed a frozen reading (≤ −12 °C) on a chilled type: it is a frozen product, switch the type so the threshold is right */
@@ -427,6 +454,15 @@ const recGhost = (R) => !!(R && R.doneAt && Date.now() - R.doneAt < 700);
 function recNudge(sel, msg) { SFX.err(); buzz([20, 40, 20]); if (msg) toast(msg, "err"); const el = $(sel); if (el) { el.classList.remove("shake"); void el.offsetWidth; el.classList.add("shake"); el.scrollIntoView({ block: "center", behavior: "smooth" }); } }
 const recBlur = () => { const a = document.activeElement; a && a.blur && a.blur(); };
 function recStep(n) { const R = recState(); R.anim = n > R.step ? "fwd" : "bwd"; R.step = n; R.ctlOpen = -1; recBlur(); rerender(); const v = $("#viewport .view:not(.leave)"); v && v.scrollTo({ top: 0 }); }
+/* one `expenses` doc (cat « achats ») per reception that has an amount; kept in step when the amount changes */
+async function recExpenseSync(r, amt) {
+  const all = DB.mode === "local" && S.rid ? Object.entries(DB.local[`restos/${S.rid}/expenses`] || {}).map(([id, d]) => ({ id, ...d })) : S.expenses;
+  const ex = all.find((e) => e.receptionId === r.id);
+  if (!amt) { if (ex) await DB.del("expenses", ex.id); return; }
+  if (ex) return DB.update("expenses", ex.id, { amountHT: amt, editedAt: Date.now() });
+  const bl = recBl(r.bl);
+  return DB.add("expenses", { day: dayKey(new Date(r.at)), cat: "achats", supplier: r.supplier || "", label: `Livraison ${r.supplier || ""}${bl ? ` · BL ${bl}` : ""}`.trim(), amountHT: amt, receptionId: r.id, at: Date.now(), by: S.me.id });
+}
 function recCommitCur() {
   const R = recState(); const L = R.cur;
   if (!L.name.trim()) { recNudge("#recName", "Quel produit ? Tapez son nom."); return false; }
@@ -537,6 +573,26 @@ Object.assign(ACT, {
     rerender();
   },
   recReason: (a) => { const L = recState().lines[+a.dataset.i]; L.reason = L.reason === a.dataset.v ? "" : a.dataset.v; SFX.tick(); $$(`[data-act=recReason][data-i="${a.dataset.i}"]`).forEach((b) => b.classList.toggle("on", b.dataset.v === L.reason)); const inp = a.closest(".rec-why")?.querySelector("input"); if (inp) inp.value = ""; },
+  recPriceToggle: () => { const R = recState(); R.priceOpen = !R.priceOpen; SFX.tick(); buzz(4); recBlur(); rerender(); if (R.priceOpen) setTimeout(() => { const i = $("[data-recprice]"); i && i.scrollIntoView({ block: "center", behavior: "smooth" }); }, 60); },
+  recUseSum: () => { const R = recState(); const sum = recLineSum(R); if (!(sum > 0)) return; R.amount = fmt(sum, 2); const i = $("#recAmt"); if (i) { i.value = R.amount; i.classList.remove("bump"); void i.offsetWidth; i.classList.add("bump"); } const s = $("#recSumLn"); if (s) s.innerHTML = recSumHtml(R); SFX.tick(); buzz(5); recDraftSave(); },
+  recAmtEdit: (a, id) => {
+    const r = S.receptions.find((x) => x.id === id); if (!r) return; SFX.tap();
+    openSheet(`<div class="rec-hs-h">${recAv(r.supplier)}<div><div class="h2" style="font-size:20px">Montant de la livraison</div><div class="sub">${esc(r.supplier || "Livraison")} · ${shortDate(dayKey(new Date(r.at)))}${recBl(r.bl) ? ` · BL ${esc(recBl(r.bl))}` : ""}</div></div></div>
+      <label class="rec-amt"><input class="input mono" id="recAmtH" value="${r.amountHT > 0 ? fmt(r.amountHT, 2) : ""}" inputmode="decimal" placeholder="0,00" autocomplete="off" enterkeyhint="done" aria-label="Montant total HT"><b>€ HT</b></label>
+      <p class="note" style="margin:0">Le total hors taxes du bon de livraison ou de la facture.</p>
+      <button class="btn acc block" data-act="recAmtSave" data-id="${r.id}">${ico("check")}Enregistrer</button><button class="btn soft block" data-act="recHistOpen" data-id="${r.id}">Retour</button>`);
+  },
+  recAmtSave: async (a, id) => {
+    const r = S.receptions.find((x) => x.id === id); const inp = $("#recAmtH"); if (!r || !inp) return;
+    const v = recMoney(inp.value); if (inp.value.trim() && (v == null || v < 0)) { recNudge("#recAmtH", "Montant illisible : tapez par exemple 482,50"); return; }
+    const amt = v ? Math.round(v * 100) / 100 : 0;
+    try {
+      await safe(DB.update("receptions", id, { amountHT: amt || null }));
+      await recExpenseSync(r, amt);
+    } catch (e) { return; }
+    SFX.ok(); buzz(8); toast(amt ? `Montant enregistré : ${recEur(amt)} HT` : "Montant retiré");
+    const nr = S.receptions.find((x) => x.id === id); if (nr) recHistSheet(nr); else closeSheet();
+  },
   recLabels: () => { const R = recState(); if (recGhost(R)) return; if (R.done && R.done.length) openLabel(R.done); },
   recAgain: () => { if (recGhost(S.rec)) return; S.rec = null; const R = recState(); R.anim = "fwd"; SFX.tap(); rerender(); const v = $("#viewport .view:not(.leave)"); v && v.scrollTo({ top: 0 }); },
   recSave: async (a) => {
@@ -549,9 +605,12 @@ Object.assign(ACT, {
       name: L.name, qty: L.qty, unit: L.unit, temp: recCold(L) ? num(L.temp) : null, tmax: recCold(L) ? L.tmax : null, type: recTypeOf(L), dlc: L.dlc, lot: L.lot, fridgeId: L.fridgeId,
       photoId: L.photoId || "", photoUrl: L.photoId ? L.photoUrl : L.photoData || "", sanitary: L.sanitary || "", peche: L.peche || "",
       ok: recOk(L), refused, reserve, reason: refused || reserve ? String(L.reason || "").trim() : "" };
+      const pr = recMoney(L.price); if (!refused && pr > 0) out.price = Math.round(pr * 10000) / 10000;
       const p = S.products.find((x) => recNorm(x.name) === recNorm(L.name)); out.productId = p ? p.id : ""; if (!p) out.newProduct = L.name;
       return out; });
-    const rid = await safe(DB.add("receptions", { supplier: R.supplier, bl: recBl(R.bl), at: now, uid: S.me.id, lines })).catch(() => null);
+    const sumP = recLineSum(R); const amtIn = recMoney(R.amount); const amountHT = amtIn > 0 ? Math.round(amtIn * 100) / 100 : sumP > 0 ? sumP : null;
+    const rdoc = { supplier: R.supplier, bl: recBl(R.bl), at: now, uid: S.me.id, lines }; if (amountHT) rdoc.amountHT = amountHT;
+    const rid = await safe(DB.add("receptions", rdoc)).catch(() => null);
     if (!rid) { R.saving = false; a.removeAttribute("disabled"); return; }
     const ids = [];
     for (const [i, L] of lines.entries()) {
@@ -562,9 +621,17 @@ Object.assign(ACT, {
       if (!p) lot.newProduct = L.name;
       const id = await DB.add("lots", lot).catch(() => null); if (id) ids.push(id);
     }
+    if (amountHT) await recExpenseSync({ ...rdoc, id: rid }, amountHT).catch((e) => console.warn(e));
+    /* remember the unit price on the product: only when it had none, or the user changed the suggested one */
+    for (const [i, L] of lines.entries()) {
+      if (!(L.price > 0)) continue; const p = S.products.find((x) => recNorm(x.name) === recNorm(L.name)); if (!p) continue;
+      if (p.unit && L.unit && p.unit !== L.unit) continue;
+      const had = +p.price > 0; if (had && !(R.lines[i] && R.lines[i].priceTouched)) continue; if (had && Math.abs(+p.price - L.price) < 0.0001) continue;
+      await DB.update("products", p.id, { price: L.price, priceAt: now }).catch(() => {});
+    }
     const refused = lines.filter((L) => L.refused); const nres = lines.filter((L) => L.reserve).length;
-    await logEvent("reception", `a réceptionné ${R.supplier || "une livraison"} · ${ids.length} produit${ids.length > 1 ? "s" : ""}${nres ? ` · ${nres} avec réserve` : ""}${refused.length ? ` · refusé : ${refused.map((L) => L.name + (L.reason ? ` (${L.reason.toLowerCase()})` : "")).join(", ")}` : ""}`, { ref: rid, photoUrl: lines.find((L) => L.photoUrl)?.photoUrl || "" });
-    R.saving = false; R.done = ids; R.savedAt = now; R.anim = "fwd"; R.celebrate = true; SFX.done(); buzz([10, 30, 10, 30, 20]);
+    await logEvent("reception", `a réceptionné ${R.supplier || "une livraison"} · ${ids.length} produit${ids.length > 1 ? "s" : ""}${nres ? ` · ${nres} avec réserve` : ""}${amountHT ? ` · ${recEur(amountHT)} HT` : ""}${refused.length ? ` · refusé : ${refused.map((L) => L.name + (L.reason ? ` (${L.reason.toLowerCase()})` : "")).join(", ")}` : ""}`, { ref: rid, photoUrl: lines.find((L) => L.photoUrl)?.photoUrl || "" });
+    R.saving = false; R.done = ids; R.savedAt = now; R.savedAmt = amountHT; R.anim = "fwd"; R.celebrate = true; SFX.done(); buzz([10, 30, 10, 30, 20]);
     R.doneAt = Date.now(); recDraftClear(); rerender(); const v = $("#viewport .view:not(.leave)"); v && v.scrollTo({ top: 0 });
   },
 });
