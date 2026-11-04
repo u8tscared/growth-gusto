@@ -7,14 +7,50 @@ const ccLS = {
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} },
   raw(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
 };
+/* legacy PIN hash (FNV-1a, field pinH): still accepted, upgraded to salted SHA-256 (pinSalt + pinSha) on the next good code */
 const ccHash = (s) => { let h = 2166136261; for (const c of String(s)) { h ^= c.charCodeAt(0); h = Math.imul(h, 16777619) >>> 0; } return h.toString(36); };
-const ccPinOk = (m, code) => !!m && !!m.pinH && m.pinH === ccHash(m.id + ":" + code);
+const ccHasPin = (m) => !!(m && (m.pinSha || m.pinH));
+/* SHA-256 (FIPS 180-4), checked against the standard "abc" vector and crypto.subtle in tools/cc-v3.js */
+function ccSha256js(str) {
+  const rr = (v, a) => (v >>> a) | (v << (32 - a)); const K = []; let H = [];
+  for (let p = 2, n = 0; n < 64; p++) { let pr = true; for (let i = 2; i * i <= p; i++) if (p % i === 0) { pr = false; break; } if (pr) { if (n < 8) H[n] = (Math.pow(p, 1 / 2) * 2 ** 32) | 0; K[n++] = (Math.pow(p, 1 / 3) * 2 ** 32) | 0; } }
+  const b = [...new TextEncoder().encode(str)]; const l = b.length * 8; b.push(0x80); while (b.length % 64 !== 56) b.push(0); b.push(0, 0, 0, 0, (l >>> 24) & 255, (l >>> 16) & 255, (l >>> 8) & 255, l & 255);
+  for (let j = 0; j < b.length; j += 64) {
+    const w = []; for (let i = 0; i < 16; i++) w[i] = (b[j + 4 * i] << 24) | (b[j + 4 * i + 1] << 16) | (b[j + 4 * i + 2] << 8) | b[j + 4 * i + 3];
+    let [A, B, C, D, E, F, G, X] = H;
+    for (let i = 0; i < 64; i++) {
+      if (i >= 16) { const a = w[i - 15], c = w[i - 2]; w[i] = (w[i - 16] + (rr(a, 7) ^ rr(a, 18) ^ (a >>> 3)) + w[i - 7] + (rr(c, 17) ^ rr(c, 19) ^ (c >>> 10))) | 0; }
+      const t1 = (X + (rr(E, 6) ^ rr(E, 11) ^ rr(E, 25)) + ((E & F) ^ (~E & G)) + K[i] + w[i]) | 0, t2 = ((rr(A, 2) ^ rr(A, 13) ^ rr(A, 22)) + ((A & B) ^ (A & C) ^ (B & C))) | 0;
+      X = G; G = F; F = E; E = (D + t1) | 0; D = C; C = B; B = A; A = (t1 + t2) | 0;
+    }
+    H = [A, B, C, D, E, F, G, X].map((x, i) => (x + H[i]) | 0);
+  }
+  return H.map((x) => (x >>> 0).toString(16).padStart(8, "0")).join("");
+}
+/* synchronous on purpose: other areas (pointeuse) call ccPinOk() inline, and a Promise would read as "true" */
+function ccSha(s) { return ccSha256js(s); }
+function ccSalt() { const a = new Uint8Array(12); try { crypto.getRandomValues(a); } catch (e) { for (let i = 0; i < a.length; i++) a[i] = (Math.random() * 256) | 0; } return [...a].map((x) => x.toString(16).padStart(2, "0")).join(""); }
+/* the fields to write for a new code: only a salted hash is stored, never the code */
+/* pinH keeps a non-empty marker so older readers that test `m.pinH` still see that the profile has a code */
+function ccPinPatch(id, code) { const pinSalt = ccSalt(); return { pinSalt, pinSha: ccSha(`${pinSalt}:${id}:${code}`), pinH: "sha256" }; }
+/* ccPinOk(member, "1234") → boolean (sync). Accepts the legacy FNV pinH and upgrades it. */
+function ccPinOk(m, code) {
+  code = String(code ?? "");
+  if (!m || !/^\d{4}$/.test(code)) return false;
+  if (m.pinSha) return m.pinSha === ccSha(`${m.pinSalt || ""}:${m.id}:${code}`);
+  if (m.pinH && m.pinH === ccHash(m.id + ":" + code)) { if (ccLocalMode()) DB.update("members", m.id, ccPinPatch(m.id, code)).catch(() => {}); return true; }
+  return false;
+}
+/* for other areas (pointeuse…): ccVerifyPin(memberId, "1234") → boolean */
+function ccVerifyPin(id, code) { return ccPinOk(ccMember(id), String(code || "")); }
+const ccWeakPin = (c) => /^(\d)\1{3}$/.test(c) || ["1234", "4321", "0123", "9876"].includes(c);
 const ccMembers = () => [...S.members].sort((a, b) => (a.joinedAt || 0) - (b.joinedAt || 0));
 const ccMember = (id) => S.members.find((m) => m.id === id);
 const ccColor = (m) => (m && m.color) || colorFor(m ? m.id : "x");
 const ccAva = (m, size = 56) => `<span class="cc-ava" style="--s:${size}px;--c:${esc(ccColor(m))}">${esc(initials(m?.name || "") || "?")}</span>`;
 const ccLocalMode = () => DB.mode === "local";
-const ccAutoLock = () => +(ccLS.raw("gg-autolock") || 0);
+/* minutes away (app hidden or untouched) before the code is asked again; 0 = only when the app opens. Default 30. */
+const ccAutoLock = () => { const r = ccLS.raw("gg-autolock"); return r == null ? 30 : +r || 0; };
 const ccHaptics = () => ccLS.raw("gg-haptics") !== "off";
 const ccGerants = () => S.members.filter((m) => m.role === "gerant");
 const ccAgo = (ts) => { if (!ts) return "jamais"; const m = Math.round((Date.now() - ts) / 60000); if (m < 1) return "à l'instant"; if (m < 60) return `il y a ${m} min`; return when(ts); };
@@ -22,7 +58,22 @@ const ccAgo = (ts) => { if (!ts) return "jamais"; const m = Math.round((Date.now
 /* rapid double taps: one run at a time per action */
 const ccBusy = new Set();
 async function ccOnce(k, fn, hold = 0) { if (ccBusy.has(k)) return; ccBusy.add(k); try { return await fn(); } finally { hold ? setTimeout(() => ccBusy.delete(k), hold) : ccBusy.delete(k); } }
-const ccNeedsLock = () => S.members.length > 1 || S.members.some((m) => m.pinH);
+/* every profile has a code: the lock applies as soon as the restaurant has someone. Tests can opt out with
+   localStorage gg-nolock=1 (only honoured under automation), or call ccUnlockTest() / ACT.ccUnlockTest(). */
+const ccNoLock = () => { try { return !!navigator.webdriver && localStorage.getItem("gg-nolock") === "1"; } catch (e) { return false; } };
+const ccNeedsLock = () => ccLocalMode() && !!S.resto && !ccNoLock();
+
+/* ───────────── roles: who sees what ───────────── */
+/* gérant sees everything; chef and équipe don't see money (finances, salaires, tableau de bord).
+   Other areas call it guarded: typeof canSee === "function" ? canSee("finance") : true */
+const CC_GERANT_ONLY = new Set(["dashboard", "finance", "finances", "staff", "salaires", "salaries", "marges", "expenses", "couts"]);
+function canSee(area) { return myRole() === "gerant" || !CC_GERANT_ONLY.has(String(area || "")); }
+/* router guard: a forbidden route never opens (side nav, tabs, deep links, other areas' go()) */
+const ccGo0 = go;
+go = function (route) {
+  if (S.resto && !canSee(route)) { SFX.err(); buzz([20, 40, 20]); toast("Réservé au gérant", "err"); if (S.route && canSee(S.route)) return; return ccGo0.call(this, "home", {}, { replace: true }); }
+  return ccGo0.apply(this, arguments);
+};
 
 function ccSaveWho() {
   if (!S.rid || !ccLocalMode()) return;
@@ -42,11 +93,11 @@ function ccOnMembers(rows) {
   const ghosts = ccLS.get("gg-ghosts", {})[S.rid] || {};
   Object.entries(ghosts).forEach(([id, g]) => { if (!rows.find((m) => m.id === id)) S.profiles[id] = { name: g.name, color: g.color }; });
   rows.forEach((m) => { S.profiles[m.id] = { ...(S.profiles[m.id] || {}), name: m.name || (m.id === S.me.id ? S.me.name : "") || S.profiles[m.id]?.name || "", color: m.color || colorFor(m.id) }; });
-  if (!rows.length) return;
+  if (!rows.length) { if (CC.locked) ccUnlock(); return; }
   const me = rows.find((m) => m.id === S.me.id);
   if (me) { S.me.name = me.name || S.me.name; S.me.color = me.color; S.isOwner = (me.role || "equipe") === "gerant"; ccSaveWho(); }
   else { const pick = rows.find((m) => m.id === "local") || rows.find((m) => m.role === "gerant") || rows[0]; ccBecome(pick, true); }
-  if (!CC.bootLocked) { CC.bootLocked = true; if (ccAutoLock() && ccNeedsLock()) setTimeout(() => ccLock(), 400); }
+  if (CC.locked) { const w = CC.who; if (w.pick && !ccMember(w.pick)) w.pick = null; if (!w.pick && rows.length === 1) ccPickStart(rows[0].id); if (!w.code) ccWhoPaint(); }
 }
 const ccAttach0 = attachResto;
 attachResto = function () { ccAttach0(); if (ccLocalMode() && S.rid && !(DB.listeners[DB.path("members")] || []).includes(ccOnMembers)) DB.watch("members", {}, ccOnMembers); };
@@ -61,6 +112,17 @@ renderChrome = function () {
   const ic = me.lastElementChild; if (ic && ic.classList.contains("ico")) ic.outerHTML = ico("swap");
   const em = me.querySelector("em"); if (em && !em.querySelector(".cc-swtx")) em.insertAdjacentHTML("beforeend", `<span class="cc-swtx"> · Changer</span>`);
 };
+/* hide what the role can't see from the side nav (and a group title left empty) */
+const ccChrome1 = renderChrome;
+renderChrome = function () {
+  ccChrome1.apply(this, arguments);
+  const side = document.getElementById("side"); if (!side) return;
+  $$(".navs .nav[data-go]", side).forEach((b) => { b.hidden = !canSee(b.dataset.go); });
+  /* « Équipe & salaires »: the gérant lands on the employee files (rh.js « staff ») when they exist; others see « Équipe » */
+  const eq = $('.navs .nav[data-go="equipe"]', side);
+  if (eq) { const nt = $(".nt", eq); if (VIEWS.staff && canSee("staff")) { eq.dataset.go = "staff"; eq.classList.toggle("on", S.route === "staff"); } else if (nt && !canSee("salaires")) nt.textContent = "Équipe"; }
+  $$(".navs .sep", side).forEach((sep) => { let n = sep.nextElementSibling, any = false; while (n && !n.classList.contains("sep")) { if (!n.hidden) any = true; n = n.nextElementSibling; } sep.hidden = !any; });
+};
 function ccBecome(m, silent) {
   if (!m) return;
   S.me = { id: m.id, name: m.name || "", color: m.color || undefined };
@@ -68,7 +130,7 @@ function ccBecome(m, silent) {
   if (ccLocalMode()) S.isOwner = (m.role || "equipe") === "gerant";
   if (m.id === "local" && m.name) { try { localStorage.setItem("gg-name", m.name); } catch (e) {} }
   ccSaveWho(); CC.last = Date.now();
-  if (!silent) { renderChrome(); rerender(); }
+  if (!silent) { renderChrome(); if (S.route && !canSee(S.route)) { S.history = []; go("home", {}, { replace: true }); } else rerender(); }
 }
 
 /* ───────────── avatar → « Qui êtes-vous ? » ───────────── */
@@ -79,7 +141,6 @@ document.addEventListener("click", (e) => {
   if (t || (hb && hb.querySelector(".ava"))) { e.stopPropagation(); e.preventDefault(); SFX.init(); SFX.tap(); ACT.whoami(); }
 }, true);
 ["pointerdown", "keydown", "touchstart"].forEach((ev) => document.addEventListener(ev, () => { CC.last = Date.now(); }, { passive: true, capture: true }));
-setInterval(() => { const n = ccAutoLock(); if (n && !CC.locked && S.resto && S.route !== "onboarding" && ccNeedsLock() && Date.now() - CC.last > n * 60000) ccLock(); }, 5000);
 document.addEventListener("keydown", (e) => {
   const w = CC.who; const open = CC.locked || ($("#sheet").classList.contains("open") && $("#sheetBody .cc-pin"));
   if (open && w.pick && /^[0-9]$/.test(e.key)) { e.preventDefault(); ACT.ccKey(null, null, e.key); return; }
@@ -101,41 +162,104 @@ document.addEventListener("input", (e) => {
   if (el.id === "ccResetIn") { const b = $("#ccResetGo"); if (b) b.toggleAttribute("disabled", el.value.trim().toUpperCase() !== "EFFACER"); }
 });
 
+/* lock: at app open (cold start), and after N minutes hidden or untouched (Réglages → Code à l'ouverture) */
+function ccIdleCheck() { const n = ccAutoLock(); if (n && !CC.locked && S.route !== "onboarding" && ccNeedsLock() && S.members.length && Date.now() - CC.last > n * 60000) ccLock(); }
+setInterval(ccIdleCheck, 5000);
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") ccIdleCheck(); });
+const ccFinish0 = finishBoot;
+finishBoot = function () {
+  /* an existing restaurant opens behind the lock (members arrive a moment later and fill the faces) */
+  if (ccNeedsLock()) ccLock(true);
+  return ccFinish0.apply(this, arguments);
+};
+
+/* wrong codes: 5 in a row → 30 s wait, kept per profile on this device (a reload doesn't skip it) */
+const CC_MAXTRY = 5, CC_WAIT = 30000;
+function ccFails() { return ccLS.get("gg-pinfail", {}); }
+function ccFailOf(id) { return ccFails()[(S.rid || "") + ":" + id] || { n: 0, until: 0 }; }
+function ccFailSet(id, f) { const all = ccFails(); const k = (S.rid || "") + ":" + id; if (f) all[k] = f; else delete all[k]; ccLS.set("gg-pinfail", all); }
+const ccWaitLeft = (id) => Math.max(0, Math.ceil((ccFailOf(id).until - Date.now()) / 1000));
+let ccWaitTimer = 0;
+function ccWaitTick() { clearInterval(ccWaitTimer); ccWaitTimer = setInterval(() => { const w = CC.who; if (!w.pick || !ccWaitLeft(w.pick)) { clearInterval(ccWaitTimer); ccWhoPaint(); return; } const el = $(".cc-wait b"); if (el) el.textContent = ccWaitLeft(w.pick) + " s"; }, 1000); }
+
+/* step: "enter" (type your code), "new" + "confirm" (first time, or after a reset), "change" (old code first, then new) */
+function ccPickStart(id, step) { const m = ccMember(id); CC.who.pick = id; CC.who.code = ""; CC.who.err = false; CC.who.first = ""; CC.who.step = step || (ccHasPin(m) ? "enter" : "new"); if (ccWaitLeft(id)) ccWaitTick(); }
 function ccWhoHTML() {
   const w = CC.who, lock = w.mode === "lock", ms = ccMembers();
+  if (lock && !ms.length) return `<div class="cc-who"><div class="cc-who-head"><span class="cc-lockic">${ico("lock")}</span><span class="lbl">${esc(S.resto?.name || "")}</span><div class="title">Un instant…</div></div></div>`;
   if (w.pick) {
     const m = ccMember(w.pick); if (!m) { w.pick = null; return ccWhoHTML(); }
+    const wait = ccWaitLeft(m.id); const st = w.step || "enter";
     const dots = [0, 1, 2, 3].map((i) => `<i class="${i < w.code.length ? "on" : ""}"></i>`).join("");
-    return `<div class="cc-pin">
-      <div class="cc-pin-top"><button class="iconbtn" data-act="ccWhoBack" aria-label="Retour">${ico("back")}</button><span class="lbl">Code personnel</span><span style="width:42px"></span></div>
-      <div class="cc-pin-who">${ccAva(m, 76)}<div class="h2">${esc(firstName(m.name))}</div><div class="sub">${w.err ? `<span style="color:var(--bad)">Code incorrect, réessayez</span>` : "Tapez votre code à 4 chiffres"}</div></div>
-      <div class="cc-dots ${w.err ? "err shake" : ""}">${dots}</div>
-      <div class="keypad cc-keys">${[1, 2, 3, 4, 5, 6, 7, 8, 9].map((d) => `<button data-act="ccKey" data-v="${d}">${d}</button>`).join("")}<span></span><button data-act="ccKey" data-v="0">0</button><button data-act="ccKey" data-v="del" aria-label="Effacer">${ico("back")}</button></div>
+    const title = st === "new" ? (w.change ? "Nouveau code" : "Créez votre code") : st === "confirm" ? "Confirmez le code" : firstName(m.name) || "Sans nom";
+    const sub = wait ? "" : w.err ? `<span class="cc-errtx">${esc(w.err === true ? "Code incorrect, réessayez" : w.err)}</span>`
+      : st === "new" ? (w.change ? "4 chiffres, rien que pour vous" : `Première fois, ${esc(firstName(m.name))} ? Choisissez 4 chiffres`) : st === "confirm" ? "Tapez-le une seconde fois" : w.change ? "Tapez d'abord votre code actuel" : "Tapez votre code à 4 chiffres";
+    const fl = ccFailOf(m.id).n; const back = !(lock && ms.length === 1);
+    return `<div class="cc-pin" data-step="${st}">
+      <div class="cc-pin-top">${back ? `<button class="iconbtn" data-act="ccWhoBack" aria-label="Retour">${ico("back")}</button>` : `<span style="width:42px"></span>`}<span class="lbl">${st === "enter" && !w.change ? (lock ? esc(S.resto?.name || "Code personnel") : "Code personnel") : "Code personnel"}</span><span style="width:42px"></span></div>
+      <div class="cc-pin-who">${ccAva(m, 76)}<div class="h2">${esc(title)}</div><div class="sub">${sub}</div></div>
+      ${wait ? `<div class="cc-wait" role="status">${ico("clock")}<span>Trop d'essais. Réessayez dans <b class="mono">${wait} s</b></span></div>` : `<div class="cc-dots ${w.err ? "err shake" : ""}">${dots}</div>`}
+      <div class="keypad cc-keys ${wait ? "off" : ""}">${[1, 2, 3, 4, 5, 6, 7, 8, 9].map((d) => `<button data-act="ccKey" data-v="${d}" ${wait ? "disabled" : ""}>${d}</button>`).join("")}<span></span><button data-act="ccKey" data-v="0" ${wait ? "disabled" : ""}>0</button><button data-act="ccKey" data-v="del" aria-label="Effacer" ${wait ? "disabled" : ""}>${ico("back")}</button></div>
+      ${st === "enter" && fl >= 2 && !wait ? `<p class="note cc-pin-help">Code oublié ? Un gérant peut le réinitialiser dans Équipe. ${CC_MAXTRY - fl} essai${CC_MAXTRY - fl > 1 ? "s" : ""} avant une pause de 30 s.</p>` : st === "new" && !w.change ? `<p class="note cc-pin-help">Il protège votre profil : personne ne signe à votre place.</p>` : ""}
     </div>`;
   }
   const h = new Date().getHours(); const hi = h < 5 ? "Bonne nuit" : h < 12 ? "Bonjour" : h < 18 ? "Bon après-midi" : "Bonsoir";
+  const lastId = (ccLS.get("gg-who", {})[S.rid] || {}).id;
   return `<div class="cc-who">
-    <div class="cc-who-head">${lock ? `<span class="cc-lockic">${ico("lock")}</span>` : ""}<span class="lbl">${hi} · ${esc(S.resto?.name || "")}</span><div class="title">Qui êtes-vous ?</div><div class="sub">Chaque relevé et chaque action seront signés à votre nom.</div></div>
-    <div class="cc-who-grid">${ms.map((m, i) => { const cur = !lock && m.id === S.me.id; return `<button class="cc-tile ${cur ? "cur" : ""}" style="--i:${i}" data-act="ccPick" data-id="${m.id}" aria-label="${esc(m.name || "Sans nom")}">
-      <span class="cc-tava">${ccAva(m, 64)}${cur ? `<span class="cc-badge">${ico("check")}</span>` : m.pinH ? `<span class="cc-badge lk">${ico("lock")}</span>` : ""}</span>
-      <b>${esc(firstName(m.name) || "Sans nom")}</b><em>${ROLES[m.role] || "Équipe"}</em></button>`; }).join("")}
+    <div class="cc-who-head">${lock ? `<span class="cc-lockic">${ico("lock")}</span>` : ""}<span class="lbl">${hi} · ${esc(S.resto?.name || "")}</span><div class="title">Qui êtes-vous ?</div><div class="sub">${lock ? "Touchez votre visage, puis tapez votre code." : "Chaque relevé et chaque action seront signés à votre nom."}</div></div>
+    <div class="cc-who-grid">${ms.map((m, i) => { const cur = !lock && m.id === S.me.id; const last = lock && m.id === lastId && ms.length > 1; return `<button class="cc-tile ${cur ? "cur" : ""} ${last ? "last" : ""}" style="--i:${i}" data-act="ccPick" data-id="${m.id}" aria-label="${esc(m.name || "Sans nom")}">
+      <span class="cc-tava">${ccAva(m, 64)}${cur ? `<span class="cc-badge">${ico("check")}</span>` : !ccHasPin(m) ? `<span class="cc-badge nw" title="Code à créer">${ico("plus")}</span>` : ""}</span>
+      <b>${esc(firstName(m.name) || "Sans nom")}</b><em>${last ? "Dernier connecté" : ROLES[m.role] || "Équipe"}</em></button>`; }).join("")}
       ${myRole() === "gerant" && !lock ? `<button class="cc-tile add" style="--i:${ms.length}" data-act="ccMemberNew"><span class="cc-tava"><span class="cc-ava plus" style="--s:64px">${ico("plus")}</span></span><b>Ajouter</b><em>un équipier</em></button>` : ""}
     </div>
     ${lock ? "" : `<div class="cc-who-foot"><button class="btn soft sm" data-go="equipe">${ico("users")}Gérer l'équipe</button><button class="btn soft sm" data-go="reglages">${ico("sliders")}Réglages</button></div>`}
   </div>`;
 }
-function ccWhoPaint() { const box = CC.who.mode === "lock" ? $("#ccLockBody") : $("#sheetBody"); if (box) box.innerHTML = ccWhoHTML(); }
-function ccLock() {
-  if (!ccLocalMode() || !S.resto || !S.members.length) return;
-  closeSheet(true); CC.locked = true; CC.who = { mode: "lock", pick: null, code: "", err: false };
-  const L = $("#ccLock"); ccWhoPaint(); L.hidden = false; void L.offsetWidth; L.classList.add("on"); SFX.sheet();
+function ccWhoPaint() { const box = CC.who.mode === "lock" ? $("#ccLockBody") : $("#sheetBody"); if (box && (CC.who.mode === "lock" || $("#sheetBody .cc-who, #sheetBody .cc-pin"))) box.innerHTML = ccWhoHTML(); }
+function ccLock(boot) {
+  if (!ccLocalMode() || !S.resto || (!boot && !S.members.length)) return;
+  if (!boot) closeSheet(true);
+  CC.locked = true; CC.who = { mode: "lock", pick: null, code: "", err: false };
+  const ms = ccMembers(); if (ms.length === 1) ccPickStart(ms[0].id);
+  const L = $("#ccLock"); ccWhoPaint(); L.hidden = false; void L.offsetWidth; L.classList.add("on"); if (!boot) SFX.sheet();
+  try { document.getElementById("app").setAttribute("inert", ""); $("#tabbar").setAttribute("inert", ""); } catch (e) {}
 }
-function ccUnlock() { CC.locked = false; const L = $("#ccLock"); L.classList.remove("on"); setTimeout(() => { if (!CC.locked) L.hidden = true; }, 420); }
+function ccUnlock() {
+  CC.locked = false; CC.last = Date.now(); const L = $("#ccLock"); L.classList.remove("on"); setTimeout(() => { if (!CC.locked) L.hidden = true; }, 420);
+  try { document.getElementById("app").removeAttribute("inert"); $("#tabbar").removeAttribute("inert"); } catch (e) {}
+}
+/* tests: unlock as the current (or given) profile without a code */
+function ccUnlockTest(id) { const m = (id && ccMember(id)) || ccMember(S.me.id) || ccMembers()[0]; if (m) ccBecome(m); CC.who = { mode: "sheet", pick: null, code: "", err: false }; ccUnlock(); return !!m; }
 function ccSwitchTo(m) {
   const same = m.id === S.me.id; const wasLock = CC.who.mode === "lock"; ccBecome(m);
   if (wasLock) ccUnlock(); else closeSheet(true);
   SFX.ok(); buzz([8, 30, 8]); CC.who = { mode: "sheet", pick: null, code: "", err: false };
   toast(same ? `Bon retour, ${firstName(m.name)}` : `${firstName(m.name)} signe maintenant`);
+}
+async function ccCodeDone() {
+  const w = CC.who; const m = ccMember(w.pick); if (!m) return; const code = w.code; const st = w.step || "enter";
+  const bad = (msg) => { setTimeout(() => { if (CC.who !== w) return; w.code = ""; w.err = msg || true; SFX.err(); buzz([30, 50, 30]); ccWhoPaint(); }, 140); };
+  const okDots = () => $$(".cc-dots").forEach((d) => d.classList.add("ok"));
+  if (st === "new") {
+    if (ccWeakPin(code)) return bad("Trop facile à deviner : choisissez-en un autre");
+    w.first = code; w.code = ""; w.step = "confirm"; setTimeout(() => { if (CC.who === w) ccWhoPaint(); }, 150); return;
+  }
+  if (st === "confirm") {
+    if (code !== w.first) { w.step = "new"; w.first = ""; return bad("Les deux codes sont différents, recommencez"); }
+    w.busy = true; try { await safe(DB.update("members", m.id, await ccPinPatch(m.id, code))); } catch (e) { w.busy = false; return bad("Enregistrement impossible, réessayez"); }
+    w.busy = false; ccFailSet(m.id, null); okDots(); SFX.done(); buzz([10, 30, 10]);
+    if (w.change) { setTimeout(() => { closeSheet(true); CC.who = { mode: "sheet", pick: null, code: "", err: false }; toast("Nouveau code enregistré"); if (S.route === "reglages" || S.route === "home") rerender(); }, 300); return; }
+    setTimeout(() => { ccSwitchTo(ccMember(m.id) || m); toast(`Code créé · bienvenue ${firstName(m.name)}`); }, 300); return;
+  }
+  w.busy = true; const ok = await ccPinOk(m, code); w.busy = false;
+  if (ok) {
+    ccFailSet(m.id, null); okDots();
+    if (w.change) { w.step = "new"; w.code = ""; SFX.ok(); setTimeout(() => { if (CC.who === w) ccWhoPaint(); }, 220); return; }
+    setTimeout(() => ccSwitchTo(m), 240); return;
+  }
+  const f = ccFailOf(m.id); f.n = (f.n || 0) + 1; if (f.n >= CC_MAXTRY) { f.n = 0; f.until = Date.now() + CC_WAIT; } ccFailSet(m.id, f);
+  if (f.until > Date.now()) ccWaitTick();
+  bad();
 }
 (function ccMount() {
   const d = document.createElement("div"); d.id = "ccLock"; d.className = "cc-lock"; d.hidden = true; d.setAttribute("role", "dialog"); d.setAttribute("aria-modal", "true"); d.innerHTML = `<div class="cc-lock-card" id="ccLockBody"></div>`; document.body.appendChild(d);
@@ -226,13 +350,13 @@ VIEWS.equipe = {
   render() {
     const canManage = myRole() === "gerant"; const ms = ccMembers(); const local = ccLocalMode();
     const ev = S.events.slice(0, 8);
-    const row = (x) => { const mine = S.events.filter((e) => e.uid === x.id); const last = mine[0]; return `<div class="li tap cc-mrow" data-act="ccMember" data-id="${x.id}">${ccAva(x, 44)}<div class="tx"><b><span class="cc-nm">${esc(x.name || nameOf(x.id))}</span>${x.id === S.me.id ? `<span class="cc-you">vous</span>` : ""}${x.pinH ? ` <span class="cc-lk" title="Protégé par un code">${ico("lock")}</span>` : ""}</b><em>${mine.length ? `${mine.length} action${mine.length > 1 ? "s" : ""} · ${ccAgo(last.at)}` : "Aucune action"}</em></div><span class="pill ${x.role === "gerant" ? "acc" : x.role === "chef" ? "warn" : "neu"}">${ROLES[x.role] || "Équipe"}</span>${ico("chev")}</div>`; };
+    const row = (x) => { const mine = S.events.filter((e) => e.uid === x.id); const last = mine[0]; return `<div class="li tap cc-mrow" data-act="ccMember" data-id="${x.id}">${ccAva(x, 44)}<div class="tx"><b><span class="cc-nm">${esc(x.name || nameOf(x.id))}</span>${x.id === S.me.id ? `<span class="cc-you">vous</span>` : ""}${ccHasPin(x) ? ` <span class="cc-lk" title="Protégé par un code">${ico("lock")}</span>` : ` <span class="cc-nopin">code à créer</span>`}</b><em>${mine.length ? `${mine.length} action${mine.length > 1 ? "s" : ""} · ${ccAgo(last.at)}` : "Aucune action"}</em></div><span class="pill ${x.role === "gerant" ? "acc" : x.role === "chef" ? "warn" : "neu"}">${ROLES[x.role] || "Équipe"}</span>${ico("chev")}</div>`; };
     return `<div class="inner cc-wide">${topBar("Équipe", { right: canManage && local ? `<button class="btn acc sm" data-act="ccMemberNew">${ico("plus")}Ajouter</button>` : "" })}
       ${local ? `<div class="cc-hero st" style="--i:1"><span class="cc-hero-ic">${ico("users")}</span><div style="flex:1;min-width:0"><b>Qui signe ?</b><span>Chacun signe à son nom.</span></div><button class="btn sm cc-hero-btn" data-act="whoami">${ico("swap")}Changer</button></div>` : ""}
       <div class="cc-cols"><div class="cc-col"><div class="glass pad st" style="--i:2"><div class="row" style="margin-bottom:2px"><span class="lbl">${ms.length} personne${ms.length > 1 ? "s" : ""}</span>${!canManage ? `<span class="note">Seul un gérant peut modifier l'équipe</span>` : ""}</div>
         ${ms.length ? ms.map(row).join("") : `<div class="empty">Personne pour l'instant.</div>`}
         ${canManage && local ? `<button class="li tap cc-addrow" data-act="ccMemberNew"><span class="cc-ava plus" style="--s:44px">${ico("plus")}</span><div class="tx"><b>Ajouter un équipier</b><em>Prénom, rôle, couleur et code facultatif</em></div></button>` : ""}</div>
-      <p class="note st" style="--i:4">Gérant : gère l'équipe et les réglages. Chef et Équipe : relevés, réceptions, étiquettes et ménage. Un code à 4 chiffres protège chaque profil.</p></div>
+      <p class="note st" style="--i:4">Gérant : gère l'équipe et les réglages. Chef et Équipe : relevés, réceptions, étiquettes, stock et ménage, sans les chiffres (finances, salaires, tableau de bord). Chacun entre avec son code à 4 chiffres.</p></div>
       <div class="cc-col"><div class="glass pad st" style="--i:3"><div class="row"><span class="lbl">Qui a fait quoi</span><button class="btn ghost sm" data-go="registre">Registre${ico("chev")}</button></div>
         ${ev.length ? ev.map((e) => `<div class="li">${avatar(e.uid)}<div class="tx"><b style="white-space:normal">${esc(said(e.uid, e.text))}</b><em>${when(e.at)}</em></div></div>`).join("") : `<div class="empty" style="padding:16px 0 6px">Les actions de chacun apparaîtront ici.</div>`}</div></div></div></div>`;
   },
@@ -244,11 +368,13 @@ function ccMemberSheet(id) {
   const ev = S.events.filter((e) => e.uid === id); const today = ev.filter((e) => dayKey(new Date(e.at)) === dayKey()).length;
   const reads = S.readings.filter((r) => r.uid === id).length;
   const evIco = (t) => (t === "reading" ? "therm" : t === "team" ? "users" : t === "out" || t === "lost" ? "out" : "check");
-  openSheet(`<div class="cc-mhead">${ccAva(m, 72)}<div style="min-width:0"><div class="h2">${esc(m.name || "Sans nom")}${isMe ? ` <span class="cc-you">vous</span>` : ""}</div><div class="sub">${ROLES[m.role] || "Équipe"} · depuis le ${m.joinedAt ? shortDate(dayKey(new Date(m.joinedAt))) : "–"}${m.pinH ? " · code actif" : ""}</div></div></div>
+  openSheet(`<div class="cc-mhead">${ccAva(m, 72)}<div style="min-width:0"><div class="h2">${esc(m.name || "Sans nom")}${isMe ? ` <span class="cc-you">vous</span>` : ""}</div><div class="sub">${ROLES[m.role] || "Équipe"} · depuis le ${m.joinedAt ? shortDate(dayKey(new Date(m.joinedAt))) : "–"}${ccHasPin(m) ? " · code actif" : " · code à créer"}</div></div></div>
     <div class="cc-kpis"><div><b class="mono">${ev.length}</b><span>actions</span></div><div><b class="mono">${today}</b><span>aujourd'hui</span></div><div><b class="mono">${reads}</b><span>relevés</span></div></div>
     <div><span class="lbl">Activité récente</span>${ev.length ? ev.slice(0, 6).map((e) => `<div class="li"><span class="ic cc-evic">${ico(evIco(e.type))}</span><div class="tx"><b style="white-space:normal">${esc(String(e.text).replace(/^a /, "A "))}</b><em>${when(e.at)}</em></div></div>`).join("") : `<div class="empty" style="padding:14px 0">Aucune action pour l'instant.</div>`}</div>
     <div class="cc-acts">${local && !isMe ? `<button class="btn acc block" data-act="ccPick" data-id="${id}">${ico("swap")}Passer sur ${esc(firstName(m.name) || "ce profil")}</button>` : ""}
       ${local && (canManage || isMe) ? `<button class="btn soft block" data-act="ccMemberEdit" data-id="${id}">${ico("edit")}Modifier</button>` : ""}
+      ${local && isMe ? `<button class="btn soft block" data-act="ccPinChange">${ico("lock")}${ccHasPin(m) ? "Changer mon code" : "Créer mon code"}</button>` : ""}
+      ${local && canManage && !isMe && ccHasPin(m) ? `<button class="btn soft block" data-act="ccPinReset" data-id="${id}">${ico("lock")}Réinitialiser son code</button>` : ""}
       ${local && canManage && !isMe ? `<button class="btn danger block" data-act="ccMemberDel" data-id="${id}">${ico("trash")}Retirer de l'équipe</button>` : ""}</div>`);
 }
 function ccFormSheet() {
@@ -257,9 +383,9 @@ function ccFormSheet() {
     <label class="field"><span>Prénom</span><input class="input" id="ccfName" value="${esc(F.name)}" placeholder="Ex. Léa" autocomplete="off" maxlength="40" enterkeyhint="done"></label>
     ${canRole ? `<div class="field"><span>Rôle</span><div class="cc-seg">${Object.entries(ROLES).map(([k, t]) => `<button class="${F.role === k ? "on" : ""}" data-act="ccFormRole" data-v="${k}">${t}</button>`).join("")}</div></div>` : ""}
     <div class="field"><span>Couleur</span><div class="cc-swatches">${PALETTE.map((c) => `<button class="${F.color === c ? "on" : ""}" style="--c:${c}" data-act="ccFormColor" data-v="${c}" aria-label="Couleur"></button>`).join("")}</div></div>
-    <label class="field"><span>Code à 4 chiffres <em class="cc-opt">facultatif</em></span><input class="input mono cc-pinin" id="ccfPin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off" placeholder="${m && m.pinH ? "Code actif, inchangé" : "Aucun code"}"></label>
-    ${m && m.pinH ? `<button class="chip ${F.clearPin ? "on" : ""}" style="align-self:flex-start" data-act="ccFormClearPin">${ico("x")}Supprimer le code</button>` : ""}
-    <span class="note" style="margin-top:-6px">Le code évite qu'un autre signe à votre place. Il reste sur cet appareil.</span>
+    ${isNew ? `<label class="field"><span>Code à 4 chiffres <em class="cc-opt">facultatif</em></span><input class="input mono cc-pinin" id="ccfPin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off" placeholder="Sinon, créé à sa 1re connexion"></label>
+    <span class="note" style="margin-top:-6px">Le code évite qu'un autre signe à sa place. Laissez vide : il le choisira lui-même en touchant son visage.</span>`
+    : `<div class="li cc-pinrow"><span class="ic">${ico("lock")}</span><div class="tx"><b>Code personnel</b><em>${ccHasPin(m) ? "Actif" : "À créer à la prochaine connexion"}</em></div>${F.id === S.me.id ? `<button class="btn soft sm" data-act="ccPinChange">${ccHasPin(m) ? "Changer" : "Créer"}</button>` : canRole && ccHasPin(m) ? `<button class="btn soft sm" data-act="ccPinReset" data-id="${F.id}">Réinitialiser</button>` : ""}</div>`}
     <button class="btn acc block" data-act="ccMemberSave">${isNew ? `${ico("plus")}Ajouter à l'équipe` : `${ico("check")}Enregistrer`}</button>`,
   (b) => { if (isNew && window.matchMedia("(min-width:960px)").matches) setTimeout(() => $("#ccfName", b)?.focus({ preventScroll: true }), 380); });
 }
@@ -277,6 +403,7 @@ VIEWS.reglages = {
       <div class="lbl st cc-sec" style="--i:2">Restaurant</div>
       <div class="glass pad st" style="--i:2">
         <div class="li tap" data-act="${local && ccMember(S.me.id) ? "ccMemberEdit" : "meRename"}" data-id="${S.me.id}"><span class="ic">${ico("users")}</span><div class="tx"><b>Mon profil</b><em>${esc(S.me.name || "À renseigner, il signe vos relevés")}</em></div>${ico("chev")}</div>
+        ${local && ccMember(S.me.id) ? `<div class="li tap" data-act="ccPinChange"><span class="ic">${ico("lock")}</span><div class="tx"><b>Mon code</b><em>${ccHasPin(ccMember(S.me.id)) ? "Actif · toucher pour le changer" : "À créer : il protège votre profil"}</em></div>${ccHasPin(ccMember(S.me.id)) ? ico("chev") : `<span class="pill warn">À créer</span>`}</div>` : ""}
         <div class="li tap" data-act="restoRename"><span class="ic">${ico("edit")}</span><div class="tx"><b>Nom du restaurant</b><em>${esc(S.resto?.name || "")}</em></div>${ico("chev")}</div>
         <div class="li tap" data-act="restoSwitch"><span class="ic">${ico("store")}</span><div class="tx"><b>Établissements</b><em>${S.restos.length} · changer ou en ajouter un</em></div>${ico("chev")}</div>
         <div class="li tap" data-go="equipe"><span class="ic">${ico("users")}</span><div class="tx"><b>Équipe</b><em>${S.members.length} personne${S.members.length > 1 ? "s" : ""}</em></div>${ico("chev")}</div>
@@ -286,7 +413,7 @@ VIEWS.reglages = {
       <div class="glass pad st" style="--i:3">
         <div class="li tap" data-act="sound" role="switch" aria-checked="${SFX.on}"><span class="ic">${ico("sound")}</span><div class="tx"><b>Sons</b><em>${SFX.on ? "Activés" : "Coupés"}</em></div>${ccSw(SFX.on)}</div>
         <div class="li tap" data-act="ccHaptics" role="switch" aria-checked="${ccHaptics()}"><span class="ic">${ico("vibe")}</span><div class="tx"><b>Vibrations</b><em>${ccVib0 ? (ccHaptics() ? "Activées" : "Coupées") : "Non prises en charge sur cet appareil"}</em></div>${ccSw(ccHaptics())}</div>
-        ${local ? `<div class="li tap" data-act="ccAutoLockSheet"><span class="ic">${ico("lock")}</span><div class="tx"><b>Verrouillage automatique</b><em>${al ? `« Qui êtes-vous ? » après ${al} min sans activité` : "Idéal pour un téléphone partagé"}</em></div><span class="pill ${al ? "acc" : "neu"}">${al ? al + " min" : "Désactivé"}</span></div>` : ""}
+        ${local ? `<div class="li tap" data-act="ccAutoLockSheet"><span class="ic">${ico("lock")}</span><div class="tx"><b>Code à l'ouverture</b><em>${al ? `Redemandé après ${al >= 60 ? al / 60 + " h" : al + " min"} sans utiliser l'app` : "Demandé seulement à l'ouverture"}</em></div><span class="pill acc">${al ? (al >= 60 ? al / 60 + " h" : al + " min") : "Ouverture"}</span></div>` : ""}
       </div>
       ${local ? `<div class="lbl st cc-sec" style="--i:4">Données</div>
       <div class="glass pad st cc-data" style="--i:4">
@@ -335,19 +462,27 @@ function ccReload(flag) { try { sessionStorage.setItem("gg-flash", flag); } catc
 setTimeout(() => { let f = null; try { f = sessionStorage.getItem("gg-flash"); sessionStorage.removeItem("gg-flash"); } catch (e) {} if (f === "import") setTimeout(() => { toast("Sauvegarde restaurée"); SFX.done(); burst(); }, 900); if (f === "reset") setTimeout(() => toast("Appareil remis à zéro"), 900); }, 0);
 
 /* ───────────── menu Plus ───────────── */
+const ccTry = (fn, d) => { try { const v = fn(); return v == null ? d : v; } catch (e) { return d; } };
+function ccOblDueN() { return typeof oblDue === "function" ? ccTry(() => (oblDue(30) || []).length, 0) : 0; }
+function ccOnShiftN() { return typeof homeOnShift === "function" ? ccTry(() => homeOnShift().filter((x) => x.st === "in").length, 0) : 0; }
 VIEWS.more = {
   render() {
     const ts = todayStats(S.slot || slotNow()); const pend = ts.exp - ts.done; const urg = urgentCount();
+    const staffR = VIEWS.staff && canSee("staff"); const fbNew = S.feedback.filter((f) => f.status === "new" || (!f.status && f.source === "client" && Date.now() - (f.at || 0) < 2 * 864e5)).length;
+    /* [route, icon, title, badge, badge tone] */
     const groups = [
-      ["Au quotidien", [["releve", "therm", "Relevés", pend > 0 && S.fridges.length ? pend : 0], ["frigos", "snow", "Frigos", 0], ["scan", "scan", "Scanner", urg], ["reception", "truck", "Réception", 0], ["menage", "spray", "Ménage", 0], ["notes", "book", "Recettes", 0]]],
-      ["Gestion", [["stock", "box", "Stock", 0], ["tickets", "receipt", "Tickets Z", 0], ["registre", "shield", "Registre", 0]]],
-      ["Restaurant", [["equipe", "users", "Équipe", 0], ["imprimante", "printer", "Imprimante", 0], ["reglages", "sliders", "Réglages", 0]]],
+      ["Au quotidien", [["releve", "therm", "Relevés", pend > 0 && S.fridges.length ? pend : 0], ["frigos", "snow", "Frigos", 0], ["scan", "scan", "Scanner", urg], ["reception", "truck", "Réception", 0]]],
+      ["Cuisine", [["notes", "book", "Recettes & allergènes", 0], ["menage", "spray", "Ménage", 0]]],
+      ["Gestion", [["dashboard", "dash", "Tableau de bord", 0], ["finance", "euro", "Finances", 0], ["stock", "box", "Stock", 0], ["tickets", "receipt", "Tickets Z", 0], ["registre", "shield", "Registre", 0], ["obligations", "calcheck", "Obligations", ccOblDueN()]]],
+      ["Équipe", [["pointeuse", "clock", "Pointeuse", ccOnShiftN(), "ok"], ["planning", "cal", "Planning", 0], staffR ? ["staff", "users", "Équipe & salaires", 0] : ["equipe", "users", "Équipe", 0], ["avis", "star", "Avis & retours", fbNew, "acc"]]],
+      ["Restaurant", [...(staffR ? [["equipe", "lock", "Profils & codes", 0]] : []), ["imprimante", "printer", "Imprimante", 0], ["reglages", "sliders", "Réglages", 0]]],
     ];
     let k = 2;
     const me = ccMember(S.me.id) || { id: S.me.id, name: S.me.name, color: S.me.color };
-    return `<div class="inner narrow">${topBar("Tout Growth Gusto", { noBack: true })}
+    return `<div class="inner narrow cc-more">${topBar("Tout Growth Gusto", { noBack: true })}
       <div class="cc-hero st" style="--i:1">${ccAva(me, 46)}<div style="flex:1;min-width:0"><b>${esc(S.me.name || "Vous")}</b><span>${ROLES[myRole()]} · ${esc(S.resto?.name || "")}</span></div>${ccLocalMode() ? `<button class="btn sm cc-hero-btn" data-act="whoami">${ico("swap")}Changer</button>` : ""}</div>
-      ${groups.map(([g, items]) => { const its = items.filter(([r]) => VIEWS[r]); if (!its.length) return ""; return `<div class="lbl st cc-sec" style="--i:${k++}">${g}</div><div class="cc-grid st" style="--i:${k++}">${its.map(([r, i, t, b]) => `<button class="cc-gt" data-go="${r}" ${r === "reception" ? 'data-fresh="1"' : ""}><span class="ic">${ico(i)}</span><span class="t">${t}</span>${b ? `<span class="cc-gb mono">${b}</span>` : ""}</button>`).join("")}</div>`; }).join("")}
+      ${groups.map(([g, items]) => { const its = items.filter(([r]) => VIEWS[r] && canSee(r)); if (!its.length) return ""; const n = its.length, c = n % 3 === 0 ? 3 : n === 4 || n === 7 || n === 8 ? 4 : n <= 2 ? 2 : 3; return `<div class="lbl st cc-sec" style="--i:${k++}">${g}</div><div class="cc-grid c${c} st" style="--i:${k++}">${its.map(([r, i, t, b, tone]) => `<button class="cc-gt" data-go="${r}" ${r === "reception" ? 'data-fresh="1"' : ""}><span class="ic">${ico(IC[i] ? i : "grid")}</span><span class="t">${t}</span>${b ? `<span class="cc-gb mono ${tone || ""}">${b}</span>` : ""}</button>`).join("")}</div>`; }).join("")}
+      ${myRole() !== "gerant" && ccLocalMode() ? `<p class="note st cc-more-note" style="--i:${k}">${ico("lock")}Finances, salaires et tableau de bord sont réservés au gérant.</p>` : ""}
     </div>`;
   },
 };
@@ -376,7 +511,7 @@ Object.assign(ACT, {
     const go1 = $("#obGo"); go1 && go1.setAttribute("disabled", "");
     try {
       await safe(DB.set("restos", rid, { name, createdAt: Date.now(), by: S.me.id }));
-      attachedRid = null; memberChecked = true; attachResto();
+      attachedRid = null; memberChecked = true; CC.last = Date.now(); attachResto();
       await DB.set("members", S.me.id, { role: "gerant", joinedAt: Date.now(), ...(S.me.name ? { name: S.me.name } : {}), color: S.me.color || PALETTE[0] });
       for (const [i, t] of (S.ui.obTeam || []).entries()) { const id = "m" + Date.now().toString(36) + i + Math.random().toString(36).slice(2, 5); await DB.set("members", id, { role: t.role || "equipe", name: t.name, color: PALETTE[(i + 1) % PALETTE.length], joinedAt: Date.now() + i + 1, by: S.me.id }); }
       const frs = OB_FRIDGES.filter(([n]) => S.ui.obFr.includes(n));
@@ -393,23 +528,26 @@ Object.assign(ACT, {
   ccPick: (a, id) => {
     const m = ccMember(id); if (!m) return; const lock = CC.locked;
     if (!lock && m.id === S.me.id && $("#sheetBody .cc-who")) { closeSheet(); return; }
-    if (m.pinH) {
-      if (!lock && !$("#sheetBody .cc-who")) { CC.who = { mode: "sheet", pick: id, code: "", err: false }; openSheet(ccWhoHTML()); return; }
-      CC.who.pick = id; CC.who.code = ""; CC.who.err = false; SFX.tap(); ccWhoPaint(); return;
-    }
-    ccSwitchTo(m);
+    if (!lock && !$("#sheetBody .cc-who")) { CC.who = { mode: "sheet", pick: null, code: "", err: false }; ccPickStart(id); openSheet(ccWhoHTML()); return; }
+    ccPickStart(id); SFX.tap(); buzz(5); ccWhoPaint();
   },
-  ccWhoBack: () => { CC.who.pick = null; CC.who.code = ""; CC.who.err = false; SFX.tap(); ccWhoPaint(); },
+  ccWhoBack: () => { const w = CC.who; if (w.change) { closeSheet(); return; } w.pick = null; w.code = ""; w.err = false; w.step = ""; SFX.tap(); ccWhoPaint(); },
   ccKey: (a, id, v) => {
-    const w = CC.who; if (!w.pick || w.code.length >= 4 && v !== "del") return; w.err = false;
+    const w = CC.who; if (!w.pick || w.busy || ccWaitLeft(w.pick) || (w.code.length >= 4 && v !== "del")) return; w.err = false;
     if (v === "del") w.code = w.code.slice(0, -1); else w.code += v;
     SFX.tick(); buzz(4); ccWhoPaint();
-    if (w.code.length === 4) {
-      const m = ccMember(w.pick);
-      if (ccPinOk(m, w.code)) { $$(".cc-dots").forEach((d) => d.classList.add("ok")); setTimeout(() => ccSwitchTo(m), 260); }
-      else { setTimeout(() => { w.code = ""; w.err = true; SFX.err(); buzz([30, 50, 30]); ccWhoPaint(); }, 140); }
-    }
+    if (w.code.length === 4) ccCodeDone();
   },
+  /* gérant: the person creates a new code at their next sign-in */
+  ccPinReset: (a, id) => ccOnce("pinReset", async () => {
+    const m = ccMember(id); if (!m || myRole() !== "gerant") return;
+    await safe(DB.update("members", id, { pinSha: "", pinSalt: "", pinH: "" })); ccFailSet(id, null);
+    await logEvent("team", `a réinitialisé le code de ${firstName(m.name)}`);
+    closeSheet(true); SFX.ok(); buzz(8); toast(`${firstName(m.name)} créera un nouveau code à sa prochaine connexion`);
+  }),
+  /* me: change (or create) my own code */
+  ccPinChange: () => { const m = ccMember(S.me.id); if (!m || !ccLocalMode()) return; CC.who = { mode: "sheet", pick: null, code: "", err: false, change: true }; ccPickStart(m.id, ccHasPin(m) ? "enter" : "new"); openSheet(ccWhoHTML()); buzz(6); },
+  ccUnlockTest: (a, id) => ccUnlockTest(typeof id === "string" ? id : null),
 
   /* équipe */
   ccMember: (a, id) => ccMemberSheet(id),
@@ -420,14 +558,15 @@ Object.assign(ACT, {
   ccFormClearPin: (a) => { CC.form.clearPin = !CC.form.clearPin; a.classList.toggle("on", CC.form.clearPin); SFX.tick(); },
   ccMemberSave: () => ccOnce("memberSave", ACT.ccMemberSave0),
   ccMemberSave0: async () => {
-    const F = CC.form; if (!F) return; const nEl = $("#ccfName"); if (!nEl) return; const name = (nEl.value || "").trim(); const pin = ($("#ccfPin").value || "").trim();
+    const F = CC.form; if (!F) return; const nEl = $("#ccfName"); if (!nEl) return; const name = (nEl.value || "").trim(); const pin = ($("#ccfPin")?.value || "").trim();
     if (!name) { ccShake(nEl); nEl.focus(); return; }
     if (S.members.some((m) => m.id !== F.id && (m.name || "").trim().toLowerCase() === name.toLowerCase())) { ccShake(nEl); toast(`Il y a déjà un ${name} : ajoutez une initiale.`, "err"); return; }
     if (pin && !/^\d{4}$/.test(pin)) { ccShake($("#ccfPin")); toast("Le code doit faire 4 chiffres.", "err"); return; }
+    if (pin && ccWeakPin(pin)) { ccShake($("#ccfPin")); toast("Code trop facile à deviner.", "err"); return; }
     if (F.id) {
       const m = ccMember(F.id); if (!m) return;
       if (m.role === "gerant" && F.role !== "gerant" && ccGerants().length < 2) { SFX.err(); toast("Il faut au moins un gérant dans l'équipe.", "err"); return; }
-      const patch = { name, role: F.role, color: F.color }; if (pin) patch.pinH = ccHash(F.id + ":" + pin); else if (F.clearPin) patch.pinH = "";
+      const patch = { name, role: F.role, color: F.color };
       await safe(DB.update("members", F.id, patch));
       if (m.role !== F.role) await logEvent("team", `a passé ${firstName(name)} en ${ROLES[F.role]}`);
       if (F.id === S.me.id) { S.me.name = name; S.me.color = F.color; if (F.id === "local") { try { localStorage.setItem("gg-name", name); } catch (e) {} } ccSaveWho(); S.isOwner = F.role === "gerant"; }
@@ -435,7 +574,7 @@ Object.assign(ACT, {
       closeSheet(true); SFX.ok(); buzz(8); toast("Profil enregistré");
     } else {
       const id = "m" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
-      await safe(DB.set("members", id, { role: F.role, name, color: F.color, joinedAt: Date.now(), by: S.me.id, ...(pin ? { pinH: ccHash(id + ":" + pin) } : {}) }));
+      await safe(DB.set("members", id, { role: F.role, name, color: F.color, joinedAt: Date.now(), by: S.me.id, ...(pin ? await ccPinPatch(id, pin) : {}) }));
       S.profiles[id] = { name, color: F.color };
       await logEvent("team", `a ajouté ${name} à l'équipe`);
       closeSheet(true); SFX.done(); buzz([10, 30, 10]); burst(window.innerWidth / 2, window.innerHeight / 2); toast(`${firstName(name)} fait partie de l'équipe`);
@@ -452,10 +591,10 @@ Object.assign(ACT, {
 
   /* réglages */
   ccHaptics: () => { const on = !ccHaptics(); try { localStorage.setItem("gg-haptics", on ? "on" : "off"); } catch (e) {} ccApplyHaptics(); SFX.tick(); buzz(14); rerender(); },
-  ccAutoLockSheet: () => { const al = ccAutoLock(); openSheet(`<div><div class="h2" style="font-size:21px">Verrouillage automatique</div><p class="sub" style="margin:6px 0 0">Après un moment sans activité, l'app revient sur « Qui êtes-vous ? ». Idéal pour un téléphone partagé en cuisine.</p></div>
-    <div style="display:flex;flex-direction:column;gap:8px">${[[0, "Désactivé"], [2, "Après 2 minutes"], [5, "Après 5 minutes"], [15, "Après 15 minutes"], [30, "Après 30 minutes"]].map(([v, t]) => `<button class="chip cc-opt-row ${al === v ? "on" : ""}" data-act="ccAutoLockSet" data-v="${v}">${t}${al === v ? ico("check") : ""}</button>`).join("")}</div>
-    ${S.members.length < 2 ? `<p class="note" style="margin:0">Ajoutez des équipiers pour en profiter pleinement.</p>` : ""}`); },
-  ccAutoLockSet: (a, id, v) => { try { localStorage.setItem("gg-autolock", String(+v)); } catch (e) {} CC.last = Date.now(); closeSheet(true); SFX.ok(); toast(+v ? `Verrouillage après ${v} min` : "Verrouillage désactivé"); rerender(); },
+  ccAutoLockSheet: () => { const al = ccAutoLock(); openSheet(`<div><div class="h2" style="font-size:21px">Redemander le code</div><p class="sub" style="margin:6px 0 0">Le code est toujours demandé à l'ouverture de l'app. Choisissez aussi au bout de combien de temps sans l'utiliser (téléphone en poche, écran éteint) il est redemandé.</p></div>
+    <div style="display:flex;flex-direction:column;gap:8px">${[[5, "Après 5 minutes"], [15, "Après 15 minutes"], [30, "Après 30 minutes (conseillé)"], [60, "Après 1 heure"], [240, "Après 4 heures"], [0, "Seulement à l'ouverture"]].map(([v, t]) => `<button class="chip cc-opt-row ${al === v ? "on" : ""}" data-act="ccAutoLockSet" data-v="${v}">${t}${al === v ? ico("check") : ""}</button>`).join("")}</div>
+    <button class="btn soft block" data-act="ccLockNow">${ico("lock")}Verrouiller maintenant</button>`); },
+  ccAutoLockSet: (a, id, v) => { try { localStorage.setItem("gg-autolock", String(+v)); } catch (e) {} CC.last = Date.now(); closeSheet(true); SFX.ok(); toast(+v ? `Code redemandé après ${+v >= 60 ? +v / 60 + " h" : v + " min"}` : "Code demandé à l'ouverture seulement"); rerender(); },
   ccLockNow: () => ccLock(),
   ccExport: () => ccOnce("export", ACT.ccExport0, 1500),
   ccExport0: async () => {
@@ -484,7 +623,7 @@ Object.assign(ACT, {
   ccResetOk: () => {
     if (($("#ccResetIn")?.value || "").trim().toUpperCase() !== "EFFACER") { ccShake($("#ccResetIn")); return; }
     Object.keys(DB.local).forEach((k) => delete DB.local[k]);
-    ["gg-local", "gg-rid", "gg-who", "gg-ghosts", "gg-name", "gg-lastbackup", "gg-autolock"].forEach((k) => { try { localStorage.removeItem(k); } catch (e) {} });
+    ["gg-local", "gg-rid", "gg-who", "gg-ghosts", "gg-name", "gg-lastbackup", "gg-autolock", "gg-pinfail"].forEach((k) => { try { localStorage.removeItem(k); } catch (e) {} });
     ["ccResetGo"].forEach((x) => $("#" + x)?.setAttribute("disabled", ""));
     try { PHOTOS.urls && Object.values(PHOTOS.urls).forEach((u) => { try { URL.revokeObjectURL(u); } catch (e) {} }); window.indexedDB && indexedDB.deleteDatabase("gg-photos"); } catch (e) {}
     closeSheet(true); SFX.close(); ccReload("reset");

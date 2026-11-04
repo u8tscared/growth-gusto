@@ -40,6 +40,74 @@ function homeRecLive() { const R = homeRecDraft(); return !!(R && (R.step > 1 ||
 const homePlural = (n, w) => `${n} ${w}${n > 1 ? "s" : ""}`;
 function homeDismissed() { try { return localStorage.getItem("gg-home-steps-" + S.rid) === "off"; } catch (e) { return false; } }
 
+
+/* ── équipe en service (pointeuse) ── */
+/* who is clocked in right now, from S.punches (newest first): [{ id, memberId, name, color, st: "in"|"pause", since }] */
+function homeOnShift() {
+  if (typeof rhOnShift === "function") { try { const r = rhOnShift(); if (Array.isArray(r)) return r; } catch (e) {} }
+  const seen = new Set(), out = [], now = Date.now();
+  for (const p of S.punches) {
+    if (!p || !p.staffId || now - (p.at || 0) > 18 * 36e5) continue;
+    if (seen.has(p.staffId)) continue; seen.add(p.staffId);
+    if (p.kind === "out") continue;
+    const s = S.staff.find((x) => x.id === p.staffId) || {}; const m = S.members.find((x) => x.id === (s.memberId || p.staffId));
+    const inP = S.punches.find((x) => x.staffId === p.staffId && x.kind === "in" && x.at <= p.at);
+    out.push({ id: p.staffId, memberId: s.memberId || (m && m.id) || null, name: s.name || (m && m.name) || "?", color: s.color || (m && m.color) || colorFor(p.staffId), st: p.kind === "breakStart" ? "pause" : "in", since: inP ? inP.at : p.at });
+  }
+  return out;
+}
+function homeMyStaffId() { const s = S.staff.find((x) => x.memberId === S.me.id && x.active !== false); return s ? s.id : null; }
+function homeShiftAva(x) { return x.memberId && (S.profiles[x.memberId] || S.members.some((m) => m.id === x.memberId)) ? avatar(x.memberId, true) : `<span class="ava sm" style="background:${esc(x.color || "#4A1FE6")}">${esc(initials(x.name || "?"))}</span>`; }
+function homeShiftCard() {
+  if (!VIEWS.pointeuse) return "";
+  const on = homeOnShift(); const work = on.filter((x) => x.st === "in"), pause = on.filter((x) => x.st === "pause");
+  const myId = homeMyStaffId(); const mine = on.find((x) => x.id === myId || (x.memberId && x.memberId === S.me.id));
+  const names = (a) => a.slice(0, 3).map((x) => esc(firstName(x.name))).join(", ") + (a.length > 3 ? ` +${a.length - 3}` : "");
+  const sub = mine ? `Vous : ${mine.st === "pause" ? "en pause" : "pointé"} depuis ${hm(mine.since)}${on.length > 1 ? ` · ${names(on.filter((x) => x !== mine))}` : ""}`
+    : on.length ? `${names(work)}${pause.length ? `${work.length ? " · " : ""}${names(pause)} en pause` : ""}` : "Arrivée, pause, départ : un geste chacun";
+  return `<section class="glass hm-shift st" style="--i:4" aria-label="Équipe en service">
+    <span class="hm-shift-avs">${on.length ? on.slice(0, 4).map((x) => `<span class="hm-sa ${x.st}">${homeShiftAva(x)}</span>`).join("") + (on.length > 4 ? `<span class="hm-sa more mono">+${on.length - 4}</span>` : "") : `<span class="ic">${ico("clock")}</span>`}</span>
+    <div class="tx"><b>${on.length ? (work.length ? `${work.length} en service` : `${pause.length} en pause`) : "Personne n'est pointé"}</b><em>${sub}</em></div>
+    <button class="btn ${mine ? "soft" : "acc"} sm hm-punch" data-act="homePunch">${ico("clock")}${mine ? "Pointer" : "Je pointe"}</button>
+  </section>`;
+}
+
+/* ── service: chambre froide ⇄ frigos de service ── */
+function homeSvcCard() {
+  if (!VIEWS.scan || S.fridges.length < 2) return "";
+  const h = new Date().getHours() + new Date().getMinutes() / 60;
+  const back = (h >= 14.5 && h < 17) || h >= 22.5 || h < 6;
+  const b = (v, ic, t, s, on) => `<button class="hm-svb ${on ? "on" : ""}" data-act="homeSvc" data-v="${v}"><span class="qi">${ico(ic)}</span><span class="tx"><b>${t}</b><em>${s}</em></span></button>`;
+  return `<section class="hm-svc st" style="--i:3" aria-label="Service">
+    ${b("mep", "move", "Mise en place", "Chambre froide → frigos", !back)}
+    ${b("retour", "snow", "Fin de service", "Frigos → chambre froide", back)}
+  </section>`;
+}
+
+/* ── tableau de bord (gérant) ── */
+function homeDashLink() {
+  if (!VIEWS.dashboard || myRole() !== "gerant" || (typeof canSee === "function" && !canSee("dashboard"))) return "";
+  let sub = "Ventes, coûts et marges en un coup d'œil";
+  if (typeof salesBetween === "function") {
+    try { const t = new Date(); const mon = addDays(dayKey(), -((t.getDay() + 6) % 7)); const r = salesBetween(mon, dayKey()); if (r && +r.ttc > 0) sub = `Cette semaine : ${Math.round(+r.ttc).toLocaleString("fr-FR")} € TTC${r.covers ? ` · ${r.covers} couverts` : ""}`; } catch (e) {}
+  }
+  return `<button class="glass hm-dash st" style="--i:5" data-go="dashboard"><span class="ic">${ico("dash")}</span><span class="tx"><b>Tableau de bord</b><em>${sub}</em></span>${ico("chev")}</button>`;
+}
+
+/* ── obligations (oblig.js) in « À faire maintenant » ── */
+function homeOblTodo(T) {
+  if (typeof oblDue !== "function") return;
+  let list = []; try { list = oblDue(30) || []; } catch (e) { return; }
+  const rows = list.map((o) => ({ o, d: o && o.nextDue ? daysUntil(String(o.nextDue).slice(0, 10)) : null })).sort((a, b) => (a.d ?? 99) - (b.d ?? 99));
+  rows.slice(0, rows.length > 2 ? 1 : 2).forEach(({ o, d }) => {
+    const late = d != null && d < 0;
+    T.push({ p: late ? 0.8 : d != null && d <= 7 ? 6.8 : 7.5, tone: late ? "bad" : d != null && d <= 7 ? "warn" : "acc", icon: "calcheck", title: esc(o.name || "Obligation"),
+      sub: `${d == null ? "À programmer" : late ? `En retard de ${homePlural(-d, "jour")}` : d === 0 ? "À faire aujourd'hui" : `Avant le ${shortDate(String(o.nextDue).slice(0, 10))}`}${o.provider ? ` · ${esc(o.provider)}` : ""}`,
+      btn: late ? "Planifier" : "Voir", attrs: `data-go="obligations"${o.id ? ` data-id="${esc(o.id)}"` : ""}` });
+  });
+  if (rows.length > 2) T.push({ p: 7.6, tone: "acc", icon: "calcheck", title: `Obligations · ${rows.length - 1} autres`, sub: esc(rows.slice(1, 4).map((x) => x.o.name).join(", ")), btn: "Tout voir", attrs: `data-go="obligations"` });
+}
+
 /* ── "À faire maintenant": one prioritised list ── */
 function homeTodo(slot, pend) {
   const T = []; const lots = activeLots().map((l) => ({ l, d: daysUntil(dlcOf(l)) })).filter((x) => x.d != null && x.d <= 1).sort((a, b) => a.d - b.d);
@@ -60,6 +128,7 @@ function homeTodo(slot, pend) {
   // monthly inventory near month end
   const inv = homeInv(); const d = new Date(); const left = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate() - d.getDate();
   if (left <= 4 && inv.total && inv.pct < 100) T.push({ p: 7, tone: "acc", icon: "list", title: `Inventaire de ${MONTHS[d.getMonth()]} · ${inv.pct}%`, sub: `${left ? `Fin du mois dans ${homePlural(left, "jour")}` : "Dernier jour du mois"} · ${inv.total - inv.n} à compter`, btn: "Compter", attrs: `data-go="stock"` });
+  homeOblTodo(T);
   return T.sort((a, b) => a.p - b.p);
 }
 function homeFreqTx(c) {
@@ -88,6 +157,8 @@ function homeSteps() {
     { done: S.receptions.length > 0, t: "Enregistrer une réception", s: "Température, DLC et photo de l'étiquette", attrs: `data-go="reception" data-fresh="1"` },
     { done: S.chores.length > 0, t: "Charger le plan de nettoyage", s: "Un plan type prêt à l'emploi, en un geste", attrs: `data-act="homeStarter"` },
     { done: S.members.length > 1, t: "Ajouter l'équipe", s: "Chaque action porte le nom de son auteur", attrs: `data-go="equipe"` },
+    ...(DB.mode === "local" && typeof ccHasPin === "function" && typeof ACT.ccPinChange === "function" && S.members.some((m) => m.id === S.me.id)
+      ? [{ done: ccHasPin(S.members.find((m) => m.id === S.me.id)), t: "Créer votre code", s: "4 chiffres pour entrer dans votre session", attrs: `data-act="ccPinChange"` }] : []),
   ];
 }
 function homeStepsCard(i) {
@@ -175,8 +246,8 @@ VIEWS.home = {
       <header class="row st hm-head" style="--i:0"><div style="min-width:0"><button class="hm-date" data-act="restoSwitch"><span>${DAYS[now.getDay()].replace(/^./, (c) => c.toUpperCase())} ${now.getDate()} ${MONTHS[now.getMonth()]} · ${esc(S.resto.name)}</span>${ico("down")}</button><div class="title">${greet}${S.me.name ? " " + esc(firstName(S.me.name)) : ""}</div></div><button class="iconbtn" ${typeof ACT.whoami === "function" ? `data-act="whoami" aria-label="Qui êtes-vous ? Changer d'utilisateur"` : `data-go="reglages" aria-label="Réglages"`} style="padding:0">${avatar(S.me.id)}</button></header>
       ${bn}
       <div class="hm-grid ${fresh ? "fresh" : ""} ${recNow ? "rec" : ""}">
-        <div class="hm-col hm-l">${hero}${instCard}${fresh && !recNow ? stepsCard : ""}${todoCard}${fresh && !recNow ? "" : stepsCard}</div>
-        <div class="hm-col hm-r">${qa}${stats}${homeFeed(6)}</div>
+        <div class="hm-col hm-l">${hero}${instCard}${homeSvcCard()}${fresh && !recNow ? stepsCard : ""}${todoCard}${fresh && !recNow ? "" : stepsCard}</div>
+        <div class="hm-col hm-r">${qa}${homeShiftCard()}${stats}${homeDashLink()}${homeFeed(6)}</div>
       </div></div>`;
   },
   after(v) {
@@ -205,6 +276,15 @@ Object.assign(ACT, {
     if (typeof ACT.choreStarter !== "function") return go("menage");
     if (S.ui.hmStarting || S.chores.length) return; S.ui.hmStarting = 1; a.style.pointerEvents = "none";
     try { await ACT.choreStarter(a); } finally { S.ui.hmStarting = 0; }
+  },
+  homePunch: () => { SFX.tap(); buzz(6); const id = homeMyStaffId(); go("pointeuse", id ? { id } : {}); },
+  /* service: « Mise en place » (chambre froide → frigos de service) / « Retour en chambre froide ». labels.js reads params.mode on « scan » */
+  homeSvc: (a, id, v) => {
+    SFX.tap(); buzz(6); const mode = v === "retour" ? "retour" : "mep";
+    if (typeof lbServiceMode === "function") { try { return lbServiceMode(mode); } catch (e) {} }
+    /* labels.js « Service » scan mode (LB.mode "svc", direction svcPref().dir "mep" | "ret"), when present */
+    if (typeof svcSave === "function" && typeof LB === "object" && LB) { try { svcSave({ dir: mode === "retour" ? "ret" : "mep" }); LB.mode = "svc"; LB.seen = {}; LB.batch = []; } catch (e) {} }
+    go("scan", { mode });
   },
   homeMore: () => { S.ui.hmAll = !S.ui.hmAll; SFX.tick(); rerender(); },
   homeStepsOff: () => { try { localStorage.setItem("gg-home-steps-" + S.rid, "off"); } catch (e) {} SFX.close(); rerender(); },

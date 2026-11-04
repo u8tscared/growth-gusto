@@ -250,3 +250,42 @@
   .cc-col>.cc-sec:first-child{margin-top:0}
 }
 #side .me .cc-swtx{color:var(--accent);font-weight:700}
+
+/* ───────── V3: code obligatoire ───────── */
+.cc-badge.nw{background:var(--warn)}
+.cc-badge.nw .ico{width:13px;height:13px;stroke-width:2.6}
+.cc-tile.last{background:rgba(74,31,230,.06)}
+.cc-tile.last em{color:var(--accent)}
+.cc-errtx{color:var(--bad);font-weight:700}
+.cc-pin .h2{font-size:24px}
+.cc-pin-who .sub{min-height:20px;max-width:30ch}
+.cc-wait{display:flex;align-items:center;justify-content:center;gap:9px;margin:0 auto;padding:11px 16px;border-radius:16px;background:rgba(212,42,72,.08);color:var(--bad);font-weight:750;font-size:14px;animation:rise .4s var(--spring) both}
+.cc-wait .ico{width:18px;height:18px;flex:none}
+.cc-wait b{font-weight:700;display:inline-block;min-width:3.2ch}
+.cc-keys.off{opacity:.38;pointer-events:none;filter:saturate(.4)}
+.cc-keys button{font-size:26px}
+.cc-keys button[disabled]{cursor:default}
+.cc-pin-help{text-align:center;margin:-4px auto 0;max-width:34ch}
+.cc-pin[data-step="new"] .cc-dots i.on,.cc-pin[data-step="confirm"] .cc-dots i.on{background:var(--ok)}
+.cc-nopin{font-size:10.5px;font-weight:800;color:var(--warn);background:rgba(184,108,0,.1);padding:2px 7px;border-radius:999px;white-space:nowrap}
+.cc-pinrow{padding:10px 12px;border-radius:16px;background:rgba(14,19,48,.04)}
+.cc-pinrow .btn.sm{min-height:44px;flex:none}
+.cc-lock-card{max-height:calc(100dvh - 40px);overflow-y:auto}
+@media (max-height:700px){.cc-keys button{height:54px}.cc-pin{gap:12px}.cc-pin-who .cc-ava{--s:60px!important}}
+/* menu Plus: badges by tone, roles note */
+.cc-gb.ok{background:var(--ok)}
+.cc-gb.acc{background:var(--accent)}
+.cc-gt .t{text-align:center;padding:0 2px}
+.cc-more-note{display:flex;align-items:center;justify-content:center;gap:6px;margin-top:4px;text-align:center}
+.cc-more-note .ico{width:14px;height:14px;flex:none}
+/* menu Plus V3: the grid follows the group size, so no group ends with a lonely tile */
+.cc-grid.c4,.cc-more .cc-grid.c4{grid-template-columns:repeat(4,1fr);gap:8px}
+.cc-grid.c4 .cc-gt{min-height:96px;padding:13px 3px 11px;gap:8px;border-radius:20px}
+.cc-grid.c4 .cc-gt .ic{width:44px;height:44px;border-radius:15px}
+.cc-grid.c4 .cc-gt .t{font-size:12px}
+.cc-grid.c4 .cc-gb{top:6px;right:6px}
+.cc-grid.c2,.cc-more .cc-grid.c2{grid-template-columns:repeat(2,1fr)}
+.cc-grid.c2 .cc-gt{flex-direction:row;justify-content:flex-start;min-height:74px;padding:12px 12px;gap:11px;text-align:left}
+.cc-grid.c2 .cc-gt .ic{flex:none;width:44px;height:44px}
+.cc-grid.c2 .cc-gt .t{text-align:left}
+.cc-grid.c2 .cc-gb{top:50%;transform:translateY(-50%)}
