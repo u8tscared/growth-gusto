@@ -472,8 +472,20 @@ window.addEventListener("popstate", () => {
   if (S.history.length || S.route !== "home") { SFX.tap(); goBack(); }
 });
 let pendingRefresh = false;
-function refresh() {
+/* Scroll guard: re-rendering a list while a finger is on it (or during momentum) kills iOS scrolling and makes the page jump.
+   Data/photo refreshes that land mid-scroll wait until the scroll settles, then run once. */
+const SCRL = { touch: 0, last: 0, pend: false, t: 0 };
+/* busy = a finger is down after the page moved, or the page moved in the last 350 ms (momentum). A plain tap is never busy. */
+function scrollBusy() { const moved = performance.now() - SCRL.last < 350; return moved || (SCRL.touch > 0 && performance.now() - SCRL.last < 3000); }
+function scrollSettle() { clearTimeout(SCRL.t); SCRL.t = setTimeout(() => { if (scrollBusy()) return scrollSettle(); if (SCRL.pend) { SCRL.pend = false; refresh(); } }, 380); }
+document.addEventListener("touchstart", (e) => { SCRL.touch = e.touches.length; }, { passive: true, capture: true });
+const scrlEnd = (e) => { SCRL.touch = e && e.touches ? e.touches.length : 0; if (SCRL.pend) scrollSettle(); };
+document.addEventListener("touchend", scrlEnd, { passive: true, capture: true }); document.addEventListener("touchcancel", scrlEnd, { passive: true, capture: true });
+document.addEventListener("scroll", () => { SCRL.last = performance.now(); if (SCRL.pend) scrollSettle(); }, { passive: true, capture: true });
+function refresh(force) {
   if (!S.ready) return;
+  if (!force && scrollBusy()) { SCRL.pend = true; scrollSettle(); return; }
+  SCRL.pend = false;
   const v = $("#viewport .view:not(.leave)"); if (!v) return;
   const VIEW = VIEWS[S.route]; if (VIEW && VIEW.live === false) return;
   const a = document.activeElement; if (a && v.contains(a) && /INPUT|TEXTAREA|SELECT/.test(a.tagName)) { pendingRefresh = true; return; }
@@ -783,7 +795,7 @@ function registerSW() {
    to the foreground. A new v means the code running here is old: with nothing in progress the app reloads silently (caches dropped,
    so the reload is guaranteed fresh); otherwise a toast offers « Mettre à jour ». sessionStorage guards against reload loops:
    one reload attempt per version per session, after which the version is simply adopted. */
-const APP_V = "2026-11-04.5";
+const APP_V = "2026-11-04.6";
 const UPD = {
   running: null, offered: null,
   get: (k, store) => { try { return store.getItem(k); } catch (e) { return null; } },

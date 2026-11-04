@@ -855,7 +855,9 @@ document.addEventListener("input", (e) => {
 });
 document.addEventListener("focusout", (e) => { const t = e.target; if (t && t.id === "auEmail" && t.value) { t.dataset.touched = "1"; AUTH.validate(); } if (t && t.id === "auCode") setTimeout(() => AUTH.codeCells(), 0); });
 /* the kitchen keeps its framing when the window or the phone rotates */
-window.addEventListener("resize", () => { if (!$("#au.on")) return; cancelAnimationFrame(AUTH._rz); AUTH._rz = requestAnimationFrame(() => AUTH.cam(true)); }, { passive: true });
+/* only a width change re-frames the kitchen: on phones the browser bar showing/hiding while scrolling changes the height constantly */
+let auRzW = window.innerWidth;
+window.addEventListener("resize", () => { if (!$("#au.on")) return; const desk = window.matchMedia("(min-width:960px)").matches; if (!desk && window.innerWidth === auRzW) return; auRzW = window.innerWidth; cancelAnimationFrame(AUTH._rz); AUTH._rz = requestAnimationFrame(() => AUTH.cam(true)); }, { passive: true });
 document.addEventListener("focusin", (e) => { if (e.target && e.target.id === "auCode") AUTH.codeCells(); });
 document.addEventListener("keydown", (e) => { if (e.key === "Escape" && $("#au.on") && AUTH.inApp && !$("#sheet.open")) { e.stopPropagation(); ACT.auClose(); } }, true);
 

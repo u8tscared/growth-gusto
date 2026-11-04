@@ -634,3 +634,6 @@ body{font-feature-settings:"tnum","ss01","cv11";font-variant-numeric:tabular-num
 }
 /* side nav on short laptop screens: smaller module tiles keep every entry in view */
 @media (min-width:960px) and (max-height:900px){.side .navs .nav .ico{width:24px;height:24px;padding:4px;border-radius:8px}.side .navs .nav{padding-block:5px}}
+/* phones/tablets: the animated aurora and the blended grain sit behind every scrolling list and cost a full-screen repaint per frame.
+   Freeze the aurora (same look, no motion) and drop the grain so scrolling stays at 60 fps. */
+@media (pointer:coarse){.aurora i{animation:none!important;will-change:auto}.grain{display:none}}
