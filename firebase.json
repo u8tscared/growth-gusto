@@ -1,0 +1,23 @@
+{
+  "hosting": [
+    {
+      "target": "app",
+      "public": ".",
+      "ignore": ["firebase.json", ".firebaserc", "**/.*", "**/node_modules/**", "site/**", "tools/**", "avant/**", "README.md", "firestore.rules"],
+      "cleanUrls": false,
+      "headers": [
+        { "source": "sw.js", "headers": [{ "key": "Cache-Control", "value": "no-store" }] },
+        { "source": "version.json", "headers": [{ "key": "Cache-Control", "value": "no-store" }] },
+        { "source": "**/*.@(js|css|html|json|webmanifest)", "headers": [{ "key": "Cache-Control", "value": "no-cache" }] }
+      ]
+    },
+    {
+      "target": "www",
+      "public": "site",
+      "ignore": ["**/.*"],
+      "cleanUrls": true,
+      "trailingSlash": false
+    }
+  ],
+  "firestore": { "rules": "firestore.rules" }
+}

@@ -1,0 +1,4 @@
+{
+  "projects": { "default": "growth-gusto" },
+  "targets": { "growth-gusto": { "hosting": { "app": ["growth-gusto-app"], "www": ["growth-gusto"] } } }
+}

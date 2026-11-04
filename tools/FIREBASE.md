@@ -42,3 +42,13 @@ Le propriétaire ne peut être ni rétrogradé ni retiré. Un invité reçoit le
 ## 5. Limite connue : Google dans l'app installée sur iPhone
 
 Sur iPhone, dans l'app ajoutée à l'écran d'accueil, la connexion Google passe par une redirection. Safari peut la bloquer, parce que la page de connexion vit sur `growth-gusto.firebaseapp.com` et l'app sur `u8tscared.github.io`. **E-mail + mot de passe marche partout.** Pour que Google marche aussi à coup sûr sur iPhone installé, il faudra un domaine à vous (par ex. `app.growthgusto.fr`) qui sert l'app et la page `/__/auth/` (Firebase Hosting le fait tout seul).
+
+## 6. Hébergement Firebase (app.growthgusto.fr + growthgusto.fr)
+
+`firebase.json` déclare deux sites Hosting : `app` (l'application, racine du dépôt sans site/, tools/, avant/) et `www` (la landing, dossier `site/`).
+Mise en place, une fois, depuis un terminal connecté (`firebase login` approuvé par Marceau) :
+1. `firebase hosting:sites:create growth-gusto-app` (le site par défaut `growth-gusto` sert la landing).
+2. `firebase deploy --only hosting,firestore:rules`.
+3. Console → Hosting → « Ajouter un domaine personnalisé » : `app.growthgusto.fr` sur le site growth-gusto-app, `growthgusto.fr` + `www.growthgusto.fr` sur growth-gusto. Firebase donne les enregistrements DNS (A / TXT / CNAME) à saisir chez IONOS.
+4. Authentication → Paramètres → Domaines autorisés : ajouter `app.growthgusto.fr` ; puis dans `js/config.js` mettre `authDomain: "app.growthgusto.fr"` (la connexion Google marche alors aussi dans l'app installée sur iPhone).
+5. Faire pointer l'ancien lien GitHub Pages vers app.growthgusto.fr (redirection dans index.html).
