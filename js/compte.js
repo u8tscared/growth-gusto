@@ -468,14 +468,14 @@ function ccOnShiftN() { return typeof homeOnShift === "function" ? ccTry(() => h
 VIEWS.more = {
   render() {
     const ts = todayStats(S.slot || slotNow()); const pend = ts.exp - ts.done; const urg = urgentCount();
-    const staffR = VIEWS.staff && canSee("staff"); const fbNew = S.feedback.filter((f) => f.status === "new" || (!f.status && f.source === "client" && Date.now() - (f.at || 0) < 2 * 864e5)).length;
+    const staffR = VIEWS.staff && canSee("staff"); const fbNew = typeof avisUnread === "function" ? (avisUnread() || 0) : 0;
     /* [route, icon, title, badge, badge tone] */
     const groups = [
       ["Au quotidien", [["releve", "therm", "Relevés", pend > 0 && S.fridges.length ? pend : 0], ["frigos", "snow", "Frigos", 0], ["scan", "scan", "Scanner", urg], ["reception", "truck", "Réception", 0]]],
       ["Cuisine", [["notes", "book", "Recettes & allergènes", 0], ["menage", "spray", "Ménage", 0]]],
       ["Gestion", [["dashboard", "dash", "Tableau de bord", 0], ["finance", "euro", "Finances", 0], ["stock", "box", "Stock", 0], ["tickets", "receipt", "Tickets Z", 0], ["registre", "shield", "Registre", 0], ["obligations", "calcheck", "Obligations", ccOblDueN()]]],
-      ["Équipe", [["pointeuse", "clock", "Pointeuse", ccOnShiftN(), "ok"], ["planning", "cal", "Planning", 0], staffR ? ["staff", "users", "Équipe & salaires", 0] : ["equipe", "users", "Équipe", 0], ["avis", "star", "Avis & retours", fbNew, "acc"]]],
-      ["Restaurant", [...(staffR ? [["equipe", "lock", "Profils & codes", 0]] : []), ["imprimante", "printer", "Imprimante", 0], ["reglages", "sliders", "Réglages", 0]]],
+      ["Équipe", [["pointeuse", "clock", "Pointeuse", ccOnShiftN(), "ok"], ["planning", "cal", "Planning", 0], staffR ? ["staff", "users", "Équipe & salaires", 0] : ["equipe", "users", "Équipe", 0], ["avis", "star", "Votre avis sur l'app", fbNew, "acc"]]],
+      ["Restaurant", [...(staffR ? [["equipe", "lock", "Profils & codes", 0]] : []), ["imprimante", "printer", "Imprimante", 0], ["reglages", "sliders", "Réglages", 0], ...(typeof avisIsAdmin === "function" && avisIsAdmin() ? [["avisAdmin", "star", "Retours reçus (admin)", 0]] : [])]],
     ];
     let k = 2;
     const me = ccMember(S.me.id) || { id: S.me.id, name: S.me.name, color: S.me.color };
