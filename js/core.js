@@ -136,41 +136,92 @@ const SFX = {
 };
 const buzz = (p = 8) => { try { navigator.vibrate && navigator.vibrate(p); } catch (e) {} };
 
-/* ───────────────────────── data layer (shared db, or local demo) ───────────────────────── */
+/* ───────────────────────── data layer ─────────────────────────
+   DB.mode: "local" (this device, localStorage gg-local), "demo" (in memory, never persisted, seeded by js/demo.js),
+   or "db" (Firestore through js/auth.js, offline cache on; or the Claude runtime db). Same API in every mode:
+   DB.watch(col, {order, dir, limit}, cb) · DB.add · DB.set · DB.update · DB.del, data under restos/{rid}/{col}. */
 const DB = {
-  mode: "local", db: null, subs: [],
+  mode: "local", db: null, uid: null, subs: [],
   local: (() => { try { return JSON.parse(localStorage.getItem("gg-local") || "{}"); } catch (e) { return {}; } })(),
   listeners: {},
   dirty: false,
-  flush() { if (!DB.dirty) return; DB.dirty = false; try { localStorage.setItem("gg-local", JSON.stringify(DB.local)); } catch (e) {} },
-  saveLocal: (() => { const d = debounce(() => DB.flush(), 60); return () => { DB.dirty = true; d(); }; })(),
+  flush() { if (!DB.dirty || DB.mode === "demo") return; DB.dirty = false; try { localStorage.setItem("gg-local", JSON.stringify(DB.local)); } catch (e) {} },
+  saveLocal: (() => { const d = debounce(() => DB.flush(), 60); return () => { if (DB.mode === "demo") return; DB.dirty = true; d(); }; })(),
   emit(path) { const all = Object.entries(this.local[path] || {}).map(([id, d]) => ({ id, ...d })); (this.listeners[path] || []).forEach((l) => { const o = l.opts || {}; let rows = all.slice(); if (o.order) { const k = o.order, m = o.dir === "desc" ? -1 : 1; rows.sort((a, b) => (a[k] > b[k] ? 1 : a[k] < b[k] ? -1 : 0) * m); } if (o.limit) rows = rows.slice(0, o.limit); l(rows); }); this.saveLocal(); },
   path(col) { return col === "restos" ? "restos" : `restos/${S.rid}/${col}`; },
+  /* Firestore refuses undefined values and class instances: plain JSON only */
+  clean: (d) => JSON.parse(JSON.stringify(d ?? {})),
+  /* a Firestore write promise only settles when the server acknowledges it, which never happens offline (the kitchen cellar):
+     the local cache already has the write, so callers wait at most 1.5 s online, not at all offline. A late refusal still shows. */
+  dbw(p) {
+    let late = false;
+    p.catch((e) => { console.warn("db write", e); if (late) { SFX.err(); toast(e && e.code === "permission-denied" ? "Modification refusée : votre rôle ne le permet pas." : "Une modification n'a pas pu être enregistrée.", "err"); } });
+    const wait = typeof navigator !== "undefined" && navigator.onLine === false ? 0 : 1500;
+    return Promise.race([p, new Promise((r) => setTimeout(() => { late = true; r(); }, wait))]);
+  },
   watch(col, opts, cb) {
     const path = this.path(col);
     if (this.mode === "db") {
+      if (col === "restos" && this.uid) return this.watchMyRestos(cb);
       let q = this.db.collection(path); if (opts.order) q = q.orderBy(opts.order, opts.dir || "asc"); if (opts.limit) q = q.limit(opts.limit);
       const timer = setTimeout(() => { S.slow = true; refresh(); }, 10000);
-      const un = q.onSnapshot((snap) => { if (!snap.metadata.fromCache) { clearTimeout(timer); S.slow = false; } cb(snap.docs.map((d) => ({ id: d.id, ...d.data() }))); }, (e) => { clearTimeout(timer); console.warn("db", col, e); S.dbErr = e.code; refresh(); });
-      this.subs.push(un); return;
+      /* a listener opened a moment before a new membership reaches the server is refused once: retry a few times, then report */
+      let un = null, dead = false; const t0 = Date.now();
+      const start = (n) => { un = q.onSnapshot((snap) => { if (!snap.metadata.fromCache) { clearTimeout(timer); S.slow = false; } cb(snap.docs.map((d) => ({ id: d.id, ...d.data() }))); }, (e) => {
+        if (!dead && e && e.code === "permission-denied" && n < 4 && Date.now() - t0 < 30000) { setTimeout(() => { if (!dead) start(n + 1); }, 1200 * (n + 1)); return; }
+        clearTimeout(timer); console.warn("db", col, e); S.dbErr = e && e.code; refresh(); }); };
+      start(0);
+      this.subs.push(() => { dead = true; clearTimeout(timer); try { un && un(); } catch (e) {} }); return;
     }
     cb.opts = opts || {}; (this.listeners[path] ||= []).push(cb); setTimeout(() => this.emit(path), 0);
+  },
+  /* accounts (js/auth.js): a user may only read the restaurants they belong to, so the list comes from users/{uid}.restos
+     and each restos/{rid} doc is watched on its own. The callback waits until every listed doc has answered. */
+  watchMyRestos(cb) {
+    const fs = this.db, subs = {}, docs = {}, seen = new Set(); let ids = [];
+    const emit = () => { if (ids.every((id) => seen.has(id))) cb(ids.filter((id) => docs[id]).map((id) => ({ id, ...docs[id] }))); };
+    const un = fs.collection("users").doc(this.uid).onSnapshot((s) => {
+      const d = s.exists ? s.data() || {} : {}; ids = Array.isArray(d.restos) ? d.restos.filter((x) => typeof x === "string") : [];
+      Object.keys(subs).forEach((id) => { if (!ids.includes(id)) { try { subs[id](); } catch (e) {} delete subs[id]; delete docs[id]; seen.delete(id); } });
+      ids.forEach((id) => {
+        if (subs[id]) return;
+        const sub = (n) => { subs[id] = fs.collection("restos").doc(id).onSnapshot((x) => { seen.add(id); if (x.exists) docs[id] = x.data(); else delete docs[id]; emit(); },
+          (e) => { console.warn("resto", id, e && e.code); seen.add(id); delete docs[id]; emit(); delete subs[id]; if (n < 4) setTimeout(() => { if (ids.includes(id) && !subs[id]) sub(n + 1); }, 1500 * (n + 1)); }); };
+        sub(0);
+      });
+      emit();
+    }, (e) => { console.warn("users", e && e.code); S.dbErr = e && e.code; ids = []; emit(); });
+    this.subs.push(() => { try { un(); } catch (e) {} Object.values(subs).forEach((u) => { try { u(); } catch (e) {} }); });
+  },
+  /* a new restaurant with accounts: the resto, its owner's gérant membership and the owner's list, in one atomic batch (works offline) */
+  createResto(id, data) {
+    const fs = this.db, FV = firebase.firestore.FieldValue, u = (typeof authUser === "function" && authUser()) || {};
+    const b = fs.batch();
+    b.set(fs.collection("restos").doc(id), this.clean({ plan: "essai", ...data, owner: this.uid, createdAt: data.createdAt || Date.now() }));
+    b.set(fs.doc(`restos/${id}/members/${this.uid}`), this.clean({ name: S.me.name || u.name || "", email: u.email || "", photo: u.photo || "", role: "gerant", joinedAt: Date.now() }));
+    b.set(fs.collection("users").doc(this.uid), { restos: FV.arrayUnion(id) }, { merge: true });
+    return b.commit();
   },
   unsubAll() { this.subs.forEach((u) => { try { u(); } catch (e) {} }); this.subs = []; this.listeners = {}; },
   async add(col, data) { const id = (Date.now().toString(36) + Math.random().toString(36).slice(2, 7)); await this.set(col, id, data); return id; },
   async set(col, id, data) {
     const path = this.path(col);
-    if (this.mode === "db") return this.db.collection(path).doc(id).set(data);
+    if (this.mode === "db") {
+      if (this.uid && col === "restos" && !S.restos.find((r) => r.id === id)) return this.dbw(this.createResto(id, data));
+      /* members: merge, so an area writing {role, name, color} keeps the account's e-mail and photo */
+      const ref = this.db.collection(path).doc(id);
+      return this.dbw(this.uid && col === "members" ? ref.set(this.clean(data), { merge: true }) : ref.set(this.clean(data)));
+    }
     (this.local[path] ||= {})[id] = JSON.parse(JSON.stringify(data)); this.emit(path);
   },
   async update(col, id, patch) {
     const path = this.path(col);
-    if (this.mode === "db") return this.db.collection(path).doc(id).update(patch);
+    if (this.mode === "db") return this.dbw(this.db.collection(path).doc(id).update(this.clean(patch)));
     const cur = (this.local[path] ||= {})[id] || {}; this.local[path][id] = { ...cur, ...JSON.parse(JSON.stringify(patch)) }; this.emit(path);
   },
   async del(col, id) {
     const path = this.path(col);
-    if (this.mode === "db") return this.db.collection(path).doc(id).delete();
+    if (this.mode === "db") return this.dbw(this.db.collection(path).doc(id).delete());
     if (this.local[path]) delete this.local[path][id]; this.emit(path);
   },
 };
@@ -254,12 +305,25 @@ async function boot() {
   if (user) {
     try { const me = await user.me(); const id = await user.id(); S.me = { id: id || me.id || "anon", name: me.name || "", avatarUrl: me.avatarUrl, color: me.color }; S.isOwner = !!me.isOwner; S.profiles[S.me.id] = { ...S.me }; } catch (e) {}
   }
-  if (db && S.me.id && S.me.id !== "local") { DB.mode = "db"; DB.db = db; } else { S.isOwner = true; }
+  if (db && S.me.id && S.me.id !== "local") { DB.mode = "db"; DB.db = db; }
+  else if (typeof AUTH !== "undefined" && AUTH.gate) {
+    /* js/auth.js decides: welcome screen, demo, this device only, or a signed-in account (Firestore) */
+    const g = (await AUTH.gate()) || { mode: "local" };
+    if (g.mode === "db") {
+      DB.mode = "db"; DB.db = g.fs; DB.uid = g.user.uid; memberChecked = true; S.isOwner = false;
+      S.me = { id: g.user.uid, name: g.user.name || "", email: g.user.email || "", avatarUrl: g.user.photo || undefined }; S.profiles[S.me.id] = { ...S.me };
+      S.rid = g.rid || lsGet("gg-rid-c") || null;
+    } else if (g.mode === "demo") {
+      DB.mode = "demo"; DB.local = g.data; S.rid = g.rid; S.me = { ...g.me }; S.isOwner = true; S.profiles[S.me.id] = { ...S.me };
+    } else S.isOwner = true;
+  } else { S.isOwner = true; }
   DB.watch("restos", {}, (rows) => {
     S.restos = rows.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
     if (!S.rid || !S.restos.find((r) => r.id === S.rid)) { S.rid = S.restos[0]?.id || null; if (S.rid) attachResto(); }
     S.resto = S.restos.find((r) => r.id === S.rid) || null;
     if (!S.ready) { S.ready = true; finishBoot(); } else refresh();
+    /* removed from every team (or the last restaurant deleted): back to « créer ou rejoindre » */
+    if (S.ready && DB.uid && !S.restos.length && typeof AUTH !== "undefined" && AUTH.noResto) AUTH.noResto();
   });
   if (S.rid) attachResto();
   setTimeout(() => { if (!S.ready) { S.ready = true; finishBoot(); } }, 10000);
@@ -270,11 +334,15 @@ function finishBoot() {
   /* deep link from a home-screen shortcut (manifest "shortcuts"): ./?go=releve — Accueil stays underneath, so Retour lands there */
   try { const u = new URL(location.href), t = u.searchParams.get("go"); if (t) { u.searchParams.delete("go"); history.replaceState(null, "", u.pathname + u.search + u.hash); if (S.resto && VIEWS[t] && t !== "home" && t !== "onboarding") go(t, t === "reception" ? { fresh: true } : {}); } } catch (e) {}
   setTimeout(() => $("#boot").classList.add("out"), 250);
+  /* hook for js/compte.js (PIN lock) and others: the app is on screen, mode and person are known */
+  try { window.dispatchEvent(new CustomEvent("gg:ready", { detail: { mode: DB.mode, uid: DB.uid, rid: S.rid } })); } catch (e) {}
 }
+function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
 let attachedRid = null;
 function attachResto() {
   if (!S.rid || attachedRid === S.rid) return; attachedRid = S.rid;
-  try { localStorage.setItem("gg-rid", S.rid); } catch (e) {}
+  /* the last open restaurant, per mode (the demo never touches this device's choice) */
+  if (DB.mode !== "demo") { try { localStorage.setItem(DB.uid ? "gg-rid-c" : "gg-rid", S.rid); } catch (e) {} }
   const keep = DB.subs.length ? DB.subs.shift() : null; DB.subs.forEach((u) => { try { u(); } catch (e) {} }); DB.subs = keep ? [keep] : [];
   if (DB.mode === "local") { Object.keys(DB.listeners).forEach((k) => { if (k !== "restos") delete DB.listeners[k]; }); }
   const w = (col, opts, key, after) => DB.watch(col, opts, (rows) => { S[key] = rows; after && after(); onData(); });
@@ -289,7 +357,7 @@ function attachResto() {
   w("chores", {}, "chores");
   w("choreLogs", { order: "at", dir: "desc", limit: 400 }, "choreLogs");
   w("tickets", { order: "at", dir: "desc", limit: 60 }, "tickets");
-  w("members", {}, "members", ensureMember);
+  w("members", {}, "members", () => { syncAccountMembers(); ensureMember(); });
   /* V3 shared collections (see tools/BRIEF.md « V3 data contract ») */
   w("moves", { order: "at", dir: "desc", limit: 5000 }, "moves");
   w("staff", {}, "staff");
@@ -301,9 +369,16 @@ function attachResto() {
   w("expenses", { order: "at", dir: "desc", limit: 3000 }, "expenses");
 }
 let memberChecked = false;
+/* accounts: role and profile come from restos/{rid}/members/{uid}; names and photos of the team from their member docs */
+function syncAccountMembers() {
+  if (!DB.uid) return;
+  S.members.forEach((m) => { S.profiles[m.id] = { ...(S.profiles[m.id] || {}), name: m.name || S.profiles[m.id]?.name || "", ...(m.photo ? { avatarUrl: m.photo } : {}), ...(m.color ? { color: m.color } : {}) }; });
+  const me = S.members.find((m) => m.id === DB.uid);
+  if (me) { S.isOwner = me.role === "gerant"; if (me.name && !S.me.name) S.me.name = me.name; }
+}
 function ensureMember() {
   const mine = S.members.find((m) => m.id === S.me.id); if (mine && mine.name && !S.me.name) { S.me.name = mine.name; }
-  if (memberChecked || DB.mode !== "db") return; memberChecked = true;
+  if (memberChecked || DB.mode !== "db" || DB.uid) return; memberChecked = true; /* accounts: memberships are written by js/auth.js (create, invite) */
   if (!S.members.find((m) => m.id === S.me.id)) {
     const role = S.isOwner || !S.members.length ? "gerant" : "equipe";
     DB.set("members", S.me.id, { role, joinedAt: Date.now(), ...(S.me.name ? { name: S.me.name } : {}) }).then(() => logEvent("team", `a rejoint ${S.resto?.name || "le restaurant"}`)).catch(() => {});
@@ -322,7 +397,7 @@ const NAV = [
   ["home", "home", "Aujourd'hui"], ["releve", "therm", "Relevés"], ["frigos", "snow", "Frigos"], ["scan", "scan", "Scanner"], ["reception", "truck", "Réception"],
   ["sep", "", "Cuisine"], ["notes", "book", "Recettes & allergènes"], ["menage", "spray", "Planning ménage"],
   ["sep", "", "Gestion"], ["dashboard", "dash", "Tableau de bord"], ["finance", "euro", "Finances"], ["stock", "box", "Stock & inventaire"], ["tickets", "receipt", "Tickets de caisse"], ["registre", "shield", "Registre HACCP"], ["obligations", "calcheck", "Obligations & contrôles"],
-  ["sep", "", "Équipe"], ["pointeuse", "clock", "Pointeuse"], ["planning", "cal", "Planning"], ["equipe", "users", "Équipe & salaires"], ["avis", "star", "Avis & retours"],
+  ["sep", "", "Équipe"], ["pointeuse", "clock", "Pointeuse"], ["planning", "cal", "Planning"], ["equipe", "users", "Équipe & salaires"], ["avis", "star", "Votre avis"],
   ["sep", "", "Restaurant"], ["imprimante", "printer", "Imprimante"], ["reglages", "sliders", "Réglages"],
 ];
 const TABS = [["home", "home", "Accueil"], ["frigos", "snow", "Frigos"], ["scan", "scan", ""], ["stock", "box", "Stock"], ["more", "grid", "Plus"]];
@@ -533,6 +608,7 @@ async function shrink(file, max = 1600, q = 0.85) {
 }
 /* upload(blob) → {id, url}. With the Claude runtime: assets capability. Standalone: compressed JPEG kept on the device (IndexedDB). */
 async function upload(blob) {
+  if (DB.mode === "demo") return { id: "", url: URL.createObjectURL(blob) }; /* demo: nothing is kept, not even photos */
   if (S.cap.assets) { try { const r = await S.cap.assets.upload(blob); return { id: r.id, url: r.url }; } catch (e) { console.warn(e); return { id: "", url: URL.createObjectURL(blob) }; } }
   try { return await PHOTOS.save(blob); } catch (e) { console.warn("photo", e); return { id: "", url: URL.createObjectURL(blob) }; }
 }
@@ -707,7 +783,7 @@ function registerSW() {
    to the foreground. A new v means the code running here is old: with nothing in progress the app reloads silently (caches dropped,
    so the reload is guaranteed fresh); otherwise a toast offers « Mettre à jour ». sessionStorage guards against reload loops:
    one reload attempt per version per session, after which the version is simply adopted. */
-const APP_V = "2026-11-04.1";
+const APP_V = "2026-11-04.2";
 const UPD = {
   running: null, offered: null,
   get: (k, store) => { try { return store.getItem(k); } catch (e) { return null; } },

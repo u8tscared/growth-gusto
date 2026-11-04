@@ -1,5 +1,8 @@
-// Onboarding -> home -> relevé -> frigos. Onboarding fields live on separate steps, so set them directly.
+// Welcome -> « Continuer sans compte » -> onboarding -> home -> relevé -> frigos. Onboarding fields live on separate steps, so set them directly.
+// (A fresh device shows the accounts welcome screen, js/auth.js; opening the app with ?local=1 skips it too.)
 module.exports=async(page,shot)=>{const c=s=>page.$eval(s,e=>e.click());
+await page.waitForFunction(()=>document.querySelector('#au.on [data-act=auLocal]')||(window.S&&S.ready),null,{timeout:8000}).catch(()=>{});
+if(await page.$('#au.on [data-act=auLocal]')){await page.waitForTimeout(700);await shot('00-welcome');await c('#au.on [data-act=auLocal]');await page.waitForTimeout(900);}
 await shot('01-onboarding');
 await page.evaluate(()=>{const set=(id,v)=>{const e=document.getElementById(id);if(e){e.value=v;e.dispatchEvent(new Event('input',{bubbles:true}));}};set('obMe','Marceau');set('obName','Chemin des Sarments');});
 await page.evaluate(()=>ACT.obCreate());await page.waitForTimeout(2500);

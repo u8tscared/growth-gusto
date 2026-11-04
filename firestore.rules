@@ -1,0 +1,100 @@
+rules_version = '2';
+// Growth Gusto · Firestore security rules (paste in Firebase console → Firestore Database → Règles → Publier).
+// Data model:
+//   users/{uid}                      { name, email, photo, restos: [rid] }       the person's own profile and restaurant list
+//   restos/{rid}                     { name, owner, createdAt, plan: "essai" }   one restaurant
+//   restos/{rid}/members/{memberId}  { name, email, role: gerant|chef|equipe, joinedAt }  memberId = uid (account) or a kitchen profile id
+//   restos/{rid}/{collection}/{id}   fridges, readings, lots, products, tickets, staff… (members only)
+//   invites/{code}                   { rid, restoName, role, createdBy, createdAt, expiresAt (ms), uses }
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() { return request.auth != null; }
+    function me() { return request.auth.uid; }
+    function restoPath(rid) { return /databases/$(database)/documents/restos/$(rid); }
+    function memberPath(rid) { return /databases/$(database)/documents/restos/$(rid)/members/$(request.auth.uid); }
+    function invitePath(code) { return /databases/$(database)/documents/invites/$(code); }
+    function isMember(rid) { return signedIn() && exists(memberPath(rid)); }
+    // after the write (or the whole batch): lets a new restaurant, an import or a join write its first docs atomically
+    function isMemberAfter(rid) { return signedIn() && existsAfter(memberPath(rid)); }
+    function isGerant(rid) { return isMember(rid) && get(memberPath(rid)).data.role == 'gerant'; }
+    function ownerOf(rid) { return get(restoPath(rid)).data.owner; }
+    function validRole(r) { return r in ['gerant', 'chef', 'equipe']; }
+    function unchanged(keys) { return !request.resource.data.diff(resource.data).affectedKeys().hasAny(keys); }
+
+    // ── people ──
+    match /users/{uid} {
+      allow read, write: if signedIn() && me() == uid;
+    }
+
+    // ── restaurants ──
+    match /restos/{rid} {
+      allow read: if isMember(rid);
+      allow create: if signedIn() && request.resource.data.owner == me() && request.resource.data.name is string;
+      allow update: if isGerant(rid) && unchanged(['owner', 'createdAt'])
+                    || isMember(rid) && unchanged(['owner', 'createdAt', 'name', 'plan']);
+      allow delete: if signedIn() && resource.data.owner == me();
+
+      // ── team: only a gérant manages it ──
+      match /members/{mid} {
+        allow read: if isMember(rid);
+        allow create: if signedIn() && validRole(request.resource.data.role) && (
+             // the owner's own gérant membership, written in the same batch as the restaurant
+             (mid == me() && request.resource.data.role == 'gerant' && getAfter(restoPath(rid)).data.owner == me())
+             // a gérant adds someone (an account or a kitchen profile)
+          || isGerant(rid)
+             // joining with a valid invite code: the role is the invite's, never chosen by the newcomer
+          || (mid == me()
+              && request.resource.data.invite is string
+              && exists(invitePath(request.resource.data.invite))
+              && get(invitePath(request.resource.data.invite)).data.rid == rid
+              && get(invitePath(request.resource.data.invite)).data.role == request.resource.data.role
+              && get(invitePath(request.resource.data.invite)).data.expiresAt > request.time.toMillis())
+        );
+        // a gérant edits anyone but cannot demote the owner; anyone edits their own name/photo/PIN but never their role
+        allow update: if validRole(request.resource.data.role) && (
+             (isGerant(rid) && (mid != ownerOf(rid) || request.resource.data.role == 'gerant'))
+          || (mid == me() && isMember(rid) && unchanged(['role', 'invite']))
+        );
+        // a gérant removes someone (never the owner); anyone can leave, except the owner
+        allow delete: if (isGerant(rid) && mid != ownerOf(rid)) || (signedIn() && mid == me() && ownerOf(rid) != me());
+      }
+
+      // ── everything else (fridges, readings, lots, stock, tickets, staff, finances…): members only ──
+      match /{col}/{doc} {
+        allow read: if col != 'members' && isMember(rid);
+        allow create, update, delete: if col != 'members' && isMemberAfter(rid);
+      }
+    }
+
+    // ── in-app feedback about Growth Gusto itself (written by js/avis.js): authors see theirs, admins see all ──
+    function isAdmin() {
+      return signedIn() && request.auth.token.email in ['marceau.ruis@gmail.com']
+        && (request.auth.token.email_verified == true || request.auth.token.firebase.sign_in_provider == 'google.com');
+    }
+    match /appFeedback/{id} {
+      // anyone signed in sends feedback for a restaurant they belong to; the restaurant's team sees its own; admins see all
+      allow create: if signedIn() && request.resource.data.uid == me() && request.resource.data.rid is string && isMember(request.resource.data.rid);
+      allow get, list: if isAdmin() || (signedIn() && (resource.data.uid == me() || isMember(resource.data.rid)));
+      allow update, delete: if isAdmin();
+    }
+
+    // ── invites: readable by whoever has the code, managed by the restaurant's gérants ──
+    match /invites/{code} {
+      allow get: if true;
+      allow list: if isGerant(resource.data.rid);
+      allow create: if isGerant(request.resource.data.rid)
+                    && request.resource.data.createdBy == me()
+                    && validRole(request.resource.data.role)
+                    && request.resource.data.uses == 0
+                    && request.resource.data.expiresAt is number;
+      allow update: if isGerant(resource.data.rid) && unchanged(['rid', 'createdBy'])
+                    // a newcomer counts their use, nothing else
+                    || (signedIn()
+                        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['uses', 'lastUsedAt'])
+                        && request.resource.data.uses == resource.data.uses + 1
+                        && resource.data.expiresAt > request.time.toMillis());
+      allow delete: if isGerant(resource.data.rid);
+    }
+  }
+}

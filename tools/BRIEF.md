@@ -70,3 +70,29 @@ This build runs on GitHub Pages, with no Claude runtime.
    - what you changed;
    - what you verified, with screenshot paths;
    - anything left or needed from core.
+
+## V3 data contract (2026-11-04)
+
+Core already subscribes these collections into `S` (arrays, newest first where ordered). Use them, don't re-watch them:
+
+| collection | `S.` key | shape (add fields freely, never rename) |
+|---|---|---|
+| `moves` | `S.moves` | stock movement: `{ productId, name, qty, unit, kind, ref?, refType?, fridgeId?, toFridgeId?, lotId?, at, uid, by }`. `qty` is signed in the product's unit: negative = out (recipe used, sold, waste), positive = in. `kind` ∈ `recette`, `vente`, `perte`, `transfert`, `correction`, `reception`. A fridge transfer has `kind:"transfert"`, `qty:0` impact on stock, and `fridgeId`/`toFridgeId`. |
+| `staff` | `S.staff` | employee file, one per person: `{ memberId?, name, role, color, contract, weeklyHours, hourlyGross, chargesPct, pinHash?, active, start, end? }` |
+| `shifts` | `S.shifts` | planned shift: `{ staffId, day:"YYYY-MM-DD", start:"HH:MM", end:"HH:MM", breakMin, post?, note? }` |
+| `punches` | `S.punches` | time clock: `{ staffId, kind:"in"|"out"|"breakStart"|"breakEnd", at, day, by, edited?, editedBy?, note? }` |
+| `obligations` | `S.obligations` | recurring legal obligation: `{ key, name, cat, everyMonths, provider?, phone?, contract?, lastDone?, nextDue?, notes?, archived? }` |
+| `oblLogs` | `S.oblLogs` | one intervention: `{ oblId, day, provider, by, at, notes?, cost?, files:[{id,name,type}] }` |
+| `feedback` | `S.feedback` | `{ source:"client"|"equipe", rating?, dish?, noteId?, channel?, text, at, by, reply?, status? }` |
+| `expenses` | `S.expenses` | purchase or cost: `{ day, cat, supplier?, label, amountHT, vat?, receptionId?, at, by }` |
+
+Shared globals: `ALLERGENS` (14 regulated allergens `{id,t,s}`) and `allergenOf(id)` live in core. Products and recipes store allergens as `allergens: ["lait","oeufs"]`.
+
+Cross-area helpers (define in your own file; callers guard with `typeof x === "function"`):
+- stock.js: `stockLevel(productId)` → theoretical quantity (last count + receptions + moves since), `stockMove(doc)` → writes a `moves` doc and logs the event.
+- notes.js: `recipeAllergens(note)` → allergen ids of a recipe (own + from linked products and sub-recipes).
+- rh.js: `staffCost(from, to)` → `{ hours, gross, loaded }` from punches (or shifts when no punch).
+- tickets.js: `salesBetween(from, to)` → `{ ttc, ht, covers, days }`.
+- oblig.js: `oblDue(days=30)` → obligations due or late within N days.
+
+Routes already in NAV/TAB_OF (core): `dashboard`, `finance` (js/finance.js), `obligations` (js/oblig.js), `pointeuse`, `planning` (js/rh.js; employee files and salaries can live at route `staff` in rh.js too, add `TAB_OF.staff="more"`), `avis` (js/avis.js). Icons `dash`, `euro`, `calcheck`, `clock`, `cal`, `star` exist.
