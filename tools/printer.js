@@ -3,8 +3,9 @@ const fs=require('fs');const path=require('path');const {chromium}=require('play
 module.exports=async(page,shot,ctx)=>{const c=s=>page.$eval(s,e=>e.click());const OUT=path.resolve(process.env.OUT||path.join(__dirname,'out'));
 await page.waitForFunction(()=>document.querySelector('#au.on [data-act=auLocal]')||(window.S&&S.ready),null,{timeout:8000}).catch(()=>{});
 if(await page.$('#au.on [data-act=auLocal]')){await c('#au.on [data-act=auLocal]');await page.waitForTimeout(900);}
-await page.evaluate(()=>{const set=(id,v)=>{const e=document.getElementById(id);if(e){e.value=v;e.dispatchEvent(new Event('input',{bubbles:true}));}};set('obMe','Marceau');set('obName','Chemin des Sarments');});
-await page.evaluate(()=>ACT.obCreate());await page.waitForTimeout(2200);
+const set=async(id,v)=>page.evaluate(([id,v])=>{const e=document.getElementById(id);if(e){e.value=v;e.dispatchEvent(new Event('input',{bubbles:true}));}},[id,v]);
+await set('obName','Chemin des Sarments');await page.evaluate(()=>ACT.obNext());await page.waitForTimeout(600);await set('obMe','Marceau');
+await page.evaluate(()=>ACT.obCreate());await page.waitForTimeout(2500);await page.evaluate(()=>typeof ACT.obFinish==='function'&&ACT.obFinish());await page.waitForTimeout(900);
 if(!(await page.evaluate(()=>!!S.resto)))throw new Error('no resto');
 // lots: one plain (allergens via its product), one opened, one with a long name and own allergens
 const ids=await page.evaluate(async()=>{const f=S.fridges[0]?.id||'';const now=Date.now();
