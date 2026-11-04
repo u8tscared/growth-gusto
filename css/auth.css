@@ -526,3 +526,11 @@ html.au-leaving body{opacity:0;transition:opacity .25s}
 @media (min-width:960px){.au-net{bottom:24px}}
 
 @media (prefers-reduced-motion:reduce){.au-demo-dot,.au-spin{animation:none!important}}
+/* accounts: destructive sheets (vider, supprimer, quitter) */
+.au-shic.bad{background:rgba(212,42,72,.1);color:var(--bad)}
+.au-conf .field{margin-top:4px}
+.au-sh form{display:flex;flex-direction:column;gap:12px}
+.au-sh .au-err{margin:0}
+.au-primary.au-danger{background:var(--c-tomato2,#C8432A);border-color:#8F2A17;--edge:#6E1F10}
+.au-delacc{margin-top:14px;color:var(--c-ink2);opacity:.8}
+.au-form .au-ghost{align-self:center}

@@ -186,7 +186,9 @@ const DB = {
       ids.forEach((id) => {
         if (subs[id]) return;
         const sub = (n) => { subs[id] = fs.collection("restos").doc(id).onSnapshot((x) => { seen.add(id); if (x.exists) docs[id] = x.data(); else delete docs[id]; emit(); },
-          (e) => { console.warn("resto", id, e && e.code); seen.add(id); delete docs[id]; emit(); delete subs[id]; if (n < 4) setTimeout(() => { if (ids.includes(id) && !subs[id]) sub(n + 1); }, 1500 * (n + 1)); }); };
+          (e) => { console.warn("resto", id, e && e.code); seen.add(id); delete docs[id]; emit(); delete subs[id]; if (n < 4) setTimeout(() => { if (ids.includes(id) && !subs[id]) sub(n + 1); }, 1500 * (n + 1));
+            /* still refused after the retries while online: removed from that team (or the restaurant was deleted), so drop it from my list for good */
+            else if (e && e.code === "permission-denied" && navigator.onLine !== false && ids.includes(id)) fs.collection("users").doc(this.uid).set({ restos: firebase.firestore.FieldValue.arrayRemove(id) }, { merge: true }).catch(() => {}); }); };
         sub(0);
       });
       emit();
