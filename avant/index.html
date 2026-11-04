@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#ECEFFB">
+<meta name="description" content="Relevés de température, étiquettes, réception et registre HACCP pour votre cuisine.">
+<meta name="format-detection" content="telephone=no">
+<meta name="application-name" content="Gusto">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Gusto">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="icon" href="icons/favicon-32.png" type="image/png" sizes="32x32">
+<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png">
+<!-- iOS launch images: rendered from the boot screen by tools/gen-splash.js (phones portrait, iPads both orientations) -->
+<link rel="apple-touch-startup-image" href="icons/splash-1320x2868.jpg" media="(device-width: 440px) and (device-height: 956px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)">
+<link rel="apple-touch-startup-image" href="icons/splash-1290x2796.jpg" media="(device-width: 430px) and (device-height: 932px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)">
+<link rel="apple-touch-startup-image" href="icons/splash-1260x2736.jpg" media="(device-width: 420px) and (device-height: 912px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)">
+<link rel="apple-touch-startup-image" href="icons/splash-1206x2622.jpg" media="(device-width: 402px) and (device-height: 874px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)">
+<link rel="apple-touch-startup-image" href="icons/splash-1179x2556.jpg" media="(device-width: 393px) and (device-height: 852px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)">
+<link rel="apple-touch-startup-image" href="icons/splash-1284x2778.jpg" media="(device-width: 428px) and (device-height: 926px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)">
+<link rel="apple-touch-startup-image" href="icons/splash-1170x2532.jpg" media="(device-width: 390px) and (device-height: 844px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)">
+<link rel="apple-touch-startup-image" href="icons/splash-1125x2436.jpg" media="(device-width: 375px) and (device-height: 812px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)">
+<link rel="apple-touch-startup-image" href="icons/splash-1242x2688.jpg" media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)">
+<link rel="apple-touch-startup-image" href="icons/splash-828x1792.jpg" media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)">
+<link rel="apple-touch-startup-image" href="icons/splash-1242x2208.jpg" media="(device-width: 414px) and (device-height: 736px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)">
+<link rel="apple-touch-startup-image" href="icons/splash-750x1334.jpg" media="(device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)">
+<link rel="apple-touch-startup-image" href="icons/splash-2064x2752.jpg" media="(device-width: 1032px) and (device-height: 1376px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)">
+<link rel="apple-touch-startup-image" href="icons/splash-2752x2064.jpg" media="(device-width: 1032px) and (device-height: 1376px) and (-webkit-device-pixel-ratio: 2) and (orientation: landscape)">
+<link rel="apple-touch-startup-image" href="icons/splash-2048x2732.jpg" media="(device-width: 1024px) and (device-height: 1366px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)">
+<link rel="apple-touch-startup-image" href="icons/splash-2732x2048.jpg" media="(device-width: 1024px) and (device-height: 1366px) and (-webkit-device-pixel-ratio: 2) and (orientation: landscape)">
+<link rel="apple-touch-startup-image" href="icons/splash-1668x2420.jpg" media="(device-width: 834px) and (device-height: 1210px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)">
+<link rel="apple-touch-startup-image" href="icons/splash-2420x1668.jpg" media="(device-width: 834px) and (device-height: 1210px) and (-webkit-device-pixel-ratio: 2) and (orientation: landscape)">
+<link rel="apple-touch-startup-image" href="icons/splash-1668x2388.jpg" media="(device-width: 834px) and (device-height: 1194px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)">
+<link rel="apple-touch-startup-image" href="icons/splash-2388x1668.jpg" media="(device-width: 834px) and (device-height: 1194px) and (-webkit-device-pixel-ratio: 2) and (orientation: landscape)">
+<link rel="apple-touch-startup-image" href="icons/splash-1640x2360.jpg" media="(device-width: 820px) and (device-height: 1180px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)">
+<link rel="apple-touch-startup-image" href="icons/splash-2360x1640.jpg" media="(device-width: 820px) and (device-height: 1180px) and (-webkit-device-pixel-ratio: 2) and (orientation: landscape)">
+<link rel="apple-touch-startup-image" href="icons/splash-1488x2266.jpg" media="(device-width: 744px) and (device-height: 1133px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)">
+<link rel="apple-touch-startup-image" href="icons/splash-2266x1488.jpg" media="(device-width: 744px) and (device-height: 1133px) and (-webkit-device-pixel-ratio: 2) and (orientation: landscape)">
+<title>Growth Gusto</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap">
+<link rel="stylesheet" href="css/base.css">
+<link rel="stylesheet" href="css/compte.css">
+<link rel="stylesheet" href="css/home.css">
+<link rel="stylesheet" href="css/releve.css">
+<link rel="stylesheet" href="css/labels.css">
+<link rel="stylesheet" href="css/reception.css">
+<link rel="stylesheet" href="css/stock.css">
+<link rel="stylesheet" href="css/tickets.css">
+<link rel="stylesheet" href="css/registre.css">
+<link rel="stylesheet" href="css/notes.css">
+<link rel="stylesheet" href="css/menage.css">
+<link rel="stylesheet" href="css/finance.css">
+<link rel="stylesheet" href="css/oblig.css">
+<link rel="stylesheet" href="css/rh.css">
+<link rel="stylesheet" href="css/avis.css">
+<style>html,body{margin:0;background:#ECEFFB}body{font:14px Manrope,system-ui}[hidden]{display:none!important}</style>
+<script>/* comparison copy (version before accounts): nothing is saved, nothing is cached */
+(function(){var m={};var st={getItem:function(k){return k in m?m[k]:null},setItem:function(k,v){m[k]=String(v)},removeItem:function(k){delete m[k]},clear:function(){m={}},key:function(i){return Object.keys(m)[i]||null}};Object.defineProperty(st,"length",{get:function(){return Object.keys(m).length}});
+try{Object.defineProperty(window,"localStorage",{value:st,configurable:true})}catch(e){}
+try{Object.defineProperty(navigator,"serviceWorker",{value:{register:function(){return Promise.reject(new Error("off"))},getRegistration:function(){return Promise.resolve(null)},getRegistrations:function(){return Promise.resolve([])},addEventListener:function(){},controller:null},configurable:true})}catch(e){}})();</script>
+<script>try{if(matchMedia("(display-mode: standalone)").matches||navigator.standalone)document.documentElement.classList.add("standalone")}catch(e){}</script>
+</head>
+<body>
+
+<div class="aurora" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+<div class="grain" aria-hidden="true"></div>
+<div class="statusveil" aria-hidden="true"></div>
+<div class="boot" id="boot" aria-hidden="true"><div class="boot-ic" id="bootMark"><svg viewBox="0 0 100 100"><path d="M86 16H50A34 34 0 0 0 25.96 74.04" fill="none" stroke="#fff" stroke-width="14"/><path d="M40.5 83.5 80 44M52 42h30v30" fill="none" stroke="#fff" stroke-width="12.5" stroke-linejoin="miter" stroke-miterlimit="4"/></svg></div></div>
+<button class="skip" id="skip" data-act="skipMain">Aller au contenu</button>
+<div id="app">
+  <nav class="side" id="side" aria-label="Navigation"></nav>
+  <main class="main" id="main"><div class="viewport" id="viewport"></div></main>
+</div>
+<nav class="tabbar" id="tabbar" aria-label="Onglets"></nav>
+<div class="scrim" id="scrim"></div>
+<div class="sheet" id="sheet" role="dialog" aria-modal="true" tabindex="-1"><div class="grab" aria-hidden="true"><i></i></div><div class="sheet-body" id="sheetBody"></div></div>
+<div class="toast" id="toast" role="status"><div class="check"><svg viewBox="0 0 24 24"><path d="M6 12.5l4 4 8-9"/></svg></div><span id="toastTx"></span></div>
+<input type="file" id="filePick" accept="image/*" capture="environment" hidden>
+<input type="file" id="filePickMulti" accept="image/*" multiple hidden>
+<script>/* very old browsers (some Android phones ship an outdated built-in browser): explain instead of a blank screen */
+(function(){var ok=true;try{new Function("var a={};a.b??=1;a.c||=2;return a?.b+`x`;")();ok=!!(window.Promise&&window.fetch&&window.localStorage&&Array.prototype.flat&&Object.fromEntries);}catch(e){ok=false}
+if(!ok){window.GG_OLD=1;document.addEventListener("DOMContentLoaded",function(){var d=document.createElement("div");d.setAttribute("style","position:fixed;inset:0;z-index:9999;background:#ECEFFB;display:flex;align-items:center;justify-content:center;padding:24px;font:16px system-ui,sans-serif;color:#0E1330;text-align:center");d.innerHTML='<div style="max-width:360px"><div style="font-size:22px;font-weight:800;margin-bottom:10px">Navigateur trop ancien</div><p style="color:#5A6386;line-height:1.5">Growth Gusto a besoin d\'un navigateur à jour. Ouvrez ce lien dans <b>Google Chrome</b> (mis à jour depuis le Play Store) :</p><p style="font-weight:700;word-break:break-all;margin-top:14px">'+location.href.split("#")[0]+'</p></div>';document.body.appendChild(d);var b=document.getElementById("boot");if(b)b.style.display="none";});}})();</script>
+<script src="vendor/qrcode.js"></script>
+<script src="vendor/jsQR.js"></script>
+
+<script src="js/core.js"></script>
+<script src="js/compte.js"></script>
+<script src="js/home.js"></script>
+<script src="js/releve.js"></script>
+<script src="js/labels.js"></script>
+<script src="js/reception.js"></script>
+<script src="js/stock.js"></script>
+<script src="js/tickets.js"></script>
+<script src="js/registre.js"></script>
+<script src="js/notes.js"></script>
+<script src="js/menage.js"></script>
+<script src="js/finance.js"></script>
+<script src="js/oblig.js"></script>
+<script src="js/rh.js"></script>
+<script src="js/avis.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
