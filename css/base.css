@@ -80,7 +80,13 @@ html.standalone body{top:0;right:0;left:0;bottom:auto;height:var(--appH,100%);mi
    flashes to the top of the screen). body is already the fixed, full-screen box: make it the containing block of every fixed layer,
    as in the home-screen app, so the tab bar, sheet, toast and banners move as one with the screen instead of jumping. */
 body{transform:translateZ(0)}
+/* Safari tab: no viewport-fixed layer at all. The page is a plain full-height box that cannot scroll (html clips it), body is a normal
+   positioned block and the containing block of the tab bar, sheet, toast and banners. Only the screen's own list scrolls. */
+html:not(.standalone){height:100%;overflow:hidden}
+html.tabs,html{margin:0!important;padding:0!important} /* html carries the "tabs" class: never let a .tabs component style reach it */
+html:not(.standalone) body{position:relative;inset:auto;height:100%;min-height:0;overflow:hidden}
 html.standalone #app{height:var(--appH,100dvh)}
+html:not(.standalone) #app{height:100%}
 html.standalone .sheet{max-height:calc(var(--appH,100dvh) - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px) - 40px)}
 html.standalone .toast{top:calc(max(env(safe-area-inset-top,0px),20px) + 10px)}
 @media (min-width:960px){html.standalone .side{height:calc(var(--appH,100dvh) - 24px)}}
@@ -641,3 +647,6 @@ body{font-feature-settings:"tnum","ss01","cv11";font-variant-numeric:tabular-num
 /* phones/tablets: the animated aurora and the blended grain sit behind every scrolling list and cost a full-screen repaint per frame.
    Freeze the aurora (same look, no motion) and drop the grain so scrolling stays at 60 fps. */
 @media (pointer:coarse){.aurora i{animation:none!important;will-change:auto}.grain{display:none}}
+
+/* diagnostics overlay (?debug=1, ?debug=0 to stop): live layout numbers for a screen recording */
+.ggdbg{position:fixed;z-index:9999;left:6px;top:calc(var(--sat,0px) + 40px);pointer-events:none;font:600 10px/1.35 ui-monospace,Menlo,monospace;color:#0f0;background:rgba(0,0,0,.78);padding:5px 7px;border-radius:8px;white-space:pre;max-width:60vw}

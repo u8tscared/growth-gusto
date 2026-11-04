@@ -803,7 +803,7 @@ function registerSW() {
    to the foreground. A new v means the code running here is old: with nothing in progress the app reloads silently (caches dropped,
    so the reload is guaranteed fresh); otherwise a toast offers « Mettre à jour ». sessionStorage guards against reload loops:
    one reload attempt per version per session, after which the version is simply adopted. */
-const APP_V = "2026-11-04.10";
+const APP_V = "2026-11-04.11";
 const UPD = {
   running: null, offered: null,
   get: (k, store) => { try { return store.getItem(k); } catch (e) { return null; } },
@@ -960,3 +960,28 @@ Object.assign(ACT, {
     c.style.height = c.offsetHeight + "px"; void c.offsetWidth; c.classList.add("bye"); setTimeout(() => { c.remove(); }, 420);
   },
 });
+
+/* ───────────────────────── diagnostics (?debug=1) ─────────────────────────
+   A small live readout for a screen recording on a real phone: viewport sizes, what scrolls, where the tab bar is, and how many
+   re-renders and navigations happened. Turn on with ?debug=1, off with ?debug=0 (remembered on this device). */
+(function ggDebug() {
+  let on = false; try { const q = new URLSearchParams(location.search).get("debug"); if (q === "1") localStorage.setItem("gg-debug", "1"); if (q === "0") localStorage.removeItem("gg-debug"); on = localStorage.getItem("gg-debug") === "1"; } catch (e) {}
+  if (!on) return;
+  const C = { r: 0, g: 0, rs: 0, vv: 0, ws: 0 }; window.GGDBG = C;
+  const wrap = (n) => { const f = window[n]; if (typeof f !== "function") return; window[n] = function (...a) { C[n === "refresh" ? "r" : "g"]++; return f.apply(this, a); }; };
+  setTimeout(() => { wrap("refresh"); wrap("go"); }, 0);
+  addEventListener("resize", () => C.rs++); window.visualViewport && visualViewport.addEventListener("resize", () => C.vv++);
+  addEventListener("scroll", () => C.ws++, { passive: true });
+  const el = document.createElement("div"); el.className = "ggdbg"; document.body.appendChild(el);
+  const r = (x) => Math.round(x);
+  const tick = () => {
+    const vv = window.visualViewport || {}, tb = $("#tabbar"), v = $("#viewport .view:not(.leave)"), b = document.body.getBoundingClientRect(), t = tb ? tb.getBoundingClientRect() : { top: 0 };
+    el.textContent = `v ${APP_V} ${document.documentElement.classList.contains("standalone") ? "app" : "safari"}
+ih ${innerHeight} vv ${r(vv.height || 0)}/${r(vv.offsetTop || 0)} sy ${r(scrollY)}
+body ${r(b.top)}/${r(b.height)} tab ${r(t.top)} view ${v ? r(v.scrollTop) : "-"}
+refresh ${C.r} go ${C.g} rs ${C.rs} vvrs ${C.vv} wscroll ${C.ws}
+${S.route} ${[...document.documentElement.classList].filter((c) => /kb|tabs|au-/.test(c)).join(" ")}`;
+    requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+})();
