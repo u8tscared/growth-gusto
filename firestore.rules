@@ -2,7 +2,8 @@ rules_version = '2';
 // Growth Gusto · Firestore security rules (paste in Firebase console → Firestore Database → Règles → Publier).
 // Data model:
 //   users/{uid}                      { name, email, photo, restos: [rid] }       the person's own profile and restaurant list
-//   restos/{rid}                     { name, owner, createdAt, plan: "essai" }   one restaurant
+//   restos/{rid}                     { name, owner, createdAt, plan: essai|essentiel|complet|suspendu, pack, trialEnds, paidUntil… }   one restaurant
+//                                    (the commercial fields are set by the gérant with an activation code, or by a Growth Gusto admin: js/abo.js)
 //   restos/{rid}/members/{memberId}  { name, email, role: gerant|chef|equipe, joinedAt }  memberId = uid (account) or a kitchen profile id
 //   restos/{rid}/{collection}/{id}   fridges, readings, lots, products, tickets, staff… (members only)
 //   invites/{code}                   { rid, restoName, role, createdBy, createdAt, expiresAt (ms), uses }
@@ -21,23 +22,34 @@ service cloud.firestore {
     function ownerOf(rid) { return get(restoPath(rid)).data.owner; }
     function validRole(r) { return r in ['gerant', 'chef', 'equipe']; }
     function unchanged(keys) { return !request.resource.data.diff(resource.data).affectedKeys().hasAny(keys); }
+    // the Growth Gusto team (js/config.js GG_ADMINS, keep both lists in sync): the admin space (js/abo.js) reads every restaurant and
+    // account, and grants, extends or suspends access. A verified e-mail (or Google) is required, so nobody can claim the address.
+    function isAdmin() {
+      return signedIn() && request.auth.token.email in ['marceau.ruis@gmail.com']
+        && (request.auth.token.email_verified == true || request.auth.token.firebase.sign_in_provider == 'google.com');
+    }
+    // the commercial fields an admin may change on a restaurant, nothing else
+    function adminKeys() { return ['plan', 'pack', 'trialEnds', 'paidUntil', 'paidAt', 'grantedBy', 'grantedAt', 'suspended', 'suspendedAt', 'suspendedBy']; }
 
     // ── people ──
     match /users/{uid} {
       allow read, write: if signedIn() && me() == uid;
+      allow get, list: if isAdmin();
     }
 
     // ── restaurants ──
     match /restos/{rid} {
       allow read: if isMember(rid);
+      allow get, list: if isAdmin();
       allow create: if signedIn() && request.resource.data.owner == me() && request.resource.data.name is string;
       allow update: if isGerant(rid) && unchanged(['owner', 'createdAt'])
-                    || isMember(rid) && unchanged(['owner', 'createdAt', 'name', 'plan']);
+                    || isMember(rid) && unchanged(['owner', 'createdAt', 'name', 'plan', 'pack', 'trialEnds', 'paidUntil', 'paidAt', 'grantedBy', 'grantedAt', 'suspended'])
+                    || isAdmin() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(adminKeys());
       allow delete: if signedIn() && resource.data.owner == me();
 
       // ── team: only a gérant manages it ──
       match /members/{mid} {
-        allow read: if isMember(rid);
+        allow read: if isMember(rid) || isAdmin();
         allow create: if signedIn() && validRole(request.resource.data.role) && (
              // the owner's own gérant membership, written in the same batch as the restaurant
              (mid == me() && request.resource.data.role == 'gerant' && getAfter(restoPath(rid)).data.owner == me())
@@ -68,11 +80,7 @@ service cloud.firestore {
       }
     }
 
-    // ── in-app feedback about Growth Gusto itself (written by js/avis.js): authors see theirs, admins see all ──
-    function isAdmin() {
-      return signedIn() && request.auth.token.email in ['marceau.ruis@gmail.com']
-        && (request.auth.token.email_verified == true || request.auth.token.firebase.sign_in_provider == 'google.com');
-    }
+    // ── in-app feedback about Growth Gusto itself (written by js/avis.js): authors see theirs, admins (isAdmin above) see all ──
     match /appFeedback/{id} {
       // anyone signed in sends feedback for a restaurant they belong to; the restaurant's team sees its own; admins see all
       allow create: if signedIn() && request.resource.data.uid == me() && request.resource.data.rid is string && isMember(request.resource.data.rid);
