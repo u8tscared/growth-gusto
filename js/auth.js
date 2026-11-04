@@ -641,7 +641,10 @@ const AUTH = {
       AU_FRIDGES.filter(([n]) => C.frs.includes(n)).forEach(([n, type, min, max], i) => b.set(R.collection("fridges").doc("f" + now.toString(36) + i), { name: n, type, min, max, order: i, createdAt: now + i }));
       b.set(R.collection("events").doc("e" + now.toString(36)), { type: "team", text: `a créé ${C.name}`, at: now, uid: u.uid });
       await this.timeout(b.commit(), 15000);
-      this.setBusy(""); this.celebrate(`C'est prêt${name ? ", " + firstName(name) : ""} !`, `${C.name} · ${C.frs.length} équipement${C.frs.length > 1 ? "s" : ""} à relever`, rid);
+      this.setBusy("");
+      /* js/onboard.js: the app opens on the onboarding (logo, adresse, équipe, imprimante…) once the kitchen moment has played */
+      if (typeof OB !== "undefined" && OB.handoff) return OB.handoff(rid, C, name);
+      this.celebrate(`C'est prêt${name ? ", " + firstName(name) : ""} !`, `${C.name} · ${C.frs.length} équipement${C.frs.length > 1 ? "s" : ""} à relever`, rid);
     } catch (x) { console.warn("create", x); this.fail(x); }
   },
   celebrate(t, sub, rid) {
