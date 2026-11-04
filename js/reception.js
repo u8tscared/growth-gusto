@@ -180,10 +180,10 @@ const recAv = (name) => `<span class="av" style="background:${colorFor(recNorm(n
 
 /* step 1 — fournisseur */
 function recStep1() {
-  const R = recState(); const sups = recSuppliers().slice(0, 8);
+  const R = recState(); const allSups = recSuppliers(); const sups = allSups.slice(0, 8);
   const hist = S.receptions.length ? `<button class="btn soft sm rec-histbtn" data-act="recHist">${ico("recHist")}Historique</button>` : "";
   const known = sups.some((s) => recNorm(s.name) === recNorm(R.supplier));
-  const tiles = sups.length ? `<div class="rec-sups">${sups.map((s, i) => `<button class="rec-sup ${recNorm(R.supplier) === recNorm(s.name) ? "on" : ""}" style="--i:${i}" data-act="recSup" data-v="${esc(s.name)}">${recAv(s.name)}<b>${esc(s.name)}</b><em>${recAgo(s.at)} · ${s.n} livraison${s.n > 1 ? "s" : ""}</em></button>`).join("")}</div>` : "";
+  const tiles = sups.length ? `<div class="rec-sups">${allSups.map((s, i) => `<button class="rec-sup ${recNorm(R.supplier) === recNorm(s.name) ? "on" : ""}" style="--i:${Math.min(i, 8)}" ${i >= 8 ? "hidden" : ""} data-k="${esc(recNorm(s.name))}" data-act="recSup" data-v="${esc(s.name)}">${recAv(s.name)}<b>${esc(s.name)}</b><em>${recAgo(s.at)} · ${s.n} livraison${s.n > 1 ? "s" : ""}</em></button>`).join("")}</div>` : "";
   const sup = R.supplier.trim();
   return {
     top: recTop("Réception", hist),
@@ -413,7 +413,7 @@ document.addEventListener("input", (e) => {
   if (el.dataset.recname) { S.rec.cur.memo = null; const s = $("#recSugs"); if (s) s.innerHTML = recSugsHtml(recSuggest(el.value)); const m = $(".rec-memo"); m && m.remove(); }
   else if (el.dataset.rect) { if (el.value.includes(".")) { const c = el.selectionStart; el.value = el.value.replace(/\./g, ","); S.rec.cur.temp = el.value; try { el.setSelectionRange(c, c); } catch (x) {} } recTFit(el); recPaintTemp(); }
   else if (el.dataset.recprice != null || el.dataset.recamt) { if (el.dataset.recprice != null) { const L = S.rec.lines[+el.dataset.recprice]; if (L) L.priceTouched = true; } const s = $("#recSumLn"); if (s) s.innerHTML = recSumHtml(S.rec); }
-  else if (el.dataset.recsup) { const b = $("#recSupGo"); const v = el.value.trim(); if (b) { b.innerHTML = `${v ? `Continuer avec ${esc(v)}` : "Continuer"}${ico("chev")}`; v ? b.removeAttribute("data-off") : b.setAttribute("data-off", "1"); } const cb = $("#recSupCta"); if (cb) cb.hidden = !v && !!$(".rec-sup"); $$(".rec-sup.on").forEach((x) => x.classList.remove("on")); }
+  else if (el.dataset.recsup) { const b = $("#recSupGo"); const v = el.value.trim(); if (b) { b.innerHTML = `${v ? `Continuer avec ${esc(v)}` : "Continuer"}${ico("chev")}`; v ? b.removeAttribute("data-off") : b.setAttribute("data-off", "1"); } const cb = $("#recSupCta"); if (cb) cb.hidden = !v && !!$(".rec-sup"); $$(".rec-sup.on").forEach((x) => x.classList.remove("on")); const q = recNorm(v); let n = 0; $$(".rec-sup").forEach((x, i) => { const hit = q ? (x.dataset.k || "").includes(q) : i < 8; const show = hit && n < 8; if (show) n++; x.hidden = !show; }); }
 });
 /* typed a frozen reading (≤ −12 °C) on a chilled type: it is a frozen product, switch the type so the threshold is right */
 document.addEventListener("change", (e) => {

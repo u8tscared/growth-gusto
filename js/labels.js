@@ -77,13 +77,20 @@ function lbSetState(st) {
   const tb = $("[data-act=lbTorch]", stage); if (tb) { tb.hidden = !(st === "live" && LB.torchOk); tb.classList.toggle("on", LB.torch); }
 }
 async function lbStart() {
+  if (LB.stream && LB.parked && LB.track && LB.track.readyState === "live") { // reuse the parked stream: no new permission prompt
+    clearTimeout(LB.parkT); LB.parked = false; LB.track.enabled = true;
+    const st = lbStageEl(); const v = st && $("video", st); if (v) { v.srcObject = LB.stream; v.play().catch(() => {}); }
+    lbSetState("live"); return;
+  }
+  if (LB.stream && LB.parked) lbStop(true);
   if (LB.stream || LB.starting) { if (LB.stream) lbSetState("live"); return; }
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { lbSetState("nocam"); return; }
   LB.starting = true; lbSetState("starting");
   try {
     const s = await navigator.mediaDevices.getUserMedia({ audio: false, video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 720 } } });
-    if (S.route !== "scan" || document.hidden) { s.getTracks().forEach((t) => t.stop()); LB.state = "off"; return; }
-    LB.stream = s; LB.track = s.getVideoTracks()[0]; LB.torch = false;
+    if (document.hidden) { s.getTracks().forEach((t) => t.stop()); LB.state = "off"; return; }
+    LB.stream = s; LB.parked = false; try { localStorage.setItem("gg-cam-ok", "1"); } catch (e) {}
+    LB.track = s.getVideoTracks()[0]; LB.torch = false; if (S.route !== "scan") { lbStop(); return; }
     let caps = {}; try { caps = (LB.track.getCapabilities && LB.track.getCapabilities()) || {}; } catch (e) {}
     LB.torchOk = !!caps.torch;
     const st = lbStageEl(); const v = st && $("video", st); if (v) { v.srcObject = s; v.play().catch(() => {}); }
@@ -93,10 +100,18 @@ async function lbStart() {
     lbSetState(n === "NotAllowedError" || n === "SecurityError" || n === "PermissionDeniedError" ? "denied" : n === "NotReadableError" || n === "TrackStartError" ? "busy" : "nocam");
   } finally { LB.starting = false; }
 }
-function lbStop() {
+/* Leaving the scanner only « parks » the camera (track disabled, stream kept for 10 min): coming back reuses it, so iPhone
+   home-screen apps don't ask for the camera permission again. A real stop happens when the app goes to the background. */
+function lbStop(hard) {
+  cancelAnimationFrame(LB.raf); LB.raf = 0;
+  if (LB.stream && !hard && LB.track && LB.track.readyState === "live") {
+    if (!LB.parked) { LB.parked = true; LB.track.enabled = false; if (LB.torch) { try { LB.track.applyConstraints({ advanced: [{ torch: false }] }); } catch (e) {} LB.torch = false; } clearTimeout(LB.parkT); LB.parkT = setTimeout(() => lbStop(true), 10 * 60 * 1000); }
+    if (["live", "starting"].includes(LB.state)) LB.state = "off";
+    return;
+  }
+  clearTimeout(LB.parkT); LB.parked = false;
   if (LB.stream) LB.stream.getTracks().forEach((t) => { try { t.stop(); } catch (e) {} });
   LB.stream = null; LB.track = null; LB.torch = false; if (["live", "starting"].includes(LB.state)) LB.state = "off";
-  cancelAnimationFrame(LB.raf); LB.raf = 0;
 }
 function lbLoop() {
   LB.raf = requestAnimationFrame(lbLoop);
@@ -214,7 +229,7 @@ VIEWS.scan = {
     const i = $("#codeIn", v); if (i && window.matchMedia("(min-width:960px)").matches) setTimeout(() => i.focus({ preventScroll: true }), 400);
   },
 };
-document.addEventListener("visibilitychange", () => { if (document.hidden) lbStop(); else if (S.route === "scan" && lbStageEl()) { if (!LB.raf) LB.raf = requestAnimationFrame(lbLoop); if (LB.state !== "denied") lbStart(); } else if (lbWake && $("#lbQr")) lbWakeLock(); });
+document.addEventListener("visibilitychange", () => { if (document.hidden) lbStop(true); else if (S.route === "scan" && lbStageEl()) { if (!LB.raf) LB.raf = requestAnimationFrame(lbLoop); if (LB.state !== "denied") lbStart(); } else if (lbWake && $("#lbQr")) lbWakeLock(); });
 
 function lookupCode(raw) {
   const code = lbParseCode(raw); if (!code) return;
