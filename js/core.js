@@ -597,9 +597,9 @@ window.addEventListener("resize", appHeight); window.addEventListener("orientati
 /* on-screen keyboard (iOS): lift the sheet above it and keep the focused field visible */
 (function kbLift() {
   const vv = window.visualViewport; if (!vv) return;
-  const upd = () => { const de = document.documentElement; const kb = Math.max(0, (APPH.px || window.innerHeight) - vv.height - vv.offsetTop); const on = kb > 80; de.style.setProperty("--kb", (on ? kb : 0) + "px"); de.style.setProperty("--vvh", vv.height + "px"); de.classList.toggle("kb", on); };
+  const upd = () => { const de = document.documentElement; const kb = Math.max(0, (APPH.px || window.innerHeight) - vv.height - vv.offsetTop); const ae = document.activeElement; const typing = !!(ae && ae.matches && ae.matches("input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]),textarea,select,[contenteditable]")); const on = kb > 80 && typing; /* iOS 26 Safari also shrinks visualViewport when its toolbar moves: only a focused field means a keyboard */ de.style.setProperty("--kb", (on ? kb : 0) + "px"); de.style.setProperty("--vvh", vv.height + "px"); de.classList.toggle("kb", on); };
   upd();
-  vv.addEventListener("resize", upd); vv.addEventListener("scroll", upd);
+  vv.addEventListener("resize", upd); vv.addEventListener("scroll", upd); document.addEventListener("focusin", () => setTimeout(upd, 50)); document.addEventListener("focusout", () => setTimeout(upd, 50));
   document.addEventListener("focusin", (e) => { const t = e.target; if (t.matches && t.matches("input,textarea,select") && t.closest("#sheet")) setTimeout(() => { try { t.scrollIntoView({ block: "nearest", behavior: "smooth" }); } catch (x) {} }, 320); });
 })();
 $("#scrim").addEventListener("click", () => closeSheet());
@@ -803,7 +803,7 @@ function registerSW() {
    to the foreground. A new v means the code running here is old: with nothing in progress the app reloads silently (caches dropped,
    so the reload is guaranteed fresh); otherwise a toast offers « Mettre à jour ». sessionStorage guards against reload loops:
    one reload attempt per version per session, after which the version is simply adopted. */
-const APP_V = "2026-11-04.9";
+const APP_V = "2026-11-04.10";
 const UPD = {
   running: null, offered: null,
   get: (k, store) => { try { return store.getItem(k); } catch (e) { return null; } },

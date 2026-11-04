@@ -76,6 +76,10 @@ h1,h2,h3{margin:0;text-wrap:balance}
    of every position:fixed layer (tab bar, sheet, scrim, toast, boot, veil, aurora), so nothing is laid out against WebKit's short viewport */
 html.standalone{height:var(--appH,100%)}
 html.standalone body{top:0;right:0;left:0;bottom:auto;height:var(--appH,100%);min-height:0;transform:translateZ(0)}
+/* Safari tab (iOS 26): while the toolbar shrinks or grows under a finger, WebKit moves viewport-fixed layers on their own (the tab bar
+   flashes to the top of the screen). body is already the fixed, full-screen box: make it the containing block of every fixed layer,
+   as in the home-screen app, so the tab bar, sheet, toast and banners move as one with the screen instead of jumping. */
+body{transform:translateZ(0)}
 html.standalone #app{height:var(--appH,100dvh)}
 html.standalone .sheet{max-height:calc(var(--appH,100dvh) - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px) - 40px)}
 html.standalone .toast{top:calc(max(env(safe-area-inset-top,0px),20px) + 10px)}
