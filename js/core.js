@@ -475,8 +475,9 @@ let pendingRefresh = false;
 /* Scroll guard: re-rendering a list while a finger is on it (or during momentum) kills iOS scrolling and makes the page jump.
    Data/photo refreshes that land mid-scroll wait until the scroll settles, then run once. */
 const SCRL = { touch: 0, last: 0, pend: false, t: 0 };
-/* busy = a finger is down after the page moved, or the page moved in the last 350 ms (momentum). A plain tap is never busy. */
-function scrollBusy() { const moved = performance.now() - SCRL.last < 350; return moved || (SCRL.touch > 0 && performance.now() - SCRL.last < 3000); }
+/* busy = a finger is on the screen (removing the touched node would cancel the gesture on iOS), or the page moved in the last 350 ms (momentum).
+   Taps are unaffected: the click that acts on them arrives after touchend. */
+function scrollBusy() { return SCRL.touch > 0 || performance.now() - SCRL.last < 350; }
 function scrollSettle() { clearTimeout(SCRL.t); SCRL.t = setTimeout(() => { if (scrollBusy()) return scrollSettle(); if (SCRL.pend) { SCRL.pend = false; refresh(); } }, 380); }
 document.addEventListener("touchstart", (e) => { SCRL.touch = e.touches.length; }, { passive: true, capture: true });
 const scrlEnd = (e) => { SCRL.touch = e && e.touches ? e.touches.length : 0; if (SCRL.pend) scrollSettle(); };
@@ -795,7 +796,7 @@ function registerSW() {
    to the foreground. A new v means the code running here is old: with nothing in progress the app reloads silently (caches dropped,
    so the reload is guaranteed fresh); otherwise a toast offers « Mettre à jour ». sessionStorage guards against reload loops:
    one reload attempt per version per session, after which the version is simply adopted. */
-const APP_V = "2026-11-04.7";
+const APP_V = "2026-11-04.8";
 const UPD = {
   running: null, offered: null,
   get: (k, store) => { try { return store.getItem(k); } catch (e) { return null; } },
@@ -809,8 +810,9 @@ const UPD = {
     const v = await this.fetchV(); if (!v) return;
     if (!this.running) {
       /* launch: the code is current if it says so (APP_V) or if this device already updated to v */
-      if (v === APP_V || v === this.get("gg-v", localStorage)) { this.running = v; this.set("gg-v", v, localStorage); return; }
-      this.running = this.get("gg-v", localStorage) || APP_V;
+      /* only the code itself (APP_V) says it is current: a stored "gg-v" could belong to a stale cached copy */
+      if (v === APP_V) { this.running = v; this.set("gg-v", v, localStorage); return; }
+      this.running = APP_V;
     }
     if (v === this.running) return;
     if (this.get("gg-upd", sessionStorage) === v) { this.running = v; this.set("gg-v", v, localStorage); return; } /* already reloaded once for v: adopt it, never loop */

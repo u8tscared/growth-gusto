@@ -424,7 +424,7 @@ VIEWS.reglages = {
       </div>
       ${gerant ? `<div class="glass pad st" style="--i:5"><div class="li tap" data-act="ccReset"><span class="ic bad">${ico("trash")}</span><div class="tx"><b style="color:var(--bad)">Tout effacer</b><em>Vide cet appareil, définitivement</em></div>${ico("chev")}</div></div>` : ""}` : ""}
       </div></div>
-      <div class="cc-about st" style="--i:6">${appIcon(40)}<div><b>Growth Gusto</b><span>Version 1.0 · novembre 2026</span></div></div></div>`;
+      <div class="cc-about st" style="--i:6">${appIcon(40)}<div><b>Growth Gusto</b><span>Version ${esc(typeof APP_V !== "undefined" ? APP_V : "")}</span></div></div></div>`;
   },
 };
 
