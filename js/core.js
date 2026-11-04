@@ -199,15 +199,23 @@ const DB = {
   createResto(id, data) {
     const fs = this.db, FV = firebase.firestore.FieldValue, u = (typeof authUser === "function" && authUser()) || {};
     const b = fs.batch();
-    b.set(fs.collection("restos").doc(id), this.clean({ plan: "essai", ...data, owner: this.uid, createdAt: data.createdAt || Date.now() }));
+    b.set(fs.collection("restos").doc(id), this.clean({ ...this.restoDefaults(data), owner: this.uid, createdAt: data.createdAt || Date.now() }));
     b.set(fs.doc(`restos/${id}/members/${this.uid}`), this.clean({ name: S.me.name || u.name || "", email: u.email || "", photo: u.photo || "", role: "gerant", joinedAt: Date.now() }));
     b.set(fs.collection("users").doc(this.uid), { restos: FV.arrayUnion(id) }, { merge: true });
     return b.commit();
   },
+  /* commercial fields on a new restaurant (js/abo.js reads them): a 14-day trial of the pack chosen on the site, Complet by default */
+  restoDefaults(d) {
+    const now = Date.now(); let pack = "complet"; try { if (localStorage.getItem("gg-plan") === "essentiel") pack = "essentiel"; localStorage.removeItem("gg-plan"); } catch (e) {}
+    return { plan: "essai", pack, trialEnds: ((d && d.createdAt) || now) + 14 * 864e5, ...(d || {}) };
+  },
+  /* the subscription gate (js/abo.js): once the trial is over, the app stays readable but a write opens the « essai terminé » sheet */
+  gate(col) { return typeof abBlocked === "function" && typeof abRefuse === "function" && abBlocked(col) ? abRefuse(col) : null; },
   unsubAll() { this.subs.forEach((u) => { try { u(); } catch (e) {} }); this.subs = []; this.listeners = {}; },
   async add(col, data) { const id = (Date.now().toString(36) + Math.random().toString(36).slice(2, 7)); await this.set(col, id, data); return id; },
   async set(col, id, data) {
-    const path = this.path(col);
+    const path = this.path(col); const g = this.gate(col); if (g) return g;
+    if (col === "restos" && !(this.mode === "db" ? S.restos.find((r) => r.id === id) : (this.local[path] || {})[id]) && data && typeof data === "object") Object.assign(data, this.restoDefaults(data));
     if (this.mode === "db") {
       if (this.uid && col === "restos" && !S.restos.find((r) => r.id === id)) return this.dbw(this.createResto(id, data));
       /* members: merge, so an area writing {role, name, color} keeps the account's e-mail and photo */
@@ -217,12 +225,12 @@ const DB = {
     (this.local[path] ||= {})[id] = JSON.parse(JSON.stringify(data)); this.emit(path);
   },
   async update(col, id, patch) {
-    const path = this.path(col);
+    const path = this.path(col); const g = this.gate(col); if (g) return g;
     if (this.mode === "db") return this.dbw(this.db.collection(path).doc(id).update(this.clean(patch)));
     const cur = (this.local[path] ||= {})[id] || {}; this.local[path][id] = { ...cur, ...JSON.parse(JSON.stringify(patch)) }; this.emit(path);
   },
   async del(col, id) {
-    const path = this.path(col);
+    const path = this.path(col); const g = this.gate(col); if (g) return g;
     if (this.mode === "db") return this.dbw(this.db.collection(path).doc(id).delete());
     if (this.local[path]) delete this.local[path][id]; this.emit(path);
   },
@@ -232,6 +240,7 @@ const DB = {
 document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") DB.flush(); });
 async function safe(p, msg = "Impossible d'enregistrer. Vérifiez la connexion et réessayez.") {
   try { return await p; } catch (e) {
+    if (e && e.code === "ab/blocked") throw e; /* the subscription sheet is already on screen (js/abo.js) */
     console.warn(e); SFX.err();
     if (e && e.code === "quota_exceeded") toast("Espace de stockage plein : supprimez d'anciennes photos dans le registre.", "err");
     else if (e && (e.code === "not_granted" || e.code === "revoked")) toast("Vous n'avez pas le droit de modifier. Demandez l'accès « Peut modifier ».", "err");
@@ -506,7 +515,7 @@ function refresh(force) {
 document.addEventListener("focusout", () => { if (pendingRefresh) { pendingRefresh = false; setTimeout(refresh, 50); } });
 function renderRoute() {
   const V = VIEWS[S.route] || VIEWS.home;
-  if (S.route !== "onboarding" && !S.resto) return VIEWS.onboarding.render();
+  if (S.route !== "onboarding" && !S.resto && !V.noResto) return VIEWS.onboarding.render();
   return photoFix(V.render(S.params));
 }
 function afterRender(v) { const V = VIEWS[S.route]; V && V.after && V.after(v); }

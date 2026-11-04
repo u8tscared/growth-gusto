@@ -416,6 +416,7 @@ VIEWS.reglages = {
         <div class="li tap" data-act="restoRename"><span class="ic">${ico("edit")}</span><div class="tx"><b>Nom du restaurant</b><em>${esc(S.resto?.name || "")}</em></div>${ico("chev")}</div>
         ${gerant && typeof OB !== "undefined" ? `<div class="li tap" data-act="obComplete"><span class="ic">${ico("obCard")}</span><div class="tx"><b>Compléter la fiche du restaurant</b><em>${[S.resto?.logo ? "" : "logo", S.resto?.address ? "" : "adresse", S.fridges.length ? "" : "frigos", S.resto?.printer ? "" : "imprimante"].filter(Boolean).join(", ") || "Logo, adresse, frigos, équipe, imprimante"}</em></div>${ico("chev")}</div>` : ""}
         <div class="li tap" data-act="restoSwitch"><span class="ic">${ico("store")}</span><div class="tx"><b>Établissements</b><em>${S.restos.length} · changer ou en ajouter un</em></div>${ico("chev")}</div>
+        ${typeof abRow === "function" ? abRow() : ""}
         <div class="li tap" data-go="equipe"><span class="ic">${ico("users")}</span><div class="tx"><b>Équipe</b><em>${S.members.length} personne${S.members.length > 1 ? "s" : ""}</em></div>${ico("chev")}</div>
         <div class="li tap" data-go="imprimante"><span class="ic">${ico("printer")}</span><div class="tx"><b>Imprimante</b><em>${esc(typeof lbPrinterCfg === "function" ? (lbPrinterCfg().name || "À choisir") : "À choisir")}</em></div>${ico("chev")}</div>
       </div></div><div class="cc-col">
@@ -490,7 +491,7 @@ VIEWS.more = {
       ["Cuisine", [["notes", "book", "Recettes & allergènes", 0], ["menage", "spray", "Ménage", 0]]],
       ["Gestion", [["dashboard", "dash", "Tableau de bord", 0], ["finance", "euro", "Finances", 0], ["stock", "box", "Stock", 0], ["tickets", "receipt", "Tickets Z", 0], ["registre", "shield", "Registre", 0], ["obligations", "calcheck", "Obligations", ccOblDueN()]]],
       ["Équipe", [["pointeuse", "clock", "Pointeuse", ccOnShiftN(), "ok"], ["planning", "cal", "Planning", 0], staffR ? ["staff", "users", "Équipe & salaires", 0] : ["equipe", "users", "Équipe", 0], ["avis", "star", "Votre avis sur l'app", fbNew, "acc"]]],
-      ["Restaurant", [...(staffR ? [["equipe", "lock", "Profils & codes", 0]] : []), ["imprimante", "printer", "Imprimante", 0], ["reglages", "sliders", "Réglages", 0], ...(typeof avisIsAdmin === "function" && avisIsAdmin() ? [["avisAdmin", "star", "Retours reçus (admin)", 0]] : [])]],
+      ["Restaurant", [...(staffR ? [["equipe", "lock", "Profils & codes", 0]] : []), ["imprimante", "printer", "Imprimante", 0], ["reglages", "sliders", "Réglages", 0], ...(typeof abTile === "function" ? [abTile()] : []), ...(typeof avisIsAdmin === "function" && avisIsAdmin() ? [["avisAdmin", "star", "Retours reçus (admin)", 0], ...(VIEWS.admin ? [["admin", "shield", "Clients (admin)", 0]] : [])] : [])]],
     ];
     let k = 2;
     const me = ccMember(S.me.id) || { id: S.me.id, name: S.me.name, color: S.me.color };

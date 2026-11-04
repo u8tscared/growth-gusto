@@ -11,7 +11,12 @@ La config publique est dans `js/config.js` (`window.GG_FIREBASE`). La mettre à 
 3. Coller le contenu entier de `firestore.rules` (à la racine du dépôt).
 4. Cliquer **Publier**. C'est actif en moins d'une minute.
 
-Les règles ont été vérifiées sur l'émulateur Firestore (45 cas : création, invitation, rôles, import, avis).
+Les règles ont été vérifiées sur l'émulateur Firestore (68 cas : création, invitation, rôles, import, avis, abonnement, admin) : `tools/rules.test.js`.
+
+## 1b. Abonnement et espace admin (js/abo.js)
+
+- Essai gratuit 14 jours à la création du restaurant (`plan: "essai"`, `pack` choisi sur le site, `trialEnds`). Ensuite l'app reste lisible, les écritures ouvrent « Votre essai est terminé ».
+- Activation : le gérant saisit un code (`window.GG_ACTIVATION` dans `js/config.js`), ou un admin (`window.GG_ADMINS` + `isAdmin()` dans les règles, **garder les deux listes identiques**) offre l'accès depuis l'espace admin : `/admin` (ou `?admin=1`) → Plus → « Clients (admin) ». Liens de paiement Stripe : `window.GG_STRIPE` (null = « contactez-nous », adresse `window.GG_CONTACT`).
 
 ## 2. Réglages Authentication (déjà faits, à vérifier si la connexion échoue)
 
@@ -24,7 +29,7 @@ Les règles ont été vérifiées sur l'émulateur Firestore (45 cas : création
 | Chemin | Contenu | Qui |
 |---|---|---|
 | `users/{uid}` | `{ name, email, photo, restos: [rid] }` | la personne seule |
-| `restos/{rid}` | `{ name, type, owner, createdAt, plan: "essai" }` | membres (lecture), gérant (modification), propriétaire (suppression) |
+| `restos/{rid}` | `{ name, type, owner, createdAt, plan: essai\|essentiel\|complet\|suspendu, pack, trialEnds, paidAt?, paidUntil?, activatedBy?, grantedBy?, grantedAt?, suspended? }` | membres (lecture), gérant (modification), propriétaire (suppression), admin (lecture + champs commerciaux) |
 | `restos/{rid}/members/{id}` | `{ name, email, photo, role: gerant\|chef\|equipe, joinedAt, invite? }` (`id` = uid d'un compte, ou profil cuisine sans compte) | membres (lecture), gérant (gestion), chacun son nom |
 | `restos/{rid}/{collection}/{id}` | frigos, relevés, lots, stock, tickets, équipe RH, finances… | membres |
 | `invites/{CODE}` | `{ rid, restoName, role, createdBy, createdAt, expiresAt, uses }` | lisible avec le code, gérée par les gérants |

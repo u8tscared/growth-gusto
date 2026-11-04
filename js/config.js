@@ -6,3 +6,11 @@
 window.GG_FIREBASE = { apiKey: "AIzaSyDHXVawSF20v0orKpr7CpazVkOFQ9F58o0", authDomain: "growth-gusto.firebaseapp.com", projectId: "growth-gusto", storageBucket: "growth-gusto.firebasestorage.app", messagingSenderId: "364546258133", appId: "1:364546258133:web:5ea7b7f7095f7fdf749e5c" };
 /* accounts that may read every in-app feedback (appFeedback, see firestore.rules: keep both lists in sync) */
 window.GG_ADMINS = ["marceau.ruis@gmail.com"];
+/* ── Commercial layer (js/abo.js) ──
+   Stripe Payment Links, one per pack (Stripe dashboard → Payment Links → « Créer »). null = no online payment yet: the app
+   shows « Pour activer votre abonnement, contactez-nous » with the address below and the activation-code field. */
+window.GG_STRIPE = { essentiel: null, complet: null };
+/* Activation codes typed by a gérant in Abonnement → « J'ai un code d'activation ». CHANGE THESE before giving any out. */
+window.GG_ACTIVATION = { "GG-ESSENTIEL-2026": "essentiel", "GG-COMPLET-2026": "complet" };
+/* where « contactez-nous » writes */
+window.GG_CONTACT = "contact@growthgusto.fr";

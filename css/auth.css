@@ -143,6 +143,12 @@ html.au-open #app,html.au-open #tabbar{visibility:hidden}
 .au-invite{display:flex;align-items:center;gap:12px;margin:0 0 18px;padding:12px 14px;border-radius:12px;background:var(--c-paper);border:1.5px solid var(--c-tk-line);box-shadow:4px 4px 0 var(--c-tk-sh);transform:rotate(-.6deg)}
 .au-invic{width:38px;height:38px;flex:none;border-radius:10px;display:grid;place-items:center;background:var(--c-herb);color:#fff;border:1.5px solid var(--c-demo-ink)}
 .au-invic .ico{width:20px;height:20px}
+/* the pack chosen on the site (?plan=): a small violet ticket above the account and restaurant forms */
+.au-pack{display:flex;align-items:center;gap:12px;margin:14px 0 2px;padding:11px 13px;border-radius:12px;background:var(--c-vtint);border:1.5px solid var(--c-vring)}
+.au-pack-ic{width:34px;height:34px;flex:none;border-radius:10px;display:grid;place-items:center;background:var(--c-v);color:#fff;box-shadow:0 6px 14px -8px var(--c-vedge)}
+.au-pack-ic .ico{width:18px;height:18px}
+.au-pack b{display:block;font:700 14.5px/1.25 var(--f-d);letter-spacing:-.01em;color:var(--c-ink)}
+.au-pack>div>span{display:block;margin-top:2px;font-size:12.5px;color:var(--c-ink2);line-height:1.35}
 .au-invite b{display:block;font:700 15px/1.25 var(--f-d);letter-spacing:-.01em}
 .au-invite>div>span{display:block;margin-top:2px;font-size:13px;color:var(--c-ink2);line-height:1.35}
 

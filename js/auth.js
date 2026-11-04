@@ -93,13 +93,19 @@ const AUTH = {
       const u = new URL(location.href), q = u.searchParams; let strip = false;
       const inv = auCleanCode(q.get("invite")); if (inv.length === 8) auLS.set("gg-invite", inv);
       const wantLocal = q.has("local"), wantDemo = q.has("demo");
-      ["invite", "local", "demo"].forEach((k) => { if (q.has(k)) { q.delete(k); strip = true; } });
+      /* links from the marketing site (growthgusto.fr): ?signup=1 (create an account), &plan=essentiel|complet (the pack chosen there,
+         remembered until the restaurant is created), ?login=1 (sign in), ?admin=1 (the Growth Gusto admin space, js/abo.js) */
+      const wantSignup = q.has("signup"), wantLogin = q.has("login"), wantAdmin = q.has("admin"), plan = String(q.get("plan") || "").toLowerCase();
+      if (plan === "essentiel" || plan === "complet") auLS.set("gg-plan", plan);
+      if (wantAdmin) auLS.sset("gg-admin", "1");
+      ["invite", "local", "demo", "signup", "login", "plan", "admin"].forEach((k) => { if (q.has(k)) { q.delete(k); strip = true; } });
       if (strip) { try { history.replaceState(null, "", u.pathname + (q.toString() ? "?" + q : "") + u.hash); } catch (e) {} }
       this.flash();
       if (wantLocal) { auLS.set("gg-mode", "local"); auLS.set("gg-local-ok", "1"); auLS.sdel("gg-demo"); return this.resolve({ mode: "local" }); }
       if (wantDemo || auLS.sget("gg-demo") === "1") return this.startDemo();
       const mode = auLS.get("gg-mode"), invite = auLS.get("gg-invite");
       if (mode === "cloud" && this.cfg) return this.resume();
+      if (wantSignup || wantLogin || wantAdmin) { auLS.sdel("gg-demo"); this.ui.tab = wantSignup ? "up" : "in"; this.ui.back = ["welcome"]; return this.show(this.cfg ? "email" : "soon"); }
       /* stay on this device only when the person chose it on the welcome screen (gg-local-ok); phones that were auto-switched before accounts existed see the welcome once */
       if (!invite && mode === "local" && auLS.get("gg-local-ok") === "1") return this.resolve({ mode: "local" });
       this.show(invite && this.cfg ? "welcome" : "welcome");
@@ -418,6 +424,11 @@ const AUTH = {
     const sg = $("#au .au-seg");
     if (sg) { const to = this.ui.tab === "up" ? "up" : "in"; if (this._seg && this._seg !== to && !auReduce()) { sg.dataset.mode = this._seg; void sg.offsetWidth; } sg.dataset.mode = to; this._seg = to; } else this._seg = null;
   },
+  /* the pack chosen on growthgusto.fr (?plan=), shown while the account and the restaurant are created */
+  packHTML(i = 3) {
+    const p = auLS.get("gg-plan") === "essentiel" ? "essentiel" : "complet", t = p === "essentiel" ? "Essentiel" : "Complet", price = p === "essentiel" ? 49 : 99;
+    return `<div class="au-pack st" style="--i:${i}"><span class="au-pack-ic" aria-hidden="true">${ico("sparkle")}</span><div><b>Essai gratuit 14 jours · Pack ${t}</b><span>Sans engagement, sans carte bancaire. Ensuite ${price} € HT par mois, si vous continuez.</span></div></div>`;
+  },
   backBtn() { return this.ui.back.length ? `<button class="au-back" data-act="auBack" aria-label="Retour">${AU_SVG.back}</button>` : this.inApp ? `<button class="au-back" data-act="auClose" aria-label="Fermer">${AU_SVG.x}</button>` : ""; },
   errHTML() { return this.ui.err ? `<div class="au-err" role="alert">${ico("alert")}<span>${esc(this.ui.err)}</span></div>` : ""; },
 
@@ -452,8 +463,9 @@ const AUTH = {
       const up = U.tab === "up", back = !!auLS.get("gg-last-email");
       return `${top(`<div class="au-seg" role="tablist" aria-label="Mode" data-mode="${up ? "up" : "in"}"><span class="au-segi" aria-hidden="true"></span><button role="tab" aria-selected="${!up}" class="${up ? "" : "on"}" data-act="auTab" data-v="in">Connexion</button><button role="tab" aria-selected="${up}" class="${up ? "on" : ""}" data-act="auTab" data-v="up">Créer un compte</button></div>`)}
         ${head(up ? "Ouvrons votre cuisine." : back ? "Bon retour en cuisine." : "Entrez en cuisine.", up ? "30 secondes, et votre cahier HACCP tient tout seul." : back ? "Vos relevés du jour vous attendent." : "Avec l'e-mail de votre compte.")}
+        ${up ? this.packHTML(3) : ""}
         ${this.errHTML()}
-        <form class="au-form st" style="--i:3" data-au="email" novalidate>
+        <form class="au-form st" style="--i:${up ? 4 : 3}" data-au="email" novalidate>
           ${up ? `<label class="au-f${this._seg === "in" ? " au-grow" : ""}"><span class="au-lbl">Prénom</span><div class="au-in"><input class="au-input" id="auName" autocomplete="given-name" maxlength="40" placeholder="Marceau" value="${esc(U.name)}" enterkeyhint="next">${okI}</div></label>` : ""}
           <label class="au-f"><span class="au-lbl">E-mail</span><div class="au-in"><input class="au-input" id="auEmail" type="email" inputmode="email" autocomplete="${up ? "email" : "username"}" autocapitalize="off" spellcheck="false" placeholder="chef@votre-restaurant.fr" value="${esc(U.email || auLS.get("gg-last-email") || "")}" enterkeyhint="next">${okI}</div><em class="au-hint" id="auEmailH" aria-live="polite"></em></label>
           <div class="au-f"><div class="au-lrow"><label class="au-lbl" for="auPw">Mot de passe</label>${up ? "" : `<button type="button" class="au-forgot" data-act="auForgot">Mot de passe oublié ?</button>`}</div>
@@ -503,6 +515,7 @@ const AUTH = {
       const C = (U.create ||= { name: "", type: "bistrot", frs: ["Chambre froide", "Frigo de service 1", "Frigo de service 2", "Congélateur"], me: "" });
       const needName = !(this.user && this.user.displayName);
       return `${top()}${head("Créons votre restaurant.", "Tout se modifie ensuite dans Réglages.")}
+        ${this.packHTML(3)}
         ${this.errHTML()}
         <form class="au-form st" style="--i:3" data-au="create" novalidate>
           ${needName ? `<label class="au-f"><span class="au-lbl">Votre prénom</span><div class="au-in"><input class="au-input" id="auRMe" autocomplete="given-name" maxlength="40" placeholder="Il signe vos relevés" value="${esc(C.me)}">${okI}</div></label>` : ""}
@@ -656,13 +669,15 @@ const AUTH = {
     try {
       if (C.me && !u.displayName) { try { await u.updateProfile({ displayName: C.me }); } catch (x) {} fs.collection("users").doc(u.uid).set({ name: C.me }, { merge: true }).catch(() => {}); }
       const b = fs.batch(), R = fs.collection("restos").doc(rid);
-      b.set(R, { name: C.name, type: C.type, owner: u.uid, createdAt: now, plan: "essai", by: u.uid });
+      /* commercial fields (js/abo.js): 14-day trial of the pack chosen on the site (Complet by default) */
+      const pack = auLS.get("gg-plan") === "essentiel" ? "essentiel" : "complet";
+      b.set(R, { name: C.name, type: C.type, owner: u.uid, createdAt: now, plan: "essai", pack, trialEnds: now + 14 * 864e5, by: u.uid });
       b.set(R.collection("members").doc(u.uid), { name, email: u.email || "", photo: u.photoURL || "", role: "gerant", joinedAt: now });
       b.set(fs.collection("users").doc(u.uid), { restos: FV.arrayUnion(rid) }, { merge: true });
       AU_FRIDGES.filter(([n]) => C.frs.includes(n)).forEach(([n, type, min, max], i) => b.set(R.collection("fridges").doc("f" + now.toString(36) + i), { name: n, type, min, max, order: i, createdAt: now + i }));
       b.set(R.collection("events").doc("e" + now.toString(36)), { type: "team", text: `a créé ${C.name}`, at: now, uid: u.uid });
       await this.timeout(b.commit(), 15000);
-      this.setBusy("");
+      auLS.del("gg-plan"); this.setBusy("");
       /* js/onboard.js: the app opens on the onboarding (logo, adresse, équipe, imprimante…) once the kitchen moment has played */
       if (typeof OB !== "undefined" && OB.handoff) return OB.handoff(rid, C, name);
       this.celebrate(`C'est prêt${name ? ", " + firstName(name) : ""} !`, `${C.name} · ${C.frs.length} équipement${C.frs.length > 1 ? "s" : ""} à relever`, rid);
@@ -730,7 +745,7 @@ const AUTH = {
       for (const [old, r] of restos) {
         const rid = "r" + Date.now().toString(36) + auCode(4).toLowerCase(); const now = Date.now();
         const R = fs.collection("restos").doc(rid); const { by, ...rest } = r || {};
-        const first = [[R, { ...DB.clean(rest), name: String((r && r.name) || "Mon restaurant").slice(0, 80), owner: u.uid, createdAt: (r && r.createdAt) || now, plan: "essai", importedAt: now }],
+        const first = [[R, { ...DB.clean(rest), name: String((r && r.name) || "Mon restaurant").slice(0, 80), owner: u.uid, createdAt: (r && r.createdAt) || now, plan: (r && r.plan) || "essai", pack: (r && r.pack) || "complet", trialEnds: (r && r.trialEnds) || now + 14 * 864e5, importedAt: now }],
           [R.collection("members").doc(u.uid), { name: u.displayName || S.me.name || "", email: u.email || "", photo: u.photoURL || "", role: "gerant", joinedAt: now }],
           [fs.collection("users").doc(u.uid), { restos: FV.arrayUnion(rid) }, { merge: true }]];
         const ops = [];
