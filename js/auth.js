@@ -68,11 +68,12 @@ const AUTH = {
       const wantLocal = q.has("local"), wantDemo = q.has("demo");
       ["invite", "local", "demo"].forEach((k) => { if (q.has(k)) { q.delete(k); strip = true; } });
       if (strip) { try { history.replaceState(null, "", u.pathname + (q.toString() ? "?" + q : "") + u.hash); } catch (e) {} }
-      if (wantLocal) { auLS.set("gg-mode", "local"); auLS.sdel("gg-demo"); return this.resolve({ mode: "local" }); }
+      if (wantLocal) { auLS.set("gg-mode", "local"); auLS.set("gg-local-ok", "1"); auLS.sdel("gg-demo"); return this.resolve({ mode: "local" }); }
       if (wantDemo || auLS.sget("gg-demo") === "1") return this.startDemo();
       const mode = auLS.get("gg-mode"), invite = auLS.get("gg-invite");
       if (mode === "cloud" && this.cfg) return this.resume();
-      if (!invite && (mode === "local" || (!mode && this.hasLocal()))) { if (!mode) auLS.set("gg-mode", "local"); return this.resolve({ mode: "local" }); }
+      /* stay on this device only when the person chose it on the welcome screen (gg-local-ok); phones that were auto-switched before accounts existed see the welcome once */
+      if (!invite && mode === "local" && auLS.get("gg-local-ok") === "1") return this.resolve({ mode: "local" });
       this.show(invite && this.cfg ? "welcome" : "welcome");
     });
   },
@@ -257,7 +258,7 @@ const AUTH = {
           <div class="au-or st" style="--i:3"><span>ou</span></div>
           ${DB.mode === "demo" ? "" : `<button class="au-btn au-demob st" style="--i:4" data-act="auDemo"><span class="au-demo-ic">${ico("auPlay")}</span><span class="au-demo-l"><b>Essayer la démo</b><em>Un vrai restaurant, déjà rempli. Rien n'est enregistré.</em></span>${ico("chev")}</button>`}
         </div>
-        ${this.inApp ? "" : `<button class="au-link st" style="--i:5" data-act="auLocal">${ico("auPhone")}Continuer sans compte <span>(sur cet appareil)</span></button>`}`;
+        ${this.inApp ? "" : `<button class="au-link st" style="--i:5" data-act="auLocal">${ico("auPhone")}${this.hasLocal() ? `Continuer avec les données de ce téléphone` : `Continuer sans compte <span>(sur cet appareil)</span>`}</button>`}`;
     }
     if (s === "soon") {
       return `<div class="au-head">${this.backBtn()}<div><div class="au-t">Les comptes arrivent</div><div class="au-s">Nous finalisons la connexion sécurisée.</div></div></div>
@@ -681,7 +682,7 @@ Object.assign(ACT, {
   auBack: () => { SFX.tap(); const p = AUTH.ui.back.pop(); AUTH.ui.err = ""; if (p) AUTH.show(p, { push: false }); },
   auClose: () => { SFX.close(); AUTH.hide(); },
   auDemo: () => { SFX.tap(); buzz(6); if (DB.uid) return; AUTH.ui.busyTx = "Préparation de la démo…"; AUTH.show("busy", { push: false }); setTimeout(() => AUTH.startDemo(), 380); },
-  auLocal: () => { SFX.tap(); auLS.set("gg-mode", "local"); auLS.del("gg-invite"); auLS.sdel("gg-demo"); if (AUTH.resolve) { AUTH.hide(); AUTH.resolve({ mode: "local" }); } else location.reload(); },
+  auLocal: () => { SFX.tap(); auLS.set("gg-mode", "local"); auLS.set("gg-local-ok", "1"); auLS.del("gg-invite"); auLS.sdel("gg-demo"); if (AUTH.resolve) { AUTH.hide(); AUTH.resolve({ mode: "local" }); } else location.reload(); },
   auSwitch: async () => { SFX.tap(); try { await AUTH.auth.signOut(); } catch (e) {} AUTH.user = null; auLS.set("gg-mode", "out"); AUTH.ui.back = []; AUTH.show("welcome", { push: false }); },
   auCreate: () => { SFX.tap(); buzz(5); AUTH.ui.err = ""; AUTH.show("create"); },
   auType: (a, id, v) => { AUTH.ui.create.type = v; $$("#au [data-act=auType]").forEach((b) => { const on = b.dataset.v === v; b.classList.toggle("on", on); b.setAttribute("aria-checked", on); }); SFX.tick(); buzz(4); AUTH.createPrev(); },
