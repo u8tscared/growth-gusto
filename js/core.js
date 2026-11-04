@@ -479,10 +479,17 @@ const SCRL = { touch: 0, last: 0, pend: false, t: 0 };
    Taps are unaffected: the click that acts on them arrives after touchend. */
 function scrollBusy() { return SCRL.touch > 0 || performance.now() - SCRL.last < 350; }
 function scrollSettle() { clearTimeout(SCRL.t); SCRL.t = setTimeout(() => { if (scrollBusy()) return scrollSettle(); if (SCRL.pend) { SCRL.pend = false; refresh(); } }, 380); }
-document.addEventListener("touchstart", (e) => { SCRL.touch = e.touches.length; }, { passive: true, capture: true });
+document.addEventListener("touchstart", (e) => { SCRL.touch = e.touches.length; const t = e.touches[0]; if (e.touches.length === 1 && t) { SCRL.x0 = t.clientX; SCRL.y0 = t.clientY; SCRL.dist = 0; SCRL.scrolled = performance.now() - SCRL.last < 120; SCRL.t0 = performance.now(); } }, { passive: true, capture: true });
+document.addEventListener("touchmove", (e) => { const t = e.touches[0]; if (t && SCRL.x0 != null) SCRL.dist = Math.max(SCRL.dist || 0, Math.hypot(t.clientX - SCRL.x0, t.clientY - SCRL.y0)); }, { passive: true, capture: true });
+/* a finger that scrolled (or stopped a momentum scroll) must never "tap" what was under it: iOS can still send a click after such a gesture */
+document.addEventListener("click", (e) => {
+  if (!SCRL.t0 || performance.now() - SCRL.t0 > 1500) return;
+  if ((SCRL.dist || 0) > 12 || SCRL.scrolled) { const tgt = e.target.closest && e.target.closest("[data-go],[data-act],[data-tab],a,button,[role=button]"); if (tgt && !tgt.closest("input,textarea,select,label")) { e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation(); } }
+  SCRL.t0 = 0;
+}, true);
 const scrlEnd = (e) => { SCRL.touch = e && e.touches ? e.touches.length : 0; if (SCRL.pend) scrollSettle(); };
 document.addEventListener("touchend", scrlEnd, { passive: true, capture: true }); document.addEventListener("touchcancel", scrlEnd, { passive: true, capture: true });
-document.addEventListener("scroll", () => { SCRL.last = performance.now(); if (SCRL.pend) scrollSettle(); }, { passive: true, capture: true });
+document.addEventListener("scroll", () => { SCRL.last = performance.now(); if (SCRL.touch > 0) SCRL.scrolled = true; if (SCRL.pend) scrollSettle(); }, { passive: true, capture: true });
 function refresh(force) {
   if (!S.ready) return;
   if (!force && scrollBusy()) { SCRL.pend = true; scrollSettle(); return; }
@@ -796,7 +803,7 @@ function registerSW() {
    to the foreground. A new v means the code running here is old: with nothing in progress the app reloads silently (caches dropped,
    so the reload is guaranteed fresh); otherwise a toast offers « Mettre à jour ». sessionStorage guards against reload loops:
    one reload attempt per version per session, after which the version is simply adopted. */
-const APP_V = "2026-11-04.8";
+const APP_V = "2026-11-04.9";
 const UPD = {
   running: null, offered: null,
   get: (k, store) => { try { return store.getItem(k); } catch (e) { return null; } },

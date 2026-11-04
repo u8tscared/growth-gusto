@@ -382,23 +382,41 @@ function setTemp(id, t) {
   if (S.route === "releve") relSyncAll();
   SFX.tick(); buzz(4);
 }
+/* Touch: nothing changes on finger-down, so a scroll that starts on a stepper or on the scale never edits a temperature.
+   Scale: a horizontal drag (or a tap) moves it, a vertical move hands over to page scrolling (touch-action:pan-y).
+   Stepper: a tap steps once on release; holding still 380 ms repeats; any scroll cancels. Mouse/pen keep the instant behaviour. */
+let relPD = null;
+const relHoldClear = () => { clearTimeout(holdT); clearTimeout(holdI); };
 document.addEventListener("pointerdown", (e) => {
   SFX.init();
+  const touch = e.pointerType === "touch";
   const sc = e.target.closest("[data-scale]");
   if (sc) {
-    e.preventDefault(); const id = sc.dataset.scale, lo = +sc.dataset.lo, hi = +sc.dataset.hi; const r = sc.getBoundingClientRect();
+    const id = sc.dataset.scale, lo = +sc.dataset.lo, hi = +sc.dataset.hi; const r = sc.getBoundingClientRect();
     const at = (x) => setTemp(id, Math.round((lo + Math.max(0, Math.min(1, (x - r.left) / r.width)) * (hi - lo)) * 10) / 10);
-    at(e.clientX); const k = $("#tk-" + id); k && (k.style.transition = "none");
-    const mv = (ev) => at(ev.clientX); const up = () => { document.removeEventListener("pointermove", mv); document.removeEventListener("pointerup", up); k && (k.style.transition = ""); };
-    document.addEventListener("pointermove", mv); document.addEventListener("pointerup", up); return;
+    const k = $("#tk-" + id); const x0 = e.clientX, y0 = e.clientY; let on = !touch, dead = false;
+    if (!touch) { e.preventDefault(); at(e.clientX); k && (k.style.transition = "none"); }
+    const mv = (ev) => {
+      if (dead) return;
+      if (!on) { const dx = Math.abs(ev.clientX - x0), dy = Math.abs(ev.clientY - y0); if (dy > 8 && dy >= dx) { dead = true; return; } if (dx > 6 && dx > dy) { on = true; k && (k.style.transition = "none"); } else return; }
+      at(ev.clientX);
+    };
+    const up = (ev) => { off(); if (touch && !dead && ev.type === "pointerup" && !on && Math.hypot(ev.clientX - x0, ev.clientY - y0) < 10) at(ev.clientX); k && (k.style.transition = ""); };
+    const off = () => { document.removeEventListener("pointermove", mv); document.removeEventListener("pointerup", up); document.removeEventListener("pointercancel", up); };
+    document.addEventListener("pointermove", mv); document.addEventListener("pointerup", up); document.addEventListener("pointercancel", up); return;
   }
-  const s = e.target.closest("[data-step]"); if (!s) return; e.preventDefault();
-  const id = s.dataset.id, dir = +s.dataset.step; stepTemp(id, dir);
-  /* long press repeats, then speeds up: -18 °C is reachable from 3 °C in a few seconds */
+  const s = e.target.closest(".step[data-step][data-id]"); if (!s) return;
+  const id = s.dataset.id, dir = +s.dataset.step;
   let n = 0; const tick = () => { n++; stepTemp(id, dir); holdI = setTimeout(tick, n < 10 ? 90 : n < 30 ? 45 : 22); };
-  holdT = setTimeout(tick, 380);
+  relHoldClear();
+  if (!touch) { e.preventDefault(); stepTemp(id, dir); n = 1; holdT = setTimeout(tick, 380); return; }
+  relPD = { id, dir, x: e.clientX, y: e.clientY, el: s, held: () => n > 0 };
+  holdT = setTimeout(() => { if (relPD) tick(); }, 380);
 });
-["pointerup", "pointercancel", "pointerleave"].forEach((ev) => document.addEventListener(ev, (e) => { if (ev === "pointerleave" && !(e.target.matches && e.target.matches("[data-step]"))) return; clearTimeout(holdT); clearTimeout(holdI); }, true));
+document.addEventListener("pointermove", (e) => { if (relPD && Math.hypot(e.clientX - relPD.x, e.clientY - relPD.y) > 10) { relPD = null; relHoldClear(); } }, true);
+document.addEventListener("pointerup", (e) => { const p = relPD; relPD = null; relHoldClear(); if (p && !p.held() && Math.hypot(e.clientX - p.x, e.clientY - p.y) < 10) stepTemp(p.id, p.dir); }, true);
+document.addEventListener("pointercancel", () => { relPD = null; relHoldClear(); }, true);
+document.addEventListener("pointerleave", (e) => { if (e.target.matches && e.target.matches("[data-step]")) { relPD = null; relHoldClear(); } }, true);
 window.addEventListener("blur", () => { clearTimeout(holdT); clearTimeout(holdI); });
 
 /* ───────────────────────── commit, advance, undo ───────────────────────── */

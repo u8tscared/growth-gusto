@@ -313,7 +313,7 @@ textarea.input{height:auto;min-height:180px;padding:14px;line-height:1.55;resize
 .step .ico{width:24px;height:24px}
 .scale{position:relative;height:10px;border-radius:10px;background:linear-gradient(90deg,#7DB9FF,#2FB985 22%,#2FB985 52%,#F0A43A 68%,#E14560 100%)}
 .scale .safe{position:absolute;top:-4px;bottom:-4px;border:1.5px dashed rgba(7,138,94,.55);border-radius:8px}
-.scale{cursor:pointer;touch-action:none}
+.scale{cursor:pointer;touch-action:pan-y}
 .scale::before{content:"";position:absolute;inset:-17px 0}
 .scale i{position:absolute;top:50%;width:32px;height:32px;border-radius:50%;background:var(--solid);box-shadow:0 3px 10px rgb(var(--sk) / .3),0 0 0 3px var(--ink);transform:translate(-50%,-50%);transition:left .45s var(--spring)}
 .scale-l{display:flex;justify-content:space-between;font-family:var(--mono);font-size:11px;color:var(--faint);margin-top:8px}
