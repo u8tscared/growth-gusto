@@ -231,3 +231,21 @@
 @media print{
   html.rg-printing .rp-scw::after,html.rg-printing .rp-hint{display:none!important}
 }
+
+/* ── V3 annexes: contrôles obligatoires, allergènes, fiches de nettoyage ── */
+.rp-kpis.k5>.rp-kpi:last-child{grid-column:1/-1}
+@media (min-width:960px){.rp-kpis.k5{grid-template-columns:repeat(5,minmax(0,1fr))}.rp-kpis.k5>.rp-kpi:last-child{grid-column:auto}}
+@media print{html.rg-printing .rp-kpis.k5{grid-template-columns:repeat(5,minmax(0,1fr))}html.rg-printing .rp-kpis.k5>.rp-kpi:last-child{grid-column:auto}}
+.rp-notice{min-width:560px}
+.rp-notice ol{margin:0;padding-left:14px}
+.rp-notice li{margin:0 0 1px}
+.rp-notice td:nth-child(1){width:22%}.rp-notice td:nth-child(2){width:20%}.rp-notice td:nth-child(4){width:20%}
+.rp-obl{min-width:620px}
+.rp-alg{min-width:520px;table-layout:fixed}
+.rp-alg th:first-child{width:26%}
+.rp-alg th.v{padding:6px 0;text-align:center;vertical-align:bottom;height:78px}
+.rp-alg th.v span{display:inline-block;writing-mode:vertical-rl;transform:rotate(180deg);white-space:nowrap;font-size:8px;letter-spacing:.02em}
+.rp-alg td.c{text-align:center;padding:4px 0;color:#C21E3C;font-size:10px}
+.rp-alg td.c.on{background:#FDF1F3}
+.rp-alg tbody tr:nth-child(even) td:not(.on){background:#FAFAFD}
+@media print{html.rg-printing .rp-notice,html.rg-printing .rp-obl,html.rg-printing .rp-alg{min-width:0}}

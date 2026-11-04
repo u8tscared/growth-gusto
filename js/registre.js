@@ -13,9 +13,10 @@ const REG_K = {
   rec: { t: "Réceptions", s: "Réception", ic: "truck", c: "#E0752F" },
   trace: { t: "Traçabilité", s: "Traçabilité", ic: "box", c: "#4A1FE6" },
   clean: { t: "Ménage", s: "Ménage", ic: "spray", c: "#0B9B6A" },
+  obl: { t: "Contrôles", s: "Contrôle", ic: "calcheck", c: "#B85C00" },
   other: { t: "Équipe", s: "Équipe", ic: "users", c: "#5A6386" },
 };
-const REG_F = [["all", "Tout"], ["nc", "Non-conformités"], ["corr", "Corrections"], ["temp", "Températures"], ["rec", "Réceptions"], ["trace", "Traçabilité"], ["clean", "Ménage"]];
+const REG_F = [["all", "Tout"], ["nc", "Non-conformités"], ["corr", "Corrections"], ["temp", "Températures"], ["rec", "Réceptions"], ["trace", "Traçabilité"], ["clean", "Ménage"], ["obl", "Contrôles"]];
 const REG_FREQ = { jour: "Chaque jour", semaine: "Chaque semaine", mois: "Chaque mois" };
 const REG_PHOTO_DAYS = 183;
 
@@ -113,7 +114,16 @@ function regEntries() {
     const c = S.chores.find((x) => x.id === g.choreId);
     E.push({ id: "m" + g.id, at: g.at, kind: "clean", uid: g.uid, what: c ? c.name : "Tâche supprimée", detail: c ? `${c.zone || ""}${c.zone ? " · " : ""}${regFreqTx(c)}` : "", valTx: "", st: "ok", stTx: "Fait", csv: [["Ménage", `${c ? c.name : "Tâche supprimée"}${c?.zone ? ` · ${c.zone}` : ""}`, "", "oui", "", ""]] });
   });
-  const skip = { reception: 1, open: 1, out: 1, lost: 1, chore: 1 };
+  /* obligations & contrôles (js/oblig.js): one entry per intervention, with its report */
+  (S.oblLogs || []).forEach((l) => {
+    const o = (S.obligations || []).find((x) => x.id === l.oblId); const f = (l.files || []).find((x) => !/pdf/i.test(x.type || "")); const nf = (l.files || []).length;
+    const at = l.at || (l.day ? parseDay(l.day).getTime() : 0);
+    E.push({ id: "g" + l.id, at, kind: "obl", uid: l.uid, what: o ? o.name : "Contrôle supprimé",
+      detail: [l.day && regDay(at) !== l.day ? `Passage du ${shortDate(l.day)}` : "", l.provider, nf ? `${nf} document${nf > 1 ? "s" : ""}` : "Sans rapport joint", l.notes].filter(Boolean).join(" · "),
+      valTx: "", st: "ok", stTx: "Fait", photoUrl: f ? regPic(f.id, f.url) : "",
+      csv: [["Contrôle", `${o ? o.name : "Contrôle"}${l.provider ? ` · ${l.provider}` : ""} · passage du ${l.day ? regFull(l.day) : "-"}`, "", "oui", l.notes || "", ""]] });
+  });
+  const skip = { reception: 1, open: 1, out: 1, lost: 1, chore: 1, obl: 1 };
   S.events.forEach((e) => {
     const text = String(e.text || "");
     /* an undone action is never hidden: the original entry stays, struck through, with who cancelled it and when */
@@ -203,7 +213,7 @@ VIEWS.registre = {
     return `<div class="inner rg">${topBar("Registre HACCP", { right: `<button class="btn soft sm" data-go="regReport">${ico("printer")}Rapport</button>` })}
       <div class="rg-top">
         <div class="glass pad st rg-heat" style="--i:1"><div class="row"><span class="lbl">Températures · 30 jours</span><span class="pill ${regConfSt(conf, nc30)}">${conf != null ? `${fmt(conf, 1)} % conformes` : "aucun relevé"}</span></div><div class="heat" style="margin-top:12px">${cells}</div><div class="rg-leg"><span><i class="g"></i>complet</span><span><i class="y"></i>incomplet</span><span><i class="r"></i>hors seuil</span><span class="rg-corr${nc30 ? " on" : ""}">${nc30 ? `${nc30} relevé${nc30 > 1 ? "s" : ""} hors seuil en 30 j` : "Aucun relevé hors seuil en 30 j"}</span></div></div>
-        <button class="glass pad st rg-cta" style="--i:2" data-go="regReport"><span class="ic">${ico("file")}</span><span class="tx"><b>Rapport pour contrôle sanitaire</b><em>Températures, réceptions, traçabilité et ménage. À imprimer ou à exporter.</em></span>${ico("chev")}</button>
+        <button class="glass pad st rg-cta" style="--i:2" data-go="regReport"><span class="ic">${ico("file")}</span><span class="tx"><b>Rapport pour contrôle sanitaire</b><em>Températures, réceptions, traçabilité, ménage, allergènes et contrôles obligatoires. À imprimer ou à exporter.</em></span>${ico("chev")}</button>
       </div>
       <div class="rg-bar st" style="--i:3"><label class="rg-q">${ico("search")}<input class="input" id="regQ" type="search" enterkeyhint="search" autocomplete="off" placeholder="Produit, frigo, personne…" value="${esc(S.ui.regQ || "")}" aria-label="Rechercher dans le registre"></label>
         <div class="chips" id="regChips">${regChips(all)}</div></div>
@@ -311,6 +321,44 @@ function regScHints(root) {
 }
 window.addEventListener("resize", debounce(() => { if (S.route === "regReport") regScHints(document); }, 150));
 
+/* ───────── report annexes: cleaning notices, obligations & contrôles (js/oblig.js), allergens (js/notes.js) ───────── */
+function regNoticeHtml() {
+  if (!S.chores.length) return "";
+  const rows = S.chores.map((c0) => {
+    let c = c0; if (typeof menNorm === "function") { try { c = menNorm(c0); } catch (e) {} }
+    let g = null; if (typeof menGuideOf === "function") { try { g = menGuideOf(c); } catch (e) {} }
+    const steps = g ? g.steps || [] : Array.isArray(c.steps) ? c.steps.filter(Boolean) : [];
+    return { c, product: g ? g.product : c.notes || "", steps, safety: g ? g.safety || "" : "", generic: !!(g && g.generic) };
+  }).sort((a, b) => String(a.c.zone || "").localeCompare(String(b.c.zone || ""), "fr") || a.c.name.localeCompare(b.c.name, "fr"));
+  return `<h3 id="rpClean">Fiches de nettoyage : produit et méthode</h3><p class="rp-note">Pour chaque tâche du plan : le produit utilisé, les étapes à suivre et les précautions. Ces notices sont affichées à l'équipe dans l'application au moment de faire la tâche.</p>
+    ${regSc(`<table class="rp-t rp-notice"><thead><tr><th>Tâche</th><th>Produit</th><th>Méthode</th><th>Précautions</th></tr></thead><tbody>${rows.map((x) => `<tr><td>${esc(x.c.name)}<small>${esc([x.c.zone, regFreqTx(x.c)].filter(Boolean).join(" · "))}</small></td><td>${esc(x.product || "–")}</td><td>${x.steps.length ? `<ol>${x.steps.map((t) => `<li>${esc(t)}</li>`).join("")}</ol>` : "–"}${x.generic ? `<small>Méthode générale</small>` : ""}</td><td>${esc(x.safety || "–")}</td></tr>`).join("")}</tbody></table>`)}`;
+}
+const REG_ALG_SHORT = { gluten: "Gluten", crustaces: "Crustacés", oeufs: "Œufs", poissons: "Poissons", arachides: "Arachides", soja: "Soja", lait: "Lait", fruitscoque: "Fruits à coque", celeri: "Céleri", moutarde: "Moutarde", sesame: "Sésame", sulfites: "Sulfites", lupin: "Lupin", mollusques: "Mollusques" };
+function regAlgRecipes() {
+  if (typeof ALLERGENS === "undefined") return [];
+  const isR = (n) => (typeof noteKind === "function" ? noteKind(n) === "Recettes" : n.cat === "Recettes");
+  return S.notes.filter((n) => isR(n) && !n.archived).map((n) => {
+    let a = null; if (typeof recipeAllergens === "function") { try { a = recipeAllergens(n); } catch (e) {} }
+    return { n, a: new Set(Array.isArray(a) ? a : n.allergens || []) };
+  }).sort((x, y) => String(x.n.title || "").localeCompare(String(y.n.title || ""), "fr"));
+}
+function regAlgHtml() {
+  const R = regAlgRecipes(); if (!R.length) return "";
+  const A = ALLERGENS;
+  return `<section id="rpAlg"><h2><span>${typeof oblReportRows === "function" && oblReportRows().length ? 6 : 5}</span>Allergènes des plats</h2><p class="rp-note">Les 14 allergènes à déclarer (règlement UE 1169/2011), pour chaque recette de la carte, y compris ceux apportés par les produits et sous-recettes utilisés. Ce tableau peut être présenté au client qui le demande.</p>
+    ${regSc(`<table class="rp-t rp-alg"><thead><tr><th>Plat</th>${A.map((x) => `<th class="v" title="${esc(x.t)}"><span>${esc(REG_ALG_SHORT[x.id] || x.t)}</span></th>`).join("")}</tr></thead><tbody>${R.map(({ n, a }) => `<tr><td>${esc(n.title || "Sans titre")}${a.size ? "" : `<small>Aucun allergène déclaré</small>`}</td>${A.map((x) => `<td class="c${a.has(x.id) ? " on" : ""}">${a.has(x.id) ? "●" : ""}</td>`).join("")}</tr>`).join("")}</tbody></table>`)}</section>`;
+}
+function regOblHtml(P) {
+  if (typeof oblReportRows !== "function") return "";
+  const R = oblReportRows(); if (!R.length) return "";
+  const stc = { late: "bad", soon: "warn", ok: "ok", unk: "neu" };
+  const stTx = { late: "En retard", soon: "À prévoir", ok: "À jour", unk: "Date à renseigner" };
+  const main = regSc(`<table class="rp-t rp-obl"><thead><tr><th>Contrôle</th><th>Fréquence</th><th>Dernier passage</th><th>Prestataire</th><th>Prochaine échéance</th><th>Statut</th><th>Rapport</th></tr></thead><tbody>${R.map((x) => `<tr class="${x.st === "late" ? "row-nc" : ""}"><td>${esc(x.name)}<small>${esc(x.catT)}</small>${x.checks ? `<small>${x.checks.done} / ${x.checks.total} affichages vérifiés</small>` : ""}</td><td class="nw">${esc(x.freqTx)}</td><td class="nw">${x.lastDone ? regFull(x.lastDone) : "–"}${x.last && x.last.by ? `<small>noté par ${esc(firstName(x.last.by))}</small>` : ""}</td><td>${esc(x.provider || "–")}${x.contract ? `<small>Contrat ${esc(x.contract)}</small>` : ""}</td><td class="nw">${x.nextDue ? regFull(x.nextDue) : "–"}</td><td class="nw"><span class="rp-st ${stc[x.st]}">${stTx[x.st]}</span></td><td class="nw">${x.files ? `${x.files} pièce${x.files > 1 ? "s" : ""}` : x.last ? "Non joint" : "–"}</td></tr>`).join("")}</tbody></table>`);
+  const logs = (S.oblLogs || []).filter((l) => l.day && l.day >= P.from && l.day <= P.to).sort((a, b) => a.day.localeCompare(b.day));
+  const per = logs.length ? regSc(`<table class="rp-t"><thead><tr><th>Date</th><th>Contrôle</th><th>Prestataire</th><th>Observations</th><th>Pièces</th></tr></thead><tbody>${logs.map((l) => { const o = (S.obligations || []).find((x) => x.id === l.oblId); const nf = (l.files || []).length; return `<tr><td class="nw">${regFull(l.day)}</td><td>${esc(o ? o.name : "–")}</td><td>${esc(l.provider || "–")}</td><td>${esc(l.notes || "–")}</td><td class="nw">${nf ? `${nf} pièce${nf > 1 ? "s" : ""}` : "–"}</td></tr>`; }).join("")}</tbody></table>`) : `<p class="rp-empty">Aucune intervention enregistrée sur la période.</p>`;
+  return `<section id="rpObl" class="${R.length <= 22 ? "rp-keep" : ""}"><h2><span>5</span>Obligations et contrôles périodiques</h2><p class="rp-note">Vérifications réglementaires (sécurité incendie, installations techniques, hygiène, documents). Dernier passage connu, prestataire et prochaine échéance. Les rapports sont conservés dans l'application et dans le registre de sécurité.</p>${main}<h3>Interventions sur la période</h3>${per}</section>`;
+}
+
 function regReportHtml(P) {
   const D = regReportData(P); const now = Date.now();
   const cell = (day, f, slot) => {
@@ -328,17 +376,23 @@ function regReportHtml(P) {
   const cxRows = D.cancelled.map((e) => { const l = S.lots.find((x) => x.id === e.ref); return `<tr class="row-cx"><td>${esc(l ? l.name : "–")}</td><td><span class="mono">${esc(l?.lot || "–")}</span></td><td colspan="4"><s>${esc(regCap(String(e.text || "").replace(/^a /, "")))} · ${shortDate(regDay(e.at))} ${hm(e.at)} · ${esc(firstName(nameOf(e.uid)))}</s><small>Annulé${e.cancelledBy ? ` par ${esc(firstName(nameOf(e.cancelledBy)))}` : ""}${e.cancelledAt ? ` le ${shortDate(regDay(e.cancelledAt))} à ${hm(e.cancelledAt)}` : ""}</small></td><td class="nw"><span class="rp-st neu">Annulé</span></td></tr>`; }).join("");
   const tLot = D.opened.length || D.cancelled.length ? regSc(`<table class="rp-t"><thead><tr><th>Produit</th><th>Lot · fournisseur</th><th>Reçu le</th><th>Ouvert le</th><th>À consommer avant</th><th>Sortie</th><th>Statut</th></tr></thead><tbody>${D.opened.map((l) => { const over = l.status === "opened" && l.dlcOpen && daysUntil(l.dlcOpen) < 0; const st = l.status === "lost" ? ["bad", "Jeté"] : l.status === "out" ? ["ok", "Utilisé"] : over ? ["bad", "DLC dépassée"] : ["acc", "En cours"]; return `<tr class="${st[0] === "bad" ? "row-nc" : ""}"><td>${esc(l.name)}</td><td><span class="mono">${esc(l.lot || "–")}</span>${l.supplier ? `<small>${esc(l.supplier)}</small>` : ""}</td><td class="nw">${l.createdAt ? shortDate(regDay(l.createdAt)) : "–"}</td><td class="nw">${l.openedAt ? `${shortDate(regDay(l.openedAt))} ${hm(l.openedAt)}<small>${esc(firstName(nameOf(l.openedBy)))}</small>` : "–"}</td><td class="nw">${l.dlcOpen ? regFull(l.dlcOpen) : l.dlc ? regFull(l.dlc) : "–"}</td><td class="nw">${l.outAt ? `${shortDate(regDay(l.outAt))} ${hm(l.outAt)}<small>${esc(firstName(nameOf(l.outBy)))}</small>` : "–"}</td><td class="nw"><span class="rp-st ${st[0]}">${st[1]}</span>${l.status === "lost" && l.lostReason ? `<small>${esc(l.lostReason)}</small>` : ""}</td></tr>`; }).join("")}${cxRows}</tbody></table>`) : `<p class="rp-empty">Aucun produit ouvert ou jeté sur la période.</p>`;
   const tClean = D.chores.length ? regSc(`<table class="rp-t"><thead><tr><th>Tâche</th><th>Zone</th><th>Fréquence</th><th class="r">Réalisé</th><th class="r">Taux</th><th>Dernière fois</th><th>Par</th></tr></thead><tbody>${D.chores.map((x) => `<tr class="${x.rate != null && x.rate < 80 ? "row-nc" : ""}"><td>${esc(x.c.name)}${x.born > D.start ? `<small>Au plan depuis le ${shortDate(x.born)}</small>` : ""}</td><td>${esc(x.c.zone || "–")}</td><td class="nw">${esc(x.freqTx)}</td><td class="r nw">${x.expN ? `${x.doneN} / ${x.expN}` : "–"}</td><td class="r nw">${x.rate == null ? `<span class="rp-st neu">À venir</span>` : `<span class="rp-st ${x.rate >= 95 ? "ok" : x.rate >= 80 ? "warn" : "bad"}">${x.rate} %</span>`}</td><td class="nw">${x.last ? `${shortDate(regDay(x.last))} ${hm(x.last)}` : "Jamais"}</td><td>${esc(x.who || "–")}</td></tr>`).join("")}</tbody></table>`) : `<p class="rp-empty">Aucun plan de nettoyage déclaré.</p>`;
+  const tNotice = regNoticeHtml();
+  const oblK = (() => { if (typeof oblReportRows !== "function") return ""; const R = oblReportRows(); if (!R.length) return ""; const c = (k) => R.filter((x) => x.st === k).length; const late = c("late"), unk = c("unk");
+    return kpi("Contrôles obligatoires", `${R.length - late - unk} / ${R.length}`, `à jour · ${late} en retard${unk ? ` · ${unk} sans date` : ""}`, late ? "bad" : unk ? "warn" : ""); })();
+  const tObl = regOblHtml(P);
+  const tAlg = regAlgHtml();
   return `<article class="rp-paper" id="rpPaper">
     <header class="rp-head"><div class="rp-brand"><span class="rp-mk">${logoMark()}</span><div><b>${esc(S.resto?.name || "Restaurant")}</b><em>Registre sanitaire · plan de maîtrise sanitaire (HACCP)</em></div></div>
       <div class="rp-per"><span>Période contrôlée</span><b>du ${regFull(P.from)} au ${regFull(P.to)}</b><em>${D.clipped ? `registre tenu depuis le ${regFull(D.start)}` : `${D.days.length} jour${D.days.length > 1 ? "s" : ""}`}</em></div></header>
     <h1>Rapport pour contrôle sanitaire</h1>
-    <div class="rp-kpis">${kpi("Relevés de température", `${D.done} / ${D.exp}`, D.exp ? `${Math.round((D.done / D.exp) * 100)} % des relevés attendus` : "–", D.exp && D.done < D.exp ? "warn" : "")}${kpi("Conformité températures", D.conf != null ? `${fmt(D.conf, 1)} %` : "–", `${D.bad.length} hors seuil · ${D.fixes.length} correction${D.fixes.length > 1 ? "s" : ""}`, { ok: "", neu: "", warn: "warn", bad: "bad" }[regConfSt(D.conf, D.bad.length)])}${kpi("Réceptions", `${D.recs.length}`, `${D.lines.length} produit${D.lines.length > 1 ? "s" : ""} · ${D.refused} refus · ${D.reserves} réserve${D.reserves > 1 ? "s" : ""}`, D.refused ? "warn" : "")}${kpi("Plan de nettoyage", D.cRate != null ? `${D.cRate} %` : "–", D.cExp ? `${D.cDone} / ${D.cExp} tâches prévues réalisées` : "aucune tâche encore due", D.cRate != null && D.cRate < 80 ? "warn" : "")}</div>
+    <div class="rp-kpis${oblK ? " k5" : ""}">${kpi("Relevés de température", `${D.done} / ${D.exp}`, D.exp ? `${Math.round((D.done / D.exp) * 100)} % des relevés attendus` : "–", D.exp && D.done < D.exp ? "warn" : "")}${kpi("Conformité températures", D.conf != null ? `${fmt(D.conf, 1)} %` : "–", `${D.bad.length} hors seuil · ${D.fixes.length} correction${D.fixes.length > 1 ? "s" : ""}`, { ok: "", neu: "", warn: "warn", bad: "bad" }[regConfSt(D.conf, D.bad.length)])}${kpi("Réceptions", `${D.recs.length}`, `${D.lines.length} produit${D.lines.length > 1 ? "s" : ""} · ${D.refused} refus · ${D.reserves} réserve${D.reserves > 1 ? "s" : ""}`, D.refused ? "warn" : "")}${kpi("Plan de nettoyage", D.cRate != null ? `${D.cRate} %` : "–", D.cExp ? `${D.cDone} / ${D.cExp} tâches prévues réalisées` : "aucune tâche encore due", D.cRate != null && D.cRate < 80 ? "warn" : "")}${oblK}</div>
     <section><h2><span>1</span>Températures des enceintes froides</h2><p class="rp-note">Deux relevés par jour et par enceinte (midi et soir), en °C. * hors seuil · <sup>c</sup> valeur corrigée (détail plus bas) · « — » relevé manquant. Initiales : personne ayant relevé.${D.clipped ? ` Registre tenu dans l'application depuis le ${regFull(D.start)}.` : ""}</p>${tempTable}
       <h3>Non-conformités et actions correctives</h3>${ncTable}
       <h3>Corrections de relevés</h3><p class="rp-note">Un relevé corrigé n'est jamais effacé : la valeur d'origine, l'auteur, la date et le motif de chaque correction sont conservés.</p>${fixTable}</section>
     <section><h2><span>2</span>Réceptions des marchandises</h2><p class="rp-note">Contrôle à réception : température, DLC, numéro de lot. Un produit refusé repart avec le livreur et n'entre pas en stock.</p>${recTable}</section>
     <section class="${D.opened.length <= 18 ? "rp-keep" : ""}"><h2><span>3</span>Traçabilité des produits ouverts</h2><p class="rp-note">Produits entamés pendant la période, avec la date limite après ouverture, et produits jetés. Une action annulée reste visible, barrée.</p>${tLot}</section>
-    <section class="${D.chores.length <= 18 ? "rp-keep" : ""}"><h2><span>4</span>Plan de nettoyage et de désinfection</h2><p class="rp-note">Tâches prévues et réalisées sur la période, comptées à partir du jour où chaque tâche a été ajoutée au plan. Une tâche hebdomadaire ou mensuelle compte une fois par période, dès qu'elle est faite ou que sa période est terminée. En dessous de 80 %, la ligne est signalée.</p>${tClean}</section>
+    <section class="${D.chores.length <= 18 ? "rp-keep" : ""}"><h2><span>4</span>Plan de nettoyage et de désinfection</h2><p class="rp-note">Tâches prévues et réalisées sur la période, comptées à partir du jour où chaque tâche a été ajoutée au plan. Une tâche hebdomadaire ou mensuelle compte une fois par période, dès qu'elle est faite ou que sa période est terminée. En dessous de 80 %, la ligne est signalée.</p>${tClean}${tNotice}</section>
+    ${tObl}${tAlg}
     <footer class="rp-foot"><div>Document généré le ${regFull(dayKey())} à ${hm(now)} par ${esc(nameOf(S.me.id))} avec Growth Gusto. Chaque enregistrement est daté et attribué à la personne connectée au moment de la saisie.</div><div class="rp-sign"><span>Visa du responsable</span><i></i></div></footer>
   </article>`;
 }
@@ -378,7 +432,9 @@ async function regPurge(silent) {
   const lim = Date.now() - REG_PHOTO_DAYS * 864e5; let n = 0;
   const store = regPhotoStore();
   if (store) {
-    try { const { assets } = await store.list(); const old = (assets || []).filter((x) => { const t = new Date(x.createdAt || x.at || 0).getTime(); return t && t < lim; }); for (const x of old) { await store.delete(x.id); n++; } }
+    /* reports of obligations & contrôles (extincteurs, hotte…) are proof kept for years: never purged */
+    const keep = new Set((S.oblLogs || []).flatMap((l) => (l.files || []).map((f) => f.id)).filter(Boolean));
+    try { const { assets } = await store.list(); const old = (assets || []).filter((x) => { const t = new Date(x.createdAt || x.at || 0).getTime(); return t && t < lim && !keep.has(x.id); }); for (const x of old) { await store.delete(x.id); n++; } }
     catch (e) { if (!silent) toast(S.cap.assets ? "Suppression impossible : seuls les éditeurs peuvent gérer les photos." : "Suppression impossible sur cet appareil.", "err"); return -1; }
   }
   if (DB.mode === "local") {
