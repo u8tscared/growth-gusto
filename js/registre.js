@@ -86,7 +86,7 @@ function regEntries() {
     E.push({ id: "r" + r.id, at: r.at, kind: "temp", uid: r.uid,
       what: `${regFrName(r)} · relevé du ${slot}`,
       detail: [r.ok ? (rg ? `Seuil ${rg}` : "") : ncTx, fixTx].filter(Boolean).join(" · "), miss: !r.ok && !r.action,
-      val: num(r.value), valTx: `${regNum(num(r.value))} °C`, st: r.ok ? (fx.length ? "warn" : "ok") : "bad", stTx: r.ok ? (fx.length ? "Corrigé" : "Conforme") : "Non conforme", nc: !r.ok, fixed: !!fx.length,
+      val: num(r.value), valTx: `${regNum(num(r.value))} °C`, st: r.ok ? (fx.length ? "warn" : "ok") : "bad", stTx: r.ok ? (fx.length ? "Corrigé" : r.peak ? "Pic pendant le service" : "Conforme") : "Non conforme", nc: !r.ok, fixed: !!fx.length,
       csv: [[`Relevé ${slot}`, regFrName(r), regNum(num(r.value)), r.ok ? "oui" : "non", r.ok ? "" : r.action || "Non renseignée", fx.map((x) => `${regFull(regDay(x.at))} ${hm(x.at)} ${nameOf(x.uid)} : ${x.tx}${x.why ? ` (${x.why})` : ""}`).join(" | ")]] });
     fx.forEach((x) => E.push({ id: `f${r.id}-${x.n}`, at: x.at, kind: "temp", uid: x.uid, what: `Correction · ${regFrName(r)}`,
       detail: `Relevé du ${regSlot(x.from.slot || r.slot)} du ${shortDate(r.day || regDay(r.at))} : ${x.tx}${x.why ? ` · Motif : ${x.why}` : " · Motif non précisé"}`,

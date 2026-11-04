@@ -278,7 +278,7 @@ Object.assign(IC, {
 
 /* ───────────── onboarding: 3 short steps ───────────── */
 /* onboarding presets: [name, type id from REL_TYPES (js/releve.js)] */
-const OB_FRIDGES = [["Chambre froide 1", "cfp"], ["Chambre froide 2", "cfp"], ["Frigo du bar", "frigo"], ["Frigo pâtisserie", "frigo"], ["Saladette", "saladette"], ["Congélateur", "congel"], ["Cave à boissons", "cave"], ["Vitrine", "vitrine"]];
+const OB_FRIDGES = [["Chambre froide 1", "cfp"], ["Chambre froide 2", "cfp"], ["Frigo de service 1", "service"], ["Frigo de service 2", "service"], ["Frigo du bar", "frigo"], ["Frigo pâtisserie", "frigo"], ["Saladette", "saladette"], ["Congélateur", "congel"], ["Cave à boissons", "cave"], ["Vitrine", "vitrine"]];
 const OB_TYPE_FALLBACK = { frigo: [0, 4, "therm"], cfp: [0, 4, "therm"], congel: [-40, -15, "snow"], saladette: [0, 4, "therm"], cave: [2, 8, "therm"], vitrine: [0, 4, "therm"] };
 function ccObType(k) {
   const t = typeof REL_TYPES !== "undefined" ? REL_TYPES.find((x) => x.k === k) : null; const f = OB_TYPE_FALLBACK[k] || OB_TYPE_FALLBACK.frigo;
