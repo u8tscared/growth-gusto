@@ -95,6 +95,7 @@ const AUTH = {
       const wantLocal = q.has("local"), wantDemo = q.has("demo");
       ["invite", "local", "demo"].forEach((k) => { if (q.has(k)) { q.delete(k); strip = true; } });
       if (strip) { try { history.replaceState(null, "", u.pathname + (q.toString() ? "?" + q : "") + u.hash); } catch (e) {} }
+      this.flash();
       if (wantLocal) { auLS.set("gg-mode", "local"); auLS.set("gg-local-ok", "1"); auLS.sdel("gg-demo"); return this.resolve({ mode: "local" }); }
       if (wantDemo || auLS.sget("gg-demo") === "1") return this.startDemo();
       const mode = auLS.get("gg-mode"), invite = auLS.get("gg-invite");
@@ -113,6 +114,7 @@ const AUTH = {
     }
     const u = await this.firstUser();
     if (!u) { if (this._wasRedirect && !this.ui.err) this.ui.err = "Google n'a pas pu finir la connexion dans l'app installée sur l'iPhone. Continuez avec votre e-mail, ou ouvrez le lien dans Safari."; this.show("welcome"); return; }
+    if (auLS.sget("gg-del-account") === "1") { this.user = u; auLS.sdel("gg-del-account"); return this.deleteAccount(true); }
     await this.signedIn(u);
   },
   firstUser() { return new Promise((res) => { const un = this.auth.onAuthStateChanged((u) => { try { un(); } catch (e) {} res(u); }); }); },
@@ -164,7 +166,7 @@ const AUTH = {
     const prof = { name: u.displayName || doc.name || "", email: u.email || "", photo: u.photoURL || "" };
     if (prof.name !== doc.name || prof.email !== doc.email || prof.photo !== doc.photo) this.fs.collection("users").doc(u.uid).set({ ...prof, updatedAt: Date.now(), ...(doc.createdAt ? {} : { createdAt: Date.now() }) }, { merge: true }).catch((e) => console.warn("users set", e && e.code));
     const inv = auLS.get("gg-invite");
-    if (inv) return this.openJoin(inv);
+    if (inv) return this.openJoin(inv, true);
     if (this.hasLocal() && !auLS.get("gg-imp-" + u.uid)) return this.show("import");
     if (this.restos.length) return this.enter();
     this.show("setup");
@@ -321,6 +323,7 @@ const AUTH = {
     const me = firstName((u && u.displayName) || (U.create && U.create.me) || (U.tab === "up" ? U.name : "") || "");
     if (s === "email") return U.tab === "up" ? ["Compte cuisine", `Par ${me || "…"}`] : ["Compte cuisine", "Retour en cuisine"];
     if (s === "reset") return ["Nouveau mot de passe", U.sent ? "Lien envoyé" : "Lien par e-mail"];
+    if (s === "delAccount" || s === "reauth") return ["Suppression du compte", "Définitif"];
     if (s === "setup") return [me ? `Cuisine de ${me}` : "Votre cuisine", `Par ${me || "vous"}`];
     if (s === "create") { const C = U.create || {}; const n = ($("#auRName")?.value ?? C.name ?? "").trim(); const t = (AU_TYPES.find((x) => x[0] === C.type) || AU_TYPES[0])[1]; return [n || "Votre restaurant", `Par ${me || "vous"} · ${t}`]; }
     if (s === "join") { const inv = U.join && U.join.inv; return inv ? [inv.restoName || "Votre équipe", `Rôle ${(AU_ROLES[inv.role] || AU_ROLES.equipe).t}`] : ["Invitation", "Code à 8 caractères"]; }
@@ -406,8 +409,8 @@ const AUTH = {
   },
   after() {
     const s = this.ui.screen, desk = window.matchMedia("(min-width:960px)").matches;
-    const f = { email: this.ui.tab === "up" && !this.ui.name ? "#auName" : "#auEmail", reset: "#auREmail", create: "#auRName", join: "#auCode" }[s];
-    if (f && (desk || s === "join")) setTimeout(() => { const i = $(f); if (i && !i.value) i.focus({ preventScroll: true }); }, 380);
+    const f = { email: this.ui.tab === "up" && !this.ui.name ? "#auName" : "#auEmail", reset: "#auREmail", create: "#auRName", join: "#auCode", reauth: "#auRePw", delAccount: "#auConfIn" }[s];
+    if (f && (desk || s === "join" || s === "reauth")) setTimeout(() => { const i = $(f); if (i && !i.value) i.focus({ preventScroll: true }); }, 380);
     if (s === "email" || s === "reset" || s === "create") this.validate();
     if (s === "join") this.codeCells();
     if (s === "create") this.createPrev();
@@ -476,7 +479,25 @@ const AUTH = {
         <div class="au-choices">
           <button class="au-choice st" style="--i:3" data-act="auCreate"><span class="au-cic">${ico("store")}</span><span class="au-ctx"><b>Créer mon restaurant</b><span>Je suis gérant, je démarre</span></span><span class="au-arr" aria-hidden="true">${AU_SVG.arrow}</span></button>
           <button class="au-choice st" style="--i:4" data-act="auJoinOpen"><span class="au-cic alt">${ico("users")}</span><span class="au-ctx"><b>Rejoindre une équipe</b><span>J'ai un code ou un lien d'invitation</span></span><span class="au-arr" aria-hidden="true">${AU_SVG.arrow}</span></button>
-        </div>`;
+        </div>
+        <button class="au-ghost au-delacc st" style="--i:5" data-act="auDelAccount">Supprimer mon compte${AU_SVG.arrowS}</button>`;
+    }
+    /* typed confirmation inside the overlay (sheets sit under it): used from the « setup » screen */
+    if (s === "delAccount") {
+      const u = this.user || {};
+      return `${top()}${head("Supprimer mon compte ?", `Vous quitterez vos équipes, les restaurants que vous possédez seront supprimés avec leurs données, puis le compte <b>${esc(u.email || "")}</b> sera effacé. C'est définitif.`)}
+        ${this.errHTML()}
+        <form class="au-form st" style="--i:3" data-au="delacc" novalidate><label class="au-f"><span class="au-lbl">Pour confirmer, tapez EFFACER</span><div class="au-in"><input class="au-input mono" id="auConfIn" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="EFFACER" enterkeyhint="done"></div></label>
+        <button class="au-tac au-primary au-submit au-danger" type="submit" id="auConfGo" disabled><span class="au-bl">${ico("trash")}Supprimer définitivement</span>${dots}</button></form>`;
+    }
+    /* Firebase asks for a fresh sign-in before deleting an account (e-mail accounts: the password) */
+    if (s === "reauth") {
+      const u = this.user || {};
+      return `${head("Confirmez votre mot de passe.", `Par sécurité, avant de supprimer le compte <b>${esc(u.email || "")}</b>.`)}
+        ${this.errHTML()}
+        <form class="au-form st" style="--i:3" data-au="reauth" novalidate><label class="au-f"><span class="au-lbl">Mot de passe</span><div class="au-in"><input class="au-input" id="auRePw" type="password" autocomplete="current-password" placeholder="Votre mot de passe" enterkeyhint="go"></div></label>
+        <button class="au-tac au-primary au-submit au-danger${busy("reauth")}" type="submit" id="auReGo"><span class="au-bl">${ico("trash")}Supprimer définitivement</span>${dots}</button>
+        <button class="au-ghost" type="button" data-act="auReauthCancel">Annuler</button></form>`;
     }
     if (s === "create") {
       const C = (U.create ||= { name: "", type: "bistrot", frs: ["Chambre froide", "Frigo de service 1", "Frigo de service 2", "Congélateur"], me: "" });
@@ -651,9 +672,9 @@ const AUTH = {
   },
 
   /* ───────────── join with an invite ───────────── */
-  async openJoin(code) {
+  async openJoin(code, auto) {
     code = auCleanCode(code);
-    this.ui.join = { code, inv: null, err: "", loading: code.length === 8 };
+    this.ui.join = { code, inv: null, err: "", loading: code.length === 8, auto: !!auto && code.length === 8 };
     this.show("join", { push: !!this.ui.back.length || this.ui.screen === "setup" });
     if (code.length === 8) this.lookup(code);
   },
@@ -663,12 +684,16 @@ const AUTH = {
       const s = await this.timeout(this.fs.collection("invites").doc(code).get(), 12000);
       if (J.code !== code) return;
       const inv = s.exists ? s.data() : null;
-      if (!inv) J.err = "Ce code n'existe pas ou a été annulé. Vérifiez-le avec votre gérant.";
-      else if (inv.expiresAt && inv.expiresAt < Date.now()) J.err = "Cette invitation a expiré. Demandez-en une nouvelle au gérant.";
+      if (!inv) { J.err = "Ce code n'existe pas ou a été annulé. Vérifiez-le avec votre gérant."; auLS.del("gg-invite"); }
+      else if (inv.expiresAt && inv.expiresAt < Date.now()) { J.err = "Cette invitation a expiré. Demandez-en une nouvelle au gérant."; auLS.del("gg-invite"); }
+      else if (inv.maxUses && (inv.uses || 0) >= inv.maxUses) { J.err = "Cette invitation a déjà été utilisée. Demandez-en une nouvelle au gérant."; auLS.del("gg-invite"); }
       else if (this.restos.includes(inv.rid)) { auLS.del("gg-invite"); toast(`Vous faites déjà partie de ${inv.restoName || "cette équipe"}`); this.enter(inv.rid); return; }
       else { J.inv = { ...inv, code }; SFX.scan(); buzz(8); }
     } catch (x) { if (J.code !== code) return; J.err = this.msg(x); }
     J.loading = false; this.paint();
+    /* opened from an invitation link: join right away with the invite's role (a code typed by hand still shows the card first) */
+    if (J.inv && J.auto) { J.auto = false; setTimeout(() => { if (this.ui.join === J && J.inv && !this.ui.busy) this.joinSubmit(); }, 350); }
+    else if (J.auto) { J.auto = false; auLS.del("gg-invite"); }
   },
   paintJoin() { if (this.ui.screen !== "join") return; const st = $("#auJState"); const J = this.ui.join; if (st && J.loading) st.innerHTML = `<div class="au-jload">${AU_DOTS_IN}Recherche de l'invitation…</div>`; },
   codeCells() {
@@ -688,7 +713,7 @@ const AUTH = {
       await this.timeout(b.commit(), 15000);
       auLS.del("gg-invite"); this.setBusy("");
       this.celebrate(`Bienvenue dans l'équipe !`, `${inv.restoName || "Restaurant"} · ${(AU_ROLES[inv.role] || AU_ROLES.equipe).t}`, inv.rid);
-    } catch (x) { console.warn("join", x); J.err = x && x.code === "permission-denied" ? "Cette invitation n'est plus valable. Demandez-en une nouvelle." : this.msg(x); this.setBusy(""); this.paint(); SFX.err(); }
+    } catch (x) { console.warn("join", x); J.err = x && x.code === "permission-denied" ? "Cette invitation n'est plus valable. Demandez-en une nouvelle." : this.msg(x); auLS.del("gg-invite"); this.setBusy(""); this.paint(); SFX.err(); }
   },
 
   /* ───────────── import this phone's data into the account ───────────── */
@@ -801,6 +826,138 @@ const AUTH = {
     this.invPaint();
   },
 
+  /* ───────────── remise à zéro (accounts): wipe the restaurant's data, delete the restaurant, leave a team, delete my account ─────────────
+     Every subcollection of restos/{rid} is deleted client-side in batches of 400 (Firestore never cascades). */
+  COLS: ["fridges", "readings", "lots", "products", "counts", "receptions", "events", "notes", "chores", "choreLogs", "tickets", "tkLinks", "moves", "stockMoves", "staff", "shifts", "punches", "obligations", "oblLogs", "feedback", "expenses"],
+  online() { return navigator.onLine !== false; },
+  isOwner() { return !!(DB.uid && S.resto && S.resto.owner === DB.uid); },
+  /* typed confirmation, same pattern as the local « Tout effacer » (compte.js): the button wakes up on EFFACER */
+  confirmSheet({ icon = "trash", title, sub, btn, act, id = "", extra = "" }) {
+    openSheet(`<div class="au-sh au-conf"><span class="au-shic bad">${ico(icon)}</span><div class="h2">${title}</div><p class="sub">${sub}</p>${extra}
+      <label class="field"><span>Pour confirmer, tapez EFFACER</span><input class="input mono" id="auConfIn" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="EFFACER" enterkeyhint="done"></label>
+      <button class="btn danger block" id="auConfGo" data-act="${act}" data-id="${esc(id)}" disabled>${ico(icon)}${btn}</button><button class="btn ghost block" data-act="sheetClose">Annuler</button></div>`);
+  },
+  confOk() {
+    const i = $("#auConfIn"); if ((i?.value || "").trim().toUpperCase() === "EFFACER") return true;
+    if (i) { i.classList.remove("shake"); void i.offsetWidth; i.classList.add("shake"); i.focus(); } SFX.err(); buzz([20, 40, 20]); return false;
+  },
+  busy(tx) { this.inApp = true; this.mount(); this.ui.busyTx = tx; this.show("busy", { push: false }); },
+  busyTx(tx) { this.ui.busyTx = tx; const h = $("#au .au-busyp .au-h2"); if (h) h.textContent = tx; },
+  needNet() { if (this.online()) return true; SFX.err(); toast("Connexion internet nécessaire pour cette opération.", "err"); return false; },
+  async wipeCols(rid, cols, tick) {
+    const fs = this.fs; let n = 0;
+    for (const col of cols) {
+      for (let guard = 0; guard < 500; guard++) {
+        const s = await this.timeout(fs.collection(`restos/${rid}/${col}`).limit(400).get(), 30000);
+        if (s.empty) break;
+        const b = fs.batch(); s.docs.forEach((d) => b.delete(d.ref)); await this.timeout(b.commit(), 30000);
+        n += s.size; tick && tick(n); if (s.size < 400) break;
+      }
+    }
+    return n;
+  },
+  /* (a) « Vider les données du restaurant »: everything but the restaurant itself and its team */
+  async wipeData() {
+    if (!DB.uid || myRole() !== "gerant" || !S.rid || !this.needNet()) return;
+    const rid = S.rid, name = S.resto?.name || "le restaurant"; closeSheet(true); this.busy("Suppression des données…");
+    try {
+      const n = await this.wipeCols(rid, this.COLS, (k) => this.busyTx(`Suppression… ${k} élément${k > 1 ? "s" : ""}`));
+      await logEvent("team", `a vidé les données de ${name}`);
+      this.hide(); SFX.done(); buzz([10, 30, 10]); toast(n ? `Données effacées · ${n} élément${n > 1 ? "s" : ""}` : "Rien à effacer"); try { refresh(); } catch (e) {}
+    } catch (e) { console.warn("wipe", e); this.hide(); SFX.err(); toast(this.msg(e), "err"); }
+  },
+  /* every doc under restos/{rid}, then the team (others first; the owner's own doc needs the owner rule of firestore.rules), the invites, the restaurant, and my list */
+  async deleteRestoDocs(rid, tick) {
+    const fs = this.fs, uid = this.user.uid;
+    const n = await this.wipeCols(rid, this.COLS, tick);
+    const ms = await this.timeout(fs.collection(`restos/${rid}/members`).get(), 30000);
+    const others = ms.docs.filter((d) => d.id !== uid), mine = ms.docs.find((d) => d.id === uid);
+    for (let i = 0; i < others.length; i += 400) { const b = fs.batch(); others.slice(i, i + 400).forEach((d) => b.delete(d.ref)); await this.timeout(b.commit(), 30000); }
+    try { const inv = await this.timeout(fs.collection("invites").where("rid", "==", rid).get(), 15000); if (!inv.empty) { const b = fs.batch(); inv.docs.forEach((d) => b.delete(d.ref)); await this.timeout(b.commit(), 15000); } } catch (e) { console.warn("invites", e && e.code); }
+    if (mine) { try { await this.timeout(mine.ref.delete(), 15000); } catch (e) { console.warn("own member doc", e && e.code); } }
+    await this.timeout(fs.collection("restos").doc(rid).delete(), 15000);
+    await this.timeout(fs.collection("users").doc(uid).set({ restos: this.FV().arrayRemove(rid) }, { merge: true }), 15000);
+    this.restos = this.restos.filter((x) => x !== rid);
+    return n;
+  },
+  /* (b) « Supprimer le restaurant » (owner only) */
+  async deleteResto() {
+    if (!this.isOwner() || !S.rid || !this.needNet()) return;
+    const rid = S.rid, name = S.resto?.name || "Le restaurant"; closeSheet(true); this.busy(`Suppression de ${name}…`);
+    try { DB.unsubAll(); } catch (e) {} /* no churn while the docs vanish; the restaurant list is re-subscribed by the reload */
+    try {
+      await this.deleteRestoDocs(rid, (k) => this.busyTx(`Suppression… ${k} élément${k > 1 ? "s" : ""}`));
+      auLS.del("gg-rid-c"); auLS.sset("gg-au-flash", `${name} a été supprimé`); SFX.done();
+      setTimeout(() => location.reload(), 300);
+    } catch (e) { console.warn("delete resto", e); SFX.err(); this.busyTx(this.msg(e)); setTimeout(() => location.reload(), 1800); }
+  },
+  /* « Quitter l'équipe » (any member but the owner) */
+  async leaveResto() {
+    if (!DB.uid || !S.rid || this.isOwner() || !this.needNet()) return;
+    const rid = S.rid, name = S.resto?.name || "l'équipe", uid = DB.uid, fs = this.fs; closeSheet(true); this.busy("Un instant…");
+    try {
+      await logEvent("team", `a quitté ${name}`);
+      try { DB.unsubAll(); } catch (e) {}
+      await this.timeout(fs.doc(`restos/${rid}/members/${uid}`).delete(), 15000);
+      await this.timeout(fs.collection("users").doc(uid).set({ restos: this.FV().arrayRemove(rid) }, { merge: true }), 15000);
+      auLS.del("gg-rid-c"); auLS.sset("gg-au-flash", `Vous avez quitté ${name}`); SFX.close();
+      setTimeout(() => location.reload(), 300);
+    } catch (e) { console.warn("leave", e); SFX.err(); this.busyTx(this.msg(e)); setTimeout(() => location.reload(), 1800); }
+  },
+  /* (c) « Supprimer mon compte »: leave every team, delete the restaurants I own, then the account (re-authentication when Firebase asks) */
+  async deleteAccount(resumed) {
+    const u = this.auth && this.auth.currentUser; if (!u) return;
+    if (!resumed && !this.needNet()) return;
+    const fs = this.fs, uid = u.uid; closeSheet(true); this.busy("Suppression du compte…");
+    try { DB.unsubAll(); } catch (e) {}
+    try {
+      let ids = []; try { const s = await this.timeout(fs.collection("users").doc(uid).get(), 15000); ids = s.exists && Array.isArray(s.data().restos) ? s.data().restos : []; } catch (e) { console.warn("users", e && e.code); }
+      ids = [...new Set([...ids, ...(S.restos || []).map((r) => r.id)])].filter((x) => typeof x === "string");
+      for (const rid of ids) {
+        let r = null; try { r = await this.timeout(fs.collection("restos").doc(rid).get(), 15000); } catch (e) { continue; } /* permission-denied: already removed from that team */
+        if (!r.exists) continue;
+        if (r.data().owner === uid) await this.deleteRestoDocs(rid, (k) => this.busyTx(`Suppression de ${r.data().name || "votre restaurant"}… ${k}`));
+        else { try { await this.timeout(fs.doc(`restos/${rid}/members/${uid}`).delete(), 15000); } catch (e) { console.warn("leave", rid, e && e.code); } }
+      }
+      try { await this.timeout(fs.collection("users").doc(uid).delete(), 15000); } catch (e) { console.warn("users del", e && e.code); }
+      this.busyTx("Suppression du compte…");
+      try { await u.delete(); }
+      catch (e) {
+        if (!(e && e.code === "auth/requires-recent-login")) throw e;
+        const ok = await this.reauth(u); if (!ok) throw Object.assign(new Error("cancel"), { code: "gg/reauth-cancel" });
+        await u.delete();
+      }
+      auLS.sdel("gg-del-account"); auLS.set("gg-mode", "out"); auLS.del("gg-rid-c"); auLS.del("gg-imp-" + uid); auLS.del("gg-last"); auLS.del("gg-last-email"); auLS.del("gg-invite"); auLS.sset("gg-au-flash", "Votre compte a été supprimé.");
+      try { await this.fs.terminate(); await this.fs.clearPersistence(); } catch (e) {}
+      SFX.close(); location.reload();
+    } catch (e) {
+      console.warn("delete account", e); auLS.sdel("gg-del-account"); SFX.err();
+      if (e && e.code === "gg/redirect") return; /* Google re-authentication by redirect: the page is leaving, deletion resumes on return */
+      this.busyTx(e && e.code === "gg/reauth-cancel" ? "Suppression annulée. Vos restaurants ont pu être retirés : le compte reste ouvert." : this.msg(e));
+      setTimeout(() => location.reload(), 2200);
+    }
+  },
+  /* Firebase wants a fresh sign-in before deleting an account: password for e-mail accounts, Google popup (redirect in the iPhone home-screen app) */
+  reauth(u) {
+    const google = (u.providerData || []).some((p) => p && p.providerId === "google.com");
+    if (google) {
+      const p = new firebase.auth.GoogleAuthProvider();
+      if (this.useRedirect()) { auLS.sset("gg-del-account", "1"); auLS.sset("gg-redirect", "1"); return u.reauthenticateWithRedirect(p).then(() => { throw Object.assign(new Error("redirect"), { code: "gg/redirect" }); }); }
+      return u.reauthenticateWithPopup(p).then(() => true).catch((e) => { if (["auth/popup-closed-by-user", "auth/cancelled-popup-request", "auth/user-cancelled"].includes(e && e.code)) return false; throw e; });
+    }
+    return new Promise((res) => { this._reauth = { res, done: false }; this.ui.err = ""; this.setBusy(""); this.show("reauth", { push: false }); SFX.sheet(); });
+  },
+  async reauthSubmit() {
+    const R = this._reauth, u = this.auth.currentUser; if (!R || R.done || !u || this.ui.busy) return;
+    const pw = $("#auRePw")?.value || ""; if (!pw) { this.shake($("#auRePw")); return; }
+    this.ui.err = ""; this.setBusy("reauth");
+    try { await u.reauthenticateWithCredential(firebase.auth.EmailAuthProvider.credential(u.email, pw)); R.done = true; this.setBusy(""); this.busy("Suppression du compte…"); R.res(true); }
+    catch (e) { console.warn("reauth", e && e.code); this.fail(e); }
+  },
+  reauthCancel() { const R = this._reauth; if (R && !R.done) { R.done = true; this.busy("Un instant…"); R.res(false); } },
+  /* a message left for the next load (deleted restaurant, left team, deleted account) */
+  flash() { const m = auLS.sget("gg-au-flash"); if (!m) return; auLS.sdel("gg-au-flash"); setTimeout(() => { try { toast(m); } catch (e) {} }, 900); },
+
   /* ───────────── Réglages « Compte » card ───────────── */
   reglagesHTML() {
     const u = authUser(), m = DB.mode;
@@ -811,7 +968,9 @@ const AUTH = {
       ${myRole() === "gerant" ? row("auInvite", "auLink", "Inviter l'équipe", "Lien, code ou QR · chacun son compte") : ""}
       ${row("auJoinOpen", "users", "Rejoindre un autre établissement", "Avec un code d'invitation")}
       ${this.hasLocal() && auLS.get("gg-imp-" + u.uid) !== "1" ? row("auImportOpen", "upload", "Importer les données de ce téléphone", "Elles restent aussi sur l'appareil") : ""}
-      ${row("auSignOut", "out", "Se déconnecter", "Les données restent dans votre compte", " bad")}`;
+      ${row("auSignOut", "out", "Se déconnecter", "Les données restent dans votre compte", " bad")}
+      ${S.rid && !this.isOwner() ? row("auLeave", "users", "Quitter l'équipe", `Vous ne verrez plus ${esc(S.resto?.name || "ce restaurant")}`, " bad") : ""}
+      ${row("auDelAccount", "trash", "Supprimer mon compte", "Définitif : vos restaurants et vos données avec", " bad")}`;
     else body = `<div class="au-acc"><span class="au-wi">${ico("auPhone")}</span><div><b>Sur cet appareil</b><span>Sans compte · données sur ce téléphone</span></div></div>${row("auOpen", "auCloud", "Créer un compte ou se connecter", this.cfg ? "Synchronisé sur tous vos appareils, équipe invitée en un lien" : "Bientôt disponible")}`;
     return `<div class="lbl st cc-sec au-acct-l" style="--i:5">Compte</div><div class="glass pad st au-acct" style="--i:5">${body}</div>`;
   },
@@ -836,8 +995,11 @@ function authUser() {
 /* ───────────── forms + live inputs inside the overlay ───────────── */
 document.addEventListener("submit", (e) => {
   const f = e.target; if (!f.dataset || !f.dataset.au) return; e.preventDefault(); SFX.init();
-  ({ email: () => AUTH.emailSubmit(), reset: () => AUTH.resetSubmit(), create: () => AUTH.createSubmit(), join: () => AUTH.joinSubmit() })[f.dataset.au]?.();
+  ({ email: () => AUTH.emailSubmit(), reset: () => AUTH.resetSubmit(), create: () => AUTH.createSubmit(), join: () => AUTH.joinSubmit(), reauth: () => AUTH.reauthSubmit(), delacc: () => ACT.auDelAccountOk() })[f.dataset.au]?.();
 });
+document.addEventListener("input", (e) => { const t = e.target; if (t && t.id === "auConfIn") { const b = $("#auConfGo"); if (b) b.toggleAttribute("disabled", t.value.trim().toUpperCase() !== "EFFACER"); } });
+document.addEventListener("keydown", (e) => { if (e.key === "Enter" && e.target && e.target.id === "auConfIn") { e.preventDefault(); const b = $("#auConfGo"); if (b && !b.disabled) b.click(); } });
+
 document.addEventListener("input", (e) => {
   const t = e.target; if (!t.closest || !t.closest("#au")) return;
   if (t.id === "auCode") {
@@ -903,6 +1065,16 @@ Object.assign(ACT, {
   auInvCopy: (a, id, v) => AUTH.invCopy(v),
   auInvNew: () => { SFX.tap(); S.ui.auInv.cur = null; AUTH.invPaint(); },
   auInvRevoke: (a, id) => AUTH.invRevoke(id),
+  /* remise à zéro (accounts) */
+  auWipe: () => { if (myRole() !== "gerant") { SFX.err(); toast("Réservé au gérant", "err"); return; } SFX.tap(); AUTH.confirmSheet({ title: "Vider les données du restaurant ?", sub: `Relevés, étiquettes, stock, recettes, planning, pointages, finances de ${esc(S.resto?.name || "ce restaurant")} : tout sera supprimé pour toute l'équipe. Le restaurant et l'équipe restent. C'est définitif.`, btn: "Vider les données", act: "auWipeOk" }); },
+  auWipeOk: () => { if (AUTH.confOk()) AUTH.wipeData(); },
+  auDelResto: () => { if (!AUTH.isOwner()) { SFX.err(); toast("Réservé au propriétaire du restaurant", "err"); return; } SFX.tap(); AUTH.confirmSheet({ title: `Supprimer ${esc(S.resto?.name || "ce restaurant")} ?`, sub: `Le restaurant, toutes ses données et son équipe (${S.members.length} personne${S.members.length > 1 ? "s" : ""}) disparaissent pour tout le monde. C'est définitif.`, btn: "Supprimer le restaurant", act: "auDelRestoOk" }); },
+  auDelRestoOk: () => { if (AUTH.confOk()) AUTH.deleteResto(); },
+  auLeave: () => { if (AUTH.isOwner()) { SFX.err(); toast("Le propriétaire ne peut pas quitter son restaurant.", "err"); return; } SFX.tap(); openSheet(`<div class="au-sh"><span class="au-shic bad">${ico("users")}</span><div class="h2">Quitter ${esc(S.resto?.name || "l'équipe")} ?</div><p class="sub">Vous n'aurez plus accès à ce restaurant. Vos relevés et actions restent au registre, à votre nom. Le gérant pourra vous réinviter.</p><button class="btn danger block" data-act="auLeaveOk">${ico("out")}Quitter l'équipe</button><button class="btn ghost block" data-act="sheetClose">Annuler</button></div>`); },
+  auLeaveOk: () => AUTH.leaveResto(),
+  auDelAccount: () => { SFX.tap(); if ($("#au.on")) { AUTH.ui.err = ""; AUTH.show("delAccount"); return; } const own = S.restos.filter((r) => r.owner === DB.uid).length; AUTH.confirmSheet({ title: "Supprimer mon compte ?", sub: `${own ? `${own === 1 ? "Le restaurant que vous possédez" : `Les ${own} restaurants que vous possédez`} et toutes ses données seront supprimés pour toute l'équipe. ` : ""}Vous quitterez les équipes dont vous faites partie, puis le compte <b>${esc(authUser()?.email || "")}</b> sera effacé. C'est définitif.`, btn: "Supprimer mon compte", act: "auDelAccountOk" }); },
+  auDelAccountOk: () => { if (AUTH.confOk()) AUTH.deleteAccount(); },
+  auReauthCancel: () => AUTH.reauthCancel(),
 });
 
 /* ───────────── light-touch integration with js/compte.js (it may also call the hooks itself) ───────────── */

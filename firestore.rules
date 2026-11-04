@@ -56,8 +56,9 @@ service cloud.firestore {
              (isGerant(rid) && (mid != ownerOf(rid) || request.resource.data.role == 'gerant'))
           || (mid == me() && isMember(rid) && unchanged(['role', 'invite']))
         );
-        // a gérant removes someone (never the owner); anyone can leave, except the owner
-        allow delete: if (isGerant(rid) && mid != ownerOf(rid)) || (signedIn() && mid == me() && ownerOf(rid) != me());
+        // a gérant removes someone (never the owner); anyone can leave, except the owner;
+        // the owner removes anyone, themselves included, when deleting the restaurant (the app empties every subcollection first)
+        allow delete: if (isGerant(rid) && mid != ownerOf(rid)) || (signedIn() && mid == me() && ownerOf(rid) != me()) || (signedIn() && ownerOf(rid) == me());
       }
 
       // ── everything else (fridges, readings, lots, stock, tickets, staff, finances…): members only ──
