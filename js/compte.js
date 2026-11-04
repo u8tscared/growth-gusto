@@ -407,7 +407,7 @@ VIEWS.reglages = {
         <div class="li tap" data-act="restoRename"><span class="ic">${ico("edit")}</span><div class="tx"><b>Nom du restaurant</b><em>${esc(S.resto?.name || "")}</em></div>${ico("chev")}</div>
         <div class="li tap" data-act="restoSwitch"><span class="ic">${ico("store")}</span><div class="tx"><b>Établissements</b><em>${S.restos.length} · changer ou en ajouter un</em></div>${ico("chev")}</div>
         <div class="li tap" data-go="equipe"><span class="ic">${ico("users")}</span><div class="tx"><b>Équipe</b><em>${S.members.length} personne${S.members.length > 1 ? "s" : ""}</em></div>${ico("chev")}</div>
-        <div class="li tap" data-go="imprimante"><span class="ic">${ico("printer")}</span><div class="tx"><b>Imprimante</b><em>${esc(S.resto?.printer || "À choisir")}</em></div>${ico("chev")}</div>
+        <div class="li tap" data-go="imprimante"><span class="ic">${ico("printer")}</span><div class="tx"><b>Imprimante</b><em>${esc(typeof lbPrinterCfg === "function" ? (lbPrinterCfg().name || "À choisir") : "À choisir")}</em></div>${ico("chev")}</div>
       </div></div><div class="cc-col">
       <div class="lbl st cc-sec" style="--i:3">Cet appareil</div>
       <div class="glass pad st" style="--i:3">
