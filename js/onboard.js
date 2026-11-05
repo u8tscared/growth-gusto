@@ -2,7 +2,7 @@
    (js/auth.js hands off with OB.handoff), on the first run of the local mode (VIEWS.onboarding delegates here), and later from Réglages
    (« Compléter la fiche du restaurant »). One screen per step, springy transitions, a live « fiche » of the restaurant on the right (desktop).
    Steps: resto · vous · frigos (starts empty, typed tiles) · etiquettes (labels.js picker) · imprimante (labels.js wizard) · equipe ·
-   outils (one-tap cards: import, sondes, caisse, résa, alertes, PMS, formation → resto.setupTodo) · pret (to-do + « ce que fait l'app »).
+   outils (one question per tool, one screen each: import · réservations · caisse · sondes · « On active aussi ? » → resto.setupTodo, setupAns, resaProvider, posProvider, importFrom) · pret (to-do + « ce que fait l'app »).
    Modes: "create" (no restaurant yet: the restaurant and the gérant are written when the person leaves step 2) · "complete" (the restaurant
    exists: every step writes live). After step 2 the flow is always "complete", so back, refresh or re-entry never create a second restaurant.
    The session marker « gg-ob » ("rid" or "rid|step") resumes the first run after a refresh; it is cleared when the flow closes.
@@ -95,10 +95,13 @@ const OB_TOOLS = [
   { k: "import", n: "Import", ic: "imUp", fb: "upload", tone: "v", t: "Vous venez d'un autre logiciel ?", s: "Produits, recettes, relevés : on récupère tout.", todo: "Importer vos données", ts: "Excel ou CSV, en 2 minutes", r: "import", wide: true,
     ok: () => (typeof window.IMPORT !== "undefined" && window.IMPORT && typeof window.IMPORT.open === "function") || !!VIEWS.import,
     done: () => { try { if (typeof imWatch === "function") imWatch(); return typeof IM !== "undefined" && IM.wRid === S.rid && (IM.hist || []).some((h) => !h.undone); } catch (e) { return false; } } },
-  { k: "sondes", n: "Sondes", ic: "sdProbe", fb: "therm", tone: "sky", t: "Sondes connectées", s: "Les frigos se relèvent seuls.", todo: "Brancher vos sondes", ts: "Shelly, SensorPush, Govee…", r: "sondes",
+  { k: "sondes", n: "Sondes", ic: "sdProbe", fb: "therm", tone: "sky", t: "Sondes connectées", s: "Les frigos se relèvent seuls.", todo: "Brancher vos sondes", ts: () => (OB.ansOf("sondes").v === "buy" ? "Quand vous les aurez reçues" : "Shelly, SensorPush, Govee…"), r: "sondes",
     done: () => { try { if (typeof sdWatch === "function") sdWatch(); return !!(window.SONDES && window.SONDES.list().length); } catch (e) { return false; } } },
-  { k: "caisse", n: "Caisse", ic: "cxPlug", fb: "receipt", tone: "sf", t: "Caisse connectée", s: "SumUp, Zelty, Square, Lightspeed.", todo: "Connecter la caisse", ts: "Ou importer un fichier de ventes", r: "caisse",
-    done: () => (S.cxStat || []).some((c) => c.status === "connected" || c.lastImport) || (S.cxSales || []).length > 0 },
+  { k: "caisse", n: "Caisse", ic: "cxPlug", fb: "receipt", tone: "sf", t: "Caisse connectée", s: "SumUp, Zelty, Square, Lightspeed.", todo: () => { const p = obPosName(); return p ? `Connecter ${p}` : "Connecter la caisse"; }, ts: "Ou importer un fichier de ventes", r: "caisse",
+    done: () => { try { if (typeof cxEnsure === "function") cxEnsure(); } catch (e) {} return (S.cxStat || []).some((c) => c.status === "connected" || c.lastImport) || (S.cxSales || []).length > 0; } },
+  /* « Une caisse classique » (question Caisse): the paper ticket Z, photographed each evening (js/tickets.js) */
+  { k: "ticketz", n: "Ticket Z", ic: "receipt", fb: "receipt", tone: "sf", t: "Ticket Z en photo", s: "Le stock se déduit seul.", todo: "Photographier le ticket Z", ts: "Ce soir, après le service", r: "tickets", hide: true,
+    done: () => (S.tickets || []).some((t) => t.source !== "caisse" && t.source !== "demo") },
   { k: "resa", n: "Réservations", ic: "resa", fb: "cal", tone: "tm", t: "Réservations en ligne", s: "Un lien pour réserver une table.", todo: "Ouvrir les réservations", ts: "Services, couverts, lien public", r: "resa",
     done: () => !!(S.resto && S.resto.resaCfg) },
   { k: "alertes", n: "Alertes", ic: "alBell", fb: "alert", tone: "tm", t: "Alertes par e-mail", s: "Prévenu si un frigo chauffe.", todo: "Régler vos alertes", ts: "Qui prévenir, et quand", r: "alertes",
@@ -109,6 +112,8 @@ const OB_TOOLS = [
     done: () => { try { if (typeof fmWatch === "function") fmWatch(); return (typeof FM !== "undefined" && FM.rid === S.rid && (FM.rows || []).length > 0) || (S.trainings || []).length > 0; } catch (e) { return false; } } },
 ];
 const obTool = (k) => OB_TOOLS.find((x) => x.k === k);
+const obTx = (v) => (typeof v === "function" ? v() : v);
+const obPosName = () => { const p = S.resto && S.resto.posProvider; if (!p || p === "aucune" || p === "papier" || p === "autre") return ""; try { if (typeof cxPos === "function") return cxPos(p).name; } catch (e) {} return ""; };
 const obToolOk = (x) => !!x && (x.ok ? x.ok() : !!VIEWS[x.r]) && obPerm(x.r);
 /* « Ce que Growth Gusto fait pour vous »: every screen, by family (only the ones loaded and allowed are shown) */
 const OB_FEATS = [
@@ -134,7 +139,7 @@ const OB = {
   start(opts = {}) {
     const r = S.resto || {}, meDoc = (S.members || []).find((m) => m.id === S.me.id) || {};
     const mode = opts.mode || (S.rid && S.resto ? "complete" : "create");
-    const d = { name: r.name || "", site: r.site || "", logo: r.logo || "", type: r.type || "", address: r.address || "", phone: r.phone || "", covers: r.covers ? String(r.covers) : "", me: meDoc.name || S.me.name || "", photo: meDoc.photo || "", more: !!(r.address || r.phone || r.covers), nw: null, added: [], gone: [], team: [], inv: null, skipped: {}, done: {}, tools: Array.isArray(r.setupTodo) ? r.setupTodo.filter((k) => obTool(k)) : [] };
+    const d = { name: r.name || "", site: r.site || "", logo: r.logo || "", type: r.type || "", address: r.address || "", phone: r.phone || "", covers: r.covers ? String(r.covers) : "", me: meDoc.name || S.me.name || "", photo: meDoc.photo || "", more: !!(r.address || r.phone || r.covers), nw: null, added: [], gone: [], team: [], inv: null, skipped: {}, done: {}, tools: Array.isArray(r.setupTodo) ? r.setupTodo.filter((k) => obTool(k)) : [], ans: r.setupAns && typeof r.setupAns === "object" ? JSON.parse(JSON.stringify(r.setupAns)) : {}, tq: 0, tp: "q" };
     this.st = { mode, step: Math.max(0, Math.min(OB_LAST, opts.step || 0)), dir: 1, from: opts.from || "", busy: false, d, ret: false, rush: false };
   },
   ensure() { if (!this.st || (this.st.mode === "create" && S.resto)) this.start({ from: this.st ? this.st.from : "boot" }); return this.st; },
@@ -156,7 +161,7 @@ const OB = {
   printerName() { try { if (typeof lbPrinterCfg === "function" && S.resto) { const c = lbPrinterCfg(); return c.model ? c.name || OB_PRINTER : ""; } } catch (e) {} const p = S.resto && S.resto.printer; return typeof p === "string" ? p : p && p.model ? OB_PRINTER : ""; },
   labelSet() { return !!(S.resto && S.resto.labelStyle); },
   /* what each step has in place (summary, CTA wording, fiche) */
-  has(k) { const d = this.st.d; return k === "resto" ? !!d.name : k === "vous" ? !!d.me : k === "frigos" ? this.frList().length > 0 : k === "etiquettes" ? this.labelSet() : k === "imprimante" ? !!this.printerName() : k === "equipe" ? this.mates().length > 0 || !!d.inv : k === "outils" ? d.tools.length > 0 : true; },
+  has(k) { const d = this.st.d; return k === "resto" ? !!d.name : k === "vous" ? !!d.me : k === "frigos" ? this.frList().length > 0 : k === "etiquettes" ? this.labelSet() : k === "imprimante" ? !!this.printerName() : k === "equipe" ? this.mates().length > 0 || !!d.inv : k === "outils" ? d.tools.length > 0 || Object.keys(d.ans || {}).length > 0 : true; },
   mark() { if (this.st && this.st.from === "boot" && S.rid && S.resto) obSS.set("gg-ob", `${S.rid}|${this.st.step}`); },
 
   /* ───────────── markup ───────────── */
@@ -186,6 +191,7 @@ const OB = {
     if (s.k === "frigos" && d.nw) return `${btn(`${OB_SVG.plus}Ajouter ${esc(d.nw.name || obKindName(d.nw.k))}`, "obFrSave")}<button class="onb-later" data-act="obFrCancel">Annuler</button>`;
     if (s.k === "frigos" && !this.frList().length) return btn("Passer cette étape", "obSkip", " light");
     if (s.k === "pret") return btn(`Ouvrir Growth Gusto${OB_SVG.arrow}`, "obFinish");
+    if (s.k === "outils" && this.tqList().length) return this.tqCtaHTML(btn);
     const tx = s.k === "vous" && st.mode === "create" ? "Créer mon restaurant" : st.ret ? "Enregistrer" : "Continuer";
     const sec = s.k === "imprimante" && !this.has("imprimante") ? skip("Je n'ai pas encore l'imprimante") : s.opt && !this.has(s.k) ? skip() : "";
     return `${btn(`${tx}${OB_SVG.arrow}`, "obNext")}${sec}`;
@@ -250,8 +256,9 @@ const OB = {
             : `<div class="onb-addrow"><div class="onb-in"><input class="onb-input" id="obTeamIn" placeholder="Son prénom" autocomplete="off" maxlength="40" enterkeyhint="done" aria-label="Prénom d'un équipier"></div><button type="button" class="onb-chip onb-addbtn" data-act="obTeamAdd">${OB_SVG.plus}<span>Ajouter</span></button></div>`}</div>
         ${cloud ? `<div class="onb-inv st" style="--i:3" id="obInv">${this.invHTML()}</div>` : ""}`;
     }
+    if (s.k === "outils" && this.tqList().length) return this.tqHTML();
     if (s.k === "outils") {
-      const L = OB_TOOLS.filter(obToolOk), wide = L.filter((x) => x.wide), grid = L.filter((x) => !x.wide);
+      const L = OB_TOOLS.filter((x) => !x.hide && obToolOk(x)), wide = L.filter((x) => x.wide), grid = L.filter((x) => !x.wide);
       return `${this.head("Et en plus ?", "Touchez ce qui vous intéresse. On vous le prépare.")}
         ${wide.map((x) => this.toolHTML(x, 2)).join("")}
         <div class="onb-tools st" style="--i:3" role="group" aria-label="Vos outils">${grid.map((x, i) => this.toolHTML(x, i)).join("")}</div>
@@ -309,7 +316,7 @@ const OB = {
     const L = this.st.d.tools.map(obTool).filter((x) => obToolOk(x) && !x.done());
     if (!L.length) return "";
     return `<section class="onb-todo st" style="--i:4" aria-labelledby="obTodoT"><h3 class="onb-h3" id="obTodoT">À faire pour bien démarrer</h3>
-      <div class="onb-todo-l">${L.map((x) => `<button type="button" class="onb-todor t-${x.tone}" data-act="obOpen" data-v="${x.k}"><span class="onb-tool-ic">${obI(x.ic, x.fb)}</span><span class="onb-tool-tx"><b>${x.todo}</b><span>${x.ts}</span></span>${OB_SVG.chev}</button>`).join("")}</div></section>`;
+      <div class="onb-todo-l">${L.map((x) => `<button type="button" class="onb-todor t-${x.tone}" data-act="obOpen" data-v="${x.k}"><span class="onb-tool-ic">${obI(x.ic, x.fb)}</span><span class="onb-tool-tx"><b>${esc(obTx(x.todo))}</b><span>${esc(obTx(x.ts))}</span></span>${OB_SVG.chev}</button>`).join("")}</div></section>`;
   },
   featsHTML(act) {
     return `<div class="onb-fgrid">${OB_FEATS.map((g) => { const it = g.items.filter(([r]) => (r === "import" ? obToolOk(obTool("import")) : !!VIEWS[r]) && obPerm(r)); if (!it.length) return "";
@@ -418,6 +425,7 @@ const OB = {
     const root = this.root(); if (!root || !this.st) return; const s = this.cur();
     const cta = $("#obCta", root); if (cta && !this.st.busy) { const h = this.ctaHTML(); if (cta._h !== h) { cta._h = h; cta.innerHTML = h; } }
     if (s.k === "frigos") this.kitPaint();
+    if (s.k === "outils") this.tqLivePaint();
     if (s.k === "equipe") { const L = $("#obTeamList", root); if (L) { const h = this.teamHTML(); if (L._h !== h) { L._h = h; L.innerHTML = h; } } }
     this.fiche();
   },
@@ -603,13 +611,14 @@ const OB = {
     if (n >= 2 && !this.live()) n = st.step <= 1 ? st.step : 1;
     if (n === st.step && this.root() && $("#obPane", this.root()).childElementCount) return;
     if (st.step === obIdx("frigos")) st.d.nw = null;
-    st.dir = n >= st.step ? 1 : -1; st.step = n; st.d.pop = null; this.paint(false);
+    if (n === obIdx("outils") && st.step !== n) { st.d.tq = 0; st.d.tp = "q"; this.tqEnter(); }
+    st.dir = n >= st.step ? 1 : -1; st.step = n; st.d.pop = null; this._stay = null; this.paint(false);
   },
-  prev() { if (this.st.step === 0) return; this.collect(); SFX.tap(); buzz(4); this.st.ret = false; this.goTo(this.st.step - 1); },
+  prev() { if (this.cur().k === "outils" && this.tqBack()) return; if (this.st.step === 0) return; this.collect(); SFX.tap(); buzz(4); this.st.ret = false; this.goTo(this.st.step - 1); },
   leave(to) {
     const st = this.st; SFX.tap(); buzz([8, 30, 8]); this.saveTools(true);
     const back = st.from === "reglages" ? "reglages" : "home", first = back === "home";
-    obSS.del("gg-ob"); st.from = ""; this.st = null; S.history = []; go(back, {}, { replace: true });
+    obSS.del("gg-ob"); st.from = ""; this.st = null; this._stay = null; S.history = []; go(back, {}, { replace: true });
     if (to) setTimeout(() => this.openTool(to), obReduce() ? 60 : 420);
     if (first) {
       setTimeout(() => toast(`${S.resto?.name || "Votre restaurant"} est prêt`), 500);
@@ -652,11 +661,262 @@ Object.assign(OB, {
       return `<section class="glass obt st" style="--i:3" aria-labelledby="obtT">
         <div class="obt-h"><div class="obt-ht"><b id="obtT">À faire pour bien démarrer</b><span>${done ? `${done} sur ${all.length} fait${done > 1 ? "s" : ""}` : obPl(left.length, "étape")}</span></div><button type="button" class="obt-x" data-act="obTodoHide">Masquer</button></div>
         <div class="obt-bar" aria-hidden="true"><i style="width:${Math.max(pct, 4)}%"></i></div>
-        <div class="obt-l">${left.map((x) => `<button type="button" class="onb-todor t-${x.tone}" data-act="obOpen" data-v="${x.k}"><span class="onb-tool-ic">${obI(x.ic, x.fb)}</span><span class="onb-tool-tx"><b>${x.todo}</b><span>${x.ts}</span></span>${OB_SVG.chev}</button>`).join("")}</div>
+        <div class="obt-l">${left.map((x) => `<button type="button" class="onb-todor t-${x.tone}" data-act="obOpen" data-v="${x.k}"><span class="onb-tool-ic">${obI(x.ic, x.fb)}</span><span class="onb-tool-tx"><b>${esc(obTx(x.todo))}</b><span>${esc(obTx(x.ts))}</span></span>${OB_SVG.chev}</button>`).join("")}</div>
       </section>`;
     } catch (e) { console.warn("ob todoCard", e); return ""; }
   },
   featuresHTML() { return `<div class="onb-fsheet"><h2 class="h2">Tout ce que fait Growth Gusto</h2><p class="onb-fsheet-s">Touchez un outil pour l'ouvrir.</p>${OB.featsHTML("obOpen")}</div>`; },
+});
+
+/* ───────────── « Vos outils »: one simple question per tool, each with its branches, everything skippable ─────────────
+   Questions: import (« Vous venez d'un autre logiciel ? ») · resa · caisse · sondes · extras (alertes, PMS, formation).
+   State in OB.st.d: tq (index of the question), tp (its screen: "q" = the question, then a branch), ans { <q>: {v, …} }.
+   Written on the resto doc: setupTodo (as before), setupAns (the answers, to come back to them), resaProvider, posProvider, importFrom.
+   « Pas de … » / « Non » takes the tool out of setupTodo, so the home card only keeps what is useful. */
+const OB_TQ = ["import", "resa", "caisse", "sondes", "extras"];
+const OB_EXTRAS = ["alertes", "pms", "formation"];
+const OB_SRCS = [["traqfood", "Traqfood", "T"], ["octopus", "Octopus", "O"], ["epack", "ePackPro", "eP"], ["restopil", "RestoPil", "RP"], ["koust", "Koust", "K"], ["excel", "Excel", "XL"], ["autre", "Autre", ""]];
+const OB_RESA = [["zenchef", "Zenchef", "Z"], ["thefork", "TheFork Manager", "TF"], ["sevenrooms", "SevenRooms", "SR"], ["guestonline", "Guestonline", "GO"], ["resy", "Resy", "R"], ["google", "Google Réserver", "G"], ["autre", "Autre outil", ""]];
+const OB_POS_FB = [["sumup", "SumUp", "S"], ["zelty", "Zelty", "Z"], ["lightspeed", "Lightspeed", "L"], ["square", "Square", "S"], ["tiller", "Tiller", "T"], ["innovorder", "Innovorder", "I"], ["laddition", "L'Addition", "LA"], ["popina", "Popina", "P"], ["autre", "Autre caisse", ""]];
+const OB_TQ_BACK = { src: "q", go: "src", ours: "q", pick: "q", offer: "pick", on: "q", keep: "offer", z: "q", brand: "pick", buy: "q" };
+const OB_TICKET_ART = `<svg class="onb-zart" viewBox="0 0 120 96" aria-hidden="true" focusable="false"><path d="M34 8h52v74l-6.5-5-6.5 5-6.5-5-6.5 5-6.5-5-6.5 5-6.5-5-6.5 5z" fill="#fff" stroke="#DCCFB8" stroke-width="1.8" stroke-linejoin="round"/><rect x="44" y="18" width="32" height="6" rx="3" fill="#1B1530"/><rect x="44" y="32" width="22" height="4" rx="2" fill="#DCCFB8"/><rect x="70" y="32" width="6" height="4" rx="2" fill="#DCCFB8"/><rect x="44" y="41" width="18" height="4" rx="2" fill="#DCCFB8"/><rect x="70" y="41" width="6" height="4" rx="2" fill="#DCCFB8"/><rect x="44" y="50" width="24" height="4" rx="2" fill="#DCCFB8"/><rect x="70" y="50" width="6" height="4" rx="2" fill="#DCCFB8"/><rect x="44" y="61" width="32" height="7" rx="3" fill="#F6B93B"/><circle cx="96" cy="66" r="16" fill="#5B2BFF"/><path d="M89 63h3l1.6-2.4h4.8L100 63h3v9H89z" fill="none" stroke="#fff" stroke-width="2" stroke-linejoin="round"/><circle cx="96" cy="67.4" r="2.4" fill="none" stroke="#fff" stroke-width="2"/></svg>`;
+const obIni = (t, ic) => `<span class="onb-ini">${t ? esc(t) : ic || OB_SVG.plus}</span>`;
+
+Object.assign(OB, {
+  ansOf(k) { const d = this.st && this.st.d; return (d && d.ans && d.ans[k]) || (S.resto && S.resto.setupAns && S.resto.setupAns[k]) || {}; },
+  /* the questions this restaurant gets (a module that is not loaded or not allowed has no question) */
+  tqList() {
+    return OB_TQ.filter((k) => k === "caisse" ? obToolOk(obTool("caisse")) || (!!VIEWS.tickets && obPerm("tickets")) : k === "extras" ? OB_EXTRAS.some((x) => obToolOk(obTool(x))) : obToolOk(obTool(k)));
+  },
+  tqCur() { const d = this.st.d, L = this.tqList(); d.tq = Math.max(0, Math.min(L.length - 1, d.tq || 0)); return { L, i: d.tq, k: L[d.tq], p: d.tp || "q", a: d.ans[L[d.tq]] || {} }; },
+  /* the last question: « Alertes » is on by default the first time it shows */
+  tqEnter() {
+    const d = this.st.d, L = this.tqList(), k = L[d.tq];
+    if (k === "extras" && !d.ans.extras) { d.ans.extras = { seen: 1 }; if (obToolOk(obTool("alertes")) && !d.tools.includes("alertes")) { d.tools.push("alertes"); d.ans.extras.dflt = 1; } this.saveTools(); }
+  },
+  setTool(k, on) { const d = this.st.d, i = d.tools.indexOf(k); if (on && i < 0) d.tools.push(k); if (!on && i >= 0) d.tools.splice(i, 1); delete d.skipped.outils; this.saveTools(); },
+  /* the answers are written at once (and the resto fields that other areas may read) */
+  saveAns(extra = {}) {
+    if (!this.st || !S.rid || !S.resto) return; const d = this.st.d;
+    const patch = { setupAns: JSON.parse(JSON.stringify(d.ans)), ...extra };
+    Object.assign(S.resto, patch); DB.update("restos", S.rid, patch).catch((e) => console.warn("setupAns", e));
+  },
+  /* one sub-screen to the next, with the same slide as the steps */
+  tqPaint(dir) { this.st.dir = dir; this._stay = null; this.st.d.pop = null; this.paint(false); },
+  tqTo(tp) { this.st.d.tp = tp; this.tqPaint(1); },
+  tqAdvance(silent) {
+    const d = this.st.d, L = this.tqList();
+    if (d.tq < L.length - 1) { d.tq++; d.tp = "q"; this.tqEnter(); this.mark(); if (!silent) this.tqPaint(1); return true; }
+    if (!silent) this.next(false); return false;
+  },
+  tqBack() {
+    const d = this.st.d; if (!this.tqList().length) return false;
+    if (d.tp && d.tp !== "q") { d.tp = OB_TQ_BACK[d.tp] || "q"; SFX.tap(); buzz(4); this.tqPaint(-1); return true; }
+    if (d.tq > 0) { d.tq--; d.tp = "q"; SFX.tap(); buzz(4); this.tqPaint(-1); return true; }
+    return false;
+  },
+
+  /* ── markup ── */
+  tqHTML() {
+    const { L, i, k, p, a } = this.tqCur();
+    const dots = `<div class="onb-tqd st" style="--i:0" role="img" aria-label="Question ${i + 1} sur ${L.length}">${L.map((x, j) => `<i class="${j < i ? "done" : j === i ? "cur" : ""}"></i>`).join("")}</div>`;
+    return `${dots}<div class="onb-tq" data-q="${k}" data-p="${p}">${this.tqBody(k, p, a)}</div>`;
+  },
+  opt(v, label, sub, ic, tone, on, j) {
+    return `<button type="button" class="onb-opt t-${tone}${on ? " on" : ""}" data-act="obTqA" data-v="${v}" style="--j:${j}" aria-pressed="${!!on}"><span class="onb-tool-ic">${ic}</span><span class="onb-opt-tx"><b>${label}</b>${sub ? `<span>${sub}</span>` : ""}</span><i class="onb-opt-go">${on ? OB_SVG.check : OB_SVG.chev}</i></button>`;
+  },
+  opts(list) { return `<div class="onb-opts st" style="--i:3" role="list">${list.join("")}</div>`; },
+  tiles(list, on) { return `<div class="onb-tiles st" style="--i:3">${list.map(([id, n, ini, sub, ic], j) => `<button type="button" class="onb-tile${on === id ? " on" : ""}" data-act="obTqP" data-v="${esc(id)}" style="--j:${j}">${obIni(ini, ic)}<b>${esc(n)}</b>${sub ? `<em>${esc(sub)}</em>` : ""}</button>`).join("")}</div>`; },
+  big(tx, act, v, cls = "", ic = "") { return `<button type="button" class="onb-big ${cls}" data-act="${act}" data-v="${esc(v)}">${ic}<span>${tx}</span></button>`; },
+  posList() { return typeof CX_POS !== "undefined" ? CX_POS.map((p) => [p.id, p.name, p.id === "autre" ? "" : typeof cxMono === "function" ? cxMono(p) : p.name.charAt(0), p.sub || "", p.id === "autre" ? ico("receipt") : ""]) : OB_POS_FB; },
+  sdList() { return typeof SD_BRANDS !== "undefined" ? (typeof SD_ORDER !== "undefined" ? SD_ORDER : Object.keys(SD_BRANDS)).map((k) => { const b = SD_BRANDS[k]; const ini = k === "gateway" || k === "csv" ? "" : k === "sensorpush" ? "SP" : b.t.charAt(0); return [k, b.t, ini, b.s, k === "csv" ? ico("upload") : k === "gateway" ? ico("wifi") : ""]; }) : []; },
+  nameIn(list, id) { const x = list.find((r) => r[0] === id); return x ? x[1] : ""; },
+  tqBody(k, p, a) {
+    const H = (t, sub) => this.head(t, sub, 1);
+    if (k === "import") {
+      if (p === "src") return H("Lequel ?") + this.tiles(OB_SRCS, a.src);
+      if (p === "go") { const n = a.src === "autre" || !a.src ? "votre logiciel" : this.nameIn(OB_SRCS, a.src); return H(`On récupère tout depuis ${esc(n)}.`, "Produits, recettes, relevés : en 2 minutes.") + `<div class="onb-acts st" style="--i:3">${this.big("Importer maintenant", "obTqDo", "import", "pri", obI("imUp", "upload"))}</div>`; }
+      return H("Vous venez d'un autre logiciel ?") + this.opts([
+        this.opt("non", "Non, je démarre", "", obI("sparkle", "plus"), "v", a.v === "non", 0),
+        this.opt("oui", "Oui", "Traqfood, Octopus, Excel…", obI("imUp", "upload"), "sf", a.v === "oui", 1)]);
+    }
+    if (k === "resa") {
+      const prov = a.prov ? this.nameIn(OB_RESA, a.prov) : "", pn = a.prov === "autre" || !prov ? "votre outil" : prov;
+      if (p === "ours") return H("Le nôtre est gratuit et inclus.", "Un carnet de réservations, et un lien pour réserver en ligne.") + `<div class="onb-acts st" style="--i:3">${this.big("Activer mes réservations", "obTqDo", "resaOn", "pri", obI("resa", "cal"))}</div>`;
+      if (p === "pick") return H("Lequel ?") + this.tiles(OB_RESA, a.prov);
+      if (p === "offer") return H("Le nôtre est gratuit et inclus.", a.prov === "google" ? "Et votre lien marche aussi sur Google." : `Vous pouvez arrêter de payer ${esc(pn)}.`) + `<div class="onb-acts st" style="--i:3">${this.big("Passer à Growth Gusto", "obTqDo", "resaOn", "pri", obI("resa", "cal"))}${this.big(`Garder ${esc(pn)}`, "obTqDo", "resaKeep", "light")}</div>`;
+      if (p === "keep") return H(`On garde ${esc(pn)}.`, `On affichera vos réservations ${esc(pn)} dès que la connexion sera ouverte.`) + `<div class="onb-done st" style="--i:3"><span class="onb-tool-ic">${OB_SVG.check}</span><span>Rien d'autre à faire.</span></div>`;
+      if (p === "on") return H("Vos réservations sont ouvertes.", S.resto && S.resto.resaCfg && S.resto.resaCfg.online ? "Partagez le lien : vos clients réservent seuls." : "Notez chaque appel en 10 secondes.") + `<div class="onb-live st" style="--i:3" id="obTqLive">${this.tqLiveHTML()}</div>`;
+      return H("Vous prenez des réservations comment ?") + this.opts([
+        this.opt("none", "Pas de réservation", "", OB_SVG.x, "v", a.v === "none", 0),
+        this.opt("tel", "Au téléphone, sur un cahier", "", OB_SVG.phone, "tm", a.v === "tel", 1),
+        this.opt("tool", "J'ai déjà un outil", "Zenchef, TheFork…", obI("resa", "cal"), "sky", a.v === "tool", 2)]);
+    }
+    if (k === "caisse") {
+      if (p === "z") return `<div class="onb-art-z st" style="--i:0">${OB_TICKET_ART}</div>` + H("Le ticket Z suffit.", "Chaque soir, prenez le ticket Z en photo, on déduit le stock tout seul.") + `<div class="onb-acts st" style="--i:3">${this.big("Essayer maintenant", "obTqDo", "tz", "light", OB_SVG.camera)}</div>`;
+      if (p === "pick") return H("Laquelle ?") + this.tiles(this.posList(), a.pos);
+      if (p === "brand") {
+        const P = typeof cxPos === "function" ? cxPos(a.pos) : null, row = this.posList().find((r) => r[0] === a.pos) || [a.pos, "Votre caisse", ""];
+        /* no fake connection: until the server part is live, the steps are the ones of the sales export */
+        const direct = P && P.kind !== "csv" && typeof cxLive === "function" && cxLive();
+        const steps = direct || (P && P.kind === "csv") ? P.steps : [P ? P.csv : "Cherchez « Export » dans les rapports de votre caisse.", "Importez le fichier ici : les ventes arrivent, le stock se déduit."];
+        return `<div class="onb-brandh st" style="--i:1">${obIni(row[2], row[4] || ico("receipt"))}<div><b>${esc(row[1])}</b><span>${esc(direct ? P.need : "Un export des ventes, CSV ou Excel.")}</span></div></div>
+          <ol class="onb-steps st" style="--i:2">${steps.map((t, j) => `<li style="--j:${j}"><span>${j + 1}</span><b>${esc(t)}</b></li>`).join("")}</ol>
+          <div class="onb-live st" style="--i:3" id="obTqLive">${this.tqLiveHTML()}</div>`;
+      }
+      const L = [this.opt("none", "Pas de caisse", "", OB_SVG.x, "v", a.v === "none", 0)];
+      if (VIEWS.tickets && obPerm("tickets")) L.push(this.opt("z", "Une caisse classique", "Ticket Z papier", obI("receipt", "receipt"), "sf", a.v === "z", 1));
+      if (obToolOk(obTool("caisse"))) L.push(this.opt("pos", "Une caisse connectée", "SumUp, Zelty, Lightspeed…", obI("cxPlug", "receipt"), "sky", a.v === "pos", 2));
+      return H("Votre caisse ?") + this.opts(L);
+    }
+    if (k === "sondes") {
+      if (p === "pick") return H("Quelle marque ?") + this.tiles(this.sdList(), a.brand);
+      if (p === "brand") { const n = this.nameIn(this.sdList(), a.brand) || "votre sonde"; return H(`Branchons ${esc(n)}.`, "Trois questions, et la sonde relève seule.") + `<div class="onb-live st" style="--i:3" id="obTqLive">${this.tqLiveHTML()}</div>`; }
+      if (p === "buy") {
+        let g = ""; try { if (typeof sdGuideHtml === "function") { const t = document.createElement("div"); t.innerHTML = sdGuideHtml(); const gl = t.querySelector(".sd-gl"); if (gl) { gl.classList.remove("glass"); [...gl.querySelectorAll(".sd-gi")].slice(2).forEach((x) => x.remove()); g = gl.outerHTML; } } } catch (e) { g = ""; }
+        return H("Quelle sonde acheter ?", "On l'ajoute à votre liste. Vous la brancherez en 2 minutes.") + (g ? `<div class="onb-sdg sd-guide st" style="--i:3">${g}</div>${typeof ACT.sdGuide === "function" ? `<button type="button" class="onb-more-link st" style="--i:4" data-act="sdGuide">Chambre froide, petit budget : tout le guide${OB_SVG.chev}</button>` : ""}` : "");
+      }
+      return H("Des sondes de température connectées ?") + this.opts([
+        this.opt("non", "Non", "", OB_SVG.x, "v", a.v === "non", 0),
+        this.opt("oui", "Oui, j'en ai", "Shelly, SensorPush, Govee…", obI("sdProbe", "therm"), "sky", a.v === "oui", 1),
+        this.opt("buy", "Je veux en installer", "Nos conseils d'achat", obI("sparkle", "plus"), "sf", a.v === "buy", 2)]);
+    }
+    /* extras */
+    const T = OB_EXTRAS.map(obTool).filter(obToolOk), on = this.st.d.tools;
+    return H("On active aussi ?", "Tout se change plus tard.") + `<div class="onb-tgs st" style="--i:3" role="group" aria-label="Outils en plus">${T.map((x, j) => `<button type="button" class="onb-tg t-${x.tone}${on.includes(x.k) ? " on" : ""}" data-act="obTqTg" data-v="${x.k}" aria-pressed="${on.includes(x.k)}" style="--j:${j}"><span class="onb-tool-ic">${obI(x.ic, x.fb)}</span><span class="onb-opt-tx"><b>${x.t}</b><span>${x.s}</span></span><i class="onb-sw" aria-hidden="true"></i></button>`).join("")}</div>`;
+  },
+  /* the part of a branch that follows the data (import done, probes added, booking link) */
+  tqLiveHTML() {
+    const { k, a } = this.tqCur();
+    if (k === "resa") {
+      const on = !!(S.resto && S.resto.resaCfg && S.resto.resaCfg.online);
+      let url = ""; try { url = typeof rsUrl === "function" ? rsUrl() : ""; } catch (e) {}
+      if (on && url) return `<div class="onb-link"><button type="button" class="onb-url" data-act="rsCopyLink"><span>${esc(url.replace(/^https?:\/\//, ""))}</span>${OB_SVG.copy}</button>
+        <div class="onb-acts row">${this.big("Copier le lien", "rsCopyLink", "", "light", OB_SVG.copy)}${typeof ACT.rsQrOpen === "function" ? this.big("QR code", "rsQrOpen", "", "light", ico("qr")) : ""}</div></div>`;
+      return `<div class="onb-done"><span class="onb-tool-ic">${OB_SVG.check}</span><span>Votre carnet est prêt. Le lien en ligne s'ouvre avec un compte.</span></div>`;
+    }
+    if (k === "caisse") {
+      const id = a.pos || "autre", P = typeof cxPos === "function" ? cxPos(id) : null, st = typeof cxStatOf === "function" ? cxStatOf(id) : null;
+      const live = typeof cxLive === "function" && cxLive(), admin = typeof cxIsAdmin !== "function" || cxIsAdmin(), kind = P ? P.kind : "csv";
+      const imp = (tx = "Importer mes ventes", cls = "pri") => this.big(tx, "obTqDo", "cxImport", cls, obI("cxFile", "upload"));
+      if (st && st.status === "connected" && (st.mode !== "csv" || st.lastImport)) return `<div class="onb-done ok"><span class="onb-tool-ic">${OB_SVG.check}</span><span><b>${st.mode === "csv" ? "Ventes importées" : "Caisse connectée"}</b>${st.mode === "csv" && typeof cxAgo === "function" ? ` · ${esc(cxAgo(st.lastImport))}` : ""}</span></div>${st.mode === "csv" ? `<div class="onb-acts">${imp("Importer un autre fichier", "light")}</div>` : ""}`;
+      if (kind === "csv") return `<div class="onb-acts">${imp()}</div>`;
+      if (live && admin && kind === "key") return `<label class="onb-f"><span class="onb-lbl">Clé API ${esc(P.name)}</span><div class="onb-in"><input class="onb-input mono" id="cxKey" autocomplete="off" spellcheck="false" placeholder="Collez la clé ici"></div></label><div class="onb-acts">${this.big(`Connecter ${esc(P.name)}`, "obTqDo", "cxKey", "pri", obI("cxKey", "lock"))}</div>`;
+      if (live && admin) return `<div class="onb-acts">${this.big(`Connecter ${esc(P.name)}`, "obTqDo", "cxGo", "pri", obI("cxPlug", "receipt"))}${imp("Importer un fichier", "light")}</div>`;
+      return `<p class="onb-soon">${obI("cxBolt", "sparkle")}<span><b>Connexion directe très bientôt.</b> En attendant, importez vos ventes.</span></p><div class="onb-acts">${imp()}</div>`;
+    }
+    if (k === "sondes") {
+      let n = 0; try { n = window.SONDES ? window.SONDES.list().length : 0; } catch (e) {}
+      if (n) return `<div class="onb-done ok"><span class="onb-tool-ic">${OB_SVG.check}</span><span><b>${obPl(n, "sonde")} branchée${n > 1 ? "s" : ""}</b></span></div><div class="onb-acts">${this.big("Ajouter une autre sonde", "obTqDo", "sdOpen", "light", OB_SVG.plus)}</div>`;
+      return `<div class="onb-acts">${this.big("Brancher ma sonde", "obTqDo", "sdOpen", "pri", obI("sdProbe", "therm"))}</div>`;
+    }
+    return "";
+  },
+  /* a till or a probe is set up (the branch's CTA turns from « Plus tard » to « Continuer ») */
+  tqDone() {
+    const { k, a } = this.tqCur();
+    try { if (k === "caisse") { const st = typeof cxStatOf === "function" ? cxStatOf(a.pos || "autre") : null; return !!(st && st.status === "connected" && (st.mode !== "csv" || st.lastImport)); } if (k === "sondes") return !!(window.SONDES && window.SONDES.list().length); } catch (e) {}
+    return false;
+  },
+  tqLivePaint() { const root = this.root(); const el = root && $("#obTqLive", root); if (!el || (document.activeElement && document.activeElement.id === "cxKey")) return; const h = this.tqLiveHTML(); if (el._h !== h && el.innerHTML !== h) { el._h = h; el.innerHTML = h; } },
+  tqCtaHTML(btn) {
+    const { L, i, k, p } = this.tqCur(), last = i === L.length - 1;
+    const skip = (tx = "Passer") => `<button class="onb-later" data-act="obTqSkip">${tx}</button>`;
+    if (k === "extras") return `${btn(`Continuer${OB_SVG.arrow}`, "obTqNext")}${skip()}`;
+    if (p === "brand" && !this.tqDone()) return btn("Plus tard", "obTqNext", " light");
+    if (["on", "keep", "z", "brand", "buy"].includes(p)) return btn(`Continuer${OB_SVG.arrow}`, "obTqNext");
+    if (p === "go") return btn("Plus tard", "obTqNext", " light");
+    return btn(last ? "Passer" : "Passer", "obTqSkip", " light");
+  },
+
+  /* ── actions ── */
+  async resaOn() {
+    const r = S.resto; if (!r || !S.rid) return false;
+    if (!r.resaCfg) {
+      const base = typeof rsDefCfg === "function" ? rsDefCfg() : { services: [{ id: "midi", name: "Midi", from: "12:00", to: "13:45", days: [1, 2, 3, 4, 5, 6] }, { id: "soir", name: "Soir", from: "19:00", to: "21:45", days: [2, 3, 4, 5, 6] }], slot: 15, maxPerSlot: 16, maxService: 0, closures: [], online: false, lead: 2, maxOnline: 8, horizon: 60, msg: "", address: "", phone: "", photo: "", tables: [] };
+      const cov = +r.covers || 0, online = typeof rsCanOnline === "function" ? rsCanOnline() : DB.mode === "db";
+      if (r.type === "bar") base.services = base.services.filter((s) => s.id === "soir");
+      if (r.type === "boulangerie" || r.type === "traiteur") base.services = base.services.filter((s) => s.id === "midi");
+      const cfg = DB.clean({ ...base, online, address: r.address || "", phone: r.phone || "", ...(cov ? { maxPerSlot: Math.max(6, Math.min(40, Math.round(cov / 3))) } : {}) });
+      try { await safe(DB.update("restos", S.rid, { resaCfg: cfg })); } catch (e) { return false; }
+      r.resaCfg = cfg; logEvent("resa", "a ouvert les réservations");
+      try { if (typeof rsWatch === "function") rsWatch(); } catch (e) {}
+    }
+    return true;
+  },
+});
+
+Object.assign(ACT, {
+  /* a question's answer */
+  obTqA: (a, id, v) => {
+    const st = OB.st; if (!st || OB.cur().k !== "outils") return; const d = st.d, { k } = OB.tqCur();
+    if (a && !obReduce()) { a.classList.remove("pop"); void a.offsetWidth; a.classList.add("pop"); }
+    SFX.tick(); buzz(6);
+    const pass = (msg) => { if (msg) toast(msg); setTimeout(() => OB.st && OB.tqAdvance(), obReduce() ? 0 : 160); };
+    if (k === "import") {
+      if (v === "non") { d.ans.import = { v: "non" }; OB.setTool("import", false); OB.saveAns(); return pass(); }
+      return setTimeout(() => OB.tqTo("src"), obReduce() ? 0 : 140);
+    }
+    if (k === "resa") {
+      if (v === "none") { d.ans.resa = { v: "none" }; OB.setTool("resa", false); OB.saveAns({ resaProvider: "aucun" }); return pass("Pas de souci, on passe."); }
+      if (v === "tel") { d.ans.resa = { v: "tel" }; OB.saveAns({ resaProvider: S.resto && S.resto.resaCfg ? "growthgusto" : "telephone" }); return setTimeout(() => OB.tqTo(S.resto && S.resto.resaCfg ? "on" : "ours"), obReduce() ? 0 : 140); }
+      return setTimeout(() => OB.tqTo("pick"), obReduce() ? 0 : 140);
+    }
+    if (k === "caisse") {
+      if (v === "none") { d.ans.caisse = { v: "none" }; OB.setTool("caisse", false); OB.setTool("ticketz", false); OB.saveAns({ posProvider: "aucune" }); return pass("Pas de souci, on passe."); }
+      if (v === "z") { d.ans.caisse = { v: "z" }; OB.setTool("ticketz", true); OB.setTool("caisse", false); OB.saveAns({ posProvider: "papier" }); return setTimeout(() => OB.tqTo("z"), obReduce() ? 0 : 140); }
+      return setTimeout(() => OB.tqTo("pick"), obReduce() ? 0 : 140);
+    }
+    if (k === "sondes") {
+      if (v === "non") { d.ans.sondes = { v: "non" }; OB.setTool("sondes", false); OB.saveAns(); return pass("Pas de souci : vous relevez à la main ou à la voix."); }
+      if (v === "buy") { d.ans.sondes = { v: "buy" }; OB.setTool("sondes", true); OB.saveAns(); return setTimeout(() => OB.tqTo("buy"), obReduce() ? 0 : 140); }
+      return setTimeout(() => OB.tqTo("pick"), obReduce() ? 0 : 140);
+    }
+  },
+  /* a tile (software, booking tool, till, probe brand) */
+  obTqP: (a, id, v) => {
+    const st = OB.st; if (!st) return; const d = st.d, { k } = OB.tqCur(); SFX.tap(); buzz(5);
+    if (a && !obReduce()) { a.classList.remove("pop"); void a.offsetWidth; a.classList.add("pop"); }
+    const later = (fn) => setTimeout(fn, obReduce() ? 0 : 140);
+    if (k === "import") { d.ans.import = { v: "oui", src: v }; OB.setTool("import", true); OB.saveAns({ importFrom: v }); return later(() => OB.tqTo("go")); }
+    if (k === "resa") { d.ans.resa = { v: "tool", prov: v }; OB.saveAns(); return later(() => OB.tqTo("offer")); }
+    if (k === "caisse") { d.ans.caisse = { v: "pos", pos: v }; OB.setTool("caisse", true); OB.setTool("ticketz", false); OB.saveAns({ posProvider: v }); try { if (typeof cxEnsure === "function") cxEnsure(); } catch (e) {} return later(() => OB.tqTo("brand")); }
+    if (k === "sondes") { d.ans.sondes = { v: "oui", brand: v }; OB.setTool("sondes", true); OB.saveAns(); return later(() => { OB.tqTo("brand"); setTimeout(() => ACT.obTqDo(null, null, "sdOpen"), obReduce() ? 80 : 420); }); }
+  },
+  /* the buttons inside a branch: they call the modules' own flows */
+  obTqDo: async (a, id, v) => {
+    const st = OB.st; if (!st) return; const d = st.d, { k } = OB.tqCur(), ans = d.ans[k] || {};
+    if (v === "import") { if (!(window.IMPORT && typeof window.IMPORT.open === "function")) { OB.openTool("import"); return; } SFX.tap(); OB.saveTools(true); OB.tqAdvance(true); window.IMPORT.open(); return; }
+    if (v === "resaOn") {
+      if (a) a.disabled = true; const ok = await OB.resaOn(); if (a) a.disabled = false; if (!ok) return;
+      d.ans.resa = { ...ans, on: 1 }; delete d.ans.resa.keep; OB.setTool("resa", true); OB.saveAns({ resaProvider: "growthgusto" });
+      SFX.done(); buzz([10, 30, 10]); OB.tqTo("on");
+      setTimeout(() => { const r = $(".onb-tq h2"); if (r && !obReduce()) { const b = r.getBoundingClientRect(); burst(b.left + Math.min(b.width, 180) / 2, b.top + 20); } }, 260);
+      return;
+    }
+    if (v === "resaKeep") { d.ans.resa = { ...ans, keep: 1 }; delete d.ans.resa.on; OB.setTool("resa", false); OB.saveAns({ resaProvider: ans.prov || "autre" }); SFX.ok(); buzz(6); OB.tqTo("keep"); return; }
+    if (v === "tz") { SFX.tap(); if (typeof ACT.tzPick === "function") ACT.tzPick(); else go("tickets"); return; }
+    if (v === "cxImport") { OB._stay = "caisse"; if (typeof ACT.cxImport === "function") ACT.cxImport(a, null, ans.pos || "autre"); else { OB._stay = null; OB.openTool("caisse"); } return; }
+    if (v === "cxGo") { if (typeof ACT.cxGo === "function") ACT.cxGo(a, null, ans.pos); return; }
+    if (v === "cxKey") { if (typeof ACT.cxKeyGo === "function") ACT.cxKeyGo(a, null, ans.pos); return; }
+    if (v === "sdOpen") {
+      if (typeof ACT.sdAdd !== "function") { OB.openTool("sondes"); return; }
+      OB._stay = "sondes"; ACT.sdAdd(); if (ans.brand && typeof ACT.sdBrand === "function" && $("#sheet.open")) ACT.sdBrand(null, null, ans.brand); return;
+    }
+  },
+  obTqTg: (a, id, v) => {
+    const st = OB.st; if (!st || !obTool(v)) return; const on = !st.d.tools.includes(v);
+    OB.setTool(v, on); st.d.ans.extras = { ...(st.d.ans.extras || {}), seen: 1, touched: 1 }; OB.saveAns();
+    a.classList.toggle("on", on); a.setAttribute("aria-pressed", on); if (on && !obReduce()) { a.classList.remove("pop"); void a.offsetWidth; a.classList.add("pop"); }
+    on ? SFX.tick() : SFX.tap(); buzz(on ? 6 : 3); OB.fiche();
+  },
+  obTqNext: () => { if (!OB.st) return; SFX.ok(); buzz(5); OB.tqAdvance(); },
+  obTqSkip: () => {
+    const st = OB.st; if (!st) return; const { k } = OB.tqCur();
+    /* « Passer » on the last question takes back « Alertes » if it was only the default */
+    if (k === "extras" && st.d.ans.extras && st.d.ans.extras.dflt && !st.d.ans.extras.touched) { OB.setTool("alertes", false); st.d.ans.extras = { seen: 1 }; }
+    SFX.tap(); buzz(4); OB.tqAdvance();
+  },
 });
 
 /* ───────────── route ───────────── */
@@ -683,7 +943,12 @@ VIEWS.onboard = {
     return f0.apply(this, arguments);
   };
   const g0 = go;
-  go = function (route, params, opts) { if (OB._redirect && route === "home") { OB._redirect = false; route = "onboard"; params = {}; } return g0.call(this, route, params, opts); };
+  go = function (route, params, opts) {
+    if (OB._redirect && route === "home") { OB._redirect = false; route = "onboard"; params = {}; }
+    /* « Vos outils » opens a module's own flow (sales import, probe sheet) over the onboarding: when it ends, its jump to its screen is skipped */
+    if (OB._stay && OB._stay === route && OB.st && (S.route === "onboard" || S.route === "onboarding")) { OB._stay = null; setTimeout(() => { try { OB.soft(); } catch (e) {} }, 60); return; }
+    return g0.call(this, route, params, opts);
+  };
   const c0 = renderChrome;
   renderChrome = function () { c0.apply(this, arguments); if (S.route === "onboard") { const sd = $("#side"); sd && sd.classList.add("off"); } };
   /* the views are not live: new fridges, members or printer settings only refresh the parts that show them */
