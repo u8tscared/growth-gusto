@@ -564,3 +564,46 @@ html.au-leaving body{opacity:0;transition:opacity .25s}
 .au-primary.au-danger{background:var(--c-tomato2,#C8432A);--edge:#8A2A17}
 .au-delacc{margin-top:16px;color:var(--c-ink3)}
 .au-form .au-ghost{align-self:center}
+
+/* ───────── « Vérifiez votre e-mail »: envelope well, 6 big code cells over one real input, resend countdown ───────── */
+.au-vic{position:relative;width:76px;height:76px;margin:4px 0 20px;border-radius:50%;display:grid;place-items:center;background:var(--c-vtint);color:var(--c-v);box-shadow:inset 0 0 0 1.5px #DCD0FF}
+.au-vic-env{display:grid;place-items:center;animation:auEnv 3.2s 1s var(--au-out) infinite}
+.au-vic-dot{position:absolute;top:-2px;right:-6px;min-width:30px;height:30px;padding:0 8px;border-radius:999px;display:grid;place-items:center;background:var(--c-saffron);color:var(--c-saffron-ink);box-shadow:0 3px 0 var(--c-saffron-edge),0 0 0 3px var(--c-canvas);font:780 15px/1 var(--f-d);animation:auPopIn .5s .5s var(--au-spring) both}
+@keyframes auEnv{0%,70%,100%{transform:none}76%{transform:translateY(-4px) rotate(-6deg)}84%{transform:translateY(0) rotate(4deg)}92%{transform:rotate(-2deg)}}
+@keyframes auPopIn{from{transform:scale(0) rotate(-30deg)}}
+.au-vform{margin-top:22px;gap:0}
+.au-vbox .au-vcells{gap:8px}
+.au-vcells i{max-width:56px;height:68px;border-radius:16px;font:700 30px/1 var(--f-m);transition:border-color .2s,box-shadow .2s,background .25s,color .25s,transform .25s var(--au-spring)}
+.au-vcells b{flex:none;width:12px;height:3px;border-radius:2px;background:var(--c-line3)}
+.au-vbox.bad .au-vcells i{border-color:var(--c-tomato);box-shadow:0 3px 0 #F6C9B8}
+.au-vbox.busy .au-vcells i{animation:auWave 1s var(--au-out) infinite;animation-delay:calc(var(--k) * 80ms)}
+@keyframes auWave{0%,60%,100%{transform:none}30%{transform:translateY(-7px)}}
+.au-vbox.won .au-vcells i{background:var(--c-v);border-color:var(--c-v);color:#fff;box-shadow:0 3px 0 var(--c-vedge);animation:auWon .5s var(--au-spring) both;animation-delay:calc(var(--k) * 55ms)}
+@keyframes auWon{0%{transform:scale(1)}40%{transform:scale(1.14) translateY(-6px)}100%{transform:none}}
+.au-vst{display:flex;align-items:center;justify-content:center;gap:8px;min-height:24px;margin:16px 0 0;font-size:14px;font-weight:600;line-height:1.4;color:var(--c-ink3);text-align:center;text-wrap:balance}
+.au-vst svg{flex:none;width:17px;height:17px}
+.au-vst.err{color:var(--c-tomato2)}
+.au-vst .au-dots{position:static;transform:none;margin:0}
+.au-vlinks{display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:2px 2px;margin-top:18px}
+.au-vlinks>i{width:4px;height:4px;border-radius:50%;background:var(--c-line3)}
+.au-vlink{all:unset;box-sizing:border-box;display:inline-flex;align-items:center;gap:7px;min-height:44px;padding:0 9px;border-radius:12px;font-size:14px;font-weight:650;color:var(--c-vtx);cursor:pointer;white-space:nowrap;font-variant-numeric:tabular-nums;transition:background .2s,color .2s}
+.au-vlink svg{flex:none;width:15px;height:15px}
+@media (max-width:374px){.au-vlinks>i{display:none}}
+.au-vlink[disabled]{color:var(--c-ink3);cursor:default}
+.au-vlink:not([disabled]):active{transform:scale(.96)}
+@media (hover:hover) and (pointer:fine){.au-vlink:not([disabled]):hover{background:var(--c-vtint)}}
+.au-vlink:focus-visible{outline:3px solid var(--c-focus);outline-offset:0}
+@media (max-width:360px){.au-vbox .au-vcells{gap:5px}.au-vcells i{height:60px;font-size:26px}}
+@media (prefers-reduced-motion:reduce){.au-vic-env,.au-vic-dot,.au-vbox.busy .au-vcells i,.au-vbox.won .au-vcells i{animation:none}}
+
+/* ───────── admin: « Aperçu des e-mails » sheet ───────── */
+.au-mp .sub{margin-top:4px}
+.au-mp-seg{margin:16px 0 12px}
+.au-mp-seg button{flex:1}
+.au-mp-subj{display:flex;align-items:baseline;gap:10px;padding:12px 14px;border-radius:16px;background:var(--paper,#FFFDF8);border:1.5px solid var(--rim,#E9DFCD);font-size:14px;line-height:1.35}
+.au-mp-subj span{flex:none;font-size:12.5px;font-weight:650;color:var(--muted,#615B74)}
+.au-mp-subj b{font-weight:700;color:var(--ink,#1B1530);min-width:0;overflow-wrap:anywhere}
+.au-mp-frame{margin-top:10px;border-radius:18px;overflow:hidden;border:1.5px solid var(--rim,#E9DFCD);background:#FBF6EC;height:min(54vh,600px)}
+.au-mp-frame iframe{display:block;width:100%;height:100%;border:0;background:#FBF6EC}
+.au-mp-when{margin:10px 2px 6px;font-size:13px;line-height:1.45;color:var(--muted,#615B74)}
+.au-vic-dot.num{font:800 11.5px/1 var(--f-m);letter-spacing:-.02em;padding:0 7px}

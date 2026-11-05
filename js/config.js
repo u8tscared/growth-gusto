@@ -16,4 +16,4 @@ window.GG_ACTIVATION = { "GG-ESSENTIEL-2026": "essentiel", "GG-COMPLET-2026": "c
 window.GG_CONTACT = "contact@growthgusto.fr";
 
 /* server modules deployed with functions/ (tools/SERVER.md): the app shows them as active */
-window.GG_SERVER = { sondes: true, alertes: true, resa: true };
+window.GG_SERVER = { sondes: true, alertes: true, resa: true, mails: true };

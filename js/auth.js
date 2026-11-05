@@ -43,6 +43,10 @@ const AU_SVG = {
   mail: auSv('<rect x="3" y="5" width="18" height="14" rx="3"/><path d="m4 7 8 6 8-6"/>'),
   arrow: auSv('<path d="M5 12h14M13 6l6 6-6 6"/>'),
   arrowS: auSv('<path d="M5 12h14M13 6l6 6-6 6"/>', 16),
+  mailBig: auSv('<rect x="2.5" y="5" width="19" height="14" rx="3.2"/><path d="m3.5 7 8.5 6.2L20.5 7"/>', 34, 1.9),
+  linkS: auSv('<path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/>', 14, 2.6),
+  redo: auSv('<path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/>', 16, 2.2),
+  pen: auSv('<path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16z"/><path d="m13.5 6.5 4 4"/>', 16, 2.2),
   play: auSv('<circle cx="12" cy="12" r="9"/><path d="m10 8.5 5 3.5-5 3.5z" fill="currentColor"/>'),
   phone: auSv('<rect x="6" y="2.5" width="12" height="19" rx="2.5"/><path d="M11 18.5h2"/>'),
   eye: auSv('<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/>'),
@@ -165,13 +169,20 @@ const AUTH = {
   },
 
   /* ───────────── signed in ───────────── */
-  async signedIn(u) {
+  async signedIn(u, opt = {}) {
     this.user = u; auLS.set("gg-mode", "cloud"); this.emit("signin");
     let doc = {};
     try { const s = await this.timeout(this.fs.collection("users").doc(u.uid).get(), 12000); doc = s.exists ? s.data() || {} : {}; } catch (e) { console.warn("users get", e && e.code); }
     this.restos = Array.isArray(doc.restos) ? doc.restos : [];
     const prof = { name: u.displayName || doc.name || "", email: u.email || "", photo: u.photoURL || "" };
     if (prof.name !== doc.name || prof.email !== doc.email || prof.photo !== doc.photo) this.fs.collection("users").doc(u.uid).set({ ...prof, updatedAt: Date.now(), ...(doc.createdAt ? {} : { createdAt: Date.now() }) }, { merge: true }).catch((e) => console.warn("users set", e && e.code));
+    /* an e-mail/password account checks its address first (6-digit code, or Firebase's link while the server is off) */
+    if (this.needVerify(u, opt.fresh)) return this.verifyStart(u);
+    this.route();
+  },
+  route() {
+    const u = this.user;
+    if (this.ui.screen === "verify") { this.ui.back = []; this.ui.screen = "busy"; } /* never « back » onto the code screen */
     const inv = auLS.get("gg-invite");
     if (inv) return this.openJoin(inv, true);
     if (this.hasLocal() && !auLS.get("gg-imp-" + u.uid)) return this.show("import");
@@ -301,6 +312,7 @@ const AUTH = {
     if (s === "welcomeDone" || (s === "import" && this.ui.imp && this.ui.imp.done)) return "done";
     if (s === "busy") return "busy";
     if (s === "welcome" || s === "soon") return s;
+    if (s === "verify" && this.ui.v && this.ui.v.ok) return "done";
     return "form";
   },
   cam(instant) {
@@ -390,7 +402,7 @@ const AUTH = {
   hide() {
     const el = $("#au"); if (!el) return;
     el.classList.remove("on"); el.classList.add("off"); document.documentElement.classList.remove("au-open");
-    cancelAnimationFrame(this._raf); clearTimeout(this._pt); clearTimeout(this._pq); this._sc = null; this._painted = null; this._lbl = null; this._dropped = false;
+    cancelAnimationFrame(this._raf); clearInterval(this._vt); clearTimeout(this._pt); clearTimeout(this._pq); this._sc = null; this._painted = null; this._lbl = null; this._dropped = false;
     setTimeout(() => { el.remove(); }, 520); this.inApp = false;
   },
   openWelcome(opt = {}) {
@@ -421,6 +433,7 @@ const AUTH = {
     if (s === "email" || s === "reset" || s === "create") this.validate();
     if (s === "join") this.codeCells();
     if (s === "create") this.createPrev();
+    if (s === "verify") { this.vTick(); const i = $("#auVCode"); if (i && !(this.ui.v && this.ui.v.ok)) { setTimeout(() => { if ($("#auVCode") === i) { i.focus({ preventScroll: true }); this.vState(); } }, 420); } this.vState(); }
     /* the segmented control's knob slides from the previous tab */
     const sg = $("#au .au-seg");
     if (sg) { const to = this.ui.tab === "up" ? "up" : "in"; if (this._seg && this._seg !== to && !auReduce()) { sg.dataset.mode = this._seg; void sg.offsetWidth; } sg.dataset.mode = to; this._seg = to; } else this._seg = null;
@@ -483,6 +496,25 @@ const AUTH = {
         ${this.errHTML()}
         <form class="au-form st" style="--i:3" data-au="reset" novalidate><label class="au-f"><span class="au-lbl">E-mail</span><div class="au-in"><input class="au-input" id="auREmail" type="email" inputmode="email" autocomplete="username" autocapitalize="off" spellcheck="false" placeholder="chef@votre-restaurant.fr" value="${esc(U.email || auLS.get("gg-last-email") || "")}" enterkeyhint="send">${okI}</div></label>
         <button class="au-tac au-primary au-submit${busy("reset")}" type="submit" id="auRGo"><span class="au-bl">Envoyer le lien</span>${dots}</button></form>`;
+    }
+    if (s === "verify") {
+      const V = U.v || { mode: "link", email: (this.user && this.user.email) || "" };
+      if (V.ok) return `${top()}<div class="au-seal st" style="--i:0">${AU_SEAL}</div>${head("Adresse validée.", V.inApp ? "Merci, c'est tout bon." : "Bienvenue à bord. On ouvre votre cuisine.")}`;
+      const icon = `<div class="au-vic st" style="--i:0" aria-hidden="true"><span class="au-vic-env">${AU_SVG.mailBig}</span><span class="au-vic-dot${V.mode === "code" ? " num" : ""}">${V.mode === "code" ? "123" : AU_SVG.linkS}</span></div>`;
+      const sec = Math.max(0, Math.ceil((V.until - Date.now()) / 1000));
+      const links = `<div class="au-vlinks st" style="--i:5"><button type="button" class="au-vlink" id="auVRe" data-act="auVResend" ${sec > 0 || V.sending ? "disabled" : ""}>${AU_SVG.redo}<span>${V.sending ? "Envoi…" : sec > 0 ? `Renvoyer dans ${sec} s` : V.mode === "code" ? "Renvoyer le code" : "Renvoyer le lien"}</span></button><i aria-hidden="true"></i><button type="button" class="au-vlink" data-act="auVChange">${AU_SVG.pen}<span>Changer d'adresse</span></button></div>`;
+      if (V.mode === "code") {
+        return `${top()}${icon}${head("Vérifiez votre e-mail.", `Entrez le code à 6 chiffres envoyé à <b>${esc(V.email)}</b>.`)}
+          <form class="au-form au-vform st" style="--i:3" data-au="verify" novalidate>
+            <label class="au-codebox au-vbox" for="auVCode"><input id="auVCode" class="au-codein" type="text" inputmode="numeric" pattern="[0-9]*" autocomplete="one-time-code" maxlength="6" value="${esc(V.code)}" aria-label="Code à 6 chiffres" aria-describedby="auVSt"><span class="au-cells au-vcells" aria-hidden="true">${Array.from({ length: 6 }, (_, i) => `<i data-i="${i}" style="--k:${i}"></i>${i === 2 ? "<b></b>" : ""}`).join("")}</span></label>
+            <p class="au-vst${V.err ? " err" : ""}" id="auVSt" role="status" aria-live="polite">${V.err ? `${ico("alert")}<span>${esc(V.err)}</span>` : "<span>Valable 10 minutes. Pensez aux indésirables.</span>"}</p>
+          </form>${links}`;
+      }
+      return `${top()}${icon}${head("Cliquez sur le lien reçu.", `Un lien de validation vient de partir vers <b>${esc(V.email)}</b>. Ouvrez-le, puis revenez ici.`)}
+        ${V.err ? `<div class="au-err st" style="--i:3" role="alert">${ico("alert")}<span>${esc(V.err)}</span></div>` : ""}
+        <div class="au-stack st" style="--i:4"><button class="au-tac au-primary au-submit${busy("verify")}" data-act="auVCheck"><span class="au-bl">J'ai cliqué sur le lien</span>${dots}</button></div>
+        ${links}
+        ${V.tries >= 2 || this.restos.length ? `<button class="au-ghost st" style="--i:6" data-act="auVSkip">Continuer quand même${AU_SVG.arrowS}</button>` : ""}`;
     }
     if (s === "busy") return `<div class="au-busyp"><span class="au-busym st" style="--i:0">${appIcon(64)}</span><h2 class="au-h2 st" style="--i:1">${esc(U.busyTx || "Connexion…")}</h2><span class="au-bdots st" style="--i:2" aria-hidden="true"><i></i><i></i><i></i></span></div>`;
     const who = this.user ? `<div class="au-who st" style="--i:0">${this.user.photoURL ? `<img src="${esc(this.user.photoURL)}" alt="" referrerpolicy="no-referrer">` : `<span class="au-wi">${esc(initials(this.user.displayName || this.user.email || "?"))}</span>`}<div><b>${esc(this.user.displayName || firstName(String(this.user.email || "").split("@")[0]))}</b><span>${esc(this.user.email || "")}</span></div><button class="au-chg" data-act="auSwitch">Changer</button></div>` : "";
@@ -625,10 +657,10 @@ const AUTH = {
     try {
       await this.sdk();
       let u;
-      if (up) { const r = await this.auth.createUserWithEmailAndPassword(email, pw); u = r.user; try { await u.updateProfile({ displayName: name }); } catch (x) {} try { u.sendEmailVerification && u.sendEmailVerification().catch(() => {}); } catch (x) {} }
+      if (up) { const r = await this.auth.createUserWithEmailAndPassword(email, pw); u = r.user; try { await u.updateProfile({ displayName: name }); } catch (x) {} }
       else { const r = await this.auth.signInWithEmailAndPassword(email, pw); u = r.user; }
       auLS.set("gg-last", "email"); auLS.set("gg-last-email", email); this.ui.pw = ""; SFX.ok(); buzz(8);
-      this.setBusy(""); await this.signedIn(this.auth.currentUser || u);
+      this.setBusy(""); await this.signedIn(this.auth.currentUser || u, { fresh: true });
     } catch (x) {
       console.warn("email", x);
       if (x && x.code === "auth/email-already-in-use") { this.ui.tab = "in"; }
@@ -642,6 +674,130 @@ const AUTH = {
     if (this.ui.busy) return; this.ui.err = ""; this.setBusy("reset");
     try { await this.sdk(); await this.auth.sendPasswordResetEmail(email); this.setBusy(""); this.ui.sent = true; SFX.done(); this.paint(); }
     catch (x) { if (x && x.code === "auth/user-not-found") { this.setBusy(""); this.ui.sent = true; this.paint(); return; } /* never reveal which e-mails have an account */ this.fail(x); }
+  },
+
+  /* ───────────── e-mail check (« Vérifiez votre e-mail »): 6-digit code from functions/src/mails.js, or Firebase's link while it is off ─────────────
+     Google accounts skip it. A returning person whose kitchen already exists is never stopped at app open (the app worked unverified
+     before); the check runs after a sign-up or an e-mail sign-in, and on reopening an account that has no restaurant yet. */
+  mailsOn() { return !!(window.GG_SERVER && GG_SERVER.mails); },
+  isPw(u) { const p = (u && u.providerData) || []; return !p.some((x) => x && x.providerId === "google.com") && p.some((x) => x && x.providerId === "password"); },
+  needVerify(u, fresh) {
+    if (!u || u.emailVerified || !u.email || !this.isPw(u)) return false;
+    if (auLS.get("gg-vskip-" + u.uid) || !this.online()) return false;
+    return !!fresh || !this.restos.length;
+  },
+  async call(name, data) {
+    if (!(window.firebase && firebase.functions)) await this.script(AU_SDK_BASE + "firebase-functions-compat.js");
+    const f = firebase.app().functions("europe-west9").httpsCallable(name, { timeout: 15000 });
+    return ((await this.timeout(f(data || {}), 16000)) || {}).data || {};
+  },
+  vCode(e) { return String((e && e.code) || "").replace(/^functions\//, ""); },
+  verifyStart(u, opt = {}) {
+    const last = +auLS.get("gg-vlink-" + u.uid) || 0;
+    this.ui.v = { mode: this.mailsOn() ? "code" : "link", email: u.email, code: "", err: "", tries: 0, until: 0, busy: false, ok: false, inApp: !!opt.inApp };
+    this.ui.err = ""; this.show("verify", { push: false, reset: true });
+    /* a link sent a few minutes ago (app reopened): no second e-mail, just the countdown */
+    if (this.ui.v.mode === "link" && Date.now() - last < 10 * 60e3) { this.ui.v.until = last + 60e3; this.vTick(); return; }
+    this.verifySend(false);
+  },
+  /* the « Renvoyer » countdown (60 s) */
+  vTick() {
+    clearInterval(this._vt); const V = this.ui.v; if (!V) return;
+    const paintRe = () => {
+      const b = $("#auVRe"); if (!b) return; const s = Math.max(0, Math.ceil((V.until - Date.now()) / 1000));
+      b.disabled = s > 0 || !!V.sending; b.querySelector("span").textContent = V.sending ? "Envoi…" : s > 0 ? `Renvoyer dans ${s} s` : V.mode === "code" ? "Renvoyer le code" : "Renvoyer le lien";
+      if (!s && !V.sending) clearInterval(this._vt);
+    };
+    paintRe(); this._vt = setInterval(() => { if (this.ui.screen !== "verify") return clearInterval(this._vt); paintRe(); }, 1000);
+  },
+  async verifySend(force) {
+    const V = this.ui.v, u = this.user; if (!V || !u || V.sending) return;
+    if (V.mode === "code") {
+      V.sending = true; this.vTick();
+      try {
+        const r = await this.call("mailSendCode", { force: !!force });
+        V.sending = false;
+        if (r.verified) { await this.vReload(); return this.verifyDone(); }
+        V.until = Date.now() + (r.wait != null ? r.wait : 60) * 1000;
+        if (force && r.sent) { V.err = ""; this.vState(); toast("Nouveau code envoyé"); }
+        this.vTick();
+        return;
+      } catch (e) {
+        V.sending = false; const c = this.vCode(e); console.warn("mailSendCode", c);
+        if (c === "resource-exhausted") V.err = "Trop de codes envoyés. Validez plutôt avec un lien.";
+        V.mode = "link"; this.paint(); /* server off, daily cap or network: Firebase's own link, never a dead end */
+      }
+    }
+    V.sending = true; this.vTick();
+    try {
+      const url = location.origin + location.pathname.replace(/index\.html$/, "");
+      await this.timeout(u.sendEmailVerification({ url }).catch((e) => { if (e && /continue-uri/.test(e.code || "")) return u.sendEmailVerification(); throw e; }), 15000);
+      auLS.set("gg-vlink-" + u.uid, String(Date.now()));
+      V.sending = false; V.until = Date.now() + 60e3; if (force) { V.err = ""; this.paint(); toast("Nouveau lien envoyé"); } else this.vTick();
+    } catch (e) {
+      V.sending = false; V.until = Date.now() + 60e3; console.warn("verify link", e && e.code);
+      V.err = e && e.code === "auth/too-many-requests" ? "Un lien est déjà parti il y a peu. Regardez vos e-mails, ou réessayez dans une minute." : this.msg(e);
+      V.tries = Math.max(V.tries, 1); this.paint();
+    }
+  },
+  async vReload() { const u = this.auth && this.auth.currentUser; if (!u) return false; try { await u.reload(); } catch (e) {} const cu = this.auth.currentUser || u; if (cu.emailVerified) { try { await cu.getIdToken(true); } catch (e) {} this.user = cu; } return !!cu.emailVerified; },
+  async verifySubmit(code) {
+    const V = this.ui.v; if (!V || V.busy || V.ok) return;
+    V.busy = true; V.err = ""; this.vState();
+    try {
+      await this.call("mailVerifyCode", { code });
+      await this.vReload(); V.busy = false; this.verifyDone();
+    } catch (e) {
+      V.busy = false; const c = this.vCode(e), left = e && e.details && e.details.left;
+      if (["not-found", "internal", "unimplemented"].includes(c)) { V.mode = "link"; this.paint(); this.verifySend(false); return; }
+      V.code = ""; const i = $("#auVCode"); if (i) i.value = "";
+      V.err = c === "invalid-argument" ? (left ? `Ce n'est pas le bon code. Encore ${left} essai${left > 1 ? "s" : ""}.` : "Ce n'est pas le bon code.")
+        : c === "deadline-exceeded" ? "Ce code a expiré. Un nouveau vient de partir."
+        : c === "resource-exhausted" ? "Trop d'essais. Un nouveau code vient de partir."
+        : c === "gg/timeout" || c === "unavailable" || !this.online() ? "Pas de réseau. Réessayez dans un instant." : "Vérification impossible. Réessayez.";
+      this.vState(true); if (i) setTimeout(() => { i.focus({ preventScroll: true }); this.vState(); }, 480);
+      if (c === "deadline-exceeded" || c === "resource-exhausted") { V.until = 0; this.verifySend(true); }
+    }
+  },
+  /* paints the cells and the status line without re-rendering the step (keeps the keyboard up) */
+  vState(bad) {
+    const V = this.ui.v; if (!V) return; const i = $("#auVCode"), v = i ? i.value.replace(/\D/g, "").slice(0, 6) : V.code;
+    $$("#au .au-vcells i").forEach((c, k) => { c.textContent = v[k] || ""; c.classList.toggle("f", !!v[k]); c.classList.toggle("cur", k === Math.min(v.length, 5) && document.activeElement === i && !V.busy && v.length < 6); });
+    const box = $("#au .au-vbox"); if (box) { box.classList.toggle("busy", !!V.busy); if (bad) { box.classList.remove("au-shake", "bad"); void box.offsetWidth; box.classList.add("au-shake", "bad"); SFX.err(); buzz([20, 40, 20]); setTimeout(() => box.classList.remove("au-shake"), 460); } else if (v.length) box.classList.remove("bad"); }
+    const st = $("#auVSt"); if (st) { st.className = "au-vst" + (V.err ? " err" : ""); st.innerHTML = V.busy ? `${AU_DOTS_IN}<span>Vérification…</span>` : V.err ? `${ico("alert")}<span>${esc(V.err)}</span>` : `<span>Valable 10 minutes. Pensez aux indésirables.</span>`; }
+  },
+  async verifyCheck() {
+    const V = this.ui.v; if (!V || V.busy) return; V.busy = true; this.setBusy("verify");
+    const ok = await this.vReload(); V.busy = false; this.setBusy("");
+    if (ok) return this.verifyDone();
+    V.tries++; V.err = "Pas encore validé. Ouvrez le lien reçu, puis revenez ici."; SFX.err(); buzz([20, 40, 20]); this.paint();
+    const er = $("#au .au-err"); er && er.classList.add("au-shake");
+  },
+  verifyDone() {
+    const V = this.ui.v; if (!V || V.ok) return; clearInterval(this._vt);
+    const box = $("#au .au-vbox") || $("#au .au-vic"); const r = box ? box.getBoundingClientRect() : null;
+    if (box) box.classList.add("won");
+    SFX.done(); buzz([12, 40, 12, 40, 30]);
+    setTimeout(() => { V.ok = true; burst(r ? r.left + r.width / 2 : undefined, r ? r.top + r.height / 2 : undefined); this.paint(); }, V.mode === "code" ? 380 : 0);
+    setTimeout(() => {
+      if (V.inApp) { this.hide(); toast("Adresse e-mail validée"); try { rerender(); } catch (e) {} return; }
+      this.route();
+    }, auReduce() ? 1200 : 2200);
+  },
+  verifySkip() { const u = this.user; if (!u) return; auLS.set("gg-vskip-" + u.uid, "1"); SFX.tap(); clearInterval(this._vt); if (this.ui.v && this.ui.v.inApp) return this.hide(); this.route(); },
+  /* wrong address: a brand-new empty account is removed and the form comes back; otherwise sign out, then sign in with the right one */
+  async verifyChange() {
+    const u = this.user; clearInterval(this._vt); SFX.tap();
+    if (this.ui.v && this.ui.v.inApp) { this.hide(); return this.signOut(); }
+    const born = (u && u.metadata && Date.parse(u.metadata.creationTime || "")) || 0;
+    const blank = !this.restos.length && born && Date.now() - born < 24 * 36e5;
+    this.ui.busyTx = "Un instant…"; this.show("busy", { push: false });
+    if (blank) { try { await u.delete(); } catch (e) { console.warn("verify change", e && e.code); } }
+    try { await this.auth.signOut(); } catch (e) {}
+    this.user = null; auLS.set("gg-mode", "out"); this.ui.v = null;
+    Object.assign(this.ui, { tab: blank ? "up" : "in", email: "", pw: "", err: "", back: ["welcome"] });
+    this.show("email", { push: false });
+    setTimeout(() => { const i = $("#auEmail"); if (i) i.focus({ preventScroll: true }); }, 420);
   },
 
   /* ───────────── create a restaurant ───────────── */
@@ -985,6 +1141,7 @@ const AUTH = {
     if (m === "demo") body = `<div class="au-acc"><span class="au-wi demo">${ico("auPlay")}</span><div><b>Mode démo</b><span>Rien n'est enregistré · tout s'efface en quittant</span></div></div>${row("auDemoSignup", "auCloud", "Créer mon compte", "Gardez vos données, invitez l'équipe")}${row("auDemoLeave", "out", "Quitter la démo", "Revenir à l'accueil", " bad")}`;
     else if (u) body = `<div class="au-acc">${u.photo ? `<img src="${esc(u.photo)}" alt="" referrerpolicy="no-referrer">` : `<span class="au-wi">${esc(initials(u.name || u.email))}</span>`}<div><b>${esc(u.name || "Mon compte")}</b><span>${esc(u.email || "")}</span></div><span class="pill acc">${esc(S.resto?.plan === "essai" || !S.resto?.plan ? "Essai" : S.resto.plan)}</span></div>
       ${myRole() === "gerant" ? row("auInvite", "auLink", "Inviter l'équipe", "Lien, code ou QR · chacun son compte") : ""}
+      ${this.user && this.isPw(this.user) && !this.user.emailVerified ? row("auVOpen", "auMail", "Valider mon adresse e-mail", this.mailsOn() ? "Un code à 6 chiffres, 20 secondes" : "Un lien par e-mail, 20 secondes") : ""}
       ${row("auJoinOpen", "users", "Rejoindre un autre établissement", "Avec un code d'invitation")}
       ${this.hasLocal() && auLS.get("gg-imp-" + u.uid) !== "1" ? row("auImportOpen", "upload", "Importer les données de ce téléphone", "Elles restent aussi sur l'appareil") : ""}
       ${row("auSignOut", "out", "Se déconnecter", "Les données restent dans votre compte", " bad")}
@@ -1108,6 +1265,121 @@ function auInsHome(mob) {
 }
 function auInstallSheet() { SFX.tap(); buzz(4); openSheet(auInstallHTML()); }
 
+/* ───────────── the account e-mails, for the admin preview (Espace admin → Aperçu des e-mails) ─────────────
+   Generated from functions/src/mails.js (block « templates »): the server sends exactly this HTML. Keep both in step. */
+const auMailHTML = (() => {
+  const APP = "https://app.growthgusto.fr/", TZ = "Europe/Paris";
+  const parisDay = (ts = Date.now()) => new Intl.DateTimeFormat("en-CA", { timeZone: TZ, year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(ts));
+  const longDate = (ts) => new Intl.DateTimeFormat("fr-FR", { timeZone: TZ, weekday: "long", day: "numeric", month: "long" }).format(new Date(ts));
+const esc = (v) => String(v == null ? "" : v).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const firstName = (n) => String(n || "").trim().split(/\s+/)[0] || "";
+const F = "'Instrument Sans','Helvetica Neue',Helvetica,Arial,sans-serif", FD = "'Bricolage Grotesque','Helvetica Neue',Helvetica,Arial,sans-serif", FM = "'JetBrains Mono',Menlo,Consolas,monospace";
+function shell({ title, pre, hero, body, cta, href, foot }) {
+  const btn = cta ? `<tr><td style="padding:6px 26px 28px"><table role="presentation" cellspacing="0" cellpadding="0" border="0"><tr><td style="border-radius:14px;background:#5B2BFF;border-bottom:4px solid #2A0BA6"><a href="${esc(href || APP)}" style="display:inline-block;padding:15px 26px;font-family:${F};font-size:16px;font-weight:700;color:#FFFFFF;text-decoration:none;border-radius:14px">${esc(cta)}&nbsp;&nbsp;&rarr;</a></td></tr></table></td></tr>` : "";
+  return `<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light only"><meta name="supported-color-schemes" content="light"><title>${esc(title)}</title>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=Instrument+Sans:wght@500;600;700&family=JetBrains+Mono:wght@700&display=swap" rel="stylesheet"></head>
+<body style="margin:0;padding:0;background:#FBF6EC;-webkit-text-size-adjust:100%">
+<div style="display:none;max-height:0;overflow:hidden;opacity:0;color:#FBF6EC">${esc(pre)}&#8199;&#65279;&#847;&#8199;&#65279;&#847;&#8199;&#65279;&#847;&#8199;&#65279;&#847;</div>
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#FBF6EC"><tr><td align="center" style="padding:28px 14px 36px">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width:520px">
+<tr><td style="padding:0 6px 18px"><table role="presentation" cellspacing="0" cellpadding="0" border="0"><tr>
+<td width="34" height="34" align="center" valign="middle" style="width:34px;height:34px;background:#5B2BFF;border-radius:10px;border-bottom:3px solid #2A0BA6;font-family:${FD};font-size:19px;font-weight:800;line-height:34px;color:#FFFFFF">G</td>
+<td style="padding-left:10px;font-family:${FD};font-size:20px;font-weight:800;letter-spacing:-.5px;color:#1B1530">Growth <span style="color:#5B2BFF">Gusto</span></td></tr></table></td></tr>
+<tr><td style="background:#FFFDF8;border:1.5px solid #E9DFCD;border-radius:24px;overflow:hidden">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">${hero || ""}${body}${btn}</table></td></tr>
+<tr><td style="padding:16px 8px 0;font-family:${F};font-size:12.5px;line-height:19px;color:#6E6880">${foot}</td></tr>
+<tr><td style="padding:10px 8px 0;font-family:${F};font-size:12px;line-height:18px;color:#9A93A8">Growth Gusto · le cahier HACCP qui se remplit tout seul · <a href="${APP}" style="color:#6E6880">app.growthgusto.fr</a></td></tr>
+</table></td></tr></table></body></html>`.replace(/(>[^<]*)\be-mail/g, (m, a) => a + "e&#8209;mail"); /* « e-mail » never breaks at its hyphen */
+}
+const P = (t, pad = "0 26px 16px") => `<tr><td style="padding:${pad};font-family:${F};font-size:15.5px;line-height:23px;color:#4A4560">${t}</td></tr>`;
+const H = (t, pad = "26px 26px 8px") => `<tr><td style="padding:${pad};font-family:${FD};font-size:28px;line-height:31px;font-weight:800;letter-spacing:-.8px;color:#1B1530">${t}</td></tr>`;
+/* coloured band at the top of the card (solid: no gradient survives Outlook) */
+const band = (bg, edge, eyebrow, eyeCol, big, bigCol, sub, subCol) => `<tr><td style="background:${bg};border-bottom:1.5px solid ${edge};padding:26px 26px 24px">
+<div style="font-family:${F};font-size:13px;font-weight:700;color:${eyeCol}">${eyebrow}</div>
+<div style="font-family:${FD};font-size:32px;line-height:35px;font-weight:800;letter-spacing:-1px;color:${bigCol};padding-top:6px">${big}</div>
+${sub ? `<div style="font-family:${F};font-size:15px;line-height:22px;color:${subCol};padding-top:8px">${sub}</div>` : ""}</td></tr>`;
+const step = (n, bg, fg, t, s) => `<tr><td style="padding:0 26px 10px"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#FFFFFF;border:1.5px solid #E9DFCD;border-radius:16px"><tr>
+<td width="58" valign="top" style="padding:14px 0 14px 14px"><div style="width:36px;height:36px;border-radius:18px;background:${bg};color:${fg};font-family:${FD};font-size:17px;font-weight:800;line-height:36px;text-align:center">${n}</div></td>
+<td style="padding:13px 14px 13px 4px;font-family:${F}"><div style="font-size:15.5px;font-weight:700;color:#1B1530">${t}</div><div style="font-size:13.5px;line-height:19px;color:#615B74;padding-top:2px">${s}</div></td></tr></table></td></tr>`;
+
+/* kind: "code" | "welcome" | "trial3" | "last" | "ended" · d: { name, code, resto, ends, pack } */
+function mailHTML(kind, d = {}) {
+  const me = firstName(d.name), resto = esc(d.resto || "votre restaurant"), packT = d.pack === "essentiel" ? "Essentiel" : "Complet";
+  if (kind === "code") {
+    const c = String(d.code || "000000").replace(/\D/g, "").padEnd(6, "0").slice(0, 6);
+    const box = (x) => `<td width="15%" align="center" style="padding:0 3px"><div style="background:#FFFFFF;border:1.5px solid #DCCFB8;border-bottom:4px solid #E2D6C2;border-radius:14px;font-family:${FM};font-size:30px;font-weight:700;line-height:58px;height:58px;color:#1B1530;text-align:center">${x}</div></td>`;
+    const cells = c.slice(0, 3).split("").map(box).join("") + `<td width="10%" align="center" style="font-family:${F};font-size:22px;font-weight:700;color:#CDBEA4">&ndash;</td>` + c.slice(3).split("").map(box).join("");
+    return {
+      subject: `${c} est votre code Growth Gusto`, kind,
+      text: `Votre code Growth Gusto : ${c}\n\nTapez-le dans l'app pour valider votre adresse. Il expire dans 10 minutes.\n\nVous n'avez rien demandé ? Ignorez cet e-mail.`,
+      html: shell({ title: "Votre code", pre: `${c} · valable 10 minutes`,
+        body: H(me ? `${esc(me)}, voici votre code.` : "Voici votre code.") + P("Tapez-le dans Growth Gusto pour valider votre adresse e-mail.", "0 26px 22px")
+          + `<tr><td style="padding:0 20px 18px"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width:420px"><tr>${cells}</tr></table></td></tr>`
+          + `<tr><td style="padding:0 26px 28px"><span style="display:inline-block;background:#FFF3D6;color:#7A5A1A;border-radius:999px;padding:7px 13px;font-family:${F};font-size:13px;font-weight:700">Valable 10 minutes</span></td></tr>`,
+        foot: "Vous n'avez rien demandé ? Ignorez cet e-mail : sans ce code, personne ne peut valider l'adresse." }),
+    };
+  }
+  if (kind === "welcome") {
+    return {
+      subject: me ? `Bienvenue sur Growth Gusto, ${me}` : "Bienvenue sur Growth Gusto", kind,
+      text: `Bienvenue${me ? ", " + me : ""} !\n\nVotre compte Growth Gusto est créé. Trois premiers pas :\n1. Ajoutez vos frigos : le relevé prend 30 secondes.\n2. Imprimez une étiquette : la DLC se calcule toute seule.\n3. Invitez votre équipe : un lien, chacun son compte.\n\nOuvrir Growth Gusto : ${APP}\n\nUne question ? Répondez simplement à cet e-mail.`,
+      html: shell({ title: "Bienvenue", pre: "Votre compte est créé. Trois pas, et votre cahier HACCP se remplit tout seul.",
+        hero: band("#5B2BFF", "#2A0BA6", "Votre compte est créé", "#D9D0FF", me ? `Bienvenue, ${esc(me)}.` : "Bienvenue en cuisine.", "#FFFFFF", "Votre cahier HACCP va se remplir tout seul.", "#EFE9FF"),
+        body: `<tr><td style="padding:22px 26px 12px;font-family:${F};font-size:13px;font-weight:700;color:#3A10D8">Trois premiers pas</td></tr>`
+          + step(1, "#EFE9FF", "#3A10D8", "Ajoutez vos frigos", "Le relevé du matin prend 30 secondes.")
+          + step(2, "#FFF3D6", "#7A5A1A", "Imprimez une étiquette", "La DLC se calcule, la traçabilité suit.")
+          + step(3, "#E6F0FF", "#2F5FBF", "Invitez votre équipe", "Un lien, et chacun a son compte.")
+          + `<tr><td style="height:12px;line-height:12px;font-size:0">&nbsp;</td></tr>`,
+        cta: "Ouvrir Growth Gusto", href: APP,
+        foot: "14 jours d'essai, sans carte bancaire. Une question ? Répondez simplement à cet e-mail, on lit tout." }),
+    };
+  }
+  if (kind === "trial3") {
+    const ends = d.ends ? longDate(d.ends) : "dans 3 jours";
+    return {
+      subject: `Plus que 3 jours d'essai · ${d.resto || "Growth Gusto"}`, kind,
+      text: `Votre essai de Growth Gusto (${d.resto || "votre restaurant"}) se termine ${ends}.\nChoisissez votre formule pour continuer sans interruption : Essentiel 49 € HT / mois ou Complet 99 € HT / mois.\n${APP}?go=abonnement\n\nRien n'est effacé à la fin de l'essai.`,
+      html: shell({ title: "Plus que 3 jours", pre: `Votre essai se termine ${ends}. Vos données restent à vous.`,
+        hero: band("#FFF3D6", "#F1D9A0", resto, "#7A5A1A", `Plus que <span style="color:#C88A12">3&nbsp;jours</span> d'essai.`, "#1B1530", `Il se termine ${esc(ends)}.`, "#7A5A1A"),
+        body: P(`${me ? esc(me) + ", c" : "C"}hoisissez votre formule pour que vos relevés, étiquettes et votre registre continuent sans interruption.`, "22px 26px 16px")
+          + `<tr><td style="padding:0 22px 16px"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"><tr>
+<td width="50%" style="padding:0 4px"><div style="background:#FFFFFF;border:1.5px solid ${d.pack === "essentiel" ? "#5B2BFF" : "#E9DFCD"};border-radius:16px;padding:14px"><div style="font-family:${F};font-size:13px;font-weight:700;color:#615B74">Essentiel</div><div style="font-family:${FD};font-size:24px;font-weight:800;letter-spacing:-.5px;color:#1B1530;padding-top:2px">49&nbsp;€&nbsp;<span style="font-family:${F};font-size:12.5px;font-weight:600;color:#6E6880">HT/mois</span></div></div></td>
+<td width="50%" style="padding:0 4px"><div style="background:#FFFFFF;border:1.5px solid ${d.pack === "essentiel" ? "#E9DFCD" : "#5B2BFF"};border-radius:16px;padding:14px"><div style="font-family:${F};font-size:13px;font-weight:700;color:#615B74">Complet</div><div style="font-family:${FD};font-size:24px;font-weight:800;letter-spacing:-.5px;color:#1B1530;padding-top:2px">99&nbsp;€&nbsp;<span style="font-family:${F};font-size:12.5px;font-weight:600;color:#6E6880">HT/mois</span></div></div></td>
+</tr></table></td></tr>`,
+        cta: "Choisir ma formule", href: APP + "?go=abonnement",
+        foot: `Vous essayez le pack ${packT}. Rien n'est effacé à la fin de l'essai : vos données restent à vous.` }),
+    };
+  }
+  /* last day (still a few hours) or already over (the tick missed the last day) */
+  const over = kind === "ended", at = d.ends ? new Date(d.ends) : null;
+  const hm = at ? new Intl.DateTimeFormat("fr-FR", { timeZone: TZ, hour: "numeric", minute: "2-digit" }).format(at).replace(":", " h ").replace(/ h 00$/, " h") : "";
+  const when = at ? `${parisDay(+at) === parisDay() ? "aujourd'hui" : "demain"} à ${hm}` : "bientôt";
+  return {
+    subject: over ? `Votre essai est terminé · ${d.resto || "Growth Gusto"}` : `Dernier jour d'essai · ${d.resto || "Growth Gusto"}`, kind,
+    text: `${over ? "Votre essai de Growth Gusto est terminé." : "C'est le dernier jour de votre essai de Growth Gusto."}\nL'app reste consultable, mais n'enregistre plus rien sans abonnement. Activez-le en une minute : ${APP}?go=abonnement\n\nRien n'est effacé.`,
+    html: shell({ title: over ? "Essai terminé" : "Dernier jour", pre: over ? "Activez votre abonnement pour reprendre là où vous en étiez." : "Activez votre abonnement pour continuer demain sans coupure.",
+      hero: band("#FFE9DE", "#F6C9B8", resto, "#C8432A", over ? "Votre essai est terminé." : "Dernier jour d'essai.", "#1B1530", over ? "Tout est gardé, rien n'est effacé." : `L'essai s'arrête ${when}.`, "#C8432A"),
+      body: P(over ? `${me ? esc(me) + ", v" : "V"}os relevés et étiquettes restent consultables. Pour en enregistrer de nouveaux, activez votre abonnement : une minute suffit.` : "Ensuite, l'app reste consultable mais n'enregistre plus rien. Activez votre abonnement pour continuer sans coupure.", "22px 26px 18px"),
+      cta: "Activer mon abonnement", href: APP + "?go=abonnement",
+      foot: `Pack ${packT} : ${d.pack === "essentiel" ? "49" : "99"} € HT par mois, sans engagement. Une question ? Répondez à cet e&#8209;mail.` }),
+  };
+}
+
+  return mailHTML;
+})();
+const AU_MAILS = [["welcome", "Bienvenue"], ["code", "Code"], ["trial3", "J-3"], ["last", "Jour J"]];
+function auMailPrev(kind = "welcome") {
+  const u = authUser(), now = Date.now();
+  const d = { name: (u && u.name) || S.me?.name || "Marceau", code: "482913", resto: S.resto?.name || "Chemin des Sarments", pack: S.resto?.pack || "complet", ends: kind === "last" ? now + 20 * 36e5 : now + 3 * 864e5 - 36e5 };
+  const m = auMailHTML(kind, d);
+  return `<div class="au-mp"><div class="h2">Aperçu des e-mails</div><p class="sub">Peu d'e-mails, envoyés par bonjour@growthgusto.fr.</p>
+    <div class="seg au-mp-seg"><span class="knob" style="width:calc(25% - 4px);transform:translateX(${Math.max(0, AU_MAILS.findIndex((x) => x[0] === kind)) * 100}%)"></span>${AU_MAILS.map(([k, t]) => `<button class="${k === kind ? "on" : ""}" data-act="auMailPrevK" data-v="${k}">${t}</button>`).join("")}</div>
+    <div class="au-mp-subj"><span>Objet</span><b>${esc(m.subject)}</b></div>
+    <div class="au-mp-frame"><iframe title="Aperçu de l'e-mail" sandbox="" referrerpolicy="no-referrer" srcdoc="${esc(m.html)}"></iframe></div>
+    <p class="au-mp-when">${{ welcome: "À la création du compte (Google tout de suite, e-mail après le code).", code: "À l'inscription par e-mail, et sur « Renvoyer le code ».", trial3: "3 jours avant la fin de l'essai, une seule fois.", last: "Le dernier jour de l'essai, une seule fois." }[kind]}${window.GG_SERVER && GG_SERVER.mails ? "" : " Actif dès que le serveur « mails » est déployé."}</p>
+    <button class="btn ghost block" data-act="sheetClose">Fermer</button></div>`;
+}
+
 function authUser() {
   const u = AUTH.user; if (!u) return null;
   const pid = (u.providerData && u.providerData[0] && u.providerData[0].providerId) || "password";
@@ -1117,7 +1389,7 @@ function authUser() {
 /* ───────────── forms + live inputs inside the overlay ───────────── */
 document.addEventListener("submit", (e) => {
   const f = e.target; if (!f.dataset || !f.dataset.au) return; e.preventDefault(); SFX.init();
-  ({ email: () => AUTH.emailSubmit(), reset: () => AUTH.resetSubmit(), create: () => AUTH.createSubmit(), join: () => AUTH.joinSubmit(), reauth: () => AUTH.reauthSubmit(), delacc: () => ACT.auDelAccountOk() })[f.dataset.au]?.();
+  ({ email: () => AUTH.emailSubmit(), reset: () => AUTH.resetSubmit(), create: () => AUTH.createSubmit(), join: () => AUTH.joinSubmit(), reauth: () => AUTH.reauthSubmit(), delacc: () => ACT.auDelAccountOk(), verify: () => { const v = ($("#auVCode")?.value || "").replace(/\D/g, ""); if (v.length === 6) AUTH.verifySubmit(v); else AUTH.vState(true); } })[f.dataset.au]?.();
 });
 document.addEventListener("input", (e) => { const t = e.target; if (t && t.id === "auConfIn") { const b = $("#auConfGo"); if (b) b.toggleAttribute("disabled", t.value.trim().toUpperCase() !== "EFFACER"); } });
 document.addEventListener("keydown", (e) => { if (e.key === "Enter" && e.target && e.target.id === "auConfIn") { e.preventDefault(); const b = $("#auConfGo"); if (b && !b.disabled) b.click(); } });
@@ -1128,6 +1400,13 @@ document.addEventListener("input", (e) => {
     const v = auCleanCode(t.value); const J = (AUTH.ui.join ||= { code: "", inv: null, err: "" });
     if (v !== J.code) { J.code = v; J.inv = null; J.err = ""; const st = $("#auJState"); if (st) st.innerHTML = `<p class="au-fine">${v.length < 8 ? `Encore ${8 - v.length} caractère${8 - v.length > 1 ? "s" : ""}` : ""}</p>`; const b = $("#au [data-au=join] .au-submit"); b && b.setAttribute("disabled", ""); SFX.tick(); if (v.length === 8) { t.blur(); AUTH.lookup(v); } }
     AUTH.codeCells(); return;
+  }
+  if (t.id === "auVCode") {
+    /* digits only (a pasted « 482 913 » or « Votre code : 482913 » works too); the 6th digit submits */
+    const V = AUTH.ui.v; if (!V) return; const v = t.value.replace(/\D/g, "").slice(0, 6); if (t.value !== v) t.value = v;
+    if (v !== V.code) { if (v.length > V.code.length) { SFX.tick(); buzz(3); } V.code = v; if (V.err && v.length) { V.err = ""; } }
+    AUTH.vState(); if (v.length === 6 && !V.busy) { t.blur(); AUTH.verifySubmit(v); }
+    return;
   }
   if (t.id === "auRName") { AUTH.ui.create.name = t.value; AUTH.createPrev(); }
   if (t.id === "auRMe") AUTH.ui.create.me = t.value;
@@ -1142,7 +1421,8 @@ document.addEventListener("focusout", (e) => { const t = e.target; if (t && t.id
 /* only a width change re-frames the kitchen: on phones the browser bar showing/hiding while scrolling changes the height constantly */
 let auRzW = window.innerWidth;
 window.addEventListener("resize", () => { if (!$("#au.on")) return; const desk = window.matchMedia("(min-width:960px)").matches; if (!desk && window.innerWidth === auRzW) return; auRzW = window.innerWidth; cancelAnimationFrame(AUTH._rz); AUTH._rz = requestAnimationFrame(() => AUTH.cam(true)); }, { passive: true });
-document.addEventListener("focusin", (e) => { if (e.target && e.target.id === "auCode") AUTH.codeCells(); });
+document.addEventListener("focusin", (e) => { if (e.target && e.target.id === "auCode") AUTH.codeCells(); if (e.target && e.target.id === "auVCode") AUTH.vState(); });
+document.addEventListener("focusout", (e) => { if (e.target && e.target.id === "auVCode") setTimeout(() => AUTH.vState(), 0); });
 document.addEventListener("keydown", (e) => { if (e.key === "Escape" && $("#au.on") && AUTH.inApp && !$("#sheet.open")) { e.stopPropagation(); ACT.auClose(); } }, true);
 
 /* ───────────── actions ───────────── */
@@ -1180,6 +1460,14 @@ Object.assign(ACT, {
   auSignOutOk: () => { closeSheet(true); AUTH.signOut(); },
   auDemoSignup: () => { SFX.tap(); AUTH.openWelcome({ screen: AUTH.cfg ? "email" : "soon", tab: "up" }); },
   auDemoLeave: () => AUTH.leaveDemo(),
+  auMailPrev: () => { SFX.tap(); openSheet(auMailPrev()); },
+  auMailPrevK: (a, id, v) => { SFX.tick(); buzz(4); $("#sheetBody").innerHTML = auMailPrev(v); },
+  /* « Vérifiez votre e-mail » */
+  auVResend: () => { SFX.tap(); buzz(4); AUTH.verifySend(true); },
+  auVChange: () => AUTH.verifyChange(),
+  auVCheck: () => { SFX.tap(); buzz(5); AUTH.verifyCheck(); },
+  auVSkip: () => AUTH.verifySkip(),
+  auVOpen: () => { if (!AUTH.user) return; SFX.tap(); closeSheet(true); AUTH.inApp = true; AUTH.ui.back = []; AUTH.mount(); AUTH.verifyStart(AUTH.user, { inApp: true }); },
   /* gérant with an account (or the demo): the « Nouvel équipier » flow (js/perms.js) asks what the person sees, then makes the invitation */
   auInvite: () => (typeof PERMS !== "undefined" && DB.mode !== "local" && myRole() === "gerant" ? PERMS.flow({ from: "invite", connect: "invite" }) : AUTH.inviteSheet()),
   auInvList: () => AUTH.inviteSheet(),
