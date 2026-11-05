@@ -39,6 +39,24 @@ const t=async(name,p)=>{try{await p;pass++;console.log('ok  ',name)}catch(e){fai
  await t('member reads bookings',assertSucceeds(getDocs(collection(A,`restos/${rid}/bookings`))));
  await t('member edits booking status',assertSucceeds(updateDoc(doc(A,`restos/${rid}/bookings/b1`),{status:'arrive',seen:true})));
  await t('member adds phone booking',assertSucceeds(setDoc(doc(A,`restos/${rid}/bookings/x1`),{date,time:'20:10',covers:12,name:'X',status:'avenir',source:'tel',createdAt:now})));
+ // ── v2: manage keys, waiting list, validation mode ──
+ const K='0123456789abcdef0123456789abcdef';
+ const bookK=(db,id,data,withCounter=true,k=K)=>{const b=writeBatch(db);b.set(doc(db,`restos/${rid}/bookings/${id}`),data);if(withCounter)b.update(doc(db,`restos/${rid}/public/resa`),new FieldPath('days',data.date,data.time),increment(data.covers),'last',id);b.set(doc(db,`resaKeys/${rid}/keys/${id}`),{k,at:Date.now()});return b.commit();};
+ await t('anon books with its manage key',assertSucceeds(bookK(anon,'k1',good({time:'21:00'}))));
+ await t('anon cannot read a manage key',assertFails(getDoc(doc(anon,`resaKeys/${rid}/keys/k1`))));
+ await t('member cannot read a manage key',assertFails(getDoc(doc(A,`resaKeys/${rid}/keys/k1`))));
+ await t('anon cannot overwrite a manage key',assertFails(setDoc(doc(anon,`resaKeys/${rid}/keys/k1`),{k:K})));
+ await t('anon cannot add a key to an existing booking',assertFails(setDoc(doc(anon,`resaKeys/${rid}/keys/b1`),{k:K})));
+ await t('anon cannot write a malformed key',assertFails(bookK(anon,'k2',good({time:'21:15'}),true,'short')));
+ await t('anon joins the waiting list (no counter)',assertSucceeds(bookK(anon,'w1',good({status:'attente',time:'20:00',covers:6}),false)));
+ await t('waiting list still bounded by maxOnline',assertFails(bookK(anon,'w2',good({status:'attente',covers:9}),false)));
+ await t('a normal booking still needs the counter',assertFails(bookK(anon,'w3',good({time:'21:30'}),false)));
+ await t('auto mode refuses « à valider »',assertFails(bookK(anon,'v0',good({status:'avalider',time:'21:30'}))));
+ await updateDoc(doc(A,`restos/${rid}/public/resa`),{'cfg.validate':true});
+ await t('validation mode: anon sends « à valider »',assertSucceeds(bookK(anon,'v1',good({status:'avalider',time:'21:30'}))));
+ await t('validation mode refuses « en ligne »',assertFails(bookK(anon,'v2',good({time:'21:45'}))));
+ await updateDoc(doc(A,`restos/${rid}/public/resa`),{'cfg.waitlist':false});
+ await t('no waiting list when switched off',assertFails(bookK(anon,'w4',good({status:'attente'}),false)));
  await updateDoc(doc(A,`restos/${rid}/public/resa`),{'cfg.online':false});
  await t('anon cannot book when online off',assertFails(book(anon,'b10',good({covers:1}))));
  console.log(`\n${pass} passed, ${fail} failed`);await env.cleanup();process.exit(fail?1:0);

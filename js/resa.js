@@ -30,22 +30,32 @@ Object.assign(IC, {
 });
 
 /* ───────── constants + config ───────── */
+/* stored values (old ones keep working): "avenir" / "en ligne" / "confirme" = confirmée, "avalider" = demande à valider,
+   "attente" = liste d'attente, "arrive", "noshow", "annule" (+ cancelledBy "client" | "resto"), "refuse" */
 const RS_ST = {
-  avenir: { t: "À venir", k: "av" },
-  "en ligne": { t: "À venir", k: "av" },
-  arrive: { t: "Arrivé", k: "ok" },
+  avenir: { t: "Confirmée", k: "av" },
+  "en ligne": { t: "Confirmée", k: "av" },
+  confirme: { t: "Confirmée", k: "av" },
+  avalider: { t: "À valider", k: "va" },
+  attente: { t: "Liste d'attente", k: "wl" },
+  arrive: { t: "Arrivée", k: "ok" },
   noshow: { t: "No-show", k: "ns" },
-  annule: { t: "Annulé", k: "an" },
+  annule: { t: "Annulée", k: "an" },
+  refuse: { t: "Refusée", k: "an" },
 };
 const RS_DSH = ["dim.", "lun.", "mar.", "mer.", "jeu.", "ven.", "sam."];
 const RS_DL = ["D", "L", "M", "M", "J", "V", "S"];
 const RS_WEEK = [1, 2, 3, 4, 5, 6, 0];
 const RS_ZONES = { salle: "Salle", terrasse: "Terrasse" };
-const rsLive = (b) => b && b.status !== "annule" && b.status !== "noshow";
+const rsLive = (b) => b && !["annule", "noshow", "refuse", "attente"].includes(b.status);
+const rsConf = (b) => b && ["avenir", "en ligne", "confirme"].includes(b.status || "avenir");
+const rsSrv = () => !!(S.resto && S.resto.server && S.resto.server.resa);
+/* client file key: the phone's last 9 digits (06 12 34 56 78, +33 6 12 34 56 78 and 0612345678 are the same person) */
+const rsPk = (ph) => { const d = String(ph || "").replace(/\D/g, ""); return d.length >= 8 ? d.slice(-9) : ""; };
 const rsWeb = (b) => b && (b.source === "web" || b.status === "en ligne");
 const rsDefCfg = () => ({
   services: [{ id: "midi", name: "Midi", from: "12:00", to: "13:45", days: [1, 2, 3, 4, 5, 6] }, { id: "soir", name: "Soir", from: "19:00", to: "21:45", days: [2, 3, 4, 5, 6] }],
-  slot: 15, maxPerSlot: 16, maxService: 0, closures: [], online: false, lead: 2, maxOnline: 8, horizon: 60, msg: "", address: "", phone: "", photo: "", tables: [],
+  slot: 15, maxPerSlot: 16, maxService: 0, closures: [], online: false, validate: false, waitlist: true, lead: 2, maxOnline: 8, horizon: 60, msg: "", address: "", phone: "", photo: "", tables: [],
 });
 function rsCfg() {
   const c = (S.resto && S.resto.resaCfg) || {}, d = rsDefCfg();
@@ -56,7 +66,7 @@ function rsCfg() {
   if (![15, 30, 60].includes(o.slot)) o.slot = 15; if (o.maxOnline < 1) o.maxOnline = 8; if (o.horizon < 1) o.horizon = 60;
   return o;
 }
-const R = { rows: null, rid: null, pub: null, pubSeen: false, day: null, svc: null, view: "list", known: null, fresh: new Set(), ed: null, ce: null, ctab: "h", pick: null, flash: null, demoPing: false, seenT: null };
+const R = { clients: [], cc: {}, rows: null, rid: null, pub: null, pubSeen: false, day: null, svc: null, view: "list", known: null, fresh: new Set(), ed: null, ce: null, ctab: "h", pick: null, flash: null, demoPing: false, seenT: null };
 
 /* ───────── time helpers ───────── */
 const rsMin = (t) => { const m = /^(\d{1,2}):(\d{2})/.exec(t || ""); return m ? +m[1] * 60 + +m[2] : 0; };
@@ -88,16 +98,20 @@ const rsOfDay = (k) => rsRows().filter((b) => b.date === k).sort((a, b) => (a.ti
 const rsCovers = (list) => list.filter(rsLive).reduce((n, b) => n + (+b.covers || 0), 0);
 function rsUsed(cfg, k, exceptId) { const m = {}; rsOfDay(k).forEach((b) => { if (!rsLive(b) || b.id === exceptId) return; const t = rsBucket(cfg, k, b.time); m[t] = (m[t] || 0) + (+b.covers || 0); }); return m; }
 function rsWatch() {
-  if (!S.rid || R.rid === S.rid) return; R.rid = S.rid; R.rows = null; R.known = null; R.pub = null; R.pubSeen = false; R.fresh = new Set();
+  if (!S.rid || R.rid === S.rid) return; R.rid = S.rid; R.rows = null; R.known = null; R.pub = null; R.pubSeen = false; R.fresh = new Set(); R.clients = []; R.cc = {};
   const rid = S.rid;
   if (DB.mode === "demo") rsSeedDemo();
   DB.watch("bookings", { order: "date", dir: "desc", limit: 3000 }, (rows) => { if (S.rid !== rid) return; rsOnRows(rows); });
+  DB.watch("clients", {}, (rows) => { if (S.rid !== rid) return; R.clients = rows; onData(); });
   if (DB.mode === "db") DB.watch("public", {}, (rows) => { if (S.rid !== rid) return; R.pub = rows.find((r) => r.id === "resa") || null; R.pubSeen = true; rsSync(); });
 }
 function rsOnRows(rows) {
   const first = !R.known; R.rows = rows;
-  if (first) R.known = new Set(rows.map((r) => r.id));
-  else rows.forEach((b) => { if (R.known.has(b.id)) return; R.known.add(b.id); if (rsWeb(b) && !b.seen) rsAlert(b); });
+  if (first) { R.known = new Set(rows.map((r) => r.id)); rows.forEach((b) => { if (b.clientChange) R.cc[b.id] = b.clientChange.at; }); }
+  else rows.forEach((b) => {
+    const cc = b.clientChange && b.clientChange.at; if (cc && R.cc[b.id] !== cc) { const was = R.cc[b.id]; R.cc[b.id] = cc; if (was !== undefined || R.known.has(b.id)) rsClientAlert(b); }
+    if (R.known.has(b.id)) return; R.known.add(b.id); if (rsWeb(b) && !b.seen) rsAlert(b);
+  });
   rsSync(); rsBadge(); onData();
   if (S.route === "resa") rsMarkSeen();
 }
@@ -106,10 +120,18 @@ function rsAlert(b) {
   R.fresh.add(b.id);
   const txt = `${b.name || "Client"} · ${+b.covers || 0} pers. · ${(rsRel(b.date) || rsShort(b.date)).toLowerCase()} ${b.time}`;
   try { SFX.init(); SFX.tone(1319, 0.32, "sine", 0.05); SFX.tone(1047, 0.5, "sine", 0.045, 0.24); buzz([18, 60, 18]); } catch (e) {}
-  toast(`Réservation en ligne : ${txt}`, "info");
-  try { if (window.ALERTES && typeof window.ALERTES.push === "function") window.ALERTES.push({ type: "resa", key: "resa_" + b.id, level: "warn", text: "Nouvelle réservation en ligne", sub: txt, day: b.date, route: "resa" }); } catch (e) {}
+  const head = b.status === "avalider" ? "Demande à valider" : b.status === "attente" ? "Liste d'attente" : "Réservation en ligne";
+  toast(`${head} : ${txt}`, "info");
+  try { if (window.ALERTES && typeof window.ALERTES.push === "function") window.ALERTES.push({ type: "resa", key: "resa_" + b.id, level: "warn", text: b.status === "avalider" ? "Nouvelle demande de réservation à valider" : b.status === "attente" ? "Nouvelle inscription sur liste d'attente" : "Nouvelle réservation en ligne", sub: txt, day: b.date, route: "resa" }); } catch (e) {}
 }
-const rsUnseen = () => rsRows().filter((b) => rsWeb(b) && !b.seen && rsLive(b)).length;
+/* the client changed or cancelled from their own page (the server already raised the alert) */
+function rsClientAlert(b) {
+  R.fresh.add(b.id);
+  try { SFX.init(); SFX.tone(1047, 0.3, "sine", 0.045); SFX.tone(784, 0.45, "sine", 0.04, 0.22); buzz([18, 60, 18]); } catch (e) {}
+  toast(`${firstName(b.name) || "Un client"} a ${b.status === "annule" ? "annulé" : "modifié"} sa réservation · ${b.covers} pers. ${(rsRel(b.date) || rsShort(b.date)).toLowerCase()} ${b.time}`, "info");
+}
+const rsPending = () => { const t = dayKey(); return rsRows().filter((b) => b.status === "avalider" && b.date >= t).sort((a, b) => (a.date + a.time > b.date + b.time ? 1 : -1)); };
+const rsUnseen = () => rsRows().filter((b) => (rsWeb(b) && !b.seen && (rsLive(b) || b.status === "attente")) || (b.status === "avalider" && b.date >= dayKey())).length;
 function rsMarkSeen() {
   clearTimeout(R.seenT);
   R.seenT = setTimeout(() => { if (S.route !== "resa") return; rsRows().filter((b) => rsWeb(b) && !b.seen).forEach((b) => { R.fresh.add(b.id); DB.update("bookings", b.id, { seen: true }).catch(() => {}); }); }, 1800);
@@ -130,7 +152,7 @@ function rsPubDoc() {
     v: 1, name: (S.resto && S.resto.name) || "", address: cfg.address || "", phone: cfg.phone || "", photo: cfg.photo || "", msg: cfg.msg || "",
     mail: !!(S.resto && S.resto.server && S.resto.server.resa),
     cfg: { services: cfg.services.map((s) => ({ id: s.id, name: s.name, from: s.from, to: s.to, days: s.days })), slot: cfg.slot, maxPerSlot: cfg.maxPerSlot, maxService: cfg.maxService,
-      closures: cfg.closures.filter((c) => c && (c.to || c.from) >= today), online: !!cfg.online, lead: cfg.lead, maxOnline: cfg.maxOnline, horizon: cfg.horizon },
+      closures: cfg.closures.filter((c) => c && (c.to || c.from) >= today), online: !!cfg.online, validate: !!cfg.validate, waitlist: cfg.waitlist !== false, lead: cfg.lead, maxOnline: cfg.maxOnline, horizon: cfg.horizon },
     days,
   };
 }
@@ -175,6 +197,7 @@ VIEWS.resa = {
     const tools = sw || prog ? `<div class="rs-tools st" style="--i:3">${sw}${prog}</div>` : "";
     return `<div class="inner wide rs">${topBar("Réservations", { right })}
       <div class="rs-grid"><div class="rs-main">
+        ${loading ? "" : rsReqPanel(cfg)}
         ${rsStrip(cfg, day)}
         ${rsHero(cfg, day, svcs, svc, all, mine)}
         ${tools}
@@ -233,20 +256,25 @@ function rsNoteKind(t) { return /allerg|intol[ée]r|sans gluten|c[œoe]liaq|arac
 function rsCard(b, cfg, i) {
   const st = RS_ST[b.status] || RS_ST.avenir, tb = b.table && cfg.tables.find((t) => t.id === b.table);
   const nk = rsNoteKind(b.notes), web = rsWeb(b), fresh = web && (R.fresh.has(b.id) || !b.seen);
-  const live = rsLive(b);
-  const btn = live ? `<button class="rs-arr ${b.status === "arrive" ? "on" : ""}" data-act="rsArr" data-id="${esc(b.id)}" aria-pressed="${b.status === "arrive"}" aria-label="${b.status === "arrive" ? "Arrivé, toucher pour annuler" : "Marquer arrivé"}">${ico("check")}<span>${b.status === "arrive" ? "Arrivé" : "Arrivé ?"}</span></button>`
+  const live = rsLive(b) && b.status !== "avalider", cs = rsStatOf(b.phone), cl = rsClientOf(b.phone);
+  const btn = b.status === "avalider" ? `<span class="rs-stp va">À valider</span>` : live ? `<button class="rs-arr ${b.status === "arrive" ? "on" : ""}" data-act="rsArr" data-id="${esc(b.id)}" aria-pressed="${b.status === "arrive"}" aria-label="${b.status === "arrive" ? "Arrivé, toucher pour annuler" : "Marquer arrivé"}">${ico("check")}<span>${b.status === "arrive" ? "Arrivé" : "Arrivé ?"}</span></button>`
     : `<span class="rs-stp ${st.k}">${st.t}</span>`;
   return `<div class="rs-card s-${st.k}${fresh ? " fresh" : ""} st" style="--i:${Math.min(i + 4, 14)}" data-card="${esc(b.id)}" data-rsdrag="${esc(b.id)}" draggable="true">
     <button class="rs-hit" data-act="rsOpen" data-id="${esc(b.id)}" aria-label="${esc(b.name || "Réservation")}, ${+b.covers || 0} personnes à ${b.time}"></button>
     <span class="rs-cv"><b>${+b.covers || 0}</b><i>pers.</i></span>
     <span class="rs-tx"><b>${esc(b.name || "Sans nom")}</b>
-      <em>${tb ? `<span class="rs-tbl">T${esc(tb.n)}</span>` : ""}${web ? `<span class="rs-web">${fresh ? "Nouveau · " : ""}en ligne</span>` : ""}${b.phone ? `<span>${esc(b.phone)}</span>` : ""}</em>
+      <em>${cl && cl.vip ? `<span class="rs-vip">VIP</span>` : ""}${cs && cs.noshow ? `<span class="rs-nsw">${rsPl(cs.noshow, "no-show")}</span>` : ""}${tb ? `<span class="rs-tbl">T${esc(tb.n)}</span>` : ""}${web ? `<span class="rs-web">${fresh ? "Nouveau · " : ""}en ligne</span>` : ""}${b.phone ? `<span>${esc(b.phone)}</span>` : ""}</em>
       ${b.notes ? `<span class="rs-note ${nk}">${nk ? ico("alert") : ""}${esc(b.notes)}</span>` : ""}</span>
     ${btn}
   </div>`;
 }
-function rsList(cfg, day, svc, mine) {
+function rsList(cfg, day, svc, all) {
+  const mine = all.filter((b) => b.status !== "attente"), wait = all.filter((b) => b.status === "attente");
+  const wl = wait.length ? `<section class="glass rs-wait st" style="--i:6"><div class="rs-wh">${ico("clock")}<b>Liste d'attente</b><span>${rsPl(wait.length, "demande")}</span></div>
+    ${wait.map((b) => { const cs = rsStatOf(b.phone); return `<div class="rs-wr"><button class="rs-wn" data-act="rsOpen" data-id="${esc(b.id)}"><b>${b.time} · ${esc(b.name || "")}</b><em>${+b.covers || 0} pers.${b.phone ? ` · ${esc(b.phone)}` : ""}${cs && cs.visits ? ` · ${rsPl(cs.visits, "visite")}` : ""}</em></button>
+      <button class="btn acc sm" data-act="rsPromote" data-id="${esc(b.id)}">Proposer la table</button></div>`; }).join("")}</section>` : "";
   if (!mine.length) {
+    if (wait.length) return wl;
     const closed = !rsSvcsOn(cfg, day).length;
     return `<div class="glass rs-empty st" style="--i:4">${rsEmptyArt()}<b>${closed ? "Pas de service ce jour-là" : `Aucune réservation${svc ? ` ${svc.name.toLowerCase() === "midi" ? "ce midi" : svc.name.toLowerCase() === "soir" ? "ce soir" : "pour ce service"}` : ""}`}</b><span>${closed ? "Vous pouvez quand même noter une table." : "Le téléphone sonne ? Un bouton, dix secondes."}</span></div>`;
   }
@@ -254,8 +282,32 @@ function rsList(cfg, day, svc, mine) {
   let i = 0;
   return `<div class="rs-list">${groups.map((g) => { const c = rsCovers(g.list); return `<section class="rs-grp" id="rs-g-${g.t.replace(":", "")}" data-rsdrop="${g.t}">
     <div class="rs-gh st" style="--i:${Math.min(i + 4, 14)}"><b>${g.t}</b><span>${c ? rsPl(c, "couvert") : "—"}</span></div>
-    ${g.list.map((b) => rsCard(b, cfg, i++)).join("")}</section>`; }).join("")}</div>`;
+    ${g.list.map((b) => rsCard(b, cfg, i++)).join("")}</section>`; }).join("")}</div>${wl}`;
 }
+/* requests waiting for the restaurant's answer (validation mode), always on top, every date */
+function rsReqPanel(cfg) {
+  const L = rsPending(); if (!L.length) return "";
+  return `<section class="rs-reqs st" style="--i:1"><div class="rs-rqh"><span class="rs-rqn">${L.length}</span><b>${L.length > 1 ? "Demandes à valider" : "Demande à valider"}</b></div>
+    ${L.slice(0, 6).map((b) => { const cs = rsStatOf(b.phone), cl = rsClientOf(b.phone), nk = rsNoteKind(b.notes); return `<div class="rs-req" data-card="${esc(b.id)}">
+      <button class="rs-rqi" data-act="rsOpen" data-id="${esc(b.id)}"><span class="rs-cv"><b>${+b.covers || 0}</b><i>pers.</i></span>
+        <span class="rs-tx"><b>${esc(b.name || "")}</b><em><span class="rs-rqd">${esc((rsRel(b.date) || rsShort(b.date)))} · ${b.time}</span>${cl && cl.vip ? `<span class="rs-vip">VIP</span>` : ""}${cs && cs.visits ? `<span>${rsPl(cs.visits, "visite")}</span>` : ""}${cs && cs.noshow ? `<span class="rs-nsw">${rsPl(cs.noshow, "no-show")}</span>` : ""}</em>
+        ${b.notes ? `<span class="rs-note ${nk}">${nk ? ico("alert") : ""}${esc(b.notes)}</span>` : ""}</span></button>
+      <div class="rs-rqb"><button class="btn soft" data-act="rsRefuse" data-id="${esc(b.id)}">${ico("x")}Refuser</button><button class="btn acc" data-act="rsAccept" data-id="${esc(b.id)}">${ico("check")}Accepter</button></div>
+    </div>`; }).join("")}${L.length > 6 ? `<p class="rs-lp">+ ${L.length - 6} autres demandes</p>` : ""}</section>`;
+}
+/* client file: restos/{rid}/clients/{phone key} { name, phone, email?, vip?, notes? } + what the bookings say */
+const rsClientOf = (ph) => { const k = rsPk(ph); return k ? R.clients.find((c) => c.id === k) || null : null; };
+let rsStatMemo = { src: null, map: null };
+function rsStats() {
+  const rows = rsRows(); if (rsStatMemo.src === rows && rsStatMemo.map) return rsStatMemo.map;
+  const m = {}, today = dayKey();
+  rows.forEach((b) => { const k = rsPk(b.phone); if (!k) return; const x = (m[k] ||= { visits: 0, noshow: 0, cancel: 0, next: 0, last: "", list: [], name: b.name, phone: b.phone, email: "" });
+    if (b.status === "arrive") { x.visits++; if (b.date > x.last) x.last = b.date; } else if (b.status === "noshow") x.noshow++; else if (b.status === "annule") x.cancel++; else if (rsLive(b) && b.date >= today) x.next++;
+    if (!x.email && b.email) x.email = b.email; x.list.push(b); });
+  Object.values(m).forEach((x) => x.list.sort((a, b) => (a.date + a.time < b.date + b.time ? 1 : -1)));
+  rsStatMemo = { src: rows, map: m }; return m;
+}
+const rsStatOf = (ph) => { const k = rsPk(ph); return k ? rsStats()[k] || null : null; };
 function rsEmptyArt() {
   return `<svg class="rs-art" viewBox="0 0 160 92" aria-hidden="true"><ellipse cx="80" cy="84" rx="62" ry="6" fill="#EFE6D6"/>
     <rect x="34" y="40" width="92" height="10" rx="5" fill="#5B2BFF"/><rect x="44" y="50" width="6" height="32" rx="3" fill="#2A0BA6"/><rect x="110" y="50" width="6" height="32" rx="3" fill="#2A0BA6"/>
@@ -342,7 +394,9 @@ function rsEdPaint(first) {
     <div class="rs-times">${slots.map((t) => { const u = used[rsBucket(cfg, e.date, t)] || 0, left = cap ? cap - u : null, full = cap && left < e.covers, past = nowM >= 0 && rsMin(t) < nowM;
       return `<button class="rs-tc${e.time === t ? " on" : ""}${full ? " full" : ""}${past ? " past" : ""}" data-act="rsEdTime" data-v="${t}"><b>${t}</b><i>${cap ? (left > 0 ? `${left} pl.` : "complet") : u ? `${u} couv.` : ""}</i></button>`; }).join("") || `<div class="rs-lp">Aucun service ce jour-là.</div>`}</div>
     <label class="rs-big-in"><span>Nom</span><input class="input" data-rsed="name" value="${esc(e.name)}" placeholder="Nom du client" autocomplete="off" autocapitalize="words" enterkeyhint="next" maxlength="60"></label>
-    <label class="rs-big-in"><span>Téléphone</span><input class="input" data-rsed="phone" value="${esc(e.phone)}" placeholder="06 12 34 56 78" type="tel" inputmode="tel" autocomplete="off" enterkeyhint="done" maxlength="25"></label>
+    <div id="rsSug" class="rs-sug" aria-live="polite">${rsSugHtml()}</div>
+    <label class="rs-big-in"><span>Téléphone</span><input class="input" data-rsed="phone" value="${esc(e.phone)}" placeholder="06 12 34 56 78" type="tel" inputmode="tel" autocomplete="off" enterkeyhint="next" maxlength="25"></label>
+    <label class="rs-big-in sm"><span>E-mail <i class="rs-opt">${rsSrv() ? "il reçoit la confirmation" : "facultatif"}</i></span><input class="input" data-rsed="email" value="${esc(e.email || "")}" placeholder="client@mail.fr" type="email" inputmode="email" autocomplete="off" autocapitalize="off" enterkeyhint="done" maxlength="120"></label>
     ${e.more ? `<label class="rs-big-in sm"><span>Note, allergies, occasion</span><textarea class="input" data-rsed="notes" rows="2" maxlength="300" placeholder="Allergie fruits à coque, anniversaire, chaise bébé…">${esc(e.notes)}</textarea></label>
       ${tabs.length ? `<div class="rs-etab"><span>Table</span><div>${["", ...tabs.map((t) => t.id)].map((id) => { const t = tabs.find((x) => x.id === id); return `<button class="${(e.table || "") === id ? "on" : ""}${t && busyT.has(id) ? " busy" : ""}" data-act="rsEdTable" data-v="${esc(id)}">${t ? `${esc(t.n)}<i>${+t.seats || 0}</i>` : "Aucune"}</button>`; }).join("")}</div></div>` : ""}`
       : `<button class="rs-more" data-act="rsEdMore">${ico("plus")}Note, allergies${tabs.length ? ", table" : ""}</button>`}
@@ -359,15 +413,35 @@ document.addEventListener("input", (ev) => {
   const el = ev.target; const k = el && el.dataset && el.dataset.rsed; if (!k || !R.ed) return;
   if (k === "date") { if (el.value) { R.ed.date = el.value; R.ed.time = ""; SFX.tick(); rsEdPaint(); } return; }
   R.ed[k] = el.value; rsEdBtn();
+  if (k === "name" || k === "phone") { const g = document.getElementById("rsSug"); if (g) g.innerHTML = rsSugHtml(); }
 });
 document.addEventListener("keydown", (ev) => {
   const el = ev.target; if (ev.key !== "Enter" || !el || !el.dataset || !el.dataset.rsed || el.tagName === "TEXTAREA") return;
-  ev.preventDefault(); if (el.dataset.rsed === "name") { const p = document.querySelector('[data-rsed="phone"]'); p && p.focus(); } else { el.blur(); const s = document.querySelector(".rs-save"); s && !s.disabled && s.click(); }
+  ev.preventDefault(); if (el.dataset.rsed === "name" || el.dataset.rsed === "phone") { const p = document.querySelector(`[data-rsed="${el.dataset.rsed === "name" ? "phone" : "email"}"]`); p && p.focus(); } else { el.blur(); const s = document.querySelector(".rs-save"); s && !s.disabled && s.click(); }
 });
 function rsEdBtn() {
   const e = R.ed, b = document.querySelector(".rs-save"); if (!e || !b) return;
   const ok = e.name.trim().length >= 1 && !!e.time && e.covers >= 1; b.disabled = !ok;
   b.textContent = ok ? `Enregistrer · ${e.covers} pers. · ${e.time}` : !e.time ? "Choisissez l'heure" : "Indiquez le nom";
+}
+/* known clients while typing a name or a phone: tap one to fill the form; a known phone shows its file */
+const rsNorm = (t) => String(t || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+function rsPeople() {
+  const m = {}; Object.entries(rsStats()).forEach(([k, x]) => { m[k] = { id: k, name: x.name, phone: x.phone, email: x.email, visits: x.visits, noshow: x.noshow }; });
+  R.clients.forEach((c) => { if (!c || !c.id) return; m[c.id] = { visits: 0, noshow: 0, ...(m[c.id] || {}), ...c, id: c.id }; });
+  return Object.values(m);
+}
+function rsSugHtml() {
+  const e = R.ed; if (!e) return ""; const pk = rsPk(e.phone);
+  const info = (c) => [c.vip ? `<span class="rs-vip">VIP</span>` : "", `<span>${c.visits ? rsPl(c.visits, "visite") : "Pas encore venu"}</span>`, c.noshow ? `<span class="rs-nsw">${rsPl(c.noshow, "no-show")}</span>` : "", c.notes ? `<span class="rs-cn${rsNoteKind(c.notes) ? " al" : ""}">${esc(c.notes)}</span>` : ""].join("");
+  const ppl = rsPeople(), hit = pk && ppl.find((c) => c.id === pk);
+  if (hit) return `<button class="rs-sugi" data-act="rsEdSug" data-v="${esc(hit.id)}">${ico("rsSeat")}<span><b>${esc(hit.name || "Client connu")}</b>${info(hit)}</span></button>`;
+  const q = rsNorm(e.name), d = String(e.phone || "").replace(/\D/g, "");
+  if (q.length < 2 && d.length < 3) return "";
+  const L = ppl.filter((c) => (d.length >= 3 ? String(c.phone || "").replace(/\D/g, "").includes(d.replace(/^0/, "")) : true) && (q.length >= 2 ? rsNorm(c.name).split(/\s+/).some((w) => w.startsWith(q)) || rsNorm(c.name).startsWith(q) : true))
+    .sort((a, b) => (b.vip ? 1 : 0) - (a.vip ? 1 : 0) || (b.visits || 0) - (a.visits || 0)).slice(0, 3);
+  if (!L.length) return "";
+  return `<div class="rs-sugl">${L.map((c) => `<button class="rs-sugc" data-act="rsEdSug" data-v="${esc(c.id)}"><b>${c.vip ? `<span class="rs-vip">VIP</span>` : ""}${esc(c.name || "")}</b><em>${esc(c.phone || "")}${c.visits ? ` · ${rsPl(c.visits, "visite")}` : ""}${c.noshow ? ` · ${rsPl(c.noshow, "no-show")}` : ""}</em></button>`).join("")}</div>`;
 }
 /* re-render the sheet after a chip tap, keeping what was typed */
 function rsEdKeep() { document.querySelectorAll("#sheetBody [data-rsed]").forEach((el) => { if (el.dataset.rsed !== "date" && R.ed) R.ed[el.dataset.rsed] = el.value; }); }
@@ -375,23 +449,112 @@ function rsEdKeep() { document.querySelectorAll("#sheetBody [data-rsed]").forEac
 /* ───────── booking sheet (status, call, quick table, edit) ───────── */
 function rsOpenSheet(id) {
   const b = rsRows().find((x) => x.id === id); if (!b) return; const cfg = rsCfg();
-  const tb = b.table && cfg.tables.find((t) => t.id === b.table), nk = rsNoteKind(b.notes);
-  const sts = [["avenir", "À venir", "clock"], ["arrive", "Arrivé", "check"], ["noshow", "No-show", "x"], ["annule", "Annulé", "trash"]];
-  const cur = b.status === "en ligne" ? "avenir" : b.status || "avenir";
+  const tb = b.table && cfg.tables.find((t) => t.id === b.table), nk = rsNoteKind(b.notes), cs = rsStatOf(b.phone), cl = rsClientOf(b.phone);
+  const sts = [["avenir", "Confirmée", "check"], ["arrive", "Arrivée", "rsSeat"], ["noshow", "No-show", "x"], ["annule", "Annulée", "trash"]];
+  const cur = rsConf(b) ? "avenir" : b.status || "avenir";
   const svc = rsSvcOf(cfg, b.date, b.time);
   const busyT = new Set(rsOfDay(b.date).filter((x) => rsLive(x) && x.id !== b.id && x.table && rsSvcOf(cfg, b.date, x.time).id === svc.id).map((x) => x.table));
   const tabs = cfg.tables.slice().sort((a, c) => String(a.n).localeCompare(String(c.n), "fr", { numeric: true }));
+  const srv = rsSrv(), log = Array.isArray(b.mailLog) ? b.mailLog : [], lastMail = log[log.length - 1];
+  const KN = { demande: "demande reçue", confirme: "confirmation", modifie: "modification", rappel: "rappel", refuse: "refus", annule: "annulation", annule_client: "annulation" };
+  const main = b.status === "avalider"
+    ? `<div class="rs-rqb big"><button class="btn soft" data-act="rsRefuse" data-id="${esc(b.id)}">${ico("x")}Refuser</button><button class="btn acc" data-act="rsAccept" data-id="${esc(b.id)}">${ico("check")}Accepter</button></div>`
+    : b.status === "attente"
+    ? `<div class="rs-rqb big"><button class="btn soft" data-act="rsSetSt" data-id="${esc(b.id)}" data-v="annule">${ico("trash")}Retirer</button><button class="btn acc" data-act="rsPromote" data-id="${esc(b.id)}">${ico("check")}Proposer la table</button></div>`
+    : `<div class="rs-sts">${sts.map(([k, t, ic]) => `<button class="rs-sb k-${k}${cur === k ? " on" : ""}" data-act="rsSetSt" data-id="${esc(b.id)}" data-v="${k}" aria-pressed="${cur === k}">${ico(ic)}<span>${b.status === "refuse" && k === "annule" ? "Refusée" : t}</span></button>`).join("")}</div>`;
   openSheet(`<div class="rs-bk">
-    <div class="rs-bkh"><span class="rs-cv big"><b>${+b.covers || 0}</b><i>pers.</i></span><div><span class="h2">${esc(b.name || "Sans nom")}</span><em>${esc(rsLong(b.date))} · <b>${b.time}</b>${tb ? ` · table ${esc(tb.n)}` : ""}</em></div></div>
-    ${rsWeb(b) ? `<div class="rs-from">${ico("rsWeb")}Réservé en ligne${b.createdAt ? ` le ${shortDate(dayKey(new Date(+b.createdAt || Date.now())))} à ${hm(+b.createdAt || Date.now())}` : ""}${b.email ? ` · ${esc(b.email)}` : ""}</div>` : ""}
+    <div class="rs-bkh"><span class="rs-cv big"><b>${+b.covers || 0}</b><i>pers.</i></span><div><button class="rs-who" data-act="rsClient" data-id="${esc(b.id)}" ${rsPk(b.phone) ? "" : "disabled"}><span class="h2">${esc(b.name || "Sans nom")}</span>${rsPk(b.phone) ? ico("chev") : ""}</button><em>${esc(rsLong(b.date))} · <b>${b.time}</b>${tb ? ` · table ${esc(tb.n)}` : ""}</em></div></div>
+    ${cs && (cs.visits || cs.noshow || (cl && (cl.vip || cl.notes))) ? `<button class="rs-cline" data-act="rsClient" data-id="${esc(b.id)}">${cl && cl.vip ? `<span class="rs-vip">VIP</span>` : ""}<span>${cs.visits ? rsPl(cs.visits, "visite") : "Première visite"}</span>${cs.noshow ? `<span class="rs-nsw">${rsPl(cs.noshow, "no-show")}</span>` : ""}${cl && cl.notes ? `<span class="rs-cn">${esc(cl.notes)}</span>` : ""}</button>` : ""}
+    ${rsWeb(b) ? `<div class="rs-from">${ico("rsWeb")}<span>Réservé en ligne${b.createdAt ? ` le ${shortDate(dayKey(new Date(+b.createdAt || Date.now())))} à ${hm(+b.createdAt || Date.now())}` : ""}</span></div>` : ""}
+    ${b.clientChange ? `<div class="rs-from cc">${ico("edit")}<span>${b.clientChange.what === "annule" ? "Annulée" : "Modifiée"} par le client ${when(b.clientChange.at)}</span></div>` : ""}
     ${b.notes ? `<div class="rs-note big ${nk}">${nk ? ico("alert") : ico("rsNote")}<span>${esc(b.notes)}</span></div>` : ""}
-    <div class="rs-sts">${sts.map(([k, t, ic]) => `<button class="rs-sb k-${k}${cur === k ? " on" : ""}" data-act="rsSetSt" data-id="${esc(b.id)}" data-v="${k}" aria-pressed="${cur === k}">${ico(ic)}<span>${t}</span></button>`).join("")}</div>
-    ${tabs.length ? `<div class="rs-etab"><span>Table</span><div>${["", ...tabs.map((t) => t.id)].map((tid) => { const t = tabs.find((x) => x.id === tid); return `<button class="${(b.table || "") === tid ? "on" : ""}${t && busyT.has(tid) ? " busy" : ""}" data-act="rsSetTable" data-id="${esc(b.id)}" data-v="${esc(tid)}">${t ? `${esc(t.n)}<i>${+t.seats || 0}</i>` : "Aucune"}</button>`; }).join("")}</div></div>` : ""}
+    ${b.resaMsg && (b.status === "refuse" || b.status === "annule") ? `<div class="rs-note big">${ico("rsMail")}<span>Votre message : « ${esc(b.resaMsg)} »</span></div>` : ""}
+    ${main}
+    ${tabs.length && rsLive(b) ? `<div class="rs-etab"><span>Table</span><div>${["", ...tabs.map((t) => t.id)].map((tid) => { const t = tabs.find((x) => x.id === tid); return `<button class="${(b.table || "") === tid ? "on" : ""}${t && busyT.has(tid) ? " busy" : ""}" data-act="rsSetTable" data-id="${esc(b.id)}" data-v="${esc(tid)}">${t ? `${esc(t.n)}<i>${+t.seats || 0}</i>` : "Aucune"}</button>`; }).join("")}</div></div>` : ""}
+    ${b.email ? `<div class="rs-mailr">${ico("rsMail")}<span><b>${esc(b.email)}</b><em>${lastMail ? `E-mail de ${KN[lastMail.k] || "réservation"} envoyé ${when(lastMail.at)}` : srv ? "Le client reçoit les e-mails de sa réservation" : "E-mails au client : bientôt actif"}</em></span>${srv && (rsConf(b) || b.status === "avalider") ? `<button class="btn soft sm" data-act="rsResend" data-id="${esc(b.id)}">Renvoyer</button>` : ""}</div>` : ""}
     <div class="rs-bkf">${b.phone ? `<a class="btn soft" href="tel:${esc(String(b.phone).replace(/[^\d+]/g, ""))}">${ico("rsPhone")}Appeler</a>` : ""}<button class="btn ${b.phone ? "soft" : "soft block"}" data-act="rsEdit" data-id="${esc(b.id)}">${ico("edit")}Modifier</button></div>
   </div>`);
 }
+/* cancel / refuse with an optional message to the client */
+function rsMsgSheet(id, kind) {
+  const b = rsRows().find((x) => x.id === id); if (!b) return;
+  const ref = kind === "refuse", chips = ref ? ["Complet ce soir-là, désolés !", "Nous sommes fermés ce jour-là.", "Groupe trop nombreux pour nous, appelez-nous."] : ["Fermeture exceptionnelle, toutes nos excuses.", "Un imprévu en cuisine, désolés !", "Appelez-nous pour trouver une autre date."];
+  R.msg = { id, kind, text: "" };
+  openSheet(`<div class="rs-ed">
+    <div class="rs-edh"><span class="h2">${ref ? "Refuser la demande" : "Annuler la réservation"}</span><button class="iconbtn" data-act="sheetClose" aria-label="Fermer">${ico("x")}</button></div>
+    <p class="sub" style="margin:0">${esc(b.name || "")} · ${+b.covers || 0} pers. · ${esc(rsLong(b.date))} à ${b.time}</p>
+    <label class="rs-big-in sm"><span>Un mot pour le client <i class="rs-opt">facultatif</i></span><textarea class="input" id="rsMsgTx" rows="3" maxlength="300" placeholder="${esc(chips[0])}"></textarea></label>
+    <div class="rs-mchips">${chips.map((c, i) => `<button data-act="rsMsgChip" data-v="${i}">${esc(c)}</button>`).join("")}</div>
+    <div class="rs-mail">${ico("rsMail")}<span>${b.email ? (rsSrv() ? "Le client est prévenu par e-mail, avec votre message." : "E-mail au client : bientôt actif. Pensez à le prévenir par téléphone.") : "Pas d'e-mail pour ce client : prévenez-le par téléphone."}</span></div>
+    <div class="grid2"><button class="btn soft" data-act="rsOpen" data-id="${esc(id)}">Retour</button><button class="btn danger" data-act="rsMsgOk">${ref ? "Refuser" : "Annuler"}</button></div>
+  </div>`, (el) => { el.querySelectorAll(".rs-mchips button").forEach((x, i) => { x.dataset.txt = chips[i]; }); });
+}
+function rsClientSheet(b) {
+  const k = rsPk(b.phone); if (!k) return; const cs = rsStatOf(b.phone) || { visits: 0, noshow: 0, cancel: 0, list: [] }, cl = rsClientOf(b.phone) || {};
+  R.cl = { id: k, name: cl.name || b.name || "", phone: cl.phone || b.phone || "", email: cl.email || cs.email || b.email || "", vip: !!cl.vip, notes: cl.notes || "" };
+  const past = cs.list.slice(0, 8);
+  openSheet(`<div class="rs-cf">
+    <div class="rs-edh"><span class="h2">${esc(R.cl.name || "Client")}</span><button class="iconbtn" data-act="sheetClose" aria-label="Fermer">${ico("x")}</button></div>
+    <div class="rs-cfs"><div><b>${cs.visits}</b><em>visite${cs.visits > 1 ? "s" : ""}</em></div><div class="${cs.noshow ? "bad" : ""}"><b>${cs.noshow}</b><em>no-show</em></div><div><b>${cs.cancel}</b><em>annulée${cs.cancel > 1 ? "s" : ""}</em></div><div><b>${cs.last ? shortDate(cs.last) : "–"}</b><em>dernière</em></div></div>
+    <button class="rs-tog${R.cl.vip ? " on" : ""}" data-act="rsClVip" aria-pressed="${R.cl.vip}"><span><b>Client VIP</b><em>Un badge VIP sur chacune de ses réservations.</em></span><i></i></button>
+    <label class="rs-big-in sm"><span>Notes (allergies, préférences)</span><textarea class="input" id="rsClNotes" rows="2" maxlength="300" placeholder="Allergie arachides, aime la table près de la fenêtre…">${esc(R.cl.notes)}</textarea></label>
+    <div class="rs-cfc">${R.cl.phone ? `<a href="tel:${esc(String(R.cl.phone).replace(/[^\d+]/g, ""))}">${ico("rsPhone")}${esc(R.cl.phone)}</a>` : ""}${R.cl.email ? `<span>${ico("rsMail")}${esc(R.cl.email)}</span>` : ""}</div>
+    ${past.length ? `<div class="rs-cfh"><b>Historique</b>${past.map((x) => `<div class="rs-cfr"><span>${shortDate(x.date)} · ${x.time}</span><span>${+x.covers || 0} pers.</span><span class="rs-stp ${(RS_ST[x.status] || RS_ST.avenir).k}">${(RS_ST[x.status] || RS_ST.avenir).t}</span></div>`).join("")}</div>` : ""}
+    <button class="btn acc block" data-act="rsClSave">Enregistrer</button>
+  </div>`);
+}
+
+/* ── client e-mails (identical copy in js/resa.js rsMailHtml and functions/src/resa.js mailHtml: keep both in sync) ── */
+const RS_MAIL_KINDS = {
+  demande: { t: "Demande bien reçue", s: (r) => `Demande reçue · ${r.name}` },
+  confirme: { t: "Votre table est réservée", s: (r, b, d) => `Table réservée chez ${r.name} · ${d} à ${b.time}` },
+  modifie: { t: "Réservation modifiée", s: (r) => `Réservation modifiée · ${r.name}` },
+  rappel: { t: "À demain !", s: (r, b) => `À demain chez ${r.name} · ${b.time}` },
+  refuse: { t: "Réservation impossible", s: (r) => `Votre demande chez ${r.name}` },
+  annule: { t: "Réservation annulée", s: (r) => `Réservation annulée · ${r.name}` },
+  annule_client: { t: "Annulation confirmée", s: (r) => `Annulation confirmée · ${r.name}` },
+};
+function rsMailDay(k) { const D = ["dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi"], M = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"]; const [y, m, d] = String(k || "").split("-").map(Number); if (!y) return ""; const dt = new Date(Date.UTC(y, m - 1, d, 12)); return `${D[dt.getUTCDay()]} ${d} ${M[m - 1]}`; }
+function rsMailHtml(kind, b, r, L) {
+  const e = (v) => String(v == null ? "" : v).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const K = RS_MAIL_KINDS[kind] || RS_MAIL_KINDS.confirme, nm = e(String(b.name || "").trim().split(/\s+/)[0] || ""), rn = e(r.name || "le restaurant");
+  const lead = {
+    demande: `Bonjour ${nm}, votre demande est bien arrivée chez <b>${rn}</b>. Le restaurant la valide au plus vite et vous recevrez un e-mail de confirmation.`,
+    confirme: `Bonjour ${nm}, c'est confirmé : <b>${rn}</b> vous attend.`,
+    modifie: `Bonjour ${nm}, votre réservation chez <b>${rn}</b> a bien été modifiée. Voici les nouveaux détails.`,
+    rappel: `Bonjour ${nm}, petit rappel : <b>${rn}</b> vous attend demain.`,
+    refuse: `Bonjour ${nm}, <b>${rn}</b> ne peut malheureusement pas vous accueillir à cette date.`,
+    annule: `Bonjour ${nm}, <b>${rn}</b> a dû annuler votre réservation. Toutes nos excuses.`,
+    annule_client: `Bonjour ${nm}, votre réservation chez <b>${rn}</b> est bien annulée. À bientôt, on l'espère !`,
+  }[kind] || "";
+  const off = kind === "refuse" || kind === "annule" || kind === "annule_client";
+  const row = (k, v) => `<tr><td style="padding:9px 0;border-top:1px solid #F1E9DA;color:#6E6880;font-size:14px">${k}</td><td style="padding:9px 0;border-top:1px solid #F1E9DA;font-weight:700;font-size:16px;text-align:right;color:#1B1530">${v}</td></tr>`;
+  const btn = (href, label, main) => `<a href="${e(href)}" style="display:block;text-align:center;text-decoration:none;font-weight:700;font-size:16px;padding:15px 18px;border-radius:16px;margin-top:10px;${main ? "background:#5B2BFF;color:#ffffff;box-shadow:0 4px 0 #2A0BA6" : "background:#FFFDF8;color:#1B1530;border:1.5px solid #DCCFB8"}">${label}</a>`;
+  const msg = b.resaMsg && (kind === "refuse" || kind === "annule") ? `<div style="margin:16px 0 0;padding:13px 15px;background:#FFF3D6;border-radius:14px;color:#7A5A1A;font-size:15px;line-height:1.45">« ${e(b.resaMsg)} »<div style="font-size:12.5px;margin-top:4px">${rn}</div></div>` : "";
+  const acts = off ? (L.book ? btn(L.book, "Réserver une autre date", true) : "")
+    : (kind !== "demande" && L.ics ? btn(L.ics, "Ajouter à mon agenda", true) : "") + (L.manage ? btn(L.manage, "Modifier ou annuler", kind === "demande") : "");
+  return `<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>${e(K.t)}</title></head>
+<body style="margin:0;padding:0;background:#FBF6EC;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;color:#1B1530">
+<div style="max-width:500px;margin:0 auto;padding:24px 14px 32px">
+ <div style="background:#4C1FEA;border-radius:26px 26px 0 0;padding:26px 24px 30px;color:#ffffff">
+  <div style="font-size:14px;color:#D9D2FF;font-weight:600">${rn}</div>
+  <div style="font-size:28px;line-height:1.1;font-weight:800;letter-spacing:-.5px;margin-top:6px">${e(K.t)}</div>
+ </div>
+ <div style="background:#FFFDF8;border:1.5px solid #E9DFCD;border-top:0;border-radius:0 0 26px 26px;padding:22px 22px 24px;box-shadow:0 3px 0 #E2D6C2">
+  <p style="margin:0 0 16px;font-size:16px;line-height:1.5;color:#4A4560">${lead}</p>
+  <table role="presentation" style="width:100%;border-collapse:collapse;${off ? "opacity:.6;text-decoration:line-through" : ""}">${row("Jour", e(rsMailDay(b.date)))}${row("Heure", e(b.time))}${row("Personnes", e(b.covers))}${row("Au nom de", e(b.name))}</table>
+  ${b.notes && !off ? `<div style="margin-top:12px;font-size:14px;color:#4A4560">Votre précision : ${e(b.notes)}</div>` : ""}
+  ${msg}
+  ${r.address ? `<div style="margin-top:16px;font-size:14px;color:#4A4560">Adresse : <b style="color:#1B1530">${e(r.address)}</b></div>` : ""}
+  <div style="margin-top:8px">${acts}</div>
+  ${r.phone ? `<div style="margin-top:16px;font-size:14px;color:#4A4560;text-align:center">Une question ? Appelez le <a href="tel:${e(String(r.phone).replace(/[^\d+]/g, ""))}" style="color:#3A10D8;font-weight:700;text-decoration:none">${e(r.phone)}</a></div>` : ""}
+ </div>
+ <div style="text-align:center;font-size:12px;color:#6E6880;margin-top:18px">Réservation en ligne par Growth Gusto</div>
+</div></body></html>`;
+}
 
 /* ───────── settings (gérant) ───────── */
+const RS_MAIL_LIST = [["demande", "Demande reçue", "Mode validation : avant votre réponse"], ["confirme", "Table réservée", "Jour, heure, adresse, agenda, lien pour modifier"], ["modifie", "Réservation modifiée", "Quand l'heure, le jour ou le nombre change"], ["rappel", "Rappel la veille", "Envoyé la veille au matin"], ["refuse", "Demande refusée", "Avec votre message"], ["annule", "Annulée par le restaurant", "Avec votre message"]];
 function rsCfgPaint() {
   const c = R.ce; if (!c) return; const t = R.ctab;
   const tabs = [["h", "Horaires"], ["w", "En ligne"], ["t", "Tables"]];
@@ -414,6 +577,9 @@ function rsCfgPaint() {
   } else if (t === "w") {
     const can = rsCanOnline();
     body = `<button class="rs-tog${c.online ? " on" : ""}" data-act="rsCeOnline" ${can ? "" : "disabled"} aria-pressed="${!!c.online}"><span><b>Réservation en ligne</b><em>${can ? (c.online ? "Vos clients réservent seuls sur votre lien." : "Coupée : le lien affiche votre téléphone.") : "Avec un compte Growth Gusto."}</em></span><i></i></button>${can ? "" : `<button class="btn soft sm block" data-act="auOpen">Créer mon compte pour l'activer</button>`}
+      <div class="rs-vm"><b>Les demandes en ligne</b>
+        <div class="rs-vmo">${[[0, "Confirmation automatique", "La table est réservée tout de suite."], [1, "Je valide chaque demande", "Vous acceptez ou refusez, le client est prévenu."]].map(([v, t, d]) => `<button class="${!!c.validate === !!v ? "on" : ""}" data-act="rsCeVal" data-v="${v}" aria-pressed="${!!c.validate === !!v}"><b>${t}</b><em>${d}</em></button>`).join("")}</div></div>
+      <button class="rs-tog${c.waitlist !== false ? " on" : ""}" data-act="rsCeWl" aria-pressed="${c.waitlist !== false}"><span><b>Liste d'attente</b><em>Créneau complet : le client peut s'inscrire, vous le rappelez si une table se libère.</em></span><i></i></button>
       <div class="rs-row"><div><b>Au plus tard</b><em>Avant l'heure de la table.</em></div>${seg("lead", [[1, "1 h"], [2, "2 h"], [4, "4 h"], [24, "la veille"]])}</div>
       <div class="rs-row"><div><b>Personnes max en ligne</b><em>Au-delà, le client vous appelle.</em></div>${step("maxOnline", c.maxOnline, 1, 30)}</div>
       <div class="rs-row"><div><b>Réservable jusqu'à</b></div>${seg("horizon", [[30, "1 mois"], [60, "2 mois"], [90, "3 mois"]])}</div>
@@ -422,7 +588,9 @@ function rsCfgPaint() {
         <div class="rs-phf"><label class="rs-big-in sm"><span>Adresse</span><input class="input" data-rsce="address" value="${esc(c.address)}" maxlength="120" placeholder="12 rue des Vignes, Lyon"></label>
         <label class="rs-big-in sm"><span>Téléphone</span><input class="input" type="tel" data-rsce="phone" value="${esc(c.phone)}" maxlength="25" placeholder="04 78 00 00 00"></label></div></div>
       <label class="rs-big-in sm"><span>Un mot pour vos clients</span><textarea class="input" rows="2" data-rsce="msg" maxlength="240" placeholder="Terrasse ouverte dès les beaux jours. Au-delà de 8, appelez-nous.">${esc(c.msg)}</textarea></label>
-      <div class="rs-mail">${ico("rsMail")}<span>${S.resto && S.resto.server && S.resto.server.resa ? "Vos clients reçoivent un e-mail de confirmation." : "E-mail de confirmation : bientôt actif. En attendant, la page confirme que la réservation est enregistrée."}</span></div>`;
+      <div class="rs-pubh"><b>E-mails à vos clients</b>${rsSrv() ? "" : `<span class="rs-soon">bientôt actif</span>`}</div>
+      <p class="sub rs-mlp">${rsSrv() ? "Envoyés tout seuls dès qu'un client laisse son e-mail. Touchez pour voir." : "En attendant, la page de réservation confirme que la table est enregistrée. Touchez pour voir les e-mails."}</p>
+      <div class="rs-mls">${RS_MAIL_LIST.filter(([k]) => k !== "demande" || c.validate).map(([k, t, d]) => `<div class="rs-ml"><button class="rs-mlb" data-act="rsMailPrev" data-v="${k}">${ico("rsMail")}<span><b>${t}</b><em>${d}</em></span>${ico("chev")}</button>${k === "rappel" ? `<button class="rs-swi${c.reminder !== false ? " on" : ""}" data-act="rsCeRem" aria-pressed="${c.reminder !== false}" aria-label="Rappel la veille"><i></i></button>` : ""}</div>`).join("")}</div>`;
   } else {
     const zs = Object.entries(RS_ZONES);
     body = `${c.tables.length ? `<div class="rs-tlist">${c.tables.map((x, i) => `<div class="rs-tr">
@@ -486,6 +654,7 @@ Object.assign(ACT, {
   },
   rsSetSt: async (a, id, v) => {
     const b = rsRows().find((x) => x.id === id); if (!b) return;
+    if (v === "annule" && b.status !== "attente" && b.status !== "annule") { SFX.tap(); rsMsgSheet(id, "annule"); return; }
     const st = v === "avenir" && rsWeb(b) ? "en ligne" : v;
     if (v === "arrive") { SFX.ok(); buzz(10); } else if (v === "noshow" || v === "annule") { SFX.close(); buzz(6); } else SFX.tap();
     closeSheet(true);
@@ -512,7 +681,8 @@ Object.assign(ACT, {
   rsEdMore: () => { rsEdKeep(); SFX.tap(); R.ed.more = true; rsEdPaint(); setTimeout(() => { const n = document.querySelector('[data-rsed="notes"]'); n && n.focus(); }, 80); },
   rsEdSave: async (a) => {
     rsEdKeep(); const e = R.ed; if (!e || !e.time || !e.name.trim()) return;
-    const doc = { date: e.date, time: e.time, covers: +e.covers || 1, name: e.name.trim().slice(0, 60), phone: e.phone.trim().slice(0, 25), notes: (e.notes || "").trim().slice(0, 300), table: e.table || "" };
+    const em = String(e.email || "").trim().slice(0, 120); if (em && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(em)) { SFX.err(); toast("E-mail invalide", "err"); const x = document.querySelector('[data-rsed="email"]'); x && x.focus(); return; }
+    const doc = { date: e.date, time: e.time, covers: +e.covers || 1, name: e.name.trim().slice(0, 60), phone: e.phone.trim().slice(0, 25), email: em, notes: (e.notes || "").trim().slice(0, 300), table: e.table || "" };
     a.disabled = true;
     try {
       if (e.id) await safe(DB.update("bookings", e.id, doc));
@@ -521,7 +691,7 @@ Object.assign(ACT, {
     if (e.id) R.flash = e.id;
     R.day = e.date; R.svc = e.svc; R.ed = null; closeSheet(true); SFX.done(); buzz([10, 40, 14]);
     const r = a.getBoundingClientRect(); burst(r.left + r.width / 2, r.top);
-    toast(e.id ? "Réservation modifiée" : `Réservation notée · ${doc.covers} pers. à ${doc.time}`);
+    toast((e.id ? "Réservation modifiée" : `Réservation notée · ${doc.covers} pers. à ${doc.time}`) + (em && rsSrv() ? " · e-mail envoyé" : ""));
     if (S.route !== "resa") go("resa"); else rerender();
   },
   rsDelAsk: (a, id) => { SFX.tap(); openSheet(`<div class="h2" style="font-size:20px">Supprimer cette réservation ?</div><p class="sub" style="margin:0">Pour un client qui ne vient pas, préférez « Annulé » ou « No-show » : l'historique reste juste.</p><div class="grid2"><button class="btn soft" data-act="rsEdit" data-id="${esc(id)}">Retour</button><button class="btn danger" data-act="rsDelOk" data-id="${esc(id)}">${ico("trash")}Supprimer</button></div>`); },
@@ -588,6 +758,66 @@ Object.assign(ACT, {
   },
 });
 
+/* ───────── validation, waitlist, messages, client file, e-mails ───────── */
+Object.assign(ACT, {
+  rsAccept: async (a, id) => {
+    const b = rsRows().find((x) => x.id === id); if (!b) return; SFX.ok(); buzz([10, 40, 14]);
+    const card = a.closest(".rs-req"); if (card) card.classList.add("rs-gone");
+    if (document.querySelector("#sheetBody .rs-bk")) closeSheet(true);
+    if (await rsSave(id, { status: rsWeb(b) ? "en ligne" : "avenir", seen: true, decidedAt: Date.now(), by: S.me.id })) {
+      const r = a.getBoundingClientRect(); burst(r.left + r.width / 2, r.top);
+      toast(`Table confirmée pour ${firstName(b.name) || "le client"}${b.email ? (rsSrv() ? " · e-mail envoyé" : " · pensez à le prévenir") : ""}`);
+    } else if (card) card.classList.remove("rs-gone");
+  },
+  rsRefuse: (a, id) => { SFX.tap(); rsMsgSheet(id, "refuse"); },
+  rsPromote: async (a, id) => {
+    const b = rsRows().find((x) => x.id === id); if (!b) return; const cfg = rsCfg();
+    const used = rsUsed(cfg, b.date)[rsBucket(cfg, b.date, b.time)] || 0;
+    SFX.ok(); buzz(10); closeSheet(true);
+    if (await rsSave(id, { status: rsWeb(b) ? "en ligne" : "avenir", seen: true, promotedAt: Date.now() }))
+      toast(`${firstName(b.name) || "Client"} passe en réservation${cfg.maxPerSlot && used + (+b.covers || 0) > cfg.maxPerSlot ? " (au-delà du maximum du créneau)" : ""}${b.email && rsSrv() ? " · e-mail envoyé" : b.phone ? " · appelez-le pour lui dire" : ""}`);
+  },
+  rsResend: async (a, id) => { a.disabled = true; SFX.tap(); if (await rsSave(id, { resendAt: Date.now() })) { SFX.ok(); toast("Confirmation renvoyée"); } else a.disabled = false; },
+  rsMsgChip: (a) => { const t = $("#rsMsgTx"); if (!t) return; SFX.tick(); t.value = a.dataset.txt || a.textContent; if (R.msg) R.msg.text = t.value; t.focus(); },
+  rsMsgOk: async (a) => {
+    const m = R.msg; if (!m) return; const b = rsRows().find((x) => x.id === m.id); if (!b) return;
+    const text = String(($("#rsMsgTx") || {}).value || "").trim().slice(0, 300);
+    a.disabled = true; SFX.close(); buzz(6);
+    if (await rsSave(m.id, { status: m.kind === "refuse" ? "refuse" : "annule", cancelledBy: "resto", resaMsg: text, seen: true, decidedAt: Date.now(), by: S.me.id })) {
+      R.msg = null; closeSheet(true);
+      toast(`${m.kind === "refuse" ? "Demande refusée" : "Réservation annulée"}${b.email ? (rsSrv() ? " · le client est prévenu par e-mail" : " · pensez à prévenir le client") : ""}`);
+    } else a.disabled = false;
+  },
+  rsClient: (a, id) => { const b = rsRows().find((x) => x.id === id); if (!b || !rsPk(b.phone)) return; SFX.tap(); rsClientSheet(b); },
+  rsClVip: (a) => { if (!R.cl) return; R.cl.vip = !R.cl.vip; R.cl.vip ? SFX.ok() : SFX.tap(); buzz(4); a.classList.toggle("on", R.cl.vip); a.setAttribute("aria-pressed", R.cl.vip); },
+  rsClSave: async (a) => {
+    const c = R.cl; if (!c) return; c.notes = String(($("#rsClNotes") || {}).value || "").trim().slice(0, 300);
+    a.disabled = true;
+    try { await safe(DB.set("clients", c.id, DB.clean({ name: String(c.name || "").slice(0, 60), phone: String(c.phone || "").slice(0, 25), email: String(c.email || "").slice(0, 120), vip: !!c.vip, notes: c.notes, updatedAt: Date.now() }))); } catch (e) { a.disabled = false; return; }
+    R.cl = null; closeSheet(true); SFX.done(); toast("Fiche client enregistrée");
+  },
+  rsEdSug: (a, id, v) => {
+    rsEdKeep(); const c = rsPeople().find((x) => x.id === v); if (!c || !R.ed) return; SFX.tick(); buzz(4);
+    R.ed.name = c.name || R.ed.name; R.ed.phone = c.phone || R.ed.phone; if (c.email && !R.ed.email) R.ed.email = c.email; rsEdPaint();
+  },
+  /* settings: validation mode, waitlist, reminder, e-mail previews */
+  rsCeVal: (a, id, v) => { rsCeKeep(); SFX.tick(); buzz(4); R.ce.validate = v === "1"; rsCfgPaint(); },
+  rsCeWl: () => { rsCeKeep(); R.ce.waitlist = R.ce.waitlist === false; R.ce.waitlist ? SFX.ok() : SFX.tap(); rsCfgPaint(); },
+  rsCeRem: () => { rsCeKeep(); R.ce.reminder = R.ce.reminder === false; R.ce.reminder ? SFX.ok() : SFX.tap(); rsCfgPaint(); },
+  rsMailPrev: (a, id, v) => {
+    rsCeKeep(); SFX.tap(); const c = R.ce || rsCfg(), d = addDays(dayKey(), 3);
+    const b = { name: "Camille Martin", date: d, time: "20:00", covers: 4, notes: "Anniversaire", resaMsg: v === "refuse" ? "Complet ce soir-là, désolés ! Le lendemain nous avons encore de la place." : v === "annule" ? "Fermeture exceptionnelle, toutes nos excuses." : "" };
+    const html = rsMailHtml(v, b, { name: (S.resto && S.resto.name) || "Votre restaurant", address: c.address || "", phone: c.phone || "" }, { manage: "#", ics: "#", book: "#" });
+    const K = RS_MAIL_KINDS[v] || RS_MAIL_KINDS.confirme;
+    openSheet(`<div class="rs-mpv"><div class="rs-edh"><span class="h2">Aperçu</span><button class="iconbtn" data-act="rsMailBack" aria-label="Retour">${ico("x")}</button></div>
+      <div class="rs-mpo"><span>Objet</span><b>${esc(K.s({ name: (S.resto && S.resto.name) || "Votre restaurant" }, b, rsMailDay(d)))}</b></div>
+      <iframe class="rs-mpf" sandbox="" title="Aperçu de l'e-mail"></iframe>
+      ${rsSrv() ? "" : `<div class="rs-mail">${ico("rsMail")}<span>Bientôt actif : ces e-mails partiront tout seuls dès que l'envoi sera branché.</span></div>`}
+      <button class="btn soft block" data-act="rsMailBack">Retour aux réglages</button></div>`, (el) => { const f = el.querySelector(".rs-mpf"); if (f) f.srcdoc = html; const sb = $("#sheetBody"); if (sb) sb.scrollTop = 0; });
+  },
+  rsMailBack: () => { SFX.tap(); if (R.ce) { R.ctab = "w"; rsCfgPaint(); setTimeout(() => { const m = document.querySelector("#sheetBody .rs-mls"); if (m) m.scrollIntoView({ block: "center" }); }, 30); } else closeSheet(); },
+});
+
 /* drag & drop (mouse): a card onto a time (group header or timeline bar) moves it; a booking onto a table seats it */
 (function rsDnD() {
   let drag = null;
@@ -607,7 +837,7 @@ Object.assign(ACT, {
 function rsSeedDemo() {
   const path = `restos/${S.rid}/bookings`; const rs = DB.local.restos && DB.local.restos[S.rid];
   if (rs && !rs.resaCfg) {
-    rs.resaCfg = { ...rsDefCfg(), online: true, maxPerSlot: 14, address: "8 place du Marché, Lyon 2e", phone: "04 78 42 18 90", msg: "Terrasse chauffée. Au-delà de 8 personnes, appelez-nous.",
+    rs.resaCfg = { ...rsDefCfg(), online: true, validate: true, maxPerSlot: 14, address: "8 place du Marché, Lyon 2e", phone: "04 78 42 18 90", msg: "Terrasse chauffée. Au-delà de 8 personnes, appelez-nous.",
       tables: [["1", 2], ["2", 2], ["3", 4], ["4", 4], ["5", 4], ["6", 4], ["7", 6], ["8", 6], ["9", 8], ["20", 2, "terrasse"], ["21", 4, "terrasse"], ["22", 4, "terrasse"], ["23", 6, "terrasse"]].map(([n, seats, zone], i) => ({ id: "dt" + i, n, seats, zone: zone || "salle" })) };
     try { DB.emit("restos"); } catch (e) {}
   }
@@ -641,6 +871,20 @@ function rsSeedDemo() {
   }
   /* two online bookings not seen yet, so the « Nouveau » badge shows on first open */
   Object.values(D).filter((b) => b.source === "web" && b.date >= today && b.status === "en ligne").slice(0, 2).forEach((b) => { b.seen = false; b.createdAt = Date.now() - 40 * 60e3; });
+  /* validation mode: requests waiting for an answer, a waitlist on a full evening, regulars with a file */
+  const soir = (i) => { for (let j = i; j < i + 7; j++) { const k = addDays(today, j); if (rsSvcsOn(cfg, k).some((x) => x.id === "soir")) return k; } return addDays(today, i); };
+  const reg = [["Sophie Laurent", "06 12 48 77 31", "sophie.laurent@mail.fr", true, "Allergie fruits à coque · aime la table 7"], ["Hugo Mercier", "06 33 90 12 54", "hugo.mercier@mail.fr", false, "Toujours en terrasse"], ["Manon Girard", "07 61 05 44 18", "", false, ""]];
+  const add = (o) => { D["bk" + (++n).toString(36).padStart(3, "0")] = { notes: "", table: "", seen: true, createdAt: Date.now() - 5 * 864e5, ...o }; };
+  /* past visits of the regulars (and Manon's two no-shows) */
+  [[-30, 0, 2], [-21, 0, 4], [-12, 0, 2], [-5, 0, 2], [-26, 1, 3], [-9, 1, 2], [-40, 2, 2], [-18, 2, 4]].forEach(([d, r, c], i) => { const [nm, ph, em] = reg[r]; add({ date: addDays(today, d), time: i % 2 ? "12:30" : "20:00", covers: c, name: nm, phone: ph, email: em, status: r === 2 ? "noshow" : "arrive", source: i % 3 ? "tel" : "web" }); });
+  const k1 = soir(1), k2 = soir(2), k0 = soir(0);
+  add({ date: k1, time: "20:00", covers: 2, name: reg[0][0], phone: reg[0][1], email: reg[0][2], status: "avalider", source: "web", seen: false, createdAt: Date.now() - 25 * 60e3, notes: "Notre anniversaire de mariage" });
+  add({ date: k2, time: "19:30", covers: 6, name: "Thomas Bertrand", phone: "06 58 21 73 40", email: "t.bertrand@mail.fr", status: "avalider", source: "web", seen: false, createdAt: Date.now() - 2 * 3600e3 });
+  add({ date: k0, time: "20:30", covers: 3, name: reg[2][0], phone: reg[2][1], status: "attente", source: "web", seen: false, createdAt: Date.now() - 50 * 60e3 });
+  add({ date: k0, time: "20:00", covers: 2, name: "Paul Henry", phone: "06 47 19 82 66", email: "paul.henry@mail.fr", status: "attente", source: "web", seen: true, createdAt: Date.now() - 3 * 3600e3 });
+  add({ date: k1, time: "12:30", covers: 4, name: reg[1][0], phone: reg[1][1], email: reg[1][2], status: "en ligne", source: "web", mailLog: [{ k: "confirme", at: Date.now() - 864e5 }] });
+  Object.values(D).filter((b) => b.email && rsConf(b) && b.date >= today && !b.mailLog).slice(0, 12).forEach((b) => { b.mailLog = [{ k: "confirme", at: (+b.createdAt || Date.now()) + 4000 }]; });
+  DB.local[`restos/${S.rid}/clients`] = Object.fromEntries(reg.slice(0, 2).map(([nm, ph, em, vip, notes]) => [rsPk(ph), { name: nm, phone: ph, email: em, vip, notes, updatedAt: Date.now() - 6 * 864e5 }]));
   DB.local[path] = D;
 }
 function rsDemoPing() {
@@ -648,7 +892,7 @@ function rsDemoPing() {
   const cfg = rsCfg(); let k = dayKey(), s = null, t = null;
   for (let i = 0; i < 6 && !t; i++) { k = addDays(dayKey(), i); const sv = rsSvcsOn(cfg, k).filter((x) => x.id === "soir"); if (sv.length) { s = sv[0]; const sl = rsSlots(cfg, s); t = sl[Math.min(sl.length - 1, 4)]; if (i === 0 && rsMin(t) < new Date().getHours() * 60 + 60) t = null; } }
   if (!t) return;
-  DB.add("bookings", { date: k, time: t, covers: 4, name: "Élodie Marchand", phone: "06 71 22 48 09", email: "elodie.marchand@mail.fr", notes: "Anniversaire de ma mère", status: "en ligne", source: "web", createdAt: Date.now(), at: parseDay(k).getTime() + rsMin(t) * 6e4 }).catch(() => {});
+  DB.add("bookings", { date: k, time: t, covers: 4, name: "Élodie Marchand", phone: "06 71 22 48 09", email: "elodie.marchand@mail.fr", notes: "Anniversaire de ma mère", status: cfg.validate ? "avalider" : "en ligne", source: "web", createdAt: Date.now(), at: parseDay(k).getTime() + rsMin(t) * 6e4 }).catch(() => {});
 }
 
 /* ───────── public API (home screen, alerts) ───────── */

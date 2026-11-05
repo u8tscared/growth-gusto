@@ -167,3 +167,30 @@ svg{width:18px;height:18px;flex:none;fill:none;stroke:currentColor;stroke-width:
 @keyframes rvConf{0%{opacity:1;transform:rotate(var(--a)) translateY(0) scale(.6)}70%{opacity:1}100%{opacity:0;transform:rotate(var(--a)) translateY(-86px) scale(1) rotate(180deg)}}
 @keyframes rvTicket{from{opacity:0;transform:translateY(30px) rotate(-3deg)}to{opacity:1;transform:none}}
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-delay:0s!important;transition-duration:.01ms!important}}
+
+/* ── v2: waiting list, validation, the client's own booking ── */
+.rv-t.wl{color:var(--saffron-ink);background:var(--saffron-tint);box-shadow:0 0 0 1.5px #F1D99A inset,0 3px 0 #EBD08C;grid-template-rows:auto auto;align-content:center;gap:0;line-height:1.05}
+.rv-t.wl i{font-family:var(--f);font-style:normal;font-size:10.5px;font-weight:700;letter-spacing:0}
+.rv-t.wl.on{background:var(--saffron);color:var(--ink);box-shadow:0 3px 0 var(--saffron-edge)}
+.rv-wl{display:flex;gap:10px;align-items:flex-start;background:var(--saffron-tint);color:var(--saffron-ink);border-radius:16px;padding:12px 14px;font-size:14px;line-height:1.45}
+.rv-wl svg{width:20px;height:20px;margin-top:1px}
+.rv-wl b{display:block;color:var(--ink);font-size:15px}
+.rv-vh{margin:0;background:var(--tint);color:var(--accent-ink);border-radius:14px;padding:10px 13px;font-weight:600}
+.rv-anim.wait .c1{fill:var(--saffron)}
+.rv-anim.wait .ck{stroke:var(--ink)}
+.rv-anim.off .c1{fill:#B4ADBF}
+.rv-tk-s{font-size:13px;font-weight:700;padding:8px 16px;background:var(--tint);color:var(--accent-ink)}
+.rv-tk-s.va,.rv-tk-s.wl{background:var(--saffron-tint);color:var(--saffron-ink)}
+.rv-tk-s.off{background:var(--tomato-tint);color:var(--bad)}
+.rv-tk-g.off b{text-decoration:line-through;text-decoration-thickness:1.5px;color:var(--faint)}
+.rv-btn.danger{background:var(--tomato);color:#fff;box-shadow:0 4px 0 #A93520}
+@media (hover:hover){.rv-btn.danger:not([disabled]):hover{background:#F06A4E}}
+.rv-btn.soft.danger-t{color:var(--bad)}
+.rv-done .rv-btn.soft+.rv-btn.soft{animation-delay:.84s}
+.rv-edh{display:flex;align-items:center;gap:10px;margin:-4px 0 2px}
+.rv-edh b{font-family:var(--d);font-size:21px;font-weight:760;letter-spacing:-.03em}
+.rv-back{all:unset;cursor:pointer;width:40px;height:40px;border-radius:13px;display:grid;place-items:center;background:var(--paper);box-shadow:0 0 0 1.5px var(--rim-2) inset,0 3px 0 var(--edge-b)}
+.rv-back svg{width:20px;height:20px}
+.rv-rmsg{background:var(--saffron-tint);color:var(--saffron-ink)!important;border-radius:14px;padding:11px 14px;font-weight:600}
+.rv-q{font-size:28px!important}
+.rv-mine .rv-hint a{color:var(--accent-ink);font-weight:700}
