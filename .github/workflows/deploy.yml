@@ -1,0 +1,78 @@
+# Mise en ligne automatique : à chaque merge sur main, le site (growthgusto.fr), l'app (app.growthgusto.fr) et les règles
+# Firestore partent sur Firebase. Les fonctions serveur partent aussi quand functions/ a changé (ou à la demande).
+# Connexion à Google sans clé ni secret (Workload Identity Federation) : seul ce dépôt peut emprunter le compte de service
+# github-deploy du projet growth-gusto. Réglage unique décrit dans tools/DEPLOY.md. Gratuit sur un dépôt public.
+name: Mise en ligne
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      functions:
+        description: "Déployer aussi les fonctions serveur"
+        type: boolean
+        default: false
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+env:
+  FIREBASE_TOOLS: firebase-tools@15.34.1
+  PROJECT: growth-gusto
+  DEPLOY_SA: github-deploy@growth-gusto.iam.gserviceaccount.com
+  WIF_PROVIDER: projects/PROJECT_NUMBER/locations/global/workloadIdentityPools/github/providers/github
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  site-app:
+    name: Site, app et règles
+    runs-on: ubuntu-latest
+    outputs:
+      functions: ${{ steps.changes.outputs.functions }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Connexion à Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ env.WIF_PROVIDER }}
+          service_account: ${{ env.DEPLOY_SA }}
+      - name: Fonctions modifiées ?
+        id: changes
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then echo "functions=${{ inputs.functions }}" >> "$GITHUB_OUTPUT"; exit 0; fi
+          before="${{ github.event.before }}"
+          if [ -z "$before" ] || [ "$before" = "0000000000000000000000000000000000000000" ] || ! git cat-file -e "$before" 2>/dev/null; then before="HEAD~1"; fi
+          if git diff --name-only "$before" "${{ github.sha }}" | grep -q '^functions/'; then echo "functions=true" >> "$GITHUB_OUTPUT"; else echo "functions=false" >> "$GITHUB_OUTPUT"; fi
+      - name: Déployer le site, l'app et les règles Firestore
+        run: npx --yes $FIREBASE_TOOLS deploy --only hosting,firestore:rules --project $PROJECT --non-interactive
+
+  functions:
+    name: Fonctions serveur
+    needs: site-app
+    if: needs.site-app.outputs.functions == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Connexion à Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ env.WIF_PROVIDER }}
+          service_account: ${{ env.DEPLOY_SA }}
+      - name: Dépendances
+        run: npm ci
+        working-directory: functions
+      - name: Déployer les fonctions
+        run: npx --yes $FIREBASE_TOOLS deploy --only functions --project $PROJECT --non-interactive --force
