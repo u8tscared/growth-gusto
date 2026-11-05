@@ -22,7 +22,7 @@ env:
   FIREBASE_TOOLS: firebase-tools@15.34.1
   PROJECT: growth-gusto
   DEPLOY_SA: github-deploy@growth-gusto.iam.gserviceaccount.com
-  WIF_PROVIDER: projects/PROJECT_NUMBER/locations/global/workloadIdentityPools/github/providers/github
+  WIF_PROVIDER: projects/364546258133/locations/global/workloadIdentityPools/github/providers/github
 
 permissions:
   contents: read
