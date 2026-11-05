@@ -5,13 +5,16 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#FBF6EC">
 <link rel="canonical" href="https://growthgusto.fr/">
+<link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://growthgusto.fr/">
 <meta property="og:title" content="Growth Gusto · Toute votre cuisine dans une seule app">
 <meta property="og:description" content="Températures, étiquettes DLC, livraisons, ménage, stock, caisse et équipe. Essai gratuit 14 jours.">
-<meta property="og:image" content="https://growthgusto.fr/img/og.jpg">
+<meta property="og:image" content="https://growthgusto.fr/og.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
 <title>Growth Gusto · Toute votre cuisine dans une seule app</title>
 <meta name="description" content="L'app de gestion pour restaurants : températures, étiquettes DLC, livraisons, ménage, stock, caisse et équipe.">
@@ -20,951 +23,764 @@
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wdth,wght@12..96,75..100,400..800&family=Instrument+Sans:wght@400..700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
 <style>
 :root{
-color-scheme:light;
---canvas:#FBF6EC;--paper:#FFFDF8;--ink:#1B1530;--ink-2:#4A4560;--ink-3:#8A8499;--line:#E9DFCD;--line-2:#DCCFB8;
---violet:#5B2BFF;--violet-2:#3A10D8;--violet-edge:#2A0BA6;--violet-tint:#EFE9FF;--wall:#4C1FEA;
---tomato:#EF5A3C;--tomato-2:#C8432A;--saffron:#F6B93B;--saffron-2:#D99A1E;--herb:#23935C;--herb-2:#1A7448;--mint:#9EF5C4;
---r:14px;--r-lg:20px;--r-xl:28px;
---spring:cubic-bezier(.34,1.56,.64,1);--out:cubic-bezier(.22,1,.36,1);
---display:"Bricolage Grotesque",ui-sans-serif,system-ui,sans-serif;
---text:"Instrument Sans",ui-sans-serif,system-ui,sans-serif;
---mono:"JetBrains Mono",ui-monospace,monospace;
---gx:max(16px,env(safe-area-inset-left,0px));--gy:max(16px,env(safe-area-inset-right,0px));
+  color-scheme:light;
+  --bg:#FBF6EC;--bg2:#F4EDE0;--paper:#FFFDF8;--rim:#E9DFCD;--rim2:#DCCFB8;--edgeb:#E2D6C2;--cream3:#EFE6D6;
+  --ink:#1B1530;--ink2:#4A4560;--muted:#615B74;--faint:#6E6880;
+  --v:#5B2BFF;--vink:#3A10D8;--vedge:#2A0BA6;--wall:#4C1FEA;--tint:#EFE9FF;--lilac:#E4DCF7;
+  --saf:#F6B93B;--safedge:#D99A1E;--saftint:#FFF3D6;--safink:#7A5A1A;
+  --tom:#EF5A3C;--tomtext:#C8432A;--tomtint:#FFE9DE;--sky:#9EC5FF;--skytint:#E6F0FF;--skyink:#2F5FBF;--mint:#9EF5C4;
+  --f:"Instrument Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --d:"Bricolage Grotesque","Instrument Sans",system-ui,sans-serif;
+  --lcd:"JetBrains Mono",ui-monospace,monospace;
+  --spring:cubic-bezier(.34,1.56,.64,1);--ease:cubic-bezier(.22,1,.36,1);
+  --sh:0 2px 0 #EFE6D6,0 14px 28px -20px rgba(27,21,48,.22);
+  --wallbg:linear-gradient(rgba(255,255,255,.08) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.08) 1px,transparent 1px);
+  --g:16px;
 }
-*{box-sizing:border-box;margin:0;padding:0}
-html{-webkit-text-size-adjust:100%}
-body{background:var(--canvas);color:var(--ink);font:400 17px/1.55 var(--text);-webkit-font-smoothing:antialiased;overflow-x:hidden;font-variant-numeric:tabular-nums}
-button{font:inherit;color:inherit;cursor:pointer;border:0;background:none}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){color-scheme:light}}
+:root[data-theme="dark"]{color-scheme:light}
+*,*::before,*::after{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%;overflow-x:clip;scroll-padding-top:84px}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--f);font-size:16.5px;line-height:1.5;letter-spacing:-.003em;overflow-x:clip;-webkit-font-smoothing:antialiased}
+img{display:block;max-width:100%;height:auto}
 a{color:inherit}
-img,svg{display:block}
-:focus-visible{outline:3px solid var(--violet);outline-offset:3px;border-radius:8px}
-.wrap{max-width:1320px;margin:0 auto;padding-left:var(--gx);padding-right:var(--gy)}
-@media (min-width:900px){:root{--gx:max(32px,env(safe-area-inset-left,0px));--gy:max(32px,env(safe-area-inset-right,0px))}}
-.ink{stroke:var(--ink);stroke-width:3;stroke-linejoin:round;stroke-linecap:round}
-.mono{font-family:var(--mono)}
+h1,h2,h3{font-family:var(--d);font-variation-settings:"opsz" 96,"wdth" 90;font-weight:770;letter-spacing:-.035em;line-height:1;margin:0}
+p{margin:0}
+::selection{background:#E4DCF7}
+:focus-visible{outline:3px solid var(--v);outline-offset:3px;border-radius:10px}
+.wrap{width:100%;max-width:1240px;margin:0 auto;padding:0 var(--g)}
+@media (min-width:760px){:root{--g:32px}}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 
-/* type */
-.kicker{font:700 12px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--violet);display:inline-flex;align-items:center;gap:10px}
-.kicker::before{content:"";width:22px;height:3px;border-radius:2px;background:currentColor}
-h1,h2,h3{font-family:var(--display);letter-spacing:-.028em;text-wrap:balance}
-h1{font-weight:750;font-size:clamp(44px,6.4vw,88px);line-height:.96;font-variation-settings:"opsz" 96,"wdth" 88}
-h1 em,h2 em{font-style:normal;color:var(--violet)}
-h2{font-weight:720;font-size:clamp(34px,4.6vw,60px);line-height:1;font-variation-settings:"opsz" 96,"wdth" 90;margin-top:16px}
-h3{font-weight:700;font-size:24px;line-height:1.08;font-variation-settings:"opsz" 48,"wdth" 92;letter-spacing:-.02em}
-.lede{font-size:clamp(17px,1.5vw,20px);line-height:1.5;color:var(--ink-2);max-width:40ch;text-wrap:pretty}
-p{text-wrap:pretty}
+/* ── buttons: they sit on an edge and press down ── */
+.btn{--e:#000;display:inline-flex;align-items:center;justify-content:center;gap:10px;height:56px;padding:0 24px;border-radius:17px;border:0;background:var(--ink);color:#fff;font:700 16.5px/1 var(--f);letter-spacing:-.01em;text-decoration:none;cursor:pointer;white-space:nowrap;box-shadow:0 5px 0 var(--e);margin-bottom:5px;transition:transform .26s var(--spring),box-shadow .26s var(--spring),background-color .2s}
+.btn svg{width:20px;height:20px;flex:none;transition:transform .3s var(--spring)}
+.btn:hover{transform:translateY(-2px);box-shadow:0 7px 0 var(--e)}
+.btn:hover svg{transform:translateX(3px)}
+.btn:active{transform:translateY(5px);box-shadow:0 0 0 var(--e);transition-duration:.06s}
+.btn.v{background:var(--v);--e:var(--vedge)}
+.btn.v:hover{background:#6538FF}
+.btn.w{background:#fff;color:var(--vink);--e:var(--vedge)}
+.btn.soft{background:var(--paper);color:var(--ink);--e:var(--edgeb);box-shadow:inset 0 0 0 1.5px var(--rim2),0 5px 0 var(--e)}
+.btn.soft:hover{background:#fff;box-shadow:inset 0 0 0 1.5px var(--rim2),0 7px 0 var(--e)}
+.btn.soft:active{box-shadow:inset 0 0 0 1.5px var(--rim2),0 0 0 var(--e)}
+.btn.sm{height:44px;padding:0 16px;border-radius:14px;font-size:15px;box-shadow:0 4px 0 var(--e);margin-bottom:4px}
+.btn.sm:hover{box-shadow:0 5px 0 var(--e)}
+.btn.soft.sm{box-shadow:inset 0 0 0 1.5px var(--rim2),0 4px 0 var(--e)}
+.btn.sm:active{transform:translateY(4px);box-shadow:0 0 0 var(--e)}
+.btn.soft.sm:active{box-shadow:inset 0 0 0 1.5px var(--rim2)}
 
-/* buttons */
-.btn{--d:4px;--edge:#E2D6C2;position:relative;display:inline-flex;align-items:center;justify-content:center;gap:10px;height:54px;padding:0 24px;border-radius:var(--r);font-weight:650;font-size:16.5px;text-decoration:none;white-space:nowrap;
-background:var(--paper);color:var(--ink);border:1.5px solid var(--line-2);box-shadow:0 var(--d) 0 var(--edge),0 12px 22px -16px rgba(27,21,48,.5);
-transition:transform 260ms var(--spring),box-shadow 260ms var(--spring),background-color 160ms;user-select:none;-webkit-tap-highlight-color:transparent}
-.btn:hover{transform:translateY(-1px);--d:5px}
-.btn:active{transform:translateY(4px);--d:0px;transition-duration:70ms}
-.btn svg{width:20px;height:20px;flex:none;transition:transform 300ms var(--spring)}
-.btn:hover svg.arr{transform:translateX(3px)}
-.btn-primary{background:var(--violet);border-color:var(--violet-2);color:#fff;--edge:var(--violet-edge)}
-.btn-primary:hover{background:#6435FF}
-.btn-dark{background:var(--ink);border-color:#000;color:#fff;--edge:#000}
-.btn-sm{height:42px;padding:0 16px;font-size:15px;border-radius:12px;--d:3px}
-.btn-sm:active{transform:translateY(3px)}
-.demo{--d:4px;display:flex;align-items:center;gap:14px;text-align:left;padding:12px 16px 12px 12px;border-radius:var(--r-lg);background:#FFF1D6;border:1.5px solid #F1D49A;box-shadow:0 var(--d) 0 #EBC77C;text-decoration:none;transition:transform 260ms var(--spring),box-shadow 260ms var(--spring)}
-.demo:hover{transform:translateY(-1px);--d:5px}
-.demo:active{transform:translateY(4px);--d:0px;transition-duration:70ms}
-.demo-ico{width:44px;height:44px;flex:none;border-radius:12px;background:var(--saffron);border:1.5px solid var(--ink);display:grid;place-items:center}
-.demo b{display:block;font-weight:650;font-size:15.5px;line-height:1.2}
-.demo small{display:block;font-size:13px;color:#7A5A1A;line-height:1.35}
-.demo .arr{margin-left:auto;flex:none;transition:transform 300ms var(--spring)}
-.demo:hover .arr{transform:translateX(4px)}
+.kick{display:inline-flex;align-items:center;gap:8px;font:650 13.5px/1 var(--f);color:var(--vink);background:var(--tint);padding:8px 13px;border-radius:999px}
+.em{color:var(--v)}
 
-/* nav */
-.nav{position:sticky;top:0;z-index:50;background:rgba(251,246,236,.86);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);border-bottom:1.5px solid transparent;transition:border-color 200ms}
-.nav.scrolled{border-bottom-color:var(--line)}
-.nav .wrap{display:flex;align-items:center;gap:8px;height:70px;padding-top:env(safe-area-inset-top,0px)}
-.brand{display:flex;align-items:center;gap:10px;text-decoration:none;margin-right:auto}
-.brand svg{width:34px;height:34px;flex:none;transition:transform 400ms var(--spring)}
-.brand:hover svg{transform:rotate(-8deg) scale(1.06)}
-.wordmark{font:700 20px/1 var(--display);font-variation-settings:"opsz" 24,"wdth" 92;letter-spacing:-.025em}
-.nav-links{display:flex;gap:2px;margin-right:8px}
-.nav-links a{font-size:15px;font-weight:550;text-decoration:none;color:var(--ink-2);padding:9px 12px;border-radius:10px;transition:background 160ms,color 160ms}
-.nav-links a:hover{background:#F2E9D9;color:var(--ink)}
-.mute{--d:3px;width:42px;height:42px;border-radius:12px;display:grid;place-items:center;background:var(--paper);border:1.5px solid var(--line-2);box-shadow:0 var(--d) 0 #E2D6C2;transition:transform 260ms var(--spring),box-shadow 260ms var(--spring);flex:none}
-.mute:active{transform:translateY(3px);--d:0px}
-.mute .off{display:none}.mute[aria-pressed="false"] .on{display:none}.mute[aria-pressed="false"] .off{display:block}
-@media (max-width:960px){.nav-links,.nav .login{display:none}}
-@media (max-width:420px){.nav .cta-long{display:none}}
-@media (min-width:421px){.nav .cta-short{display:none}}
+/* ── header ── */
+.top{position:sticky;top:0;z-index:50;background:rgba(251,246,236,.92);transition:box-shadow .3s}
+@supports (backdrop-filter:blur(2px)){.top{background:rgba(251,246,236,.86);backdrop-filter:saturate(1.3) blur(12px);-webkit-backdrop-filter:saturate(1.3) blur(12px)}}
+.top.sc{box-shadow:0 1.5px 0 var(--rim)}
+.top .wrap{display:flex;align-items:center;gap:10px;height:68px}
+.brand{display:inline-flex;align-items:center;gap:10px;text-decoration:none;font:780 21px/1 var(--d);font-variation-settings:"opsz" 96,"wdth" 90;letter-spacing:-.035em;color:var(--ink);margin-right:auto;white-space:nowrap}
+.brand img{width:36px;height:36px;transition:transform .5s var(--spring)}
+.brand:hover img{transform:rotate(-10deg) scale(1.06)}
+.brand b{color:var(--v);font-weight:inherit}
+.links{display:none;gap:4px}
+.links a{font:650 15px/1 var(--f);color:var(--ink2);text-decoration:none;padding:11px 14px;border-radius:12px;transition:background .2s,color .2s}
+.links a:hover{background:var(--bg2);color:var(--ink)}
+.top .login{display:none}
+.mute{display:none;width:44px;height:44px;border-radius:14px;border:0;background:transparent;color:var(--faint);cursor:pointer;place-items:center}
+.mute:hover{background:var(--bg2);color:var(--ink)}
+.mute svg{width:20px;height:20px}
+.mute .off{display:none}.mute[aria-pressed=false] .on{display:none}.mute[aria-pressed=false] .off{display:block}
+.cta-short{display:inline}.cta-long{display:none}
+@media (min-width:420px){.cta-short{display:none}.cta-long{display:inline}}
+@media (min-width:900px){.links{display:flex;margin-right:14px}.top .login{display:inline-flex}.mute{display:grid}}
 
-/* stage */
-.tiles{background-color:var(--wall);background-image:linear-gradient(#5A30F4 1.5px,transparent 1.5px),linear-gradient(90deg,#5A30F4 1.5px,transparent 1.5px);background-size:48px 32px}
-.stage{position:relative;border-radius:var(--r-xl);overflow:hidden;background:var(--wall);isolation:isolate}
-.stage>svg{position:absolute;inset:0;width:100%;height:100%}
-.wig{cursor:pointer}
-.wig:hover{animation:wig 520ms var(--out)}
-.wig,.door,.sway,.needle,.toss{transform-box:fill-box}
-.wig{transform-origin:50% 100%}
-@keyframes wig{0%,100%{transform:none}25%{transform:rotate(-3deg)}55%{transform:rotate(2.2deg)}80%{transform:rotate(-1deg)}}
-.door{transform-origin:0 0;transition:transform 640ms var(--spring)}
-.dback{opacity:0;transition:opacity 80ms 140ms}
-.dfront{transition:opacity 80ms 140ms}
-.fl{opacity:0;transition:opacity 300ms 120ms}
-.open .door{transform:scaleX(-.3) skewY(9deg)}
-.open .dfront{opacity:0}.open .dback{opacity:1}.open .fl{opacity:1}
-.steam path{fill:none;stroke:#FFF6E6;stroke-width:5;stroke-linecap:round;opacity:0;animation:steam 3.2s ease-in-out infinite}
-.steam path:nth-child(2){animation-delay:1.05s}.steam path:nth-child(3){animation-delay:2.1s}
-@keyframes steam{0%{opacity:0;transform:translateY(10px)}30%{opacity:.75}100%{opacity:0;transform:translateY(-34px)}}
-.sway{transform-origin:50% 0;animation:sway 6s ease-in-out infinite}
-@keyframes sway{0%,100%{transform:rotate(-1.4deg)}50%{transform:rotate(1.4deg)}}
-.lbl{transition:transform 0ms}
-.printing{animation:print 1100ms steps(1,end) forwards}
-@keyframes print{0%{transform:translateY(152px)}12%{transform:translateY(132px)}24%{transform:translateY(112px)}36%{transform:translateY(92px)}48%{transform:translateY(72px)}60%{transform:translateY(52px)}72%{transform:translateY(32px)}84%{transform:translateY(12px)}100%{transform:none}}
-.toss{transform-origin:50% 100%}
-.tossing{animation:toss 620ms var(--out)}
-@keyframes toss{0%{transform:none}35%{transform:translate(-6px,-26px) rotate(-6deg)}70%{transform:translate(2px,2px) rotate(1deg)}100%{transform:none}}
-.pan:hover .toss{animation:toss 620ms var(--out)}
+/* ── hero: the violet wall ── */
+.hero{padding:6px 10px 0}
+.wallc{background-color:var(--wall);background-image:var(--wallbg);background-size:22px 22px;color:#fff;border-radius:30px;position:relative;overflow:hidden;box-shadow:0 6px 0 var(--vedge)}
+.hero .wallc{max-width:1400px;margin:0 auto;padding:40px 22px 0;display:grid;gap:30px}
+.eyebrow{display:inline-flex;align-items:center;gap:9px;font:650 14px/1 var(--f);color:#E4DEFF;background:rgba(255,255,255,.12);padding:9px 14px 9px 9px;border-radius:999px}
+.eyebrow img{width:22px;height:22px}
+.hero h1{font-size:clamp(46px,12.4vw,92px);font-weight:790;letter-spacing:-.045em;line-height:.93;margin:22px 0 0}
+.hl{display:inline-block;background:var(--paper);color:var(--v);padding:.02em .16em .1em;border-radius:.2em;transform:rotate(-2.2deg);box-shadow:0 .08em 0 var(--vedge);margin-top:.12em;transform-origin:20% 80%}
+.lede{font-size:18px;line-height:1.48;color:#E4DEFF;max-width:30em;margin-top:24px;font-weight:500}
+.lede b{color:#fff;font-weight:650}
+.ctas{display:flex;flex-wrap:wrap;gap:12px 14px;align-items:center;margin-top:28px}
+.demo{display:inline-flex;align-items:center;gap:12px;text-decoration:none;padding:6px 14px 6px 6px;border-radius:18px;transition:background .2s}
+.demo .pl{width:46px;height:46px;border-radius:50%;display:grid;place-items:center;flex:none;transition:transform .35s var(--spring)}
+.demo .pl svg{width:18px;height:18px;margin-left:2px}
+.demo b{display:block;font:700 16px/1.2 var(--f)}
+.demo small{display:block;font-size:13.5px;line-height:1.3;opacity:.82}
+.demo:hover .pl{transform:scale(1.1) rotate(-8deg)}
+.wallc .demo{color:#fff}.wallc .demo .pl{background:rgba(255,255,255,.16);color:#fff}
+.wallc .demo:hover{background:rgba(255,255,255,.08)}
+.fine{display:flex;flex-wrap:wrap;gap:6px 8px;margin-top:22px;font:600 13.5px/1 var(--f);color:#E4DEFF}
+.fine span{padding:8px 12px;border-radius:999px;background:rgba(255,255,255,.1)}
 
-/* hero */
-.hero{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.12fr);gap:48px;align-items:center;padding-top:32px;padding-bottom:72px}
-.hero-copy{max-width:600px}
-.eyebrow{font:500 12px/1.3 var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--ink-2);display:inline-flex;align-items:center;gap:10px;padding:8px 12px 8px 10px;border-radius:999px;background:var(--paper);border:1.5px solid var(--line)}
-.eyebrow i{width:8px;height:8px;border-radius:50%;background:var(--herb);box-shadow:0 0 0 3px rgba(35,147,92,.18);animation:live 2.4s ease-in-out infinite}
-@keyframes live{50%{box-shadow:0 0 0 6px rgba(35,147,92,.05)}}
-.hero h1{margin:22px 0 20px}
-.cta-row{display:flex;flex-wrap:wrap;gap:12px;margin-top:30px;align-items:stretch}
-.cta-row .btn{height:auto;min-height:62px}
-.fine{font-size:13.5px;color:var(--ink-3);margin-top:18px;display:flex;flex-wrap:wrap;gap:6px 16px}
-.fine span{display:inline-flex;gap:6px;align-items:center}
-.fine span::before{content:"";width:12px;height:7px;border-left:2px solid var(--herb);border-bottom:2px solid var(--herb);transform:rotate(-45deg) translateY(-2px)}
-.hero-stage{aspect-ratio:8/7;width:100%;box-shadow:0 30px 60px -40px rgba(42,11,166,.8)}
-.caption{position:absolute;left:22px;top:20px;font:500 11px/1.45 var(--mono);letter-spacing:.07em;text-transform:uppercase;color:rgba(255,255,255,.75);pointer-events:none}
-.caption b{color:#fff}
-.hint{position:absolute;left:16px;bottom:16px;font:500 11px/1 var(--mono);letter-spacing:.05em;color:#fff;background:rgba(27,21,48,.5);padding:8px 10px;border-radius:999px;pointer-events:none}
-@media (max-width:900px){
-.hero{grid-template-columns:1fr;gap:28px;padding-top:18px;padding-bottom:48px}
-.hero-stage{aspect-ratio:auto;height:min(92vw,400px);border-radius:24px}
-.cta-row{flex-direction:column}
-.cta-row .btn{min-height:56px}
-.caption{display:none}
+/* drawn kitchen */
+.scene{position:relative;height:360px;margin:0 -22px;user-select:none}
+.floor{position:absolute;left:0;right:0;bottom:56px;height:10px;background:rgba(255,253,248,.9)}
+.kit{position:absolute;left:14px;bottom:66px;display:flex;align-items:flex-end;gap:10px;transform-origin:left bottom;transform:scale(.62)}
+.hero .kit .cg{display:none}
+.fr{position:relative;flex:none;animation:pop .8s var(--spring) both;animation-delay:calc(var(--j,0)*90ms + 250ms)}
+.box{position:relative;background:var(--paper);border-radius:12px 12px 5px 5px;box-shadow:inset -9px 0 0 #EEE9FB,inset 0 -6px 0 #E4DCF7}
+.cf .box{width:128px;height:214px}
+.cg .box{width:120px;height:78px;border-radius:10px 10px 5px 5px;box-shadow:inset 0 12px 0 #DCEAFF,inset 0 -6px 0 #E4DCF7}
+.lcdw{position:absolute;left:10px;right:19px;top:12px;height:30px;border-radius:7px;background:var(--ink);color:var(--mint);font:700 15px/30px var(--lcd);text-align:center;letter-spacing:-.02em;white-space:nowrap;overflow:hidden}
+.lcdw i{font-style:normal;display:inline-block;transition:opacity .15s}
+.lcdw.blink i{opacity:.35}
+.cg .lcdw{top:24px;left:12px;right:12px}
+.hd{position:absolute;right:13px;top:60px;width:6px;height:44px;border-radius:3px;background:#C9BFE9}
+.cf .hd{top:70px;height:70px}
+.cf .door{position:absolute;left:10px;right:19px;top:160px;height:2px;background:#EEE9FB}
+.nm{position:absolute;left:50%;top:calc(100% + 20px);transform:translateX(-50%);font:600 16px/1.2 var(--f);color:#E4DEFF;white-space:nowrap}
+/* counter with service fridge underneath, printer on top */
+.counter{position:relative;width:172px;height:130px;flex:none;animation:pop .8s var(--spring) both;animation-delay:340ms}
+.slab{position:absolute;left:-8px;right:-8px;top:0;height:18px;border-radius:6px;background:var(--paper);box-shadow:inset 0 -5px 0 #E4DCF7}
+.under{position:absolute;left:8px;right:8px;top:18px;bottom:0;background:#F3EEFF;border-radius:0 0 5px 5px;display:flex;gap:6px;padding:8px 6px 6px}
+.under .box{flex:1;height:auto;border-radius:6px;box-shadow:inset -7px 0 0 #EEE9FB,inset 0 -5px 0 #E4DCF7}
+.under .lcdw{top:10px;left:8px;right:16px;font-size:14px;height:27px;line-height:27px}
+.under .hd{top:48px;height:30px;right:12px}
+.printer{position:absolute;left:26px;bottom:100%;width:118px;height:70px}
+.pbody{position:absolute;inset:auto 0 0 0;height:64px;border-radius:16px 16px 6px 6px;background:var(--ink);box-shadow:inset 0 -6px 0 #000}
+.pbody::before{content:"";position:absolute;left:14px;right:14px;top:16px;height:7px;border-radius:4px;background:#000}
+.pbody::after{content:"";position:absolute;right:14px;bottom:16px;width:10px;height:10px;border-radius:50%;background:var(--mint);box-shadow:0 0 0 3px rgba(158,245,196,.18)}
+.pbody .btnp{position:absolute;left:16px;bottom:15px;width:22px;height:8px;border-radius:4px;background:#4A4560}
+.label{position:absolute;left:18px;width:82px;bottom:44px;height:96px;background:#fff;border-radius:6px 6px 2px 2px;padding:9px 8px;color:var(--ink);transform-origin:50% 100%;animation:print 6.5s var(--ease) infinite 1.4s;transform:translateY(60px) scaleY(.2);opacity:0;box-shadow:0 2px 0 #E4DCF7}
+.label b{display:block;font:780 11px/1.1 var(--d);letter-spacing:-.02em}
+.label .dlc{display:inline-block;margin-top:5px;font:700 9.5px/1 var(--lcd);color:#fff;background:var(--v);padding:3px 4px;border-radius:3px}
+.label .qr{position:absolute;right:8px;bottom:8px;width:30px;height:30px;background:
+  conic-gradient(from 90deg at 3px 3px,#1B1530 90deg,transparent 0) 0 0/10px 10px;opacity:.9;border-radius:2px}
+.label .qr::before{content:"";position:absolute;left:0;top:0;width:11px;height:11px;border:3px solid #1B1530;background:#fff;border-radius:2px}
+.label small{position:absolute;left:8px;bottom:8px;font:600 8.5px/1.25 var(--f);color:var(--muted)}
+@keyframes print{0%{transform:translateY(60px) scaleY(.2);opacity:0}6%{opacity:1}26%{transform:translateY(0) scaleY(1);opacity:1}34%{transform:translateY(-10px) rotate(-3deg)}40%,82%{transform:translateY(-6px) rotate(-5deg);opacity:1}92%,100%{transform:translateY(-70px) rotate(-12deg);opacity:0}}
+@keyframes pop{0%{transform:translateY(40px) scale(.7);opacity:0}100%{transform:none;opacity:1}}
+/* reading toast */
+.toast{position:absolute;z-index:3;left:16px;top:8px;display:flex;align-items:center;gap:11px;background:var(--paper);color:var(--ink);border-radius:18px;padding:10px 16px 10px 10px;box-shadow:0 5px 0 var(--vedge);white-space:nowrap;animation:toast 6.5s var(--spring) infinite 2.2s;opacity:0}
+.toast .ok{width:36px;height:36px;border-radius:50%;background:var(--v);color:#fff;display:grid;place-items:center;flex:none}
+.toast .ok svg{width:18px;height:18px}
+.toast .tt b{display:block;font:700 15px/1.25 var(--f)}
+.toast .tt em{font-style:normal}
+.toast .tt small{display:block;font:500 13px/1.25 var(--f);color:var(--muted)}
+@keyframes toast{0%{opacity:0;transform:translateY(16px) scale(.8)}8%,70%{opacity:1;transform:none}80%,100%{opacity:0;transform:translateY(-8px) scale(.95)}}
+/* phone */
+.phone{position:relative;width:100%;aspect-ratio:390/844;border-radius:15%/7%;padding:3.2%;background:var(--ink);box-shadow:0 0 0 1.5px #000,0 40px 70px -34px rgba(27,21,48,.6)}
+.phone::before{content:"";position:absolute;z-index:2;top:3.6%;left:50%;width:28%;height:3.3%;transform:translateX(-50%);background:#000;border-radius:999px}
+.phone img,.phone .scr{width:100%;height:100%;object-fit:cover;object-position:top;border-radius:12.5%/5.8%;background:var(--bg)}
+.scr{position:relative;overflow:hidden}
+.scr img{position:absolute;inset:0;transition:opacity .35s ease,transform .5s var(--spring)}
+.scr img.out{opacity:0;transform:scale(.96) translateY(12px)}
+.hphone{position:absolute;right:14px;bottom:-120px;width:176px;transform:rotate(5deg);animation:rise 1.1s var(--spring) both .45s}
+@keyframes rise{0%{transform:translateY(180px) rotate(12deg)}100%{transform:rotate(5deg)}}
+.hphone .phone{animation:float 6s ease-in-out infinite 1.6s}
+@keyframes float{50%{transform:translateY(-10px)}}
+@media (min-width:520px){.kit{transform:scale(.8)}.hero .kit .cg{display:block}.hphone{width:220px;right:28px}.scene{height:440px}}
+@media (min-width:980px){
+  .hero{padding:8px 16px 0}
+  .hero .wallc{grid-template-columns:minmax(0,1.08fr) minmax(0,.92fr);padding:76px 64px 0;gap:0;border-radius:40px;min-height:760px}
+  .hero .copy{padding-bottom:120px;position:relative;z-index:2;max-width:680px}
+  .scene{position:absolute;inset:0;height:auto;margin:0;pointer-events:none}
+  .hero .floor{bottom:70px}
+  .hero .kit{left:auto;right:calc(3% + 262px);bottom:80px;transform:scale(.82);transform-origin:right bottom}
+  .hphone{width:340px;right:3%;bottom:-70px;z-index:2}
+  .toast{left:auto;right:calc(3% + 250px);top:96px;transform-origin:right center}
+}
+@media (min-width:980px) and (max-width:1279px){.hero .kit .cg{display:none}.hero h1{font-size:70px}.hero .copy{max-width:520px}.hero .kit{transform:scale(.6);right:calc(2% + 300px)}.hphone{width:290px;right:2%;bottom:-40px}.toast{display:none}}
+
+
+@media (min-width:1280px){.hero h1{font-size:min(88px,6.1vw)}}
+@media (min-width:1280px) and (max-width:1399px){.hero .kit{transform:scale(.68)}.hero .copy{max-width:690px}}
+/* ── feature chips ── */
+.chips-w{padding:56px var(--g) 0;text-align:center}
+.chips-h{font:760 15px/1 var(--d);letter-spacing:-.01em;color:var(--muted);margin-bottom:16px}
+.chips-h b{color:var(--v)}
+.chips{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;max-width:980px;margin:0 auto}
+.chip{font:650 14.5px/1 var(--f);color:var(--ink2);text-decoration:none;background:var(--paper);border:1.5px solid var(--rim);box-shadow:0 2px 0 var(--cream3);padding:10px 14px;border-radius:999px;transition:transform .3s var(--spring),background .2s,color .2s,border-color .2s}
+.chip:hover{transform:translateY(-3px) rotate(-1.5deg);background:var(--tint);color:var(--vink);border-color:#D6CCFF}
+
+/* ── sections ── */
+section{position:relative}
+.sh{text-align:center;max-width:760px;margin:0 auto}
+.sh h2,.h2{font-size:clamp(38px,8vw,68px);margin-top:18px}
+.sh p{font-size:18px;color:var(--muted);margin-top:16px}
+.feat{padding-top:110px;padding-bottom:30px}
+.fg{margin-top:64px;display:grid;gap:26px;align-items:start}
+.fg-head h3{font-size:clamp(32px,6vw,46px);margin-top:14px}
+.fg-head p{color:var(--muted);font-size:17px;margin-top:10px;max-width:26em}
+.fg-n{font:700 13.5px/1 var(--f);color:var(--c-ink);background:var(--c);padding:8px 13px;border-radius:999px;display:inline-block}
+.flist{list-style:none;margin:22px 0 0;padding:0;border-top:1.5px solid var(--rim)}
+.fi{border-bottom:1.5px solid var(--rim)}
+.fi-b{all:unset;box-sizing:border-box;display:flex;align-items:center;gap:14px;width:100%;padding:16px 4px;cursor:pointer;border-radius:14px;transition:background .2s}
+.fi-b:focus-visible{outline:3px solid var(--v);outline-offset:2px}
+.fi-n{flex:none;width:40px;height:40px;border-radius:50%;display:grid;place-items:center;background:var(--bg2);color:var(--ink2);font:760 14px/1 var(--d);font-variant-numeric:tabular-nums;transition:background .3s,color .3s,transform .4s var(--spring)}
+.fi-t{flex:1;min-width:0;font:740 20px/1.15 var(--d);font-variation-settings:"opsz" 96,"wdth" 92;letter-spacing:-.025em;transition:color .2s}
+.tag{flex:none;font:700 12px/1 var(--f);color:var(--safink);background:var(--saftint);padding:6px 9px;border-radius:999px}
+.fi-x{flex:none;width:22px;height:22px;color:var(--faint);transition:transform .35s var(--spring)}
+.fi-b:hover .fi-n{transform:rotate(-10deg) scale(1.06)}
+.fi-b:hover .fi-t{color:var(--vink)}
+.fi.on .fi-n{background:var(--v);color:#fff}
+.fi.on .fi-x{transform:rotate(45deg);color:var(--v)}
+.fi-d{display:grid;grid-template-rows:0fr;transition:grid-template-rows .45s var(--ease)}
+.fi-d>div{overflow:hidden;padding-left:0}
+@media (min-width:600px){.fi-d>div{padding-left:58px}.fi-m{margin-left:-58px}}
+.fi.on .fi-d{grid-template-rows:1fr}
+.fi-d p{font-size:16.5px;color:var(--ink2);max-width:32em}
+.fi-d ul{list-style:none;padding:0;margin:12px 0 0;display:flex;flex-wrap:wrap;gap:7px}
+.fi-d li{font:600 14px/1.25 var(--f);background:var(--paper);border:1.5px solid var(--rim);border-radius:12px;padding:8px 11px;color:var(--ink)}
+.fi-m{margin:18px 0 22px;background:var(--c);border-radius:26px;padding:28px 0 0;overflow:hidden;height:420px;position:relative}
+.fi-m .phone{width:250px;margin:0 auto}
+.fi-d>div>:last-child{margin-bottom:0}
+.fi:not(.on) .fi-m{visibility:hidden}
+.stage{display:none}
+.fg[data-c=v]{--c:var(--tint);--c-ink:var(--vink);--c2:#DCD2FF}
+.fg[data-c=s]{--c:var(--saftint);--c-ink:var(--safink);--c2:#FBE2A6}
+.fg[data-c=k]{--c:var(--skytint);--c-ink:var(--skyink);--c2:#C9DDFF}
+.fg[data-c=t]{--c:var(--tomtint);--c-ink:var(--tomtext);--c2:#FFD0BD}
+.fg[data-c=l]{--c:var(--lilac);--c-ink:var(--vink);--c2:#CFC2F2}
+@media (min-width:980px){
+  .fg{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:64px;margin-top:120px;align-items:stretch}
+  .fg.rev .fg-l{order:2}
+  .fi-m{display:none}
+  .fi-d>div{padding-bottom:18px}
+  .fi:not(.on) .fi-d>div{padding-bottom:0}
+  .stage{display:block;position:relative;border-radius:36px;background:var(--c);min-height:640px;overflow:hidden}
+  .stage .dk{position:absolute;width:540px;height:540px;border-radius:50%;background:var(--c2);left:50%;top:56%;transform:translate(-50%,-50%) scale(.9);transition:transform 1s var(--spring)}
+  .fg.in .stage .dk{transform:translate(-50%,-50%) scale(1)}
+  .stage .phone{position:absolute;left:50%;top:56px;width:310px;margin-left:-155px;transform:rotate(-2deg)}
+  .fg.rev .stage .phone{transform:rotate(2deg)}
+  .cap{position:absolute;left:28px;top:28px;z-index:3;font:740 17px/1 var(--d);letter-spacing:-.02em;background:var(--paper);color:var(--ink);padding:12px 16px;border-radius:14px;box-shadow:0 4px 0 var(--edgeb),inset 0 0 0 1.5px var(--rim2);transform:rotate(-3deg);transition:transform .4s var(--spring)}
+  .cap.bump{animation:bump .5s var(--spring)}
+  .fg-l{padding:24px 0}
+}
+@keyframes bump{0%{transform:rotate(-3deg) scale(.85)}100%{transform:rotate(-3deg)}}
+@media (min-width:1180px){.stage .phone{width:330px;margin-left:-165px}}
+
+/* ── devices ── */
+.dev{padding-top:120px;padding-bottom:40px}
+.dv{display:grid;gap:44px;align-items:center}
+.dv .h2{font-size:clamp(36px,6.6vw,58px)}
+.dv .l{color:var(--muted);font-size:18px;margin-top:16px;max-width:28em}
+.dl{list-style:none;padding:0;margin:28px 0 0;display:grid;gap:10px}
+.dl li{display:flex;align-items:center;gap:14px;background:var(--paper);border:1.5px solid var(--rim);border-radius:20px;padding:12px 16px 12px 12px;box-shadow:0 2px 0 var(--cream3)}
+.well{width:48px;height:48px;flex:none;border-radius:50%;display:grid;place-items:center}
+.well svg{width:24px;height:24px}
+.w1{background:var(--tint);color:var(--v)}.w2{background:var(--saftint);color:var(--safink)}.w3{background:var(--skytint);color:var(--skyink)}
+.dl b{display:block;font:740 18px/1.2 var(--d);letter-spacing:-.02em}
+.dl span{display:block;font-size:14.5px;color:var(--muted)}
+.mock{position:relative;padding:0 0 40px 0}
+.browser{background:var(--paper);border:1.5px solid var(--rim2);border-radius:20px;overflow:hidden;box-shadow:0 5px 0 var(--edgeb),0 40px 70px -40px rgba(27,21,48,.45)}
+.browser .bar{display:flex;align-items:center;gap:6px;height:38px;padding:0 14px;border-bottom:1.5px solid var(--rim)}
+.browser .bar i{width:11px;height:11px;border-radius:50%;background:var(--rim2)}
+.browser .bar i:first-child{background:var(--tom)}.browser .bar i:nth-child(2){background:var(--saf)}
+.browser .bar span{margin:0 auto;font:600 12.5px/1 var(--f);color:var(--muted);background:var(--bg2);padding:6px 16px;border-radius:999px;transform:translateX(-20px)}
+.mock .phone{position:absolute;width:26%;min-width:110px;right:6px;bottom:0;transform:rotate(4deg)}
+@media (min-width:980px){.dv{grid-template-columns:minmax(0,.8fr) minmax(0,1.2fr);gap:72px}.mock{padding:0 0 60px}.mock .phone{right:-30px;width:24%}}
+
+/* ── start: tickets on the rail ── */
+.start{background:var(--ink);color:#fff;margin-top:110px;padding:96px 0 100px;border-radius:40px 40px 0 0}
+.start .sh h2{color:#fff}
+.start .kick{background:rgba(255,255,255,.1);color:#E4DEFF}
+.rail{position:relative;margin:56px auto 0;max-width:1100px;display:grid;gap:22px}
+.tk{position:relative;background:var(--paper);color:var(--ink);border-radius:8px 8px 0 0;padding:22px 24px 34px;--zz:radial-gradient(circle at 10px 0,transparent 9px,#000 9.5px);-webkit-mask:var(--zz) 0 100%/20px 14px repeat-x,linear-gradient(#000,#000) top/100% calc(100% - 13px) no-repeat;mask:var(--zz) 0 100%/20px 14px repeat-x,linear-gradient(#000,#000) top/100% calc(100% - 13px) no-repeat;transform:rotate(var(--r,0deg));transition:transform .5s var(--spring)}
+.tk:hover{transform:rotate(0) translateY(-6px)}
+.tk-k{display:flex;justify-content:space-between;font:700 12.5px/1 var(--lcd);color:var(--muted);padding-bottom:14px;border-bottom:1.5px dashed var(--rim2)}
+.tk-n{font:790 108px/.9 var(--d);letter-spacing:-.06em;color:var(--v);margin:18px 0 4px}
+.tk h3{font-size:25px;letter-spacing:-.03em;line-height:1.08}
+.tk p{color:var(--muted);margin-top:10px;font-size:15.5px}
+.tk-s{display:inline-block;margin-top:18px;font:700 13.5px/1 var(--f);background:var(--tint);color:var(--vink);padding:8px 12px;border-radius:999px}
+.tk:nth-child(3) .tk-s{background:var(--saftint);color:var(--safink)}
+.start-cta{text-align:center;margin-top:52px}
+.start-cta p{color:#B9B2CF;margin-top:14px;font-size:14.5px}
+@media (min-width:860px){
+  .rail{grid-template-columns:repeat(3,1fr);gap:28px;padding-top:28px}
+  .rail::before{content:"";position:absolute;left:-20px;right:-20px;top:0;height:16px;border-radius:8px;background:#3A3352;box-shadow:inset 0 -4px 0 #2A2440}
+  .tk{border-radius:0}
+  .tk::before{content:"";position:absolute;left:0;right:0;top:0;height:6px;background:#E4DCF7}
 }
 
-/* start */
-.start{margin-top:80px;padding:84px 0 96px;color:#fff;position:relative;overflow:hidden}
-.start .kicker{color:var(--mint)}
-.start h2{color:#fff;max-width:18ch}
-.rail{position:relative;margin-top:52px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:28px;padding-top:22px}
-.rail::before{content:"";position:absolute;left:-12px;right:-12px;top:0;height:12px;border-radius:6px;background:#E7E3F1;border:3px solid var(--ink)}
-.ticket{position:relative;background:var(--paper);color:var(--ink);border:3px solid var(--ink);border-radius:8px 8px 14px 14px;padding:24px 22px 22px;box-shadow:8px 8px 0 rgba(27,21,48,.3);transform-origin:50% -22px;animation:sway 6s ease-in-out infinite;transition:transform 500ms var(--spring)}
-.ticket:nth-child(2){animation-delay:-2s;margin-top:18px}.ticket:nth-child(3){animation-delay:-4s;margin-top:6px}
-.ticket:hover{animation-play-state:paused;transform:rotate(-3deg)}
-.ticket::before{content:"";position:absolute;left:50%;top:-25px;width:26px;height:22px;margin-left:-13px;border-radius:5px;background:#C9C3DA;border:3px solid var(--ink)}
-.tk-k{font:700 11px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);display:flex;justify-content:space-between}
-.tk-n{font:800 64px/1 var(--display);font-variation-settings:"opsz" 96,"wdth" 80;letter-spacing:-.04em;color:var(--violet);margin-top:12px}
-.ticket h3{margin-top:6px}
-.ticket p{font-size:15.5px;color:var(--ink-2);margin-top:8px}
-.tk-s{display:flex;align-items:center;gap:8px;margin-top:16px;padding-top:12px;border-top:2px dashed #E6DCCB;font-size:13px;font-weight:600;color:var(--ink-2)}
-.tk-s i{width:9px;height:9px;border-radius:50%;background:var(--herb)}
-.start-cta{display:flex;flex-wrap:wrap;gap:12px;margin-top:48px;align-items:center}
-.start-cta p{font-size:15px;color:#DCD2FF}
-@media (max-width:900px){.start{padding:60px 0 64px}.rail{grid-template-columns:1fr;gap:40px;padding-top:34px}.rail::before{left:20px;right:auto;width:12px;top:0;bottom:0;height:auto}.ticket{margin-top:0!important;transform-origin:50% 0}}
-
-/* pricing */
-.pricing{padding-top:100px;padding-bottom:40px}
-.p-head{display:flex;justify-content:space-between;align-items:flex-end;gap:24px;flex-wrap:wrap}
-.seg{position:relative;display:inline-grid;grid-template-columns:auto auto;background:#F1E8D8;border-radius:14px;padding:5px;border:1.5px solid var(--line)}
-.seg button{position:relative;z-index:1;height:42px;padding:0 18px;border-radius:10px;font-size:15px;font-weight:650;color:var(--ink-2);transition:color 200ms;display:flex;align-items:center;gap:8px}
-.seg button[aria-checked="true"]{color:var(--ink)}
-.seg em{font-style:normal;font:700 10.5px/1 var(--mono);padding:4px 6px;border-radius:5px;background:var(--saffron);color:var(--ink)}
-.seg .pill{position:absolute;top:5px;left:5px;height:42px;border-radius:10px;background:var(--paper);box-shadow:0 2px 0 #E2D6C2,0 4px 10px -4px rgba(27,21,48,.25);transition:transform 460ms var(--spring),width 460ms var(--spring)}
-.plans{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.08fr);gap:20px;margin-top:40px;align-items:stretch}
-.plan{position:relative;border-radius:var(--r-xl);padding:32px;background:var(--paper);border:1.5px solid var(--line);display:flex;flex-direction:column}
-.plan h3{font-size:30px}
-.plan .who{color:var(--ink-2);font-size:15.5px;margin-top:6px}
-.price{display:flex;align-items:flex-end;gap:10px;margin-top:24px}
-.price b{font:800 84px/.86 var(--display);font-variation-settings:"opsz" 96,"wdth" 80;letter-spacing:-.045em;min-width:1.2ch}
-.price span{font-size:15px;font-weight:600;color:var(--ink-2);line-height:1.25;padding-bottom:4px}
-.eq{font:500 13px/1.4 var(--mono);color:var(--ink-3);margin-top:12px;min-height:1.4em}
-.plan ul{list-style:none;margin:24px 0 28px;display:grid;gap:10px}
-.plan li{display:flex;gap:10px;font-size:15.5px;line-height:1.35}
-.plan li::before{content:"";flex:none;width:18px;height:18px;margin-top:1px;border-radius:50%;background:#E2F4EA url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 6.2 5 8.6l4.6-5' fill='none' stroke='%231A7448' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/12px no-repeat}
+/* ── pricing ── */
+.pricing{padding-top:120px;padding-bottom:40px}
+.plans{display:grid;gap:22px;margin:56px auto 0;max-width:1020px;align-items:start}
+.plan{position:relative;background:var(--paper);border:1.5px solid var(--rim);border-radius:32px;padding:30px 26px 26px;box-shadow:var(--sh);display:flex;flex-direction:column}
+.plan h3{font-size:34px}
+.who{color:var(--muted);margin-top:8px;font-size:16px;min-height:2.9em}
+.price{display:flex;align-items:flex-end;gap:10px;margin-top:20px}
+.price b{font:790 96px/.8 var(--d);letter-spacing:-.06em;font-variation-settings:"opsz" 96,"wdth" 88}
+.price span{font:650 14.5px/1.25 var(--f);color:var(--ink2);padding-bottom:4px}
+.eq{font-size:14px;color:var(--muted);margin-top:14px}
+.plan ul{list-style:none;padding:0;margin:22px 0 26px;display:grid;gap:11px;border-top:1.5px solid var(--rim);padding-top:22px}
+.plan li{display:flex;gap:11px;align-items:flex-start;font-size:15.5px;font-weight:550;line-height:1.35}
+.plan li::before{content:"";flex:none;width:20px;height:20px;margin-top:0;border-radius:50%;background:var(--tint) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%235B2BFF' stroke-width='3.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 12.5l4 4 8-9'/%3E%3C/svg%3E") center/13px no-repeat}
+.plan li.grp,.plan li.all{font:740 16px/1.2 var(--d);letter-spacing:-.015em;color:var(--vink)}
+.plan li.grp::before,.plan li.all::before{display:none}
 .plan .btn{margin-top:auto;width:100%}
-.plan-plus{background:var(--ink);color:#fff;border-color:#000;box-shadow:0 30px 60px -40px rgba(42,11,166,.9)}
-.plan-plus .who,.plan-plus .price span{color:#C9C3DA}
-.plan-plus .eq{color:#9D94BC}
-.plan-plus li::before{background-color:rgba(158,245,196,.16);background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 6.2 5 8.6l4.6-5' fill='none' stroke='%239EF5C4' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")}
-.plan-plus li.all{font-weight:650;color:var(--mint)}
-.sticker{position:absolute;right:24px;top:-16px;transform:rotate(4deg);background:var(--saffron);color:var(--ink);border:2.5px solid var(--ink);border-radius:10px;padding:8px 12px;font:700 12px/1 var(--mono);letter-spacing:.06em;text-transform:uppercase;box-shadow:3px 3px 0 var(--ink)}
-.trial{display:flex;flex-wrap:wrap;gap:10px 22px;margin-top:22px;font-weight:600;font-size:15px}
-.trial span{display:inline-flex;align-items:center;gap:8px}
-.trial span::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--herb)}
-.compare{margin-top:28px;display:grid;grid-template-columns:auto 1fr;gap:18px;align-items:center;padding:20px 22px;border-radius:var(--r-lg);border:2px dashed var(--line-2)}
-.compare b{font:700 12px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--tomato-2);padding:8px 10px;border-radius:8px;background:#FDE6E0}
-.compare p{font-size:16px;color:var(--ink-2)}
-.compare small{display:block;font-size:12.5px;color:var(--ink-3);margin-top:4px}
-@media (max-width:900px){.plans{grid-template-columns:1fr}.plan{padding:24px}.price b{font-size:72px}.compare{grid-template-columns:1fr}.compare b{justify-self:start}}
+.plan-plus{border:2.5px solid var(--v);box-shadow:0 6px 0 var(--vedge),0 40px 70px -40px rgba(76,31,234,.55)}
+.sticker{position:absolute;right:20px;top:-18px;font:780 15px/1 var(--d);letter-spacing:-.01em;background:var(--saf);color:var(--ink);padding:11px 15px;border-radius:14px;box-shadow:0 4px 0 var(--safedge);transform:rotate(5deg)}
+.plan-plus .price b{color:var(--v)}
+.trial{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin-top:30px}
+.trial span{font:650 14px/1 var(--f);color:var(--ink2);background:var(--bg2);padding:10px 14px;border-radius:999px}
+.replace{margin:64px auto 0;max-width:1020px;background:var(--paper);border:1.5px solid var(--rim);border-radius:32px;padding:30px 24px;box-shadow:var(--sh);display:grid;gap:24px;align-items:center}
+.replace h3{font-size:clamp(28px,5vw,40px)}
+.replace p{color:var(--muted);margin-top:10px;max-width:30em}
+.olds{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.old{position:relative;font:650 15px/1 var(--f);background:var(--bg2);color:var(--ink2);padding:12px 14px;border-radius:12px;transform:rotate(var(--r,0deg))}
+.old::after{content:"";position:absolute;left:8px;right:8px;top:50%;height:3px;border-radius:2px;background:var(--tom);transform:scaleX(0);transform-origin:left;transition:transform .5s var(--ease) calc(var(--j)*120ms + 300ms)}
+.replace.in .old::after{transform:scaleX(1)}
+.olds .arrow{width:28px;height:28px;color:var(--faint)}
+.olds .gg{width:58px;height:58px;transform:scale(.4) rotate(-30deg);opacity:0;transition:transform .7s var(--spring) 1s,opacity .3s 1s}
+.replace.in .olds .gg{transform:none;opacity:1}
+@media (min-width:860px){.plans{grid-template-columns:1fr 1fr;gap:28px}.plan{padding:38px 36px 34px}.replace{grid-template-columns:1fr 1.1fr;padding:40px 44px}}
 
-/* faq */
-.faq{padding-top:100px;padding-bottom:100px;display:grid;grid-template-columns:minmax(0,4fr) minmax(0,7fr);gap:56px}
-.faq-side p{color:var(--ink-2);margin-top:16px}
-.faq-side a{color:var(--violet);font-weight:650}
-details{border-bottom:1.5px solid var(--line-2)}
-details:first-of-type{border-top:1.5px solid var(--line-2)}
-summary{list-style:none;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:16px;padding:22px 2px;font:700 20px/1.25 var(--display);font-variation-settings:"wdth" 94;letter-spacing:-.015em}
+/* ── FAQ ── */
+.faq{padding-top:120px;padding-bottom:40px;display:grid;gap:36px}
+.faq-side p{color:var(--muted);margin-top:16px;font-size:17px;max-width:24em}
+.faq-side a{color:var(--vink);font-weight:650;text-decoration-thickness:1.5px;text-underline-offset:3px}
+.faq-side .h2{font-size:clamp(38px,6.4vw,58px)}
+.qs{display:grid;gap:10px}
+details{background:var(--paper);border:1.5px solid var(--rim);border-radius:22px;box-shadow:0 2px 0 var(--cream3);transition:border-color .2s}
+details[open]{border-color:var(--rim2)}
+summary{list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:20px 20px 20px 22px;font:720 19px/1.25 var(--d);letter-spacing:-.02em;border-radius:22px}
 summary::-webkit-details-marker{display:none}
-summary i{position:relative;width:34px;height:34px;flex:none;border-radius:10px;background:var(--paper);border:1.5px solid var(--line-2);box-shadow:0 3px 0 #E2D6C2;transition:transform 400ms var(--spring),background 200ms}
-summary i::before,summary i::after{content:"";position:absolute;left:50%;top:50%;width:12px;height:2.5px;margin:-1.25px 0 0 -6px;background:var(--ink);border-radius:2px;transition:transform 400ms var(--spring)}
-summary i::after{transform:rotate(90deg)}
-details[open] summary i{background:var(--violet-tint);transform:rotate(180deg)}
-details[open] summary i::after{transform:rotate(0)}
-summary:hover i{transform:translateY(-1px)}
-.ans{padding:0 2px 24px;color:var(--ink-2);max-width:62ch}
-details[open] .ans{animation:ans 420ms var(--out)}
-@keyframes ans{from{opacity:.2;transform:translateY(-6px)}to{opacity:1;transform:none}}
-@media (max-width:900px){.faq{grid-template-columns:1fr;gap:20px;padding-top:64px;padding-bottom:64px}summary{font-size:18px;padding:18px 0}}
+summary i{flex:none;width:34px;height:34px;border-radius:50%;background:var(--bg2);position:relative;transition:transform .4s var(--spring),background .2s}
+summary i::before,summary i::after{content:"";position:absolute;left:50%;top:50%;width:14px;height:2.5px;border-radius:2px;background:var(--ink);transform:translate(-50%,-50%)}
+summary i::after{transform:translate(-50%,-50%) rotate(90deg)}
+details[open] summary i{transform:rotate(45deg);background:var(--v)}
+details[open] summary i::before,details[open] summary i::after{background:#fff}
+summary:hover i{background:var(--tint)}
+.ans{padding:0 22px 22px;color:var(--ink2);font-size:16px;max-width:40em}
+@media (min-width:980px){.faq{grid-template-columns:.8fr 1.2fr;gap:72px}.faq-side{position:sticky;top:110px;align-self:start}}
 
-/* final */
-.final{border-radius:32px;overflow:hidden;position:relative;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);min-height:560px;background:#170A52}
-.final-copy{position:relative;z-index:2;padding:64px 56px;color:#fff;display:flex;flex-direction:column;justify-content:center}
-.final-copy .kicker{color:var(--mint)}
-.final-copy h2{color:#fff;font-size:clamp(40px,5vw,68px)}
-.final-copy h2 em{color:var(--mint)}
-.final-copy p{color:#C9C3DA;margin-top:16px;font-size:18px;max-width:34ch}
-.final-copy .cta-row .demo{background:#2A1A78;border-color:#3F2B9E;box-shadow:0 var(--d) 0 #0E0538;color:#fff}
-.final-copy .demo small{color:#C9C3DA}
-.final-copy .fine{color:#9D94BC}
-.final-scene{position:relative;min-height:420px}
-.final-scene svg{position:absolute;inset:0;width:100%;height:100%}
-.star{animation:tw 3s ease-in-out infinite}
-.star:nth-child(2){animation-delay:-1s}.star:nth-child(3){animation-delay:-2s}
-@keyframes tw{50%{opacity:.25}}
-.lcdglow{animation:breathe 4s ease-in-out infinite}
-@keyframes breathe{50%{opacity:.6}}
-@media (max-width:900px){.final{grid-template-columns:1fr;border-radius:24px}.final-copy{padding:36px 22px 8px}.final-scene{min-height:340px}}
+/* ── final ── */
+.final-w{padding:100px 10px 0}
+.final{max-width:1400px;margin:0 auto;padding:48px 22px 0;display:grid;gap:10px}
+.final h2{font-size:clamp(44px,10vw,86px);letter-spacing:-.045em;line-height:.95;margin-top:20px}
+.final h2 em{font-style:normal;color:var(--saf)}
+.final p.l{color:#E4DEFF;font-size:18px;margin-top:18px;max-width:26em}
+.final .eyebrow{font-family:var(--lcd);font-weight:700;padding:9px 14px}
+.night{position:relative;height:330px;margin:0 -22px}
+.night .floor{bottom:46px}
+.night .kit{left:50%;bottom:56px;transform:translateX(-50%) scale(.66);transform-origin:50% 100%;gap:16px}
+.night .fr{animation:none}
+.win{position:absolute;right:12%;top:10px;width:120px;height:120px;border-radius:14px;background:#2E12A8;box-shadow:inset 0 0 0 6px var(--paper)}
+.win::before,.win::after{content:"";position:absolute;background:var(--paper)}
+.win::before{left:57px;top:0;bottom:0;width:6px}.win::after{top:57px;left:0;right:0;height:6px}
+.moon{position:absolute;left:22px;top:20px;width:30px;height:30px;border-radius:50%;box-shadow:inset -9px 4px 0 0 var(--saf);transform:rotate(-20deg)}
+.star{position:absolute;width:5px;height:5px;border-radius:50%;background:#fff;animation:tw 2.4s ease-in-out infinite}
+@keyframes tw{50%{opacity:.25;transform:scale(.6)}}
+.zz{position:absolute;font:800 22px/1 var(--d);color:#fff;opacity:0;animation:zz 3.6s ease-in-out infinite}
+@keyframes zz{0%{opacity:0;transform:translate(0,10px) scale(.7)}30%{opacity:1}100%{opacity:0;transform:translate(22px,-50px) scale(1.2)}}
+.chk{position:absolute;top:-24px;left:50%;margin-left:-17px;width:34px;height:34px;border-radius:50%;background:var(--paper);color:var(--v);display:grid;place-items:center;box-shadow:0 3px 0 var(--vedge);transform:scale(0);transition:transform .6s var(--spring) calc(var(--j)*160ms + 400ms)}
+.chk svg{width:18px;height:18px}
+.final.in .chk{transform:scale(1)}
+@media (min-width:520px){.night .kit{transform:translateX(-50%) scale(.8)}}
+@media (min-width:980px){
+  .final-w{padding:120px 16px 0}
+  .final{grid-template-columns:1.05fr .95fr;padding:80px 64px 0;border-radius:40px;min-height:560px}
+  .final .copy{padding-bottom:130px}
+  .night{height:auto;margin:0 -64px 0 0}
+  .night .floor{bottom:70px;left:-200%}
+  .night .kit{bottom:80px;transform:translateX(-50%)}
+}
 
-/* footer */
-footer{padding:48px 0 calc(40px + env(safe-area-inset-bottom,0px))}
-.foot{display:flex;flex-wrap:wrap;justify-content:space-between;gap:24px;align-items:flex-start;padding-top:28px;border-top:1.5px solid var(--line)}
-.foot p{color:var(--ink-3);font-size:14px;margin-top:10px;max-width:36ch}
-.foot nav{display:flex;flex-wrap:wrap;gap:6px 22px;font-size:14.5px;font-weight:550}
-.foot nav a{text-decoration:none;color:var(--ink-2)}
-.foot nav a:hover{color:var(--violet)}
-.foot .mail{font:500 14px/1 var(--mono);color:var(--ink)}
+/* ── footer ── */
+footer{padding:64px var(--g) 40px}
+.foot{display:grid;gap:26px;max-width:1240px;margin:0 auto;padding-top:28px;border-top:1.5px solid var(--rim)}
+.foot p{color:var(--muted);font-size:14.5px;margin-top:12px}
+.foot nav{display:flex;flex-wrap:wrap;gap:6px 22px;align-items:center}
+.foot nav a,.foot nav span{font:600 14.5px/1 var(--f);color:var(--ink2);text-decoration:none;padding:6px 0}
+.foot nav a:hover{color:var(--vink)}
+.copy-r{max-width:1240px;margin:22px auto 0;font-size:13px;color:var(--faint)}
+@media (min-width:860px){.foot{grid-template-columns:1fr auto;align-items:end}}
+
+/* ── reveal ── */
+.js [data-r]{opacity:0;transform:translateY(34px);transition:opacity .7s var(--ease),transform .9s var(--spring);transition-delay:calc(var(--dl,0)*90ms)}
+.js [data-r="pop"]{transform:translateY(20px) scale(.92)}
+.js [data-r].in{opacity:1;transform:none}
+.js .tk[data-r].in{transform:rotate(var(--r,0deg))}
+.js .tk[data-r].in:hover{transform:rotate(0) translateY(-6px)}
+.hero h1 .ln{display:block;animation:up .9s var(--spring) both}
+.hero h1 .ln:nth-child(2){animation-delay:.1s}
+.hero .hl{animation:hl 1s var(--spring) both .35s}
+@keyframes up{0%{opacity:0;transform:translateY(40px)}100%{opacity:1;transform:none}}
+@keyframes hl{0%{opacity:0;transform:rotate(-12deg) scale(.6)}100%{opacity:1;transform:rotate(-2.2deg)}}
 
 @media (prefers-reduced-motion:reduce){
-*,*::before,*::after{animation-duration:1ms!important;animation-iteration-count:1!important;transition-duration:1ms!important;transition-delay:0ms!important;scroll-behavior:auto!important}
-.steam path{opacity:.5}
+  *,*::before,*::after{animation-duration:.001ms!important;animation-iteration-count:1!important;animation-delay:0s!important;transition-duration:.001ms!important;transition-delay:0s!important;scroll-behavior:auto!important}
+  .js [data-r]{opacity:1;transform:none}
+  .label{animation:none!important;opacity:1;transform:translateY(-6px) rotate(-5deg)}
+  .toast{animation:none!important;opacity:1;transform:none}
+  .hero h1 .ln,.hero .hl,.hphone,.fr,.counter{animation:none!important}
+  .zz{display:none}
 }
 
-/* ===== v2 ===== */
-.hero h1{font-size:clamp(42px,5.8vw,80px)}
-.hero-vis{position:relative;min-width:0}
-.phone.hero-phone{position:absolute;right:-18px;bottom:-34px;width:min(38%,250px);transform:rotate(4deg);animation:rise 900ms var(--spring) 200ms both;z-index:3}
-@keyframes rise{from{transform:translateY(60px) rotate(9deg)}to{transform:rotate(4deg)}}
-.phone{position:relative;border-radius:38px;background:#0F0B1E;padding:7px;border:3px solid var(--ink);box-shadow:10px 14px 0 rgba(27,21,48,.22),0 30px 50px -30px rgba(27,21,48,.6)}
-.phone::before{content:"";position:absolute;left:50%;top:13px;width:30%;height:16px;margin-left:-15%;border-radius:10px;background:#0F0B1E;z-index:2}
-.phone img{width:100%;height:auto;aspect-ratio:390/844;object-fit:cover;object-position:top;border-radius:31px;display:block;background:#EEEAF8}
-.chips-wrap{padding-bottom:28px}
-.chips-h{font:700 12px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);margin-bottom:14px}
-.chips{display:flex;flex-wrap:wrap;gap:8px}
-.chip{display:inline-flex;align-items:center;height:36px;padding:0 14px;border-radius:999px;background:var(--paper);border:1.5px solid var(--line-2);box-shadow:0 3px 0 #E2D6C2;font-size:14.5px;font-weight:600;text-decoration:none;color:var(--ink);transition:transform 260ms var(--spring),background 160ms}
-.chip:hover{transform:translateY(-2px);background:var(--violet-tint)}
-.chip:active{transform:translateY(2px);box-shadow:0 1px 0 #E2D6C2}
-/* features */
-.feat2{padding-top:72px;padding-bottom:24px}
-.feat2-head{max-width:820px}
-.feat2-head p{color:var(--ink-2);font-size:19px;margin-top:16px;max-width:52ch}
-.fg{margin-top:72px;padding-top:40px;border-top:1.5px solid var(--line)}
-.fg-head{display:grid;grid-template-columns:minmax(0,1fr);gap:8px;max-width:640px}
-.fg-head h3{font-size:clamp(28px,3.2vw,42px);font-weight:720}
-.fg-head p{color:var(--ink-2)}
-.fx{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,340px);gap:56px;margin-top:28px;align-items:start}
-.flist{list-style:none;display:grid;gap:10px}
-.fi{border-radius:var(--r-lg);background:transparent;border:1.5px solid transparent;transition:background 200ms,border-color 200ms,box-shadow 300ms var(--spring)}
-.fi.on{background:var(--paper);border-color:var(--line-2);box-shadow:0 4px 0 #E2D6C2}
-.fi-b{width:100%;display:flex;align-items:center;gap:14px;padding:16px 18px;text-align:left;border-radius:var(--r-lg)}
-.fi-n{font:700 12px/1 var(--mono);color:var(--ink-3);width:22px;flex:none}
-.fi-t{font:700 21px/1.15 var(--display);letter-spacing:-.015em;font-variation-settings:"wdth" 94;flex:1;min-width:0}
-.fi.on .fi-n{color:var(--violet)}
-.fi-c{flex:none;color:var(--ink-3);transition:transform 300ms var(--spring)}
-.fi.on .fi-c{transform:rotate(90deg);color:var(--violet)}
-.tag-c{flex:none;font:700 10.5px/1 var(--mono);letter-spacing:.05em;text-transform:uppercase;padding:6px 8px;border-radius:7px;background:var(--ink);color:var(--mint)}
-.fi-d{padding:0 18px 18px 54px;display:none}
-.fi.on .fi-d{display:block;animation:ans 420ms var(--out)}
-.fi-d p{color:var(--ink-2);font-size:16.5px;max-width:54ch}
-.fi-d ul{list-style:none;display:grid;gap:6px;margin-top:12px}
-.fi-d li{display:flex;gap:10px;font-size:15px;line-height:1.35}
-.fi-d li::before{content:"";flex:none;width:16px;height:16px;margin-top:1px;border-radius:50%;background:#E2F4EA url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 6.2 5 8.6l4.6-5' fill='none' stroke='%231A7448' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/11px no-repeat}
-.fi-m{display:none}
-.fi-b:hover .fi-t{color:var(--violet)}
-.fx-ph{position:sticky;top:96px}
-.fx-ph .phone img{transition:opacity 220ms,transform 420ms var(--spring)}
-.fx-ph .phone.swap img{opacity:0;transform:translateY(14px) scale(.98)}
-.ph-cap{margin-top:18px;text-align:center;font:600 12px/1.3 var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3)}
-@media (max-width:900px){
-.feat2{padding-top:48px}
-.fg{margin-top:48px;padding-top:28px}
-.fx{grid-template-columns:1fr;gap:0;margin-top:18px}
-.fx-ph{display:none}
-.fi{background:var(--paper);border-color:var(--line)}
-.fi-b{padding:14px 14px}
-.fi-t{font-size:19px}
-.fi-d{display:block;padding:0 14px 16px 14px}
-.fi-c{display:none}
-.fi-m{display:block;margin:0 14px 16px;max-width:260px}
-.fi-m img{width:100%;height:auto;border-radius:24px;border:3px solid var(--ink);box-shadow:6px 8px 0 rgba(27,21,48,.18);aspect-ratio:390/700;object-fit:cover;object-position:top}
+@media (max-width:759px){
+  .chips-w{padding-left:0;padding-right:0}
+  .chips{display:grid;grid-auto-flow:column;grid-template-rows:repeat(3,auto);justify-content:start;overflow-x:auto;scrollbar-width:none;padding:4px var(--g) 10px;scroll-padding:0 var(--g);-webkit-mask:linear-gradient(90deg,transparent,#000 16px,#000 calc(100% - 28px),transparent);mask:linear-gradient(90deg,transparent,#000 16px,#000 calc(100% - 28px),transparent)}
+  .chips::-webkit-scrollbar{display:none}
+  .chip{white-space:nowrap}
+  .night{height:300px}
 }
-/* devices */
-.devices{padding-top:88px;padding-bottom:20px}
-.dv{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,7fr);gap:48px;align-items:center}
-.dv p.l{color:var(--ink-2);font-size:18px;margin-top:16px;max-width:40ch}
-.dv ul{list-style:none;display:grid;gap:10px;margin-top:22px}
-.dv li{display:flex;gap:12px;align-items:center;font-weight:600}
-.dv li b{font:700 11px/1 var(--mono);letter-spacing:.06em;text-transform:uppercase;padding:7px 9px;border-radius:8px;background:var(--violet-tint);color:var(--violet-2);min-width:96px;text-align:center}
-.browser{border-radius:18px;background:var(--paper);border:3px solid var(--ink);box-shadow:12px 14px 0 rgba(27,21,48,.16);overflow:hidden}
-.browser .bar{display:flex;gap:7px;align-items:center;padding:11px 14px;border-bottom:3px solid var(--ink);background:#F3ECDF}
-.browser .bar i{width:11px;height:11px;border-radius:50%;border:2px solid var(--ink);background:var(--tomato)}
-.browser .bar i:nth-child(2){background:var(--saffron)}.browser .bar i:nth-child(3){background:var(--herb)}
-.browser .bar span{margin-left:10px;font:500 12px/1 var(--mono);color:var(--ink-2);background:var(--paper);border:1.5px solid var(--line-2);border-radius:7px;padding:6px 10px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.browser img{width:100%;height:auto;display:block}
-@media (max-width:900px){.dv{grid-template-columns:1fr;gap:28px}.devices{padding-top:56px}}
-/* pricing v2 */
-.plan .price b{min-width:auto}
-.plan li.grp{font:700 11.5px/1 var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3);margin-top:8px}
-.plan li.grp::before{display:none}
-.plan-plus li.grp{color:#9D94BC}
-.replace{margin-top:28px;padding:22px;border-radius:var(--r-lg);border:2px dashed var(--line-2);display:grid;grid-template-columns:auto 1fr;gap:18px;align-items:center}
-.replace b{font:700 12px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--violet-2);padding:8px 10px;border-radius:8px;background:var(--violet-tint)}
-.replace p{color:var(--ink-2)}
-@media (max-width:900px){.replace{grid-template-columns:1fr}.replace b{justify-self:start}.phone.hero-phone{width:34%;right:8px;bottom:-26px}.hero-phone.phone{padding:5px;border-radius:26px}.hero-phone.phone img{border-radius:21px}}
-
-
-/* no small green markers (Marceau, 2026-11-04) */
-.eyebrow i,.tk-s i{display:none}
-.eyebrow{padding-left:14px}
-.fine span::before,.trial span::before{display:none}
-.fine,.trial{gap:6px 0}
-.fine span+span::before,.trial span+span::before{content:"·";display:inline;width:auto;height:auto;border:0;background:none;transform:none;margin:0 10px;border-radius:0;color:inherit}
-.plan li::before,.fi-d li::before{background:var(--violet-tint) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 6.2 5 8.6l4.6-5' fill='none' stroke='%233A10D8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/11px no-repeat}
-.plan-plus li::before{background:rgba(201,184,255,.16) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 6.2 5 8.6l4.6-5' fill='none' stroke='%23C9B8FF' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/11px no-repeat}
-.plan-plus li.all{color:#C9B8FF}
 </style>
 </head>
 <body>
-<svg width="0" height="0" style="position:absolute" aria-hidden="true">
-<defs>
-<pattern id="tiles" width="48" height="32" patternUnits="userSpaceOnUse"><rect width="48" height="32" fill="#4C1FEA"/><path d="M0 .75H48M.75 0V32" stroke="#5A30F4" stroke-width="1.5"/></pattern>
-<pattern id="tilesN" width="48" height="32" patternUnits="userSpaceOnUse"><rect width="48" height="32" fill="#1E0C66"/><path d="M0 .75H48M.75 0V32" stroke="#2A1680" stroke-width="1.5"/></pattern>
-<radialGradient id="gl"><stop offset="0" stop-color="#9EF5C4" stop-opacity=".55"/><stop offset="1" stop-color="#9EF5C4" stop-opacity="0"/></radialGradient>
-<radialGradient id="gw"><stop offset="0" stop-color="#FFF4D9" stop-opacity=".9"/><stop offset="1" stop-color="#FFF4D9" stop-opacity="0"/></radialGradient>
-</defs>
-<symbol id="s-fbody" overflow="visible">
-<rect x="70" y="140" width="230" height="660" rx="18" fill="#FFFDF8" class="ink"/>
-<rect x="280" y="150" width="14" height="640" rx="6" fill="#EDE4D3"/>
-<rect x="80" y="150" width="210" height="116" rx="10" fill="#FFFDF8" class="ink" style="stroke-width:2.5"/>
-<rect x="250" y="176" width="10" height="66" rx="5" fill="#1B1530"/>
-<path d="M100 176h40" class="ink" style="stroke-width:2.5;stroke:#D7CCB8"/>
-<rect x="80" y="276" width="210" height="514" rx="10" fill="#FFF4D9" class="ink" style="stroke-width:2.5"/>
-<rect x="140" y="286" width="90" height="8" rx="4" fill="#F6B93B" class="ink" style="stroke-width:2"/>
-<path d="M84 404h202M84 530h202M84 656h202" class="ink"/>
-<rect x="98" y="350" width="104" height="54" rx="6" fill="#E7E3F1" class="ink" style="stroke-width:2.5"/>
-<rect x="94" y="342" width="112" height="12" rx="4" fill="#C9C3DA" class="ink" style="stroke-width:2.5"/>
-<rect x="120" y="366" width="40" height="22" rx="3" fill="#fff" class="ink" style="stroke-width:2"/>
-<path d="M126 373h22M126 381h14" stroke="#1B1530" stroke-width="2" stroke-linecap="round"/>
-<path d="M232 404v-44l8-12v-14h12v14l8 12v44z" fill="#23935C" class="ink" style="stroke-width:2.5"/>
-<rect x="96" y="470" width="120" height="60" rx="5" fill="#E8B26A" class="ink" style="stroke-width:2.5"/>
-<path d="M96 490h120M96 510h120" stroke="#1B1530" stroke-width="2"/>
-<rect x="118" y="478" width="76" height="14" rx="2" fill="#fff" stroke="#1B1530" stroke-width="2"/>
-<path d="M232 530c0-26 10-40 20-46 10 6 20 20 20 46z" fill="#23935C" class="ink" style="stroke-width:2.5"/>
-<path d="M252 486v44" stroke="#1A7448" stroke-width="2.5"/>
-<path d="M104 656v-34l70-18v52z" fill="#F6B93B" class="ink" style="stroke-width:2.5"/>
-<circle cx="140" cy="636" r="5" fill="#D99A1E"/><circle cx="158" cy="624" r="3.5" fill="#D99A1E"/>
-<rect x="196" y="616" width="70" height="40" rx="6" fill="#EF5A3C" class="ink" style="stroke-width:2.5"/>
-<path d="M206 630h50" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
-</symbol>
-<symbol id="s-dfront" overflow="visible">
-<rect x="80" y="276" width="210" height="514" rx="10" fill="#FFFDF8" class="ink" style="stroke-width:2.5"/>
-<rect x="250" y="300" width="10" height="140" rx="5" fill="#1B1530"/>
-<rect x="104" y="306" width="128" height="78" rx="12" fill="#1B1530"/>
-<rect x="110" y="312" width="116" height="66" rx="8" fill="#11402B"/>
-<rect x="121" y="322" width="8" height="38" rx="4" fill="none" stroke="#9EF5C4" stroke-width="2"/>
-<rect x="123" y="343" width="4" height="17" rx="2" fill="#9EF5C4"/>
-<circle cx="125" cy="364" r="6" fill="#9EF5C4"/>
-<text x="214" y="355" text-anchor="end" font-family="JetBrains Mono,monospace" font-weight="700" font-size="30" fill="#9EF5C4">3,2</text>
-<text x="214" y="370" text-anchor="end" font-family="JetBrains Mono,monospace" font-weight="500" font-size="9" letter-spacing="1" fill="#9EF5C4" opacity=".7">°C · OK</text>
-<text x="104" y="404" font-family="JetBrains Mono,monospace" font-weight="700" font-size="9" letter-spacing="1.6" fill="#8A8499">FRIGO 2 · POSITIF</text>
-<g transform="translate(0 130) rotate(-4 150 520)">
-<rect x="104" y="470" width="96" height="112" rx="4" fill="#F6B93B" class="ink" style="stroke-width:2.5"/>
-<text x="116" y="496" font-family="Bricolage Grotesque,sans-serif" font-weight="700" font-size="13" fill="#1B1530">Relevés</text>
-<path d="M116 516l4 4 7-8M116 538l4 4 7-8M116 560l4 4 7-8" fill="none" stroke="#1B1530" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M134 516h50M134 538h40M134 560h46" stroke="#1B1530" stroke-width="2" stroke-linecap="round" opacity=".55"/>
-<circle cx="152" cy="470" r="9" fill="#EF5A3C" class="ink" style="stroke-width:2.5"/>
-</g>
-</symbol>
-<symbol id="s-dback" overflow="visible">
-<rect x="80" y="276" width="210" height="514" rx="10" fill="#F2EADB" class="ink" style="stroke-width:2.5"/>
-<rect x="96" y="330" width="178" height="40" rx="6" fill="#FFFDF8" class="ink" style="stroke-width:2.5"/>
-<rect x="96" y="470" width="178" height="40" rx="6" fill="#FFFDF8" class="ink" style="stroke-width:2.5"/>
-<rect x="96" y="610" width="178" height="40" rx="6" fill="#FFFDF8" class="ink" style="stroke-width:2.5"/>
-</symbol>
-<symbol id="s-printer" overflow="visible">
-<g transform="translate(-402 -480)">
-<rect x="336" y="418" width="132" height="62" rx="14" fill="#FFFDF8" class="ink"/>
-<rect x="337.5" y="452" width="129" height="26" fill="#EDE4D3"/>
-<rect x="336" y="418" width="132" height="62" rx="14" fill="none" class="ink"/>
-<rect x="352" y="414" width="100" height="9" rx="4.5" fill="#1B1530"/>
-<circle cx="354" cy="440" r="4" fill="#23935C"/>
-<rect x="366" y="436" width="40" height="8" rx="4" fill="#EDE4D3"/>
-<circle cx="446" cy="442" r="9" fill="#5B2BFF" stroke="#1B1530" stroke-width="2.5"/>
-</g>
-</symbol>
-<symbol id="s-label" overflow="visible">
-<rect width="104" height="150" rx="6" fill="#fff" class="ink" style="stroke-width:2.5"/>
-<text x="9" y="18" font-family="JetBrains Mono,monospace" font-weight="700" font-size="7" letter-spacing=".5" fill="#8A8499">GG · LOT 0411</text>
-<rect x="86" y="11" width="9" height="9" rx="2" fill="#5B2BFF"/>
-<text x="9" y="40" font-family="Bricolage Grotesque,sans-serif" font-weight="700" font-size="14" fill="#1B1530" letter-spacing="-.3">Bœuf</text>
-<text x="9" y="55" font-family="Bricolage Grotesque,sans-serif" font-weight="700" font-size="13" fill="#1B1530" letter-spacing="-.4">bourguignon</text>
-<text x="9" y="75" font-family="JetBrains Mono,monospace" font-weight="700" font-size="7.5" letter-spacing=".8" fill="#C8432A">DLC</text>
-<text x="8" y="101" font-family="Bricolage Grotesque,sans-serif" font-weight="800" font-size="27" fill="#1B1530" letter-spacing="-1">07/11</text>
-<text x="9" y="116" font-family="JetBrains Mono,monospace" font-weight="500" font-size="6.5" fill="#4A4560">Fait le 04/11 · Léa</text>
-<g fill="#1B1530" transform="translate(9 122)"><path d="M0 0h18v18H0zM3 3v12h12V3zM5 5h8v8H5z" fill-rule="evenodd"/><path d="M22 0h4v4h-4zM30 0h4v8h-4zM22 8h8v4h-8zM26 14h4v4h-4zM34 12h4v6h-4zM40 2h6v4h-6zM44 10h6v4h-6zM40 16h4v2h-4zM52 4h4v6h-4zM56 14h6v4h-6zM66 0h4v4h-4zM64 8h8v4h-8zM74 2h3v16h-3zM80 0h6v6h-6zM80 10h6v8h-6z"/></g>
-</symbol>
-<symbol id="s-dial" overflow="visible">
-<circle r="66" fill="#FFFDF8" class="ink"/>
-<circle r="58" fill="none" stroke="#E9DFCD" stroke-width="2"/>
-<path d="M-30.2 -36A47 47 0 0 1 -6.5 -46.5" fill="none" stroke="#23935C" stroke-width="7" stroke-linecap="round"/>
-<path d="M-46.8 27L-36.4 21M-50.1 20.2L-45.4 18.4M-52.4 13.1L-47.5 11.9M-53.7 5.6L-48.7 5.1M-54 -1.9L-49 -1.7M-53.2 -9.4L-45.3 -8M-51.4 -16.7L-46.6 -15.1M-48.5 -23.7L-44 -21.5M-44.8 -30.2L-40.6 -27.4M-40.1 -36.1L-36.4 -32.8M-34.7 -41.4L-27 -32.2M-28.6 -45.8L-26 -41.6M-22 -49.3L-19.9 -44.8M-14.9 -51.9L-13.5 -47.1M-7.5 -53.5L-6.8 -48.5M0 -54L0 -46M7.5 -53.5L6.8 -48.5M14.9 -51.9L13.5 -47.1M22 -49.3L19.9 -44.8M28.6 -45.8L26 -41.6M34.7 -41.4L27 -32.2M40.1 -36.1L36.4 -32.8M44.8 -30.2L40.6 -27.4M48.5 -23.7L44 -21.5M51.4 -16.7L46.6 -15.1M53.2 -9.4L45.3 -8M54 -1.9L49 -1.7M53.7 5.6L48.7 5.1M52.4 13.1L47.5 11.9M50.1 20.2L45.4 18.4M46.8 27L36.4 21" stroke="#1B1530" stroke-width="2" stroke-linecap="round"/>
-<g font-family="JetBrains Mono,monospace" font-weight="700" font-size="9" fill="#4A4560" text-anchor="middle"><text x="-27.7" y="19">-10</text><text x="-20.6" y="-21.5">0</text><text x="20.6" y="-21.5">10</text><text x="27.7" y="19">20</text></g>
-</symbol>
-<symbol id="s-crate" overflow="visible">
-<path d="M-72 -74c0-30 30-46 66-42 32 4 58 16 62 42z" fill="#E26D6D" class="ink"/>
-<path d="M-44 -96c10 6 24 4 34-2M0 -106c8 6 18 6 26 0M18 -88c8 4 16 4 22-2" stroke="#FFD9D2" stroke-width="3.5" fill="none" stroke-linecap="round"/>
-<path d="M-56 -84c4-10 12-18 22-22" stroke="#fff" stroke-width="3" fill="none" stroke-linecap="round" opacity=".6"/>
-<rect x="-100" y="-76" width="200" height="76" rx="6" fill="#E8B26A" class="ink"/>
-<path d="M-100 -50H100M-100 -24H100" stroke="#1B1530" stroke-width="2.5"/>
-<rect x="-100" y="-76" width="18" height="76" rx="4" fill="#D49A4E" class="ink" style="stroke-width:2.5"/>
-<rect x="82" y="-76" width="18" height="76" rx="4" fill="#D49A4E" class="ink" style="stroke-width:2.5"/>
-<rect x="-54" y="-66" width="100" height="40" rx="5" fill="#fff" class="ink" style="stroke-width:2.5"/>
-<ellipse cx="-4" cy="-46" rx="40" ry="13" fill="none" stroke="#23935C" stroke-width="2.5"/>
-<text x="-4" y="-43" text-anchor="middle" font-family="JetBrains Mono,monospace" font-weight="700" font-size="7.5" fill="#1A7448">FR 29.019.001 CE</text>
-</symbol>
-<symbol id="s-spray" overflow="visible">
-<path d="M-22 0V-80c0-12 8-20 22-20s22 8 22 20V0z" fill="#23935C" class="ink"/>
-<rect x="-14" y="-64" width="28" height="36" rx="4" fill="#FFFDF8" class="ink" style="stroke-width:2.5"/>
-<path d="M-8 -54h16M-8 -46h10" stroke="#23935C" stroke-width="2.5" stroke-linecap="round"/>
-<rect x="-9" y="-116" width="18" height="16" rx="3" fill="#E7E3F1" class="ink" style="stroke-width:2.5"/>
-<path d="M-18 -116v-14h40l12 9v5z" fill="#FFFDF8" class="ink"/>
-<path d="M4 -116l6 18" class="ink"/>
-<rect x="40" y="-28" width="62" height="28" rx="6" fill="#F6B93B" class="ink"/>
-<rect x="40" y="-38" width="62" height="12" rx="4" fill="#23935C" class="ink" style="stroke-width:2.5"/>
-</symbol>
-<symbol id="s-register" overflow="visible">
-<path d="M-92 0l10-58h164l10 58z" fill="#E7E3F1" class="ink"/>
-<rect x="-80" y="-112" width="96" height="44" rx="8" fill="#1B1530"/>
-<text x="-32" y="-82" text-anchor="middle" font-family="JetBrains Mono,monospace" font-weight="700" font-size="17" fill="#9EF5C4">Z 0311</text>
-<path d="M-44 -68v10" class="ink"/>
-<g fill="#FFFDF8" stroke="#1B1530" stroke-width="2"><rect x="-70" y="-48" width="18" height="10" rx="3"/><rect x="-46" y="-48" width="18" height="10" rx="3"/><rect x="-22" y="-48" width="18" height="10" rx="3"/><rect x="2" y="-48" width="18" height="10" rx="3"/><rect x="-74" y="-32" width="18" height="10" rx="3"/><rect x="-50" y="-32" width="18" height="10" rx="3"/><rect x="-26" y="-32" width="18" height="10" rx="3"/><rect x="-2" y="-32" width="18" height="10" rx="3"/></g>
-<rect x="36" y="-46" width="40" height="24" rx="4" fill="#EF5A3C" class="ink" style="stroke-width:2.5"/>
-<path d="M30 -58v-86l6 6 6-6 6 6 6-6 6 6 6-6 6 6v86" fill="#fff" class="ink" style="stroke-width:2.5"/>
-<text x="36" y="-120" font-family="JetBrains Mono,monospace" font-weight="700" font-size="7" fill="#1B1530">TICKET Z</text>
-<path d="M36 -108h34M36 -98h26M36 -88h34M36 -78h20" stroke="#8A8499" stroke-width="2.5" stroke-linecap="round"/>
-</symbol>
-<symbol id="s-folder" overflow="visible">
-<path d="M-104 0V-132a8 8 0 0 1 8-8h62l14 14h116a8 8 0 0 1 8 8V0z" fill="#3A10D8" class="ink"/>
-<g transform="rotate(-5)"><rect x="-80" y="-160" width="150" height="132" rx="4" fill="#fff" class="ink" style="stroke-width:2.5"/><path d="M-66 -138h80M-66 -124h110M-66 -110h96M-66 -96h104" stroke="#C9C3DA" stroke-width="3" stroke-linecap="round"/></g>
-<rect x="34" y="-162" width="42" height="22" rx="5" fill="#EF5A3C" class="ink" style="stroke-width:2.5" transform="rotate(-5)"/>
-<text x="55" y="-146" text-anchor="middle" transform="rotate(-5)" font-family="JetBrains Mono,monospace" font-weight="700" font-size="11" fill="#fff">PDF</text>
-<path d="M-110 0l-6-92h232l-6 92z" fill="#5B2BFF" class="ink"/>
-<text x="0" y="-44" text-anchor="middle" font-family="JetBrains Mono,monospace" font-weight="700" font-size="10" letter-spacing="1.5" fill="#fff">DOSSIER CONTRÔLE</text>
-<path d="M-40 -30h80" stroke="#9D85FF" stroke-width="3" stroke-linecap="round"/>
-</symbol>
-<symbol id="s-stamp" overflow="visible">
-<circle r="54" fill="rgba(255,253,248,.94)" stroke="#23935C" stroke-width="4"/>
-<circle r="46" fill="none" stroke="#23935C" stroke-width="2" stroke-dasharray="5 5"/>
-<text y="2" text-anchor="middle" font-family="Bricolage Grotesque,sans-serif" font-weight="800" font-size="22" fill="#23935C">PRÊT</text>
-<text y="20" text-anchor="middle" font-family="JetBrains Mono,monospace" font-weight="700" font-size="7.5" letter-spacing="1.2" fill="#23935C">POUR LE CONTRÔLE</text>
-</symbol>
-<symbol id="s-spark" overflow="visible"><path d="M0 -14C2 -4 4 -2 14 0 4 2 2 4 0 14-2 4-4 2-14 0-4-2-2-4 0-14z" fill="#fff" stroke="#1B1530" stroke-width="2.5" stroke-linejoin="round"/></symbol>
-<symbol id="s-counter" overflow="visible">
-<rect x="-400" y="0" width="1600" height="600" fill="#3A10D8"/>
-<rect x="-400" y="0" width="1600" height="300" fill="#3A10D8" class="ink"/>
-<rect x="-400" y="-24" width="1600" height="26" rx="6" fill="#F3E6CF" class="ink"/>
-<path d="M-400 -5H1200" stroke="#E2D0B0" stroke-width="5"/>
-</symbol>
-</svg>
-<header class="nav" id="nav">
+<header class="top" id="nav">
 <div class="wrap">
-<a class="brand" href="#top" data-to="top" aria-label="Growth Gusto, accueil">
-<svg viewBox="0 0 512 512" aria-hidden="true"><defs><linearGradient id="g1" x1="0" y1="0" x2="1" y2="1" gradientTransform="rotate(-15 .5 .5)"><stop offset="0" stop-color="#8F63FF"/><stop offset=".55" stop-color="#4A1FE6"/><stop offset="1" stop-color="#2F1BC4"/></linearGradient></defs><rect width="512" height="512" rx="143.36" fill="url(#g1)"/><svg x="97.28" y="97.28" width="317.44" height="317.44" viewBox="0 0 100 100"><path d="M86 16H50A34 34 0 0 0 25.96 74.04" fill="none" stroke="#fff" stroke-width="14"/><path d="M40.5 83.5 80 44M52 42h30v30" fill="none" stroke="#fff" stroke-width="12.5"/></svg></svg>
-<span class="wordmark">Growth Gusto</span>
-</a>
-<nav class="nav-links" aria-label="Sections">
-<a href="#fonctionnalites" data-to="fonctionnalites">Fonctionnalités</a>
-<a href="#tarifs" data-to="tarifs">Tarifs</a>
-<a href="#faq" data-to="faq">FAQ</a>
+<a class="brand" href="#top" aria-label="Growth Gusto, accueil"><img src="icon.svg" alt="" width="36" height="36"><span>Growth <b>Gusto</b></span></a>
+<nav class="links" aria-label="Sections">
+<a href="#fonctionnalites">Fonctionnalités</a>
+<a href="#tarifs">Tarifs</a>
+<a href="#faq">FAQ</a>
 </nav>
-<a class="btn btn-sm login" href="https://app.growthgusto.fr/" target="_blank" rel="noopener">Se connecter</a>
-<a class="btn btn-sm btn-primary" href="https://app.growthgusto.fr/?signup=1" target="_blank" rel="noopener"><span class="cta-long">Essayer 14 jours</span><span class="cta-short">Essayer</span></a>
-<button class="mute" id="mute" aria-pressed="true" aria-label="Sons de l'interface" title="Sons">
-<svg class="on" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1B1530" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9z"/><path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/></svg>
-<svg class="off" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1B1530" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9z"/><path d="m17 9 5 6M22 9l-5 6"/></svg>
+<button class="mute" id="mute" type="button" aria-pressed="true" aria-label="Sons de l'interface" title="Sons">
+<svg class="on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/></svg>
+<svg class="off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="M16 9.5l5 5M21 9.5l-5 5"/></svg>
 </button>
+<a class="btn soft sm login" href="https://app.growthgusto.fr/" target="_blank" rel="noopener">Se connecter</a>
+<a class="btn v sm" href="https://app.growthgusto.fr/?signup=1" target="_blank" rel="noopener"><span class="cta-long">Essayer 14 jours</span><span class="cta-short">Essayer</span></a>
 </div>
 </header>
 
 <main id="top">
-<section class="hero wrap" aria-labelledby="h-hero">
-<div class="hero-copy">
-<p class="eyebrow"><i></i>L'app de gestion pour restaurants</p>
-<h1 id="h-hero">Toute votre cuisine dans <em>une seule app.</em></h1>
-<p class="lede">Températures, étiquettes DLC, livraisons, ménage, stock, caisse et équipe. Vos cuisiniers notent en un tap. Le jour du contrôle sanitaire, le rapport est prêt.</p>
-<div class="cta-row">
-<a class="btn btn-primary" href="https://app.growthgusto.fr/?signup=1" target="_blank" rel="noopener">Essayer 14 jours gratuits <svg class="arr" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
-<a class="demo" href="https://app.growthgusto.fr/?demo=1" target="_blank" rel="noopener"><span class="demo-ico" aria-hidden="true"><svg width="26" height="26" viewBox="0 0 32 32" fill="none" class="ink" style="stroke-width:2"><path d="M6 20h20a10 10 0 0 0-20 0Z" fill="#fff"/><path d="M4 23h24"/><path d="M16 8v2"/><circle cx="16" cy="7" r="1.6" fill="#1B1530"/></svg></span><span><b>Voir la démo</b><small>Un restaurant déjà rempli. Rien n'est enregistré.</small></span><svg class="arr" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1B1530" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+<section class="hero" aria-labelledby="h-hero">
+<div class="wallc">
+<div class="copy">
+<p class="eyebrow"><img src="icon.svg" alt="" width="22" height="22">L'app de gestion pour restaurants</p>
+<h1 id="h-hero"><span class="ln">Toute votre cuisine</span><span class="ln">dans <span class="hl">une seule app.</span></span></h1>
+<p class="lede">Températures, étiquettes DLC, livraisons, ménage, stock, caisse et équipe. <b>Vos cuisiniers notent en un tap.</b> Le jour du contrôle sanitaire, le rapport est prêt.</p>
+<div class="ctas">
+<a class="btn w" href="https://app.growthgusto.fr/?signup=1" target="_blank" rel="noopener">Essayer 14 jours gratuits <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+<a class="demo" href="https://app.growthgusto.fr/?demo=1" target="_blank" rel="noopener"><span class="pl"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.5-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg></span><span><b>Voir la démo</b><small>Un restaurant déjà rempli. Rien n'est enregistré.</small></span></a>
 </div>
 <p class="fine"><span>14 jours gratuits</span><span>Sans engagement</span><span>iPhone, Android, ordinateur</span></p>
 </div>
-<div class="hero-vis">
-<div class="stage hero-stage" role="img" aria-label="Illustration : une cuisine sur mur de carrelage violet. Le frigo s'ouvre, le thermomètre descend à 3,2 °C et l'imprimante sort une étiquette Bœuf bourguignon, DLC 07/11.">
-<svg viewBox="0 0 800 700" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
-<g transform="translate(-30 -20)">
-<rect x="-400" y="-200" width="1600" height="1100" fill="url(#tiles)"/>
-<use href="#s-counter" y="504"/>
-<ellipse cx="402" cy="481" rx="74" ry="6" fill="#3A10D8" opacity=".55"/><ellipse cx="600" cy="481" rx="100" ry="6" fill="#3A10D8" opacity=".55"/>
-<!-- rail + ticket -->
-<rect x="652" y="84" width="200" height="10" rx="5" fill="#E7E3F1" class="ink"/>
-<g class="sway wig" id="hTicket">
-<rect x="686" y="76" width="22" height="18" rx="4" fill="#C9C3DA" class="ink"/>
-<rect x="664" y="92" width="132" height="150" rx="8" fill="#FFFDF8" class="ink"/>
-<text x="678" y="118" font-family="JetBrains Mono,monospace" font-weight="700" font-size="9" letter-spacing="1" fill="#8A8499">RELEVÉ · 07:42</text>
-<text x="678" y="142" font-family="Bricolage Grotesque,sans-serif" font-weight="700" font-size="16" fill="#1B1530">Frigo 2</text>
-<text x="678" y="180" font-family="Bricolage Grotesque,sans-serif" font-weight="800" font-size="34" letter-spacing="-1" fill="#1B1530"><tspan id="hTv">3,2</tspan><tspan font-size="16" dx="4">°C</tspan></text>
-<path d="M678 200h104" stroke="#E6DCCB" stroke-width="2" stroke-dasharray="5 4"/>
-<circle cx="683" cy="221" r="4.5" fill="#23935C" id="hDot"/>
-<text x="694" y="225" font-family="Instrument Sans,sans-serif" font-weight="600" font-size="11.5" fill="#4A4560" id="hTs">Conforme · Léa</text>
-</g>
-<!-- fridge -->
-<g id="hFridge" class="wig" style="transform-origin:50% 100%">
-<use href="#s-fbody"/>
-<rect class="fl" x="92" y="284" width="186" height="90" rx="8" fill="url(#gw)"/>
-<g class="door"><g class="dfront"><use href="#s-dfront"/></g><g class="dback"><use href="#s-dback"/></g></g>
-</g>
-<!-- dial thermometer -->
-<g id="hDial" class="wig" style="transform-origin:50% 0">
-<path d="M520 112l-34 54M520 112l34 54" stroke="#1B1530" stroke-width="2.5" fill="none"/>
-<circle cx="520" cy="110" r="6" fill="#C9C3DA" class="ink" style="stroke-width:2.5"/>
-<use href="#s-dial" x="520" y="224"/>
-<g transform="translate(520 224)">
-<g id="needle" transform="rotate(-14.4)"><path d="M0 10V-48" stroke="#EF5A3C" stroke-width="4" stroke-linecap="round"/><circle r="8" fill="#1B1530"/></g>
-<text y="40" text-anchor="middle" font-family="JetBrains Mono,monospace" font-weight="700" font-size="15" fill="#1B1530" id="hDv">3,2 °C</text>
-</g>
-</g>
-<!-- printer + label -->
-<clipPath id="hClip"><rect x="340" y="200" width="130" height="219"/></clipPath>
-<g clip-path="url(#hClip)"><g id="hLabel" class="lbl"><g transform="translate(350 268)">
-<rect width="104" height="150" rx="6" fill="#fff" class="ink" style="stroke-width:2.5"/>
-<text x="9" y="18" font-family="JetBrains Mono,monospace" font-weight="700" font-size="7" letter-spacing=".5" fill="#8A8499">GG · LOT 0411</text>
-<rect x="86" y="11" width="9" height="9" rx="2" fill="#5B2BFF"/>
-<text x="9" y="40" font-family="Bricolage Grotesque,sans-serif" font-weight="700" font-size="14" fill="#1B1530" letter-spacing="-.3" id="hl1">Bœuf</text>
-<text x="9" y="55" font-family="Bricolage Grotesque,sans-serif" font-weight="700" font-size="13" fill="#1B1530" letter-spacing="-.4" id="hl2">bourguignon</text>
-<text x="9" y="75" font-family="JetBrains Mono,monospace" font-weight="700" font-size="7.5" letter-spacing=".8" fill="#C8432A">DLC</text>
-<text x="8" y="101" font-family="Bricolage Grotesque,sans-serif" font-weight="800" font-size="27" fill="#1B1530" letter-spacing="-1" id="hl3">07/11</text>
-<text x="9" y="116" font-family="JetBrains Mono,monospace" font-weight="500" font-size="6.5" fill="#4A4560">Fait le 04/11 · Léa</text>
-<g fill="#1B1530" transform="translate(9 122)"><path d="M0 0h18v18H0zM3 3v12h12V3zM5 5h8v8H5z" fill-rule="evenodd"/><path d="M22 0h4v4h-4zM30 0h4v8h-4zM22 8h8v4h-8zM26 14h4v4h-4zM34 12h4v6h-4zM40 2h6v4h-6zM44 10h6v4h-6zM40 16h4v2h-4zM52 4h4v6h-4zM56 14h6v4h-6zM66 0h4v4h-4zM64 8h8v4h-8zM74 2h3v16h-3zM80 0h6v6h-6zM80 10h6v8h-6z"/></g>
-</g></g></g>
-<g id="hPrinter" class="wig"><use href="#s-printer" x="402" y="480"/></g>
-<!-- sauteuse -->
-<g class="pan" id="hPan" style="cursor:pointer">
-<g class="steam"><path d="M560 390c-8-10 8-18 0-30"/><path d="M596 384c-8-10 8-18 0-30"/><path d="M632 390c-8-10 8-18 0-30"/></g>
-<g class="toss" id="hToss">
-<path d="M684 446l104-16a8 8 0 0 1 3 15l-104 18z" fill="#1B1530"/>
-<circle cx="782" cy="438" r="2.5" fill="#F3E6CF"/>
-<path d="M506 438h186l-12 30a14 14 0 0 1-13 9H531a14 14 0 0 1-13-9z" fill="#D9824A" class="ink"/>
-<path d="M524 452h150" stroke="#F2A770" stroke-width="5" stroke-linecap="round"/>
-<ellipse cx="599" cy="438" rx="93" ry="13" fill="#7A2E1E" class="ink"/>
-<g class="ink" style="stroke-width:2">
-<circle cx="560" cy="434" r="7" fill="#5C1F14"/><circle cx="604" cy="430" r="8" fill="#5C1F14"/><circle cx="642" cy="436" r="7" fill="#5C1F14"/>
-<circle cx="584" cy="440" r="4.5" fill="#EF8A3C"/><circle cx="626" cy="440" r="4.5" fill="#EF8A3C"/><circle cx="538" cy="440" r="3.5" fill="#F3E6CF"/>
-</g>
-<path d="M572 430l5-3M616 444l5-2M656 432l4 3" stroke="#23935C" stroke-width="3" stroke-linecap="round"/>
-</g>
-</g>
-</g>
-</svg>
-<div class="caption"><b>Chemin des Sarments</b><br>Lundi · mise en place</div>
+<div class="scene" role="img" aria-label="Illustration : une cuisine dessinée sur le mur violet. Les écrans des frigos affichent leurs températures, l'imprimante sort une étiquette Bœuf bourguignon, DLC 07/11, et le téléphone montre l'accueil de Growth Gusto.">
+<i class="floor"></i>
+<div class="toast" aria-hidden="true"><span class="ok"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 12.5l4 4 8-9"/></svg></span><span class="tt"><b>Chambre froide · <em data-lcd="cf">1,2</em> °C</b><small>Relevé par Camille · conforme</small></span></div>
+<div class="kit" aria-hidden="true">
+<div class="fr cf" style="--j:0"><div class="box"><span class="lcdw"><i data-t="1.2" data-min="0.6" data-max="2.4">1,2°</i></span><span class="hd"></span><span class="door"></span></div><span class="nm">Chambre froide</span></div>
+<div class="counter"><div class="printer"><div class="label"><b>Bœuf bourguignon</b><span class="dlc">DLC 07/11</span><small>Thomas<br>05/11 · 10 h</small><i class="qr"></i></div><div class="pbody"><i class="btnp"></i></div></div><i class="slab"></i><div class="under"><div class="box"><span class="lcdw"><i data-t="2.8" data-min="2.1" data-max="3.6">2,8°</i></span><span class="hd"></span></div></div><span class="nm">Frigo de service</span></div>
+<div class="fr cg" style="--j:3"><div class="box"><span class="lcdw"><i data-t="-19.4" data-min="-20.2" data-max="-18.6">-19,4°</i></span></div><span class="nm">Congélateur</span></div>
 </div>
-<div class="phone hero-phone"><img src="img/home.jpg" alt="Écran d'accueil de Growth Gusto : 4 frigos à relever, réception, scanner, ménage, inventaire" width="390" height="844"></div>
+<div class="hphone"><div class="phone "><img src="img/home.jpg" alt="Écran d&#x27;accueil de Growth Gusto : relevé du midi, frigos, réception, scanner, ménage, inventaire" width="390" height="844" decoding="async"></div></div>
+</div>
 </div>
 </section>
-<section class="chips-wrap wrap" aria-label="Toutes les fonctions">
-<p class="chips-h">20 fonctions, une seule app</p>
-<div class="chips"><a class="chip" href="#f-releve" data-feat="releve">Relevés de températures</a><a class="chip" href="#f-frigo" data-feat="frigo">Frigos et chambre froide</a><a class="chip" href="#f-service" data-feat="service">Mise en place et fin de service</a><a class="chip" href="#f-reception" data-feat="reception">Réception des livraisons</a><a class="chip" href="#f-imprimante" data-feat="imprimante">Étiquettes DLC et QR</a><a class="chip" href="#f-menage" data-feat="menage">Planning ménage</a><a class="chip" href="#f-fiche" data-feat="fiche">Fiches recettes et allergènes</a><a class="chip" href="#f-noteProc" data-feat="noteProc">Process HACCP par plat</a><a class="chip" href="#f-notes" data-feat="notes">Procédures et notes</a><a class="chip" href="#f-registre" data-feat="registre">Registre HACCP</a><a class="chip" href="#f-regReport" data-feat="regReport">Rapport pour le contrôle sanitaire</a><a class="chip" href="#f-obligations" data-feat="obligations">Obligations et contrôles</a><a class="chip" href="#f-stock" data-feat="stock">Stock et inventaire</a><a class="chip" href="#f-tickets" data-feat="tickets">Tickets de caisse</a><a class="chip" href="#f-dashboard" data-feat="dashboard">Tableau de bord</a><a class="chip" href="#f-finance" data-feat="finance">Finances</a><a class="chip" href="#f-equipe" data-feat="equipe">Comptes de l'équipe</a><a class="chip" href="#f-pointeuse" data-feat="pointeuse">Pointeuse</a><a class="chip" href="#f-planning" data-feat="planning">Planning de l'équipe</a><a class="chip" href="#f-staff" data-feat="staff">Employés et salaires</a></div>
+
+<section class="chips-w" aria-label="Toutes les fonctions">
+<p class="chips-h"><b>20 fonctions</b>, une seule app</p>
+<div class="chips"><a class="chip" href="#f-releve" data-feat="releve">Relevés de températures</a><a class="chip" href="#f-frigo" data-feat="frigo">Frigos et chambre froide</a><a class="chip" href="#f-service" data-feat="service">Mise en place et fin de service</a><a class="chip" href="#f-reception" data-feat="reception">Réception des livraisons</a><a class="chip" href="#f-imprimante" data-feat="imprimante">Étiquettes DLC et QR</a><a class="chip" href="#f-menage" data-feat="menage">Planning ménage</a><a class="chip" href="#f-fiche" data-feat="fiche">Fiches recettes et allergènes</a><a class="chip" href="#f-noteProc" data-feat="noteProc">Process HACCP par plat</a><a class="chip" href="#f-notes" data-feat="notes">Procédures et notes</a><a class="chip" href="#f-registre" data-feat="registre">Registre HACCP</a><a class="chip" href="#f-regReport" data-feat="regReport">Rapport pour le contrôle sanitaire</a><a class="chip" href="#f-obligations" data-feat="obligations">Obligations et contrôles</a><a class="chip" href="#f-stock" data-feat="stock">Stock et inventaire</a><a class="chip" href="#f-tickets" data-feat="tickets">Tickets de caisse</a><a class="chip" href="#f-dashboard" data-feat="dashboard">Tableau de bord</a><a class="chip" href="#f-finance" data-feat="finance">Finances</a><a class="chip" href="#f-equipe" data-feat="equipe">Comptes de l&#x27;équipe</a><a class="chip" href="#f-pointeuse" data-feat="pointeuse">Pointeuse</a><a class="chip" href="#f-planning" data-feat="planning">Planning de l&#x27;équipe</a><a class="chip" href="#f-staff" data-feat="staff">Employés et salaires</a></div>
 </section>
-<section class="feat2 wrap" id="fonctionnalites" aria-labelledby="h-feat">
-<div class="feat2-head"><span class="kicker">Fonctionnalités</span><h2 id="h-feat">Voici ce que fait l'app, <em>écran par écran.</em></h2>
+
+<section class="feat wrap" id="fonctionnalites" aria-labelledby="h-feat">
+<div class="sh" data-r><span class="kick">Fonctionnalités</span><h2 id="h-feat">Voici ce que fait l'app, <span class="em">écran par écran.</span></h2>
 <p>Ce sont les vrais écrans de Growth Gusto, avec un restaurant de démo.</p></div>
-<div class="fg" id="g-hygiene">
-<div class="fg-head"><span class="kicker">Tous les jours</span><h3>Hygiène et HACCP</h3><p>Ce que l'équipe fait à chaque service, en un tap.</p></div>
-<div class="fx">
-<ul class="flist" role="list"><li class="fi on" id="f-releve" data-img="releve">
-<button class="fi-b" type="button" aria-controls="ph-hygiene" aria-pressed="true"><span class="fi-n">01</span><span class="fi-t">Relevés de températures</span><svg class="fi-c" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>
-<div class="fi-d"><p>Midi et soir, l'app vous dit quel frigo relever. Vous glissez le curseur, c'est noté.</p><ul><li>Seuil par équipement : 0 à 4 °C, -18 °C</li><li>Hors seuil : l'action corrective est demandée</li><li>Chaque relevé porte le prénom et l'heure</li></ul></div>
-<figure class="fi-m"><img src="img/releve.jpg" alt="Écran Relevés de températures de l'app Growth Gusto" loading="lazy" width="390" height="844"></figure>
-</li><li class="fi" id="f-frigo" data-img="frigo">
-<button class="fi-b" type="button" aria-controls="ph-hygiene" aria-pressed="false"><span class="fi-n">02</span><span class="fi-t">Frigos et chambre froide</span><svg class="fi-c" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>
-<div class="fi-d"><p>Ce qu'il y a dans chaque frigo, avec les DLC qui arrivent.</p><ul><li>Frigos, congélateurs, chambres froides</li><li>DLC dépassée signalée en rouge</li><li>Historique des températures</li></ul></div>
-<figure class="fi-m"><img src="img/frigo.jpg" alt="Écran Frigos et chambre froide de l'app Growth Gusto" loading="lazy" width="390" height="844"></figure>
-</li><li class="fi" id="f-service" data-img="service">
-<button class="fi-b" type="button" aria-controls="ph-hygiene" aria-pressed="false"><span class="fi-n">03</span><span class="fi-t">Mise en place et fin de service</span><svg class="fi-c" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>
-<div class="fi-d"><p>Le matin, sortez les produits de la chambre froide. Le soir, l'app vous dit quoi remettre.</p><ul><li>Un tap ou un scan pour déplacer</li><li>Temps passé hors chambre froide suivi</li><li>« Tout remettre » en un bouton</li></ul></div>
-<figure class="fi-m"><img src="img/service.jpg" alt="Écran Mise en place et fin de service de l'app Growth Gusto" loading="lazy" width="390" height="844"></figure>
-</li><li class="fi" id="f-reception" data-img="reception">
-<button class="fi-b" type="button" aria-controls="ph-hygiene" aria-pressed="false"><span class="fi-n">04</span><span class="fi-t">Réception des livraisons</span><svg class="fi-c" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>
-<div class="fi-d"><p>Touchez le fournisseur, contrôlez les produits, photographiez l'étiquette.</p><ul><li>Température à cœur à la livraison</li><li>Photo de l'étiquette sanitaire</li><li>Refus et non-conformités tracés</li></ul></div>
-<figure class="fi-m"><img src="img/reception.jpg" alt="Écran Réception des livraisons de l'app Growth Gusto" loading="lazy" width="390" height="844"></figure>
-</li><li class="fi" id="f-imprimante" data-img="imprimante">
-<button class="fi-b" type="button" aria-controls="ph-hygiene" aria-pressed="false"><span class="fi-n">05</span><span class="fi-t">Étiquettes DLC et QR</span><svg class="fi-c" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>
-<div class="fi-d"><p>Imprimez l'étiquette du produit ouvert ou préparé. Le QR se scanne pour tout retrouver.</p><ul><li>Imprimante Wi-Fi ou Bluetooth</li><li>Zebra ZD421d ou Brother QL-820NWB</li><li>Scan à la porte du frigo</li></ul></div>
-<figure class="fi-m"><img src="img/imprimante.jpg" alt="Écran Étiquettes DLC et QR de l'app Growth Gusto" loading="lazy" width="390" height="844"></figure>
-</li><li class="fi" id="f-menage" data-img="menage">
-<button class="fi-b" type="button" aria-controls="ph-hygiene" aria-pressed="false"><span class="fi-n">06</span><span class="fi-t">Planning ménage</span><svg class="fi-c" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>
-<div class="fi-d"><p>Chaque tâche a son jour, sa fiche « comment faire » et la signature de qui l'a faite.</p><ul><li>Vue du jour, de la semaine, plan complet</li><li>Retards signalés</li><li>Photo de preuve possible</li></ul></div>
-<figure class="fi-m"><img src="img/menage.jpg" alt="Écran Planning ménage de l'app Growth Gusto" loading="lazy" width="390" height="844"></figure>
-</li></ul>
-<div class="fx-ph" aria-hidden="true"><div class="phone" id="ph-hygiene"><img src="img/releve.jpg" alt="" width="390" height="844"></div><div class="ph-cap" id="cap-hygiene">Relevés de températures</div></div>
+<div class="fg" id="g-hygiene" data-c="v" data-r>
+<div class="fg-l"><div class="fg-head"><span class="fg-n">Tous les jours</span><h3>Hygiène et HACCP</h3><p>Ce que l&#x27;équipe fait à chaque service, en un tap.</p></div>
+<ul class="flist" role="list"><li class="fi on" id="f-releve" data-img="releve" data-t="Relevés de températures">
+<button class="fi-b" type="button" aria-expanded="true"><span class="fi-n">01</span><span class="fi-t">Relevés de températures</span><svg class="fi-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
+<div class="fi-d"><div><p>Midi et soir, l&#x27;app vous dit quel frigo relever. Vous glissez le curseur, c&#x27;est noté.</p><ul><li>Seuil par équipement : 0 à 4 °C, -18 °C</li><li>Hors seuil : l&#x27;action corrective est demandée</li><li>Photo du thermomètre, si vous voulez</li><li>Chaque relevé porte le prénom et l&#x27;heure</li></ul>
+<figure class="fi-m"><div class="phone "><img src="img/releve.jpg" alt="Écran Relevés de températures de l&#x27;app Growth Gusto" width="390" height="844" loading="lazy" decoding="async"></div></figure></div></div>
+</li><li class="fi" id="f-frigo" data-img="frigo" data-t="Frigos et chambre froide">
+<button class="fi-b" type="button" aria-expanded="false"><span class="fi-n">02</span><span class="fi-t">Frigos et chambre froide</span><svg class="fi-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
+<div class="fi-d"><div><p>Ce qu&#x27;il y a dans chaque frigo, avec les DLC qui arrivent.</p><ul><li>Frigos, congélateurs, chambres froides</li><li>DLC dépassée signalée en rouge</li><li>Historique des températures</li></ul>
+<figure class="fi-m"><div class="phone "><img src="img/frigo.jpg" alt="Écran Frigos et chambre froide de l&#x27;app Growth Gusto" width="390" height="844" loading="lazy" decoding="async"></div></figure></div></div>
+</li><li class="fi" id="f-service" data-img="service" data-t="Mise en place et fin de service">
+<button class="fi-b" type="button" aria-expanded="false"><span class="fi-n">03</span><span class="fi-t">Mise en place et fin de service</span><svg class="fi-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
+<div class="fi-d"><div><p>Le matin, sortez les produits de la chambre froide. Le soir, l&#x27;app vous dit quoi remettre.</p><ul><li>Un tap ou un scan pour déplacer</li><li>Temps passé hors chambre froide suivi</li><li>« Tout remettre » en un bouton</li></ul>
+<figure class="fi-m"><div class="phone "><img src="img/service.jpg" alt="Écran Mise en place et fin de service de l&#x27;app Growth Gusto" width="390" height="844" loading="lazy" decoding="async"></div></figure></div></div>
+</li><li class="fi" id="f-reception" data-img="reception" data-t="Réception des livraisons">
+<button class="fi-b" type="button" aria-expanded="false"><span class="fi-n">04</span><span class="fi-t">Réception des livraisons</span><svg class="fi-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
+<div class="fi-d"><div><p>Touchez le fournisseur, contrôlez les produits, photographiez l&#x27;étiquette.</p><ul><li>Température à cœur à la livraison</li><li>Photo de l&#x27;étiquette sanitaire</li><li>Refus et non-conformités tracés</li></ul>
+<figure class="fi-m"><div class="phone "><img src="img/reception.jpg" alt="Écran Réception des livraisons de l&#x27;app Growth Gusto" width="390" height="844" loading="lazy" decoding="async"></div></figure></div></div>
+</li><li class="fi" id="f-imprimante" data-img="imprimante" data-t="Étiquettes DLC et QR">
+<button class="fi-b" type="button" aria-expanded="false"><span class="fi-n">05</span><span class="fi-t">Étiquettes DLC et QR</span><svg class="fi-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
+<div class="fi-d"><div><p>Imprimez l&#x27;étiquette du produit ouvert ou préparé. Le QR se scanne pour tout retrouver.</p><ul><li>Imprimante Wi-Fi compatible AirPrint</li><li>Brother QL-810Wc, par exemple</li><li>Scan à la porte du frigo</li></ul>
+<figure class="fi-m"><div class="phone "><img src="img/imprimante.jpg" alt="Écran Étiquettes DLC et QR de l&#x27;app Growth Gusto" width="390" height="844" loading="lazy" decoding="async"></div></figure></div></div>
+</li><li class="fi" id="f-menage" data-img="menage" data-t="Planning ménage">
+<button class="fi-b" type="button" aria-expanded="false"><span class="fi-n">06</span><span class="fi-t">Planning ménage</span><svg class="fi-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
+<div class="fi-d"><div><p>Chaque tâche a son jour, sa fiche « comment faire » et la signature de qui l&#x27;a faite.</p><ul><li>Vue du jour, de la semaine, plan complet</li><li>Retards signalés</li><li>Photo de preuve possible</li></ul>
+<figure class="fi-m"><div class="phone "><img src="img/menage.jpg" alt="Écran Planning ménage de l&#x27;app Growth Gusto" width="390" height="844" loading="lazy" decoding="async"></div></figure></div></div>
+</li></ul></div>
+<div class="stage" aria-hidden="true"><i class="dk"></i><span class="cap">Relevés de températures</span><div class="phone"><div class="scr"><img src="img/releve.jpg" alt="" width="390" height="844" loading="lazy" decoding="async"></div></div></div>
 </div>
+<div class="fg rev" id="g-cuisine" data-c="s" data-r>
+<div class="fg-l"><div class="fg-head"><span class="fg-n">En cuisine</span><h3>Recettes et allergènes</h3><p>Le savoir de la cuisine, au même endroit.</p></div>
+<ul class="flist" role="list"><li class="fi on" id="f-fiche" data-img="fiche" data-t="Fiches recettes et allergènes">
+<button class="fi-b" type="button" aria-expanded="true"><span class="fi-n">07</span><span class="fi-t">Fiches recettes et allergènes</span><svg class="fi-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
+<div class="fi-d"><div><p>Les 14 allergènes sont calculés depuis les ingrédients. En salle, on répond au client tout de suite.</p><ul><li>Fiche recette et portions</li><li>Tableau des allergènes de la carte</li><li>Ingrédients reliés au stock</li></ul>
+<figure class="fi-m"><div class="phone "><img src="img/fiche.jpg" alt="Écran Fiches recettes et allergènes de l&#x27;app Growth Gusto" width="390" height="844" loading="lazy" decoding="async"></div></figure></div></div>
+</li><li class="fi" id="f-noteProc" data-img="noteProc" data-t="Process HACCP par plat">
+<button class="fi-b" type="button" aria-expanded="false"><span class="fi-n">08</span><span class="fi-t">Process HACCP par plat</span><svg class="fi-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
+<div class="fi-d"><div><p>Le diagramme de fabrication de chaque plat, de la réception au stockage.</p><ul><li>Points critiques : ≥ 63 °C à cœur</li><li>Refroidissement de 63 °C à 10 °C en moins de 2 h</li><li>Export en PDF</li></ul>
+<figure class="fi-m"><div class="phone "><img src="img/noteProc.jpg" alt="Écran Process HACCP par plat de l&#x27;app Growth Gusto" width="390" height="844" loading="lazy" decoding="async"></div></figure></div></div>
+</li><li class="fi" id="f-notes" data-img="notes" data-t="Procédures et notes">
+<button class="fi-b" type="button" aria-expanded="false"><span class="fi-n">09</span><span class="fi-t">Procédures et notes</span><svg class="fi-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
+<div class="fi-d"><div><p>Ouverture, fermeture, consignes : l&#x27;équipe trouve tout en cherchant un mot.</p><ul><li>Procédures pas à pas</li><li>Recherche par plat ou ingrédient</li><li>Partagé avec toute l&#x27;équipe</li></ul>
+<figure class="fi-m"><div class="phone "><img src="img/notes.jpg" alt="Écran Procédures et notes de l&#x27;app Growth Gusto" width="390" height="844" loading="lazy" decoding="async"></div></figure></div></div>
+</li></ul></div>
+<div class="stage" aria-hidden="true"><i class="dk"></i><span class="cap">Fiches recettes et allergènes</span><div class="phone"><div class="scr"><img src="img/fiche.jpg" alt="" width="390" height="844" loading="lazy" decoding="async"></div></div></div>
 </div>
-<div class="fg" id="g-cuisine">
-<div class="fg-head"><span class="kicker">En cuisine</span><h3>Recettes et allergènes</h3><p>Le savoir de la cuisine, au même endroit.</p></div>
-<div class="fx">
-<ul class="flist" role="list"><li class="fi on" id="f-fiche" data-img="fiche">
-<button class="fi-b" type="button" aria-controls="ph-cuisine" aria-pressed="true"><span class="fi-n">07</span><span class="fi-t">Fiches recettes et allergènes</span><svg class="fi-c" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>
-<div class="fi-d"><p>Les 14 allergènes sont calculés depuis les ingrédients. En salle, on répond au client tout de suite.</p><ul><li>Fiche recette et portions</li><li>Tableau des allergènes de la carte</li><li>Ingrédients reliés au stock</li></ul></div>
-<figure class="fi-m"><img src="img/fiche.jpg" alt="Écran Fiches recettes et allergènes de l'app Growth Gusto" loading="lazy" width="390" height="844"></figure>
-</li><li class="fi" id="f-noteProc" data-img="noteProc">
-<button class="fi-b" type="button" aria-controls="ph-cuisine" aria-pressed="false"><span class="fi-n">08</span><span class="fi-t">Process HACCP par plat</span><svg class="fi-c" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>
-<div class="fi-d"><p>Le diagramme de fabrication de chaque plat, de la réception au stockage.</p><ul><li>Points critiques : ≥ 63 °C à cœur</li><li>Refroidissement de 63 °C à 10 °C en moins de 2 h</li><li>Export en PDF</li></ul></div>
-<figure class="fi-m"><img src="img/noteProc.jpg" alt="Écran Process HACCP par plat de l'app Growth Gusto" loading="lazy" width="390" height="844"></figure>
-</li><li class="fi" id="f-notes" data-img="notes">
-<button class="fi-b" type="button" aria-controls="ph-cuisine" aria-pressed="false"><span class="fi-n">09</span><span class="fi-t">Procédures et notes</span><svg class="fi-c" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>
-<div class="fi-d"><p>Ouverture, fermeture, consignes : l'équipe trouve tout en cherchant un mot.</p><ul><li>Procédures pas à pas</li><li>Recherche par plat ou ingrédient</li><li>Partagé avec toute l'équipe</li></ul></div>
-<figure class="fi-m"><img src="img/notes.jpg" alt="Écran Procédures et notes de l'app Growth Gusto" loading="lazy" width="390" height="844"></figure>
-</li></ul>
-<div class="fx-ph" aria-hidden="true"><div class="phone" id="ph-cuisine"><img src="img/fiche.jpg" alt="" width="390" height="844"></div><div class="ph-cap" id="cap-cuisine">Fiches recettes et allergènes</div></div>
+<div class="fg" id="g-controle" data-c="k" data-r>
+<div class="fg-l"><div class="fg-head"><span class="fg-n">Le jour du contrôle</span><h3>Registre et contrôles</h3><p>Tout ce qui est fait est enregistré. Le dossier sort en un tap.</p></div>
+<ul class="flist" role="list"><li class="fi on" id="f-registre" data-img="registre" data-t="Registre HACCP">
+<button class="fi-b" type="button" aria-expanded="true"><span class="fi-n">10</span><span class="fi-t">Registre HACCP</span><svg class="fi-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
+<div class="fi-d"><div><p>Qui a fait quoi, et quand. Rien ne s&#x27;efface.</p><ul><li>Taux de conformité sur 30 jours</li><li>Filtre sur les non-conformités</li><li>Températures, réceptions, ménage, traçabilité</li></ul>
+<figure class="fi-m"><div class="phone "><img src="img/registre.jpg" alt="Écran Registre HACCP de l&#x27;app Growth Gusto" width="390" height="844" loading="lazy" decoding="async"></div></figure></div></div>
+</li><li class="fi" id="f-regReport" data-img="regReport" data-t="Rapport pour le contrôle sanitaire">
+<button class="fi-b" type="button" aria-expanded="false"><span class="fi-n">11</span><span class="fi-t">Rapport pour le contrôle sanitaire</span><svg class="fi-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
+<div class="fi-d"><div><p>Choisissez la période, l&#x27;app prépare le rapport à montrer à l&#x27;inspecteur.</p><ul><li>7 jours, 30 jours ou vos dates</li><li>PDF à imprimer ou CSV</li><li>Plan de maîtrise sanitaire à jour</li></ul>
+<figure class="fi-m"><div class="phone "><img src="img/regReport.jpg" alt="Écran Rapport pour le contrôle sanitaire de l&#x27;app Growth Gusto" width="390" height="844" loading="lazy" decoding="async"></div></figure></div></div>
+</li><li class="fi" id="f-obligations" data-img="obligations" data-t="Obligations et contrôles">
+<button class="fi-b" type="button" aria-expanded="false"><span class="fi-n">12</span><span class="fi-t">Obligations et contrôles</span><svg class="fi-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
+<div class="fi-d"><div><p>Extincteurs, dératisation, hotte, électricité : l&#x27;app prévient avant l&#x27;échéance.</p><ul><li>Prestataire et dernier passage</li><li>Rappel avant la date</li><li>En retard : signalé sur l&#x27;accueil</li></ul>
+<figure class="fi-m"><div class="phone "><img src="img/obligations.jpg" alt="Écran Obligations et contrôles de l&#x27;app Growth Gusto" width="390" height="844" loading="lazy" decoding="async"></div></figure></div></div>
+</li></ul></div>
+<div class="stage" aria-hidden="true"><i class="dk"></i><span class="cap">Registre HACCP</span><div class="phone"><div class="scr"><img src="img/registre.jpg" alt="" width="390" height="844" loading="lazy" decoding="async"></div></div></div>
 </div>
+<div class="fg rev" id="g-gestion" data-c="t" data-r>
+<div class="fg-l"><div class="fg-head"><span class="fg-n">Au bureau</span><h3>Stock, caisse et chiffres</h3><p>Savoir ce que vous avez, ce que vous vendez, ce que vous gagnez.</p></div>
+<ul class="flist" role="list"><li class="fi on" id="f-stock" data-img="stock" data-t="Stock et inventaire">
+<button class="fi-b" type="button" aria-expanded="true"><span class="fi-n">13</span><span class="fi-t">Stock et inventaire</span><span class="tag">Pack Complet</span><svg class="fi-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
+<div class="fi-d"><div><p>L&#x27;inventaire du mois se fait en comptant zone par zone. L&#x27;app montre les écarts.</p><ul><li>Inventaire mensuel guidé</li><li>Mouvements et rangement</li><li>Valeur du stock et produits à commander</li></ul>
+<figure class="fi-m"><div class="phone "><img src="img/stock.jpg" alt="Écran Stock et inventaire de l&#x27;app Growth Gusto" width="390" height="844" loading="lazy" decoding="async"></div></figure></div></div>
+</li><li class="fi" id="f-tickets" data-img="tickets" data-t="Tickets de caisse">
+<button class="fi-b" type="button" aria-expanded="false"><span class="fi-n">14</span><span class="fi-t">Tickets de caisse</span><span class="tag">Pack Complet</span><svg class="fi-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
+<div class="fi-d"><div><p>Photographiez le ticket Z du soir : les ventes déduisent le stock.</p><ul><li>Ticket long ? En plusieurs photos</li><li>Chiffre d&#x27;affaires et couverts</li><li>Ventes reliées aux recettes</li></ul>
+<figure class="fi-m"><div class="phone "><img src="img/tickets.jpg" alt="Écran Tickets de caisse de l&#x27;app Growth Gusto" width="390" height="844" loading="lazy" decoding="async"></div></figure></div></div>
+</li><li class="fi" id="f-dashboard" data-img="dashboard" data-t="Tableau de bord">
+<button class="fi-b" type="button" aria-expanded="false"><span class="fi-n">15</span><span class="fi-t">Tableau de bord</span><span class="tag">Pack Complet</span><svg class="fi-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
+<div class="fi-d"><div><p>Le chiffre du jour, de la semaine, comparé à la semaine d&#x27;avant.</p><ul><li>Chiffre d&#x27;affaires TTC</li><li>Food cost et prime cost</li><li>Masse salariale du mois</li></ul>
+<figure class="fi-m"><div class="phone "><img src="img/dashboard.jpg" alt="Écran Tableau de bord de l&#x27;app Growth Gusto" width="390" height="844" loading="lazy" decoding="async"></div></figure></div></div>
+</li><li class="fi" id="f-finance" data-img="finance" data-t="Finances">
+<button class="fi-b" type="button" aria-expanded="false"><span class="fi-n">16</span><span class="fi-t">Finances</span><span class="tag">Pack Complet</span><svg class="fi-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
+<div class="fi-d"><div><p>Le résultat estimé du mois et les ratios qui comptent.</p><ul><li>Marge brute, CA moyen par jour</li><li>Comparaison au mois précédent</li><li>Export pour le comptable</li></ul>
+<figure class="fi-m"><div class="phone "><img src="img/finance.jpg" alt="Écran Finances de l&#x27;app Growth Gusto" width="390" height="844" loading="lazy" decoding="async"></div></figure></div></div>
+</li></ul></div>
+<div class="stage" aria-hidden="true"><i class="dk"></i><span class="cap">Stock et inventaire</span><div class="phone"><div class="scr"><img src="img/stock.jpg" alt="" width="390" height="844" loading="lazy" decoding="async"></div></div></div>
 </div>
-<div class="fg" id="g-controle">
-<div class="fg-head"><span class="kicker">Le jour du contrôle</span><h3>Registre et contrôles</h3><p>Tout ce qui est fait est enregistré. Le dossier sort en un tap.</p></div>
-<div class="fx">
-<ul class="flist" role="list"><li class="fi on" id="f-registre" data-img="registre">
-<button class="fi-b" type="button" aria-controls="ph-controle" aria-pressed="true"><span class="fi-n">10</span><span class="fi-t">Registre HACCP</span><svg class="fi-c" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>
-<div class="fi-d"><p>Qui a fait quoi, et quand. Rien ne s'efface.</p><ul><li>Taux de conformité sur 30 jours</li><li>Filtre sur les non-conformités</li><li>Températures, réceptions, ménage, traçabilité</li></ul></div>
-<figure class="fi-m"><img src="img/registre.jpg" alt="Écran Registre HACCP de l'app Growth Gusto" loading="lazy" width="390" height="844"></figure>
-</li><li class="fi" id="f-regReport" data-img="regReport">
-<button class="fi-b" type="button" aria-controls="ph-controle" aria-pressed="false"><span class="fi-n">11</span><span class="fi-t">Rapport pour le contrôle sanitaire</span><svg class="fi-c" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>
-<div class="fi-d"><p>Choisissez la période, l'app prépare le rapport à montrer à l'inspecteur.</p><ul><li>7 jours, 30 jours ou vos dates</li><li>PDF à imprimer ou CSV</li><li>Plan de maîtrise sanitaire à jour</li></ul></div>
-<figure class="fi-m"><img src="img/regReport.jpg" alt="Écran Rapport pour le contrôle sanitaire de l'app Growth Gusto" loading="lazy" width="390" height="844"></figure>
-</li><li class="fi" id="f-obligations" data-img="obligations">
-<button class="fi-b" type="button" aria-controls="ph-controle" aria-pressed="false"><span class="fi-n">12</span><span class="fi-t">Obligations et contrôles</span><svg class="fi-c" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>
-<div class="fi-d"><p>Extincteurs, dératisation, hotte, électricité : l'app prévient avant l'échéance.</p><ul><li>Prestataire et dernier passage</li><li>Rappel avant la date</li><li>En retard : signalé sur l'accueil</li></ul></div>
-<figure class="fi-m"><img src="img/obligations.jpg" alt="Écran Obligations et contrôles de l'app Growth Gusto" loading="lazy" width="390" height="844"></figure>
-</li></ul>
-<div class="fx-ph" aria-hidden="true"><div class="phone" id="ph-controle"><img src="img/registre.jpg" alt="" width="390" height="844"></div><div class="ph-cap" id="cap-controle">Registre HACCP</div></div>
-</div>
-</div>
-<div class="fg" id="g-gestion">
-<div class="fg-head"><span class="kicker">Au bureau</span><h3>Stock, caisse et chiffres</h3><p>Savoir ce que vous avez, ce que vous vendez, ce que vous gagnez.</p></div>
-<div class="fx">
-<ul class="flist" role="list"><li class="fi on" id="f-stock" data-img="stock">
-<button class="fi-b" type="button" aria-controls="ph-gestion" aria-pressed="true"><span class="fi-n">13</span><span class="fi-t">Stock et inventaire</span><span class="tag-c">Pack Complet</span><svg class="fi-c" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>
-<div class="fi-d"><p>L'inventaire du mois se fait en comptant zone par zone. L'app montre les écarts.</p><ul><li>Inventaire mensuel guidé</li><li>Mouvements et rangement</li><li>Valeur du stock et produits à commander</li></ul></div>
-<figure class="fi-m"><img src="img/stock.jpg" alt="Écran Stock et inventaire de l'app Growth Gusto" loading="lazy" width="390" height="844"></figure>
-</li><li class="fi" id="f-tickets" data-img="tickets">
-<button class="fi-b" type="button" aria-controls="ph-gestion" aria-pressed="false"><span class="fi-n">14</span><span class="fi-t">Tickets de caisse</span><span class="tag-c">Pack Complet</span><svg class="fi-c" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>
-<div class="fi-d"><p>Photographiez le ticket Z du soir : les ventes déduisent le stock.</p><ul><li>Ticket long ? En plusieurs photos</li><li>Chiffre d'affaires et couverts</li><li>Ventes reliées aux recettes</li></ul></div>
-<figure class="fi-m"><img src="img/tickets.jpg" alt="Écran Tickets de caisse de l'app Growth Gusto" loading="lazy" width="390" height="844"></figure>
-</li><li class="fi" id="f-dashboard" data-img="dashboard">
-<button class="fi-b" type="button" aria-controls="ph-gestion" aria-pressed="false"><span class="fi-n">15</span><span class="fi-t">Tableau de bord</span><span class="tag-c">Pack Complet</span><svg class="fi-c" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>
-<div class="fi-d"><p>Le chiffre du jour, de la semaine, comparé à la semaine d'avant.</p><ul><li>Chiffre d'affaires TTC</li><li>Food cost et prime cost</li><li>Masse salariale du mois</li></ul></div>
-<figure class="fi-m"><img src="img/dashboard.jpg" alt="Écran Tableau de bord de l'app Growth Gusto" loading="lazy" width="390" height="844"></figure>
-</li><li class="fi" id="f-finance" data-img="finance">
-<button class="fi-b" type="button" aria-controls="ph-gestion" aria-pressed="false"><span class="fi-n">16</span><span class="fi-t">Finances</span><span class="tag-c">Pack Complet</span><svg class="fi-c" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>
-<div class="fi-d"><p>Le résultat estimé du mois et les ratios qui comptent.</p><ul><li>Marge brute, CA moyen par jour</li><li>Comparaison au mois précédent</li><li>Export pour le comptable</li></ul></div>
-<figure class="fi-m"><img src="img/finance.jpg" alt="Écran Finances de l'app Growth Gusto" loading="lazy" width="390" height="844"></figure>
-</li></ul>
-<div class="fx-ph" aria-hidden="true"><div class="phone" id="ph-gestion"><img src="img/stock.jpg" alt="" width="390" height="844"></div><div class="ph-cap" id="cap-gestion">Stock et inventaire</div></div>
-</div>
-</div>
-<div class="fg" id="g-equipe">
-<div class="fg-head"><span class="kicker">L'équipe</span><h3>Équipe, pointeuse et planning</h3><p>Chacun son compte, ses horaires, son planning.</p></div>
-<div class="fx">
-<ul class="flist" role="list"><li class="fi on" id="f-equipe" data-img="equipe">
-<button class="fi-b" type="button" aria-controls="ph-equipe" aria-pressed="true"><span class="fi-n">17</span><span class="fi-t">Comptes de l'équipe</span><svg class="fi-c" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>
-<div class="fi-d"><p>Chaque cuisinier a son compte. Vous voyez qui a fait chaque relevé, chaque étiquette.</p><ul><li>Utilisateurs illimités</li><li>Rôles : gérant, chef, équipe</li><li>Invitation par code ou QR</li></ul></div>
-<figure class="fi-m"><img src="img/equipe.jpg" alt="Écran Comptes de l'équipe de l'app Growth Gusto" loading="lazy" width="390" height="844"></figure>
-</li><li class="fi" id="f-pointeuse" data-img="pointeuse">
-<button class="fi-b" type="button" aria-controls="ph-equipe" aria-pressed="false"><span class="fi-n">18</span><span class="fi-t">Pointeuse</span><span class="tag-c">Pack Complet</span><svg class="fi-c" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>
-<div class="fi-d"><p>Arrivée, pause, départ : chacun touche son prénom.</p><ul><li>Sur la tablette de la cuisine</li><li>Heures du jour et de la semaine</li><li>Retards visibles</li></ul></div>
-<figure class="fi-m"><img src="img/pointeuse.jpg" alt="Écran Pointeuse de l'app Growth Gusto" loading="lazy" width="390" height="844"></figure>
-</li><li class="fi" id="f-planning" data-img="planning">
-<button class="fi-b" type="button" aria-controls="ph-equipe" aria-pressed="false"><span class="fi-n">19</span><span class="fi-t">Planning de l'équipe</span><span class="tag-c">Pack Complet</span><svg class="fi-c" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>
-<div class="fi-d"><p>Le planning de la semaine, avec les heures prévues et pointées.</p><ul><li>Créneaux par poste</li><li>Alerte repos de 11 h</li><li>Coût estimé de la semaine</li></ul></div>
-<figure class="fi-m"><img src="img/planning.jpg" alt="Écran Planning de l'équipe de l'app Growth Gusto" loading="lazy" width="390" height="844"></figure>
-</li><li class="fi" id="f-staff" data-img="staff">
-<button class="fi-b" type="button" aria-controls="ph-equipe" aria-pressed="false"><span class="fi-n">20</span><span class="fi-t">Employés et salaires</span><span class="tag-c">Pack Complet</span><svg class="fi-c" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>
-<div class="fi-d"><p>Contrats, taux horaires et coût réel de chaque employé.</p><ul><li>Brut et chargé par heure et par mois</li><li>Masse salariale comparée au CA</li><li>Fiche par employé</li></ul></div>
-<figure class="fi-m"><img src="img/staff.jpg" alt="Écran Employés et salaires de l'app Growth Gusto" loading="lazy" width="390" height="844"></figure>
-</li></ul>
-<div class="fx-ph" aria-hidden="true"><div class="phone" id="ph-equipe"><img src="img/equipe.jpg" alt="" width="390" height="844"></div><div class="ph-cap" id="cap-equipe">Comptes de l'équipe</div></div>
-</div>
+<div class="fg" id="g-equipe" data-c="l" data-r>
+<div class="fg-l"><div class="fg-head"><span class="fg-n">L&#x27;équipe</span><h3>Équipe, pointeuse et planning</h3><p>Chacun son compte, ses horaires, son planning.</p></div>
+<ul class="flist" role="list"><li class="fi on" id="f-equipe" data-img="equipe" data-t="Comptes de l&#x27;équipe">
+<button class="fi-b" type="button" aria-expanded="true"><span class="fi-n">17</span><span class="fi-t">Comptes de l&#x27;équipe</span><svg class="fi-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
+<div class="fi-d"><div><p>Chaque cuisinier a son compte. Vous voyez qui a fait chaque relevé, chaque étiquette.</p><ul><li>Utilisateurs illimités</li><li>Rôles : gérant, chef, équipe</li><li>Invitation par code ou QR</li></ul>
+<figure class="fi-m"><div class="phone "><img src="img/equipe.jpg" alt="Écran Comptes de l&#x27;équipe de l&#x27;app Growth Gusto" width="390" height="844" loading="lazy" decoding="async"></div></figure></div></div>
+</li><li class="fi" id="f-pointeuse" data-img="pointeuse" data-t="Pointeuse">
+<button class="fi-b" type="button" aria-expanded="false"><span class="fi-n">18</span><span class="fi-t">Pointeuse</span><span class="tag">Pack Complet</span><svg class="fi-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
+<div class="fi-d"><div><p>Arrivée, pause, départ : chacun touche son prénom.</p><ul><li>Sur la tablette de la cuisine</li><li>Heures du jour et de la semaine</li><li>Retards visibles</li></ul>
+<figure class="fi-m"><div class="phone "><img src="img/pointeuse.jpg" alt="Écran Pointeuse de l&#x27;app Growth Gusto" width="390" height="844" loading="lazy" decoding="async"></div></figure></div></div>
+</li><li class="fi" id="f-planning" data-img="planning" data-t="Planning de l&#x27;équipe">
+<button class="fi-b" type="button" aria-expanded="false"><span class="fi-n">19</span><span class="fi-t">Planning de l&#x27;équipe</span><span class="tag">Pack Complet</span><svg class="fi-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
+<div class="fi-d"><div><p>Le planning de la semaine, avec les heures prévues et pointées.</p><ul><li>Créneaux par poste</li><li>Alerte repos de 11 h</li><li>Coût estimé de la semaine</li></ul>
+<figure class="fi-m"><div class="phone "><img src="img/planning.jpg" alt="Écran Planning de l&#x27;équipe de l&#x27;app Growth Gusto" width="390" height="844" loading="lazy" decoding="async"></div></figure></div></div>
+</li><li class="fi" id="f-staff" data-img="staff" data-t="Employés et salaires">
+<button class="fi-b" type="button" aria-expanded="false"><span class="fi-n">20</span><span class="fi-t">Employés et salaires</span><span class="tag">Pack Complet</span><svg class="fi-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
+<div class="fi-d"><div><p>Contrats, taux horaires et coût réel de chaque employé.</p><ul><li>Brut et chargé par heure et par mois</li><li>Masse salariale comparée au CA</li><li>Fiche par employé</li></ul>
+<figure class="fi-m"><div class="phone "><img src="img/staff.jpg" alt="Écran Employés et salaires de l&#x27;app Growth Gusto" width="390" height="844" loading="lazy" decoding="async"></div></figure></div></div>
+</li></ul></div>
+<div class="stage" aria-hidden="true"><i class="dk"></i><span class="cap">Comptes de l&#x27;équipe</span><div class="phone"><div class="scr"><img src="img/equipe.jpg" alt="" width="390" height="844" loading="lazy" decoding="async"></div></div></div>
 </div>
 </section>
-<section class="devices wrap" aria-labelledby="h-dev">
+
+<section class="dev wrap" aria-labelledby="h-dev">
 <div class="dv">
-<div><span class="kicker">Partout</span><h2 id="h-dev">Le téléphone en cuisine, <em>l'ordinateur au bureau.</em></h2>
+<div data-r><span class="kick">Partout</span><h2 class="h2" id="h-dev">Le téléphone en cuisine, <span class="em">l'ordinateur au bureau.</span></h2>
 <p class="l">La même app sur tous les appareils. Ce qui est noté en cuisine apparaît tout de suite au bureau.</p>
-<ul><li><b>Téléphone</b>Relevés, étiquettes, scan, ménage</li><li><b>Tablette</b>Pointeuse et réception au passe</li><li><b>Ordinateur</b>Tableau de bord, stock, registre</li></ul></div>
-<div class="browser"><div class="bar"><i></i><i></i><i></i><span>app.growthgusto.fr</span></div><img src="img/desk-home.jpg" alt="Accueil de Growth Gusto sur ordinateur : menu complet, frigos à relever, urgences et activité de l'équipe" loading="lazy" width="2049" height="1281"></div>
+<ul class="dl">
+<li><span class="well w1"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="7" y="2.5" width="10" height="19" rx="2.6"/><path d="M11 18.5h2"/></svg></span><span><b>Téléphone</b><span>Relevés, étiquettes, scan, ménage</span></span></li>
+<li><span class="well w2"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="3" width="17" height="18" rx="2.6"/><path d="M11 18h2"/></svg></span><span><b>Tablette</b><span>Pointeuse et réception au passe</span></span></li>
+<li><span class="well w3"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4.5" width="16" height="11" rx="2"/><path d="M2 19.5h20"/></svg></span><span><b>Ordinateur</b><span>Tableau de bord, stock, registre</span></span></li>
+</ul></div>
+<div class="mock" data-r style="--dl:2">
+<div class="browser"><div class="bar"><i></i><i></i><i></i><span>app.growthgusto.fr</span></div><img src="img/desk-home.jpg" alt="Accueil de Growth Gusto sur ordinateur : menu complet, frigos relevés, tâches à faire et activité de l'équipe" loading="lazy" decoding="async" width="2000" height="1250"></div>
+<div class="phone"><img src="img/releve.jpg" alt="" loading="lazy" decoding="async" width="390" height="844"></div>
+</div>
 </div>
 </section>
-<section class="start tiles" aria-labelledby="h-start">
+
+<section class="start" aria-labelledby="h-start">
 <div class="wrap">
-<span class="kicker">Démarrage</span>
-<h2 id="h-start">Ouvert ce soir, en trois étapes.</h2>
+<div class="sh" data-r><span class="kick">Démarrage</span><h2 id="h-start">Ouvert ce soir, en trois étapes.</h2></div>
 <div class="rail">
-<article class="ticket"><div class="tk-k"><span>Étape</span><span>2 min</span></div><div class="tk-n">1</div><h3>Créez le compte et le restaurant.</h3><p>Un e-mail, le nom de votre maison. C'est tout.</p><div class="tk-s"><i></i>14 jours offerts</div></article>
-<article class="ticket"><div class="tk-k"><span>Étape</span><span>5 min</span></div><div class="tk-n">2</div><h3>Ajoutez vos frigos.</h3><p>Frigos, congélateurs, chambres froides, avec leur plage. Le premier relevé se fait dans la foulée.</p><div class="tk-s"><i></i>0 à 4 °C, -18 °C</div></article>
-<article class="ticket"><div class="tk-k"><span>Étape</span><span>1 min</span></div><div class="tk-n">3</div><h3>Imprimez vos premières étiquettes.</h3><p>Jumelez l'imprimante, choisissez un produit, la DLC sort du rouleau.</p><div class="tk-s"><i></i>Ça marche !</div></article>
+<article class="tk" data-r style="--r:-1.6deg;--dl:0"><div class="tk-k"><span>Étape</span><span>2 min</span></div><div class="tk-n">1</div><h3>Créez le compte et le restaurant.</h3><p>Un e-mail, le nom de votre maison. C'est tout.</p><span class="tk-s">14 jours offerts</span></article>
+<article class="tk" data-r style="--r:1.2deg;--dl:1"><div class="tk-k"><span>Étape</span><span>5 min</span></div><div class="tk-n">2</div><h3>Ajoutez vos frigos.</h3><p>Frigos, congélateurs, chambres froides, avec leur plage. Le premier relevé se fait dans la foulée.</p><span class="tk-s">0 à 4 °C, -18 °C</span></article>
+<article class="tk" data-r style="--r:-.8deg;--dl:2"><div class="tk-k"><span>Étape</span><span>1 min</span></div><div class="tk-n">3</div><h3>Imprimez vos premières étiquettes.</h3><p>Ajoutez l'imprimante Wi-Fi, choisissez un produit, la DLC sort du rouleau.</p><span class="tk-s">Ça marche !</span></article>
 </div>
-<div class="start-cta">
-<a class="btn" href="https://app.growthgusto.fr/?signup=1" target="_blank" rel="noopener" style="--edge:#2A0BA6;border-color:#fff">Essayer 14 jours gratuits <svg class="arr" viewBox="0 0 24 24" fill="none" stroke="#1B1530" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+<div class="start-cta" data-r>
+<a class="btn v" href="https://app.growthgusto.fr/?signup=1" target="_blank" rel="noopener">Essayer 14 jours gratuits <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
 <p>14 jours gratuits. Sans engagement.</p>
 </div>
 </div>
 </section>
+
 <section class="pricing wrap" id="tarifs" aria-labelledby="h-price">
-<div class="p-head"><div><span class="kicker">Tarifs</span><h2 id="h-price">Deux packs. <em>C'est tout.</em></h2></div></div>
+<div class="sh" data-r><span class="kick">Tarifs</span><h2 id="h-price">Deux packs. <span class="em">C'est tout.</span></h2></div>
 <div class="plans">
-<article class="plan">
+<article class="plan" data-r>
 <h3>Essentiel</h3>
 <p class="who">Toute l'hygiène et le HACCP, pour un restaurant.</p>
 <div class="price"><b>49</b><span>€ HT<br>par mois</span></div>
 <p class="eq">Sans engagement · sans frais d'installation</p>
 <ul><li class="grp">Hygiène, cuisine, contrôles</li><li>Relevés de températures</li><li>Frigos, congélateurs, chambre froide</li><li>Mise en place et fin de service</li><li>Réception des livraisons</li><li>Étiquettes DLC, QR et scan</li><li>Planning ménage</li><li>Fiches recettes et 14 allergènes</li><li>Process HACCP par plat en PDF</li><li>Registre et rapport de contrôle sanitaire</li><li>Obligations et contrôles</li><li>Comptes équipe illimités</li></ul>
-<a class="btn" href="https://app.growthgusto.fr/?signup=1&amp;plan=essentiel" target="_blank" rel="noopener">Essayer Essentiel 14 jours</a>
+<a class="btn soft" href="https://app.growthgusto.fr/?signup=1&amp;plan=essentiel" target="_blank" rel="noopener">Essayer Essentiel 14 jours</a>
 </article>
-<article class="plan plan-plus">
+<article class="plan plan-plus" data-r style="--dl:1">
 <span class="sticker">Tout compris</span>
 <h3>Complet</h3>
 <p class="who">Toute l'app : HACCP, stock, caisse, chiffres et équipe.</p>
 <div class="price"><b>99</b><span>€ HT<br>par mois</span></div>
 <p class="eq">Sans engagement · sans frais d'installation</p>
 <ul><li class="all">Tout Essentiel, plus :</li><li>Stock et inventaire mensuel</li><li>Tickets de caisse : ventes déduites du stock</li><li>Tableau de bord et finances</li><li>Pointeuse</li><li>Planning de l'équipe</li><li>Employés et salaires</li><li>Plusieurs restaurants</li><li>Mise en route avec nous (visio 30 min)</li><li>Support prioritaire 7 j/7</li></ul>
-<a class="btn btn-primary" href="https://app.growthgusto.fr/?signup=1&amp;plan=complet" target="_blank" rel="noopener">Essayer Complet 14 jours</a>
+<a class="btn v" href="https://app.growthgusto.fr/?signup=1&amp;plan=complet" target="_blank" rel="noopener">Essayer Complet 14 jours</a>
 </article>
 </div>
-<p class="trial"><span>14 jours gratuits</span><span>Sans engagement</span><span>Utilisateurs illimités</span></p>
-<div class="replace"><b>Une app au lieu de cinq</b><p>Le classeur HACCP, le tableur de stock, la pointeuse, le planning papier et le carnet des contrôles. Tout est au même endroit, et tout est relié.</p></div>
+<p class="trial" data-r><span>14 jours gratuits</span><span>Sans engagement</span><span>Utilisateurs illimités</span></p>
+<div class="replace" data-r>
+<div><h3>Une app au lieu de cinq</h3><p>Le classeur HACCP, le tableur de stock, la pointeuse, le planning papier et le carnet des contrôles. Tout est au même endroit, et tout est relié.</p></div>
+<div class="olds" aria-hidden="true"><span class="old" style="--r:-3deg;--j:0">Classeur HACCP</span><span class="old" style="--r:2deg;--j:1">Tableur de stock</span><span class="old" style="--r:-1deg;--j:2">Pointeuse</span><span class="old" style="--r:3deg;--j:3">Planning papier</span><span class="old" style="--r:-2deg;--j:4">Carnet des contrôles</span><svg class="arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg><img class="gg" src="icon.svg" alt="" width="58" height="58"></div>
+</div>
 </section>
+
 <section class="faq wrap" id="faq" aria-labelledby="h-faq">
-<div class="faq-side">
-<span class="kicker">FAQ</span>
-<h2 id="h-faq">Les questions du passe.</h2>
+<div class="faq-side" data-r>
+<span class="kick">FAQ</span>
+<h2 class="h2" id="h-faq">Les questions du passe.</h2>
 <p>Une autre question ? Écrivez-nous à <a href="mailto:contact@growthgusto.fr">contact@growthgusto.fr</a>. Une vraie personne vous répond.</p>
 </div>
-<div>
+<div class="qs" data-r style="--dl:1">
 <details open><summary>Y a-t-il un engagement ?<i aria-hidden="true"></i></summary><div class="ans">Non. L'abonnement est mensuel, sans engagement et sans frais d'installation. Vous résiliez depuis l'app, quand vous voulez.</div></details>
 <details><summary>Comment marche l'essai de 14 jours ?<i aria-hidden="true"></i></summary><div class="ans">Vous créez votre compte et vous avez toute l'app pendant 14 jours. Ensuite, vous choisissez Essentiel ou Complet pour continuer.</div></details>
-<details><summary>De quel matériel ai-je besoin ?<i aria-hidden="true"></i></summary><div class="ans">Un téléphone, une tablette ou un ordinateur. Growth Gusto s'installe depuis le navigateur, sur iPhone comme sur Android. Gardez votre sonde : vous tapez la valeur lue.</div></details>
-<details><summary>Quelle imprimante pour les étiquettes ?<i aria-hidden="true"></i></summary><div class="ans">Une imprimante d'étiquettes Wi-Fi ou Bluetooth, par exemple la Zebra ZD421d. Avec le pack Complet, nous la jumelons avec vous pendant la mise en route. Sans imprimante, l'app fonctionne aussi.</div></details>
+<details><summary>De quel matériel ai-je besoin ?<i aria-hidden="true"></i></summary><div class="ans">Un téléphone, une tablette ou un ordinateur. Growth Gusto s'installe depuis le navigateur, sur iPhone comme sur Android. Gardez votre sonde : vous tapez la valeur lue, et vous ajoutez une photo si vous le souhaitez.</div></details>
+<details><summary>Quelle imprimante pour les étiquettes ?<i aria-hidden="true"></i></summary><div class="ans">Une imprimante d'étiquettes Wi-Fi compatible AirPrint, par exemple la Brother QL-810Wc. Avec le pack Complet, nous la configurons avec vous pendant la mise en route. Sans imprimante, l'app fonctionne aussi.</div></details>
 <details><summary>Où sont hébergées mes données ?<i aria-hidden="true"></i></summary><div class="ans">En France. Vos données sont traitées dans le respect du RGPD, elles restent à vous, et vous les exportez en PDF quand vous voulez.</div></details>
 <details><summary>Toute l'équipe peut l'utiliser ?<i aria-hidden="true"></i></summary><div class="ans">Oui, les utilisateurs sont illimités dans les deux packs. Chacun a son compte : chaque relevé, chaque étiquette, chaque tâche garde le nom de qui l'a fait.</div></details>
 <details><summary>Ça marche sans réseau ?<i aria-hidden="true"></i></summary><div class="ans">Le sous-sol n'a pas de 4G ? Vous notez vos relevés quand même : ils sont gardés sur l'appareil et partent dès que le réseau revient.</div></details>
 </div>
 </section>
-<!-- ===== Final ===== -->
-<section class="wrap" aria-labelledby="h-final">
-<div class="final">
-<div class="final-copy">
-<span class="kicker">23:04 · Fermeture</span>
-<h2 id="h-final">Tout est relevé. <em>Bonne nuit, chef.</em></h2>
-<p>Demain matin, le frigo vous attend. Le classeur, lui, peut partir au recyclage.</p>
-<div class="cta-row">
-<a class="btn btn-primary" href="https://app.growthgusto.fr/?signup=1" target="_blank" rel="noopener">Essayer 14 jours gratuits <svg class="arr" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
-<a class="demo" href="https://app.growthgusto.fr/?demo=1" target="_blank" rel="noopener"><span class="demo-ico" aria-hidden="true"><svg width="26" height="26" viewBox="0 0 32 32" fill="none" class="ink" style="stroke-width:2"><path d="M6 20h20a10 10 0 0 0-20 0Z" fill="#fff"/><path d="M4 23h24"/><path d="M16 8v2"/><circle cx="16" cy="7" r="1.6" fill="#1B1530"/></svg></span><span><b>Voir la démo</b><small>Rien n'est enregistré.</small></span></a>
+
+<section class="final-w" aria-labelledby="h-final">
+<div class="final wallc" data-r>
+<div class="copy">
+<span class="eyebrow">23:04 · Fermeture</span>
+<h2 id="h-final">Tout est relevé.<br><em>Bonne nuit, chef.</em></h2>
+<p class="l">Demain matin, le frigo vous attend. Le classeur, lui, peut partir au recyclage.</p>
+<div class="ctas">
+<a class="btn w" href="https://app.growthgusto.fr/?signup=1" target="_blank" rel="noopener">Essayer 14 jours gratuits <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+<a class="demo" href="https://app.growthgusto.fr/?demo=1" target="_blank" rel="noopener"><span class="pl"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.5-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg></span><span><b>Voir la démo</b><small>Rien n'est enregistré.</small></span></a>
 </div>
 <p class="fine"><span>14 jours gratuits</span><span>Sans engagement</span></p>
 </div>
-<div class="final-scene" aria-hidden="true">
-<svg viewBox="0 0 560 560" preserveAspectRatio="xMidYMax slice">
-<rect x="-300" y="-100" width="1200" height="800" fill="url(#tilesN)"/>
-<g fill="#FFF4D9"><use class="star" href="#s-spark" x="350" y="40"/></g>
-<rect x="300" y="60" width="200" height="150" rx="10" fill="#120838" class="ink"/>
-<path d="M400 60v150M300 135h200" class="ink"/>
-<circle cx="452" cy="104" r="20" fill="#FFF4D9"/><circle cx="462" cy="98" r="18" fill="#120838"/>
-<circle class="star" cx="330" cy="90" r="2.5" fill="#fff"/><circle class="star" cx="360" cy="170" r="2" fill="#fff"/><circle class="star" cx="440" cy="180" r="2.5" fill="#fff"/>
-<use href="#s-counter" y="480"/>
-<circle class="lcdglow" cx="170" cy="330" r="150" fill="url(#gl)"/>
-<g transform="translate(20 -10)">
-<use href="#s-fbody"/><use href="#s-dfront"/>
-<rect x="80" y="276" width="210" height="514" rx="10" fill="#0D0533" opacity=".45"/>
-<rect x="80" y="150" width="210" height="116" rx="10" fill="#0D0533" opacity=".45"/>
-<rect x="110" y="312" width="116" height="66" rx="8" fill="#11402B"/>
-<text x="214" y="355" text-anchor="end" font-family="JetBrains Mono,monospace" font-weight="700" font-size="30" fill="#9EF5C4">3,1</text>
-<text x="214" y="370" text-anchor="end" font-family="JetBrains Mono,monospace" font-weight="500" font-size="9" letter-spacing="1" fill="#9EF5C4" opacity=".8">°C · OK</text>
-<path d="M291 290v480" stroke="#9EF5C4" stroke-width="3" opacity=".7"/>
-</g>
-<g transform="translate(420 300)"><g class="sway">
-<rect x="-12" y="-16" width="24" height="18" rx="4" fill="#C9C3DA" class="ink"/>
-<rect x="-66" y="0" width="132" height="140" rx="8" fill="#FFFDF8" class="ink"/>
-<text x="-52" y="26" font-family="JetBrains Mono,monospace" font-weight="700" font-size="9" letter-spacing="1" fill="#8A8499">FERMETURE · 23:04</text>
-<text x="-52" y="54" font-family="Bricolage Grotesque,sans-serif" font-weight="700" font-size="17" fill="#1B1530">Tout est</text>
-<text x="-52" y="76" font-family="Bricolage Grotesque,sans-serif" font-weight="700" font-size="17" fill="#1B1530">conforme</text>
-<path d="M-52 96h104" stroke="#E6DCCB" stroke-width="2" stroke-dasharray="5 4"/>
-<circle cx="-47" cy="118" r="4.5" fill="#23935C"/>
-<text x="-36" y="122" font-family="Instrument Sans,sans-serif" font-weight="600" font-size="11.5" fill="#4A4560">12 relevés · 4 DLC</text>
-</g></g>
-<rect x="400" y="282" width="200" height="10" rx="5" fill="#E7E3F1" class="ink"/>
-</svg>
+<div class="night" aria-hidden="true">
+<div class="win"><i class="moon"></i><i class="star" style="left:80px;top:22px"></i><i class="star" style="left:92px;top:84px;animation-delay:.8s"></i><i class="star" style="left:30px;top:88px;animation-delay:1.5s"></i></div>
+<i class="floor"></i>
+<div class="kit">
+<div class="fr cf" style="--j:0"><span class="chk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 12.5l4 4 8-9"/></svg></span><div class="box"><span class="lcdw"><i>1,4°</i></span><span class="hd"></span><span class="door"></span></div><i class="zz" style="left:118px;top:-6px">z</i><i class="zz" style="left:130px;top:-26px;animation-delay:1.2s;font-size:16px">z</i></div>
+<div class="fr" style="--j:1"><span class="chk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 12.5l4 4 8-9"/></svg></span><div class="box" style="width:96px;height:150px"><span class="lcdw"><i>3,0°</i></span><span class="hd"></span></div></div>
+<div class="fr cg" style="--j:2"><span class="chk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 12.5l4 4 8-9"/></svg></span><div class="box"><span class="lcdw"><i>-19,6°</i></span></div></div>
+</div>
 </div>
 </div>
 </section>
 </main>
 
-<footer class="wrap">
+<footer>
 <div class="foot">
 <div>
-<a class="brand" href="#top" data-to="top" aria-label="Growth Gusto">
-<svg viewBox="0 0 512 512" aria-hidden="true"><defs><linearGradient id="g2" x1="0" y1="0" x2="1" y2="1" gradientTransform="rotate(-15 .5 .5)"><stop offset="0" stop-color="#8F63FF"/><stop offset=".55" stop-color="#4A1FE6"/><stop offset="1" stop-color="#2F1BC4"/></linearGradient></defs><rect width="512" height="512" rx="143.36" fill="url(#g2)"/><svg x="97.28" y="97.28" width="317.44" height="317.44" viewBox="0 0 100 100"><path d="M86 16H50A34 34 0 0 0 25.96 74.04" fill="none" stroke="#fff" stroke-width="14"/><path d="M40.5 83.5 80 44M52 42h30v30" fill="none" stroke="#fff" stroke-width="12.5"/></svg></svg>
-<span class="wordmark">Growth Gusto</span>
-</a>
+<a class="brand" href="#top" aria-label="Growth Gusto"><img src="icon.svg" alt="" width="36" height="36"><span>Growth <b>Gusto</b></span></a>
 <p>Né dans la cuisine du Chemin des Sarments. Données hébergées en France.</p>
 </div>
 <nav aria-label="Informations">
 <a href="#" data-noop>Mentions légales</a><a href="#" data-noop>CGU</a><a href="#" data-noop>Confidentialité</a><span class="mail">contact@growthgusto.fr</span>
 </nav>
 </div>
-<p style="font-size:13px;color:var(--ink-3);margin-top:22px">© 2026 Growth Gusto. Chaud devant.</p>
+<p class="copy-r">© 2026 Growth Gusto. Chaud devant.</p>
 </footer>
 <script>
 (() => {
 const $ = (s, r = document) => r.querySelector(s), $$ = (s, r = document) => [...r.querySelectorAll(s)];
 document.documentElement.classList.add('js');
 const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
-const fmt = (n, d = 1) => n.toFixed(d).replace('.', ',');
+const fmt = (n) => n.toFixed(1).replace('.', ',');
 
-/* ---------- sound ---------- */
-let ctx = null, on = true;
+/* sound: tiny synthesized clicks, off until the first gesture */
+let ac = null, on = true;
 try { on = localStorage.getItem('gg-sound') !== 'off'; } catch (e) {}
 const mute = $('#mute');
-const syncMute = () => { mute.setAttribute('aria-pressed', on); mute.title = on ? 'Couper le son' : 'Activer le son'; };
-syncMute();
-const ensure = () => { if (!ctx) { try { ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { ctx = null; } } if (ctx && ctx.state === 'suspended') ctx.resume(); };
-function tone(f1, f2, dur, type = 'sine', g = .045, delay = 0) {
-if (!on || !ctx) return;
-const t = ctx.currentTime + delay, o = ctx.createOscillator(), a = ctx.createGain();
-o.type = type; o.frequency.setValueAtTime(f1, t); o.frequency.exponentialRampToValueAtTime(f2, t + dur);
-a.gain.setValueAtTime(0, t); a.gain.linearRampToValueAtTime(g, t + .005); a.gain.exponentialRampToValueAtTime(.0001, t + dur);
-o.connect(a).connect(ctx.destination); o.start(t); o.stop(t + dur + .02);
-}
-const S = {
-click: () => tone(720, 360, .06, 'triangle', .05),
-tick: () => tone(1500, 1100, .025, 'square', .012),
-print: () => { for (let i = 0; i < 9; i++) tone(180, 120, .04, 'square', .018, i * .12); },
-ding: () => { tone(1318, 1318, .25, 'sine', .04); tone(1760, 1760, .35, 'sine', .035, .09); },
-door: () => tone(220, 90, .18, 'sine', .05)
+const sync = () => { mute.setAttribute('aria-pressed', on); mute.title = on ? 'Couper le son' : 'Activer le son'; };
+sync();
+const ensure = () => { if (!ac) { try { ac = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { ac = null; } } if (ac && ac.state === 'suspended') ac.resume(); };
+const tone = (f1, f2, dur, type = 'sine', g = .04, delay = 0) => {
+  if (!on || !ac) return;
+  const t = ac.currentTime + delay, o = ac.createOscillator(), a = ac.createGain();
+  o.type = type; o.frequency.setValueAtTime(f1, t); o.frequency.exponentialRampToValueAtTime(f2, t + dur);
+  a.gain.setValueAtTime(0, t); a.gain.linearRampToValueAtTime(g, t + .005); a.gain.exponentialRampToValueAtTime(.0001, t + dur);
+  o.connect(a).connect(ac.destination); o.start(t); o.stop(t + dur + .02);
 };
-addEventListener('pointerdown', ensure, { passive: true });
-mute.addEventListener('click', () => { on = !on; try { localStorage.setItem('gg-sound', on ? 'on' : 'off'); } catch (e) {} syncMute(); ensure(); if (on) S.click(); });
-$$('.btn,.demo,.seg button,summary').forEach(b => b.addEventListener('pointerdown', () => { ensure(); S.click(); }));
+const click = () => tone(720, 360, .06, 'triangle', .05);
+mute.addEventListener('click', () => { on = !on; try { localStorage.setItem('gg-sound', on ? 'on' : 'off'); } catch (e) {} sync(); ensure(); click(); });
+$$('.btn,.demo,summary,.fi-b,.chip').forEach((b) => b.addEventListener('pointerdown', () => { ensure(); click(); }, { passive: true }));
 
-/* ---------- nav ---------- */
+/* header */
 const nav = $('#nav');
-const onScroll = () => nav.classList.toggle('scrolled', scrollY > 8);
+const onScroll = () => nav.classList.toggle('sc', scrollY > 8);
 addEventListener('scroll', onScroll, { passive: true }); onScroll();
-$$('[data-to]').forEach(a => a.addEventListener('click', e => {
-const t = document.getElementById(a.dataset.to); if (!t) return;
-e.preventDefault(); t.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
+$$('[data-noop]').forEach((a) => a.addEventListener('click', (e) => e.preventDefault()));
+$$('a[href^="#"]:not([data-noop])').forEach((a) => a.addEventListener('click', (e) => {
+  const id = a.getAttribute('href').slice(1), t = id ? document.getElementById(id) : null;
+  if (!t || a.dataset.feat) return;
+  e.preventDefault(); t.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
+  history.replaceState(null, '', '#' + id);
 }));
-$$('[data-noop]').forEach(a => a.addEventListener('click', e => e.preventDefault()));
-document.addEventListener('submit', e => e.preventDefault());
 
-/* ---------- hero orchestration ---------- */
-const fridge = $('#hFridge'), needle = $('#needle'), dv = $('#hDv'), tv = $('#hTv'), ts = $('#hTs'), dot = $('#hDot'), label = $('#hLabel');
-const ang = t => -120 + (t + 10) * 8;
-function setTemp(t) { needle.setAttribute('transform', `rotate(${ang(t).toFixed(2)})`); dv.textContent = fmt(t) + ' °C'; tv.textContent = fmt(t); }
-function dropNeedle(from, to, dur, done) {
-const t0 = performance.now(); let last = 0;
-ts.textContent = 'Mesure en cours…'; dot.setAttribute('fill', '#F6B93B');
-const step = now => {
-const p = Math.min(1, (now - t0) / dur);
-const v = to + (from - to) * Math.exp(-4.2 * p) * Math.cos(7.5 * p);
-setTemp(p < 1 ? v : to);
-if (now - last > 90) { S.tick(); last = now; }
-if (p < 1) requestAnimationFrame(step); else { ts.textContent = 'Conforme · Léa'; dot.setAttribute('fill', '#23935C'); done && done(); }
-};
-requestAnimationFrame(step);
+/* scroll reveal */
+const els = $$('[data-r]');
+if (reduce || !('IntersectionObserver' in window)) els.forEach((el) => el.classList.add('in'));
+else {
+  const io = new IntersectionObserver((es) => es.forEach((e) => { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } }), { rootMargin: '0px 0px -12% 0px', threshold: .08 });
+  els.forEach((el) => io.observe(el));
 }
-const PRODUCTS = [['Bœuf', 'bourguignon', '07/11'], ['Fond de', 'veau maison', '08/11'], ['Sauce', 'tomate', '07/11'], ['Crème', 'anglaise', '06/11']];
-let pi = 0;
-function printLabel(next) {
-if (next) {
-pi = (pi + 1) % PRODUCTS.length;
-$('#hl1').textContent = PRODUCTS[pi][0]; $('#hl2').textContent = PRODUCTS[pi][1]; $('#hl3').textContent = PRODUCTS[pi][2];
-}
-if (reduce) return;
-label.classList.remove('printing'); label.style.transform = 'translateY(152px)'; void label.getBoundingClientRect();
-label.style.transform = ''; label.classList.add('printing'); S.print();
-setTimeout(() => { S.ding(); }, 1150);
-}
-function openDoor(v) { fridge.classList.toggle('open', v); S.door(); }
-function intro() {
-if (reduce) return;
-setTemp(14); label.style.transform = 'translateY(152px)';
-setTimeout(() => fridge.classList.add('open'), 450);
-setTimeout(() => dropNeedle(14, 3.2, 1700), 800);
-setTimeout(() => fridge.classList.remove('open'), 2700);
-setTimeout(() => printLabel(false), 2900);
-}
-fridge.addEventListener('click', () => { const o = !fridge.classList.contains('open'); openDoor(o); if (o) setTimeout(() => dropNeedle(6.4, 3.2, 1200), 200); });
-$('#hPrinter').addEventListener('click', () => printLabel(true));
-$('#hDial').addEventListener('click', () => dropNeedle(9, 3.2, 1300));
-$('#hPan').addEventListener('click', () => { const t = $('#hToss'); t.classList.remove('tossing'); void t.getBoundingClientRect(); t.classList.add('tossing'); tone(300, 140, .12, 'sawtooth', .02); });
-$('#hTicket').addEventListener('click', () => S.tick());
-intro();
 
-
-
-/* ---------- features ---------- */
-const mob = () => matchMedia('(max-width:900px)').matches;
-$$('.fg').forEach(g => {
-  const ph = $('.fx-ph .phone', g), img = ph && $('img', ph), cap = $('.ph-cap', g), items = $$('.flist > .fi', g);
-  function show(li, quiet) {
-    items.forEach(x => { x.classList.toggle('on', x === li); $('.fi-b', x).setAttribute('aria-pressed', x === li); });
-    if (!img) return;
-    const src = 'img/' + li.dataset.img + '.jpg';
-    if (img.getAttribute('src') === src) return;
-    if (cap) cap.textContent = $('.fi-t', li).textContent;
-    if (!quiet) S.tick();
-    if (reduce) { img.src = src; return; }
-    ph.classList.add('swap');
-    const pre = new Image(); pre.src = src;
-    setTimeout(() => { img.src = src; const done = () => requestAnimationFrame(() => ph.classList.remove('swap')); if (img.complete) done(); else { img.onload = done; img.onerror = done; } }, 200);
+/* features: one open item per group, the stage phone follows */
+const open = (li, scroll) => {
+  const g = li.closest('.fg'); if (!g) return;
+  $$('.fi', g).forEach((x) => { const is = x === li; x.classList.toggle('on', is); $('.fi-b', x).setAttribute('aria-expanded', is); });
+  const scr = $('.stage .scr', g), cap = $('.stage .cap', g);
+  if (scr) {
+    const src = 'img/' + li.dataset.img + '.jpg', cur = $('img:last-child', scr);
+    if (!cur.getAttribute('src').endsWith(src)) {
+      const im = new Image(); im.alt = ''; im.width = 390; im.height = 844; im.src = src; im.className = 'out';
+      scr.appendChild(im);
+      const go = () => requestAnimationFrame(() => requestAnimationFrame(() => { im.classList.remove('out'); $$('img', scr).forEach((o) => { if (o !== im) { o.classList.add('out'); setTimeout(() => o.remove(), 450); } }); }));
+      im.decode ? im.decode().then(go, go) : (im.onload = go);
+    }
+    cap.textContent = li.dataset.t; cap.classList.remove('bump'); void cap.offsetWidth; cap.classList.add('bump');
   }
-  items.forEach(li => $('.fi-b', li).addEventListener('click', () => { if (!mob()) show(li); }));
-  g._show = show;
-});
-addEventListener('load', () => setTimeout(() => $$('.fi[data-img]').forEach(li => { const i = new Image(); i.src = 'img/' + li.dataset.img + '.jpg'; }), 1200));
-$$('.chip').forEach(c => c.addEventListener('click', e => {
-  e.preventDefault(); const li = document.getElementById('f-' + c.dataset.feat); if (!li) return;
-  const g = li.closest('.fg');
-  if (!mob() && g && g._show) g._show(li, true);
-  (mob() ? li : g).scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
-  ensure(); S.click();
+  if (scroll) li.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: matchMedia('(min-width:980px)').matches ? 'center' : 'start' });
+};
+$$('.fi-b').forEach((b) => b.addEventListener('click', () => {
+  const li = b.closest('.fi');
+  if (li.classList.contains('on') && !matchMedia('(min-width:980px)').matches) { li.classList.remove('on'); b.setAttribute('aria-expanded', 'false'); return; }
+  open(li, false);
 }));
+$$('.chip[data-feat]').forEach((c) => c.addEventListener('click', (e) => {
+  const li = document.getElementById('f-' + c.dataset.feat); if (!li) return;
+  e.preventDefault(); open(li, false);
+  setTimeout(() => li.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: matchMedia('(min-width:980px)').matches ? 'center' : 'start' }), 40);
+}));
+if (location.hash.startsWith('#f-')) { const li = document.getElementById(location.hash.slice(1)); if (li) open(li, false); }
 
-/* ---------- faq: one open at a time ---------- */
-$$('details').forEach(d => d.addEventListener('toggle', () => { if (d.open) $$('details').forEach(o => { if (o !== d) o.open = false; }); }));
+/* hero: fridge screens tick like real probes */
+if (!reduce) {
+  const lcds = $$('.hero .lcdw i[data-t]');
+  const toastV = $('[data-lcd="cf"]');
+  setInterval(() => {
+    const el = lcds[Math.floor(Math.random() * lcds.length)];
+    let t = +el.dataset.t + (Math.random() < .5 ? -.1 : .1);
+    t = Math.min(+el.dataset.max, Math.max(+el.dataset.min, t));
+    el.dataset.t = t.toFixed(1);
+    const w = el.parentNode; w.classList.add('blink');
+    setTimeout(() => { el.textContent = fmt(t) + '°'; w.classList.remove('blink'); if (toastV && el === lcds[0]) toastV.textContent = fmt(t); }, 140);
+  }, 1300);
+}
 })();
 </script>
-
 </body>
 </html>
