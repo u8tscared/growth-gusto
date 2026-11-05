@@ -193,7 +193,9 @@ function alSeedSites() {
 }
 
 /* ───────── e-mail (same template as functions/src/alertes.js) ───────── */
-function alMailHTML({ resto, title, intro, items = [], stats = null, cta = "Ouvrir les alertes", foot = "" }) {
+function alMailHTML({ resto, logo = "", title, intro, items = [], stats = null, cta = "Ouvrir les alertes", foot = "" }) {
+  /* the restaurant logo, only as an https URL: most mail clients block data: images */
+  const lg = typeof logo === "string" && /^https:\/\/[^\s"'<>]+$/.test(logo) && logo.length <= 2000 ? logo : "";
   const e = esc, col = { bad: ["#FFE9DE", "#C8432A"], warn: ["#FFF3D6", "#7A5A1A"], ok: ["#E3F5EA", "#1E7F55"], vio: ["#EFE9FF", "#3A10D8"] };
   const row = (it) => { const [bg, fg] = col[it.level] || col.vio; return `<tr><td style="padding:0 0 10px"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#FFFFFF;border:1.5px solid #E9DFCD;border-radius:16px"><tr><td width="44" style="padding:14px 0 14px 14px;vertical-align:top"><div style="width:30px;height:30px;border-radius:50%;background:${bg};color:${fg};font:800 15px/30px Arial,sans-serif;text-align:center">!</div></td><td style="padding:14px 14px 14px 10px;font-family:Arial,Helvetica,sans-serif"><div style="font-size:15px;font-weight:700;color:#1B1530">${e(it.text)}</div>${it.sub ? `<div style="font-size:13px;color:#615B74;margin-top:3px">${e(it.sub)}</div>` : ""}</td></tr></table></td></tr>`; };
   const st = stats ? `<tr><td style="padding:0 0 14px"><table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr>${stats.map(([v, l, lv]) => `<td width="${Math.floor(100 / stats.length)}%" style="padding:0 4px"><div style="background:#FFFFFF;border:1.5px solid #E9DFCD;border-radius:16px;padding:12px 10px;text-align:center;font-family:Arial,Helvetica,sans-serif"><div style="font-size:24px;font-weight:800;letter-spacing:-.5px;color:${lv ? (col[lv] || col.vio)[1] : "#1B1530"}">${e(v)}</div><div style="font-size:12px;color:#615B74;margin-top:2px">${e(l)}</div></div></td>`).join("")}</tr></table></td></tr>` : "";
@@ -203,7 +205,7 @@ function alMailHTML({ resto, title, intro, items = [], stats = null, cta = "Ouvr
 <tr><td style="padding:0 4px 16px;font-family:Arial,Helvetica,sans-serif;font-size:19px;font-weight:800;letter-spacing:-.4px;color:#1B1530">Growth <span style="color:#5B2BFF">Gusto</span></td></tr>
 <tr><td style="background:#FFFDF8;border:1.5px solid #E9DFCD;border-radius:24px;padding:22px 18px 12px">
 <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
-<tr><td style="padding:0 0 4px;font-family:Arial,Helvetica,sans-serif;font-size:13px;font-weight:700;color:#3A10D8">${e(resto)}</td></tr>
+${lg ? `<tr><td style="padding:0 0 10px"><img src="${e(lg)}" width="44" height="44" alt="${e(resto)}" style="display:block;width:44px;height:44px;border-radius:13px;object-fit:contain;background:#FFFFFF;border:1px solid #E9DFCD"></td></tr>` : ""}<tr><td style="padding:0 0 4px;font-family:Arial,Helvetica,sans-serif;font-size:13px;font-weight:700;color:#3A10D8">${e(resto)}</td></tr>
 <tr><td style="padding:0 0 6px;font-family:Arial,Helvetica,sans-serif;font-size:24px;line-height:28px;font-weight:800;letter-spacing:-.6px;color:#1B1530">${e(title)}</td></tr>
 ${intro ? `<tr><td style="padding:0 0 16px;font-family:Arial,Helvetica,sans-serif;font-size:14.5px;line-height:21px;color:#4A4560">${e(intro)}</td></tr>` : ""}
 ${st}${items.map(row).join("")}
@@ -371,12 +373,12 @@ Object.assign(ACT, {
     if (alServerOn()) { await ALERTES.push({ type: "test", level: "warn", key: "test_" + Date.now(), text: "E-mail de test" }); SFX.ok(); toast(`E-mail envoyé à ${rc.length} personne${rc.length > 1 ? "s" : ""}`); return; }
     const un = alCurrent().filter((x) => !x.seen).slice(0, 4);
     const items = un.length ? un.map((x) => ({ level: x.level, text: x.text, sub: x.sub })) : [{ level: "bad", text: "Chambre froide à 6,2 °C", sub: "Exemple · hors seuil depuis 15 min" }];
-    alPreview("Aperçu de l'e-mail", rc, alMailHTML({ resto: S.resto.name, title: un.length ? (un.length > 1 ? `${un.length} alertes à voir` : "1 alerte à voir") : "Une alerte à voir", intro: "Voici ce que vous recevrez dès qu'une alerte se déclenche.", items }));
+    alPreview("Aperçu de l'e-mail", rc, alMailHTML({ resto: S.resto.name, logo: S.resto.logo, title: un.length ? (un.length > 1 ? `${un.length} alertes à voir` : "1 alerte à voir") : "Une alerte à voir", intro: "Voici ce que vous recevrez dès qu'une alerte se déclenche.", items }));
   },
   alReport: () => {
     const W = alWeekly(S), rc = alRecipients();
     const items = [...W.obl.slice(0, 3).map((o) => ({ level: o.late ? "bad" : "warn", text: o.name, sub: o.statusTx })), ...W.thrown.slice(0, 3).map((l) => ({ level: "warn", text: `${l.name} jeté`, sub: l.lostReason || "DLC dépassée" }))];
-    const html = alMailHTML({ resto: S.resto.name, title: "Votre semaine", intro: `Du ${shortDate(W.from)} au ${shortDate(W.to)}.`, stats: [[W.conf == null ? "–" : W.conf + " %", "conformité", W.conf == null ? "" : W.conf >= 95 ? "ok" : W.conf >= 80 ? "warn" : "bad"], [String(W.bad), "anomalies", W.bad ? "bad" : "ok"], [String(W.thrown.length), "DLC jetées", W.thrown.length ? "warn" : "ok"]], items: items.length ? items : [{ level: "ok", text: "Rien à prévoir", sub: "Aucune obligation dans les 30 jours" }], cta: "Ouvrir Growth Gusto" });
+    const html = alMailHTML({ resto: S.resto.name, logo: S.resto.logo, title: "Votre semaine", intro: `Du ${shortDate(W.from)} au ${shortDate(W.to)}.`, stats: [[W.conf == null ? "–" : W.conf + " %", "conformité", W.conf == null ? "" : W.conf >= 95 ? "ok" : W.conf >= 80 ? "warn" : "bad"], [String(W.bad), "anomalies", W.bad ? "bad" : "ok"], [String(W.thrown.length), "DLC jetées", W.thrown.length ? "warn" : "ok"]], items: items.length ? items : [{ level: "ok", text: "Rien à prévoir", sub: "Aucune obligation dans les 30 jours" }], cta: "Ouvrir Growth Gusto" });
     alPreview("Rapport du lundi", rc, html);
   },
 });

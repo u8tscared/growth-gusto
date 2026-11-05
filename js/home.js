@@ -137,7 +137,7 @@ function homeFreqTx(c) {
     if (typeof menToday === "function") { try { const o = menToday().groups; const open = (x) => x.c.id === c.id && (x.st === "todo" || x.st === "overdue"); slot = o.midi.some(open) ? "midi" : o.fermeture.some(open) ? "soir" : slot; } catch (e) {} }
     return slot === "midi" ? "après le service du midi" : "après le service du soir";
   }
-  if (c.freq === "jours") return "aujourd'hui";
+  if (["jours", "ndays", "nweeks", "dates", "once"].includes(c.freq)) return "aujourd'hui";
   if (c.freq === "semaine") return "cette semaine";
   if (c.freq === "mois") return "ce mois-ci";
   return "chaque jour";

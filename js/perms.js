@@ -153,7 +153,7 @@ VIEWS.noaccess = {
 };
 const PM_ACT_CAP = {
   correctReadings: ["relFix", "relFixBack", "relFixSave", "relFixCorr", "relFixSvc", "relSlot", "relDel", "relDelOk"],
-  editSettings: ["fridgeEdit", "fridgeSave", "fridgeDel", "fridgeDelOk", "fridgeOrder", "menEdit", "menSave", "menDel", "menDelOk", "choreEdit", "menStarter", "choreStarter", "noteNew", "noteEdit", "noteSave", "noteDel", "noteDelOk", "npEdit", "npSave", "npDel", "npAdd", "npGen", "npGenGo"],
+  editSettings: ["fridgeEdit", "fridgeSave", "fridgeDel", "fridgeDelOk", "fridgeOrder", "menEdit", "menSave", "menDel", "menDelOk", "choreEdit", "menStarter", "choreStarter", "menZones", "menZoneAdd", "menZoneEdit", "menZoneRenOk", "menZoneDel", "menZoneDelOk", "menEdZone", "menEdZoneOk", "noteNew", "noteEdit", "noteSave", "noteDel", "noteDelOk", "npEdit", "npSave", "npDel", "npAdd", "npGen", "npGenGo"],
 };
 const PM_CAP_TX = { correctReadings: "Corriger un relevé est réservé", editSettings: "Modifier les réglages est réservé" };
 const PM_BY_ACT = {}; Object.entries(PM_ACT_CAP).forEach(([c, acts]) => acts.forEach((a) => { PM_BY_ACT[a] = c; }));

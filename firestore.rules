@@ -100,7 +100,7 @@ service cloud.firestore {
       allow get, list: if isAdmin();
       allow create: if signedIn() && request.resource.data.owner == me() && request.resource.data.name is string;
       allow update: if isGerant(rid) && unchanged(['owner', 'createdAt', 'server', 'alertMail', 'alertState'])
-                    || isMember(rid) && unchanged(['owner', 'createdAt', 'server', 'alertMail', 'alertState', 'alertCfg', 'resaCfg', 'trainingRequired', 'uiDefault', 'name', 'plan', 'pack', 'trialEnds', 'paidUntil', 'paidAt', 'grantedBy', 'grantedAt', 'suspended'])
+                    || isMember(rid) && unchanged(['owner', 'createdAt', 'server', 'alertMail', 'alertState', 'alertCfg', 'resaCfg', 'trainingRequired', 'chorePhotoStaff', 'uiDefault', 'name', 'plan', 'pack', 'trialEnds', 'paidUntil', 'paidAt', 'grantedBy', 'grantedAt', 'suspended'])
                     || isAdmin() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(adminKeys());
       allow delete: if signedIn() && resource.data.owner == me();
 

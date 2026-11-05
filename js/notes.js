@@ -616,7 +616,7 @@ function noteDocHTML(n, P, proposed) {
   return `<article class="ntd">
     <header class="ntd-h"><div class="ntd-hl"><div class="ntd-k">Fiche process HACCP · diagramme de fabrication</div><h1>${esc(n.title || "Sans titre")}</h1>
       <div class="ntd-meta"><span>${esc(S.resto?.name || "")}</span>${por ? `<span>${noteNum(por)} portion${por >= 2 ? "s" : ""}</span>` : ""}<span>${proposed ? "Process proposé, à valider" : `Version ${n.processV || 1}`}</span><span>Édité le ${today}</span></div></div>
-      <div class="ntd-logo">${(() => { try { return typeof appIcon === "function" ? appIcon(36) : logoMark({ mono: "#5B2BFF" }); } catch (e) { return ""; } })()}</div></header>
+      <div class="ntd-logo">${(() => { try { return typeof restoMark === "function" && restoLogo() ? restoMark(40) : typeof appIcon === "function" ? appIcon(36) : logoMark({ mono: "#5B2BFF" }); } catch (e) { return ""; } })()}</div></header>
     <p class="ntd-legend ntd-muted"><span class="ntd-key"></span> Étape &nbsp; <span class="ntd-key ccp"></span> Point critique (CCP) : limite à respecter, contrôle noté.</p>
     ${flow}
     <section class="ntd-two"><div><h2>Ingrédients</h2>${ings.length ? `<table class="ntd-t ntd-ing"><tbody>${ings.map((g) => { const s = noteScale(g.qty, g.unit, 1); return `<tr><td>${esc(g.name)}</td><td class="r">${esc(s.q)} ${esc(s.u)}</td></tr>`; }).join("")}</tbody></table>` : `<p class="ntd-muted">Non renseignés.</p>`}</div>
@@ -1040,7 +1040,7 @@ function noteCarteDocHTML() {
   const body = noteCarteGroups(L).map(([c, G]) => `<tr class="ntc-cat"><td colspan="15">${esc(NOTE_CARTE_PL[c])}</td></tr>${G.map((n) => { const on = recipeAllergens(n, true); return `<tr><td class="ntc-d">${esc(n.title)}</td>${NOTE_ALLERGENS.map(([k]) => `<td class="ntc-a">${on.includes(k) ? "●" : ""}</td>`).join("")}</tr>`; }).join("")}`).join("");
   return `<article class="ntd ntc-doc"><header class="ntd-h"><div class="ntd-hl"><div class="ntd-k">Information des consommateurs · allergènes</div><h1>${esc(S.resto?.name || "Notre carte")}</h1>
       <div class="ntd-meta"><span>Allergènes présents dans nos plats</span><span>Mis à jour le ${today}</span></div></div>
-      <div class="ntd-logo">${(() => { try { return typeof appIcon === "function" ? appIcon(36) : logoMark({ mono: "#5B2BFF" }); } catch (e) { return ""; } })()}</div></header>
+      <div class="ntd-logo">${(() => { try { return typeof restoMark === "function" && restoLogo() ? restoMark(40) : typeof appIcon === "function" ? appIcon(36) : logoMark({ mono: "#5B2BFF" }); } catch (e) { return ""; } })()}</div></header>
     <table class="ntc-t"><thead>${head}</thead><tbody>${body}</tbody></table>
     <p class="ntc-leg">● : le plat contient cet allergène ou des produits qui en contiennent.</p>
     <p class="ntc-law">Liste des 14 allergènes à déclaration obligatoire (règlement UE n° 1169/2011, annexe II ; décret n° 2015-447). Nos plats sont préparés dans une cuisine où tous ces allergènes sont présents : des traces restent possibles. Une allergie ou une intolérance ? Parlez-en à notre équipe avant de commander.</p>

@@ -115,6 +115,11 @@ const t=async(name,p)=>{try{await p;pass++;console.log('ok  ',name)}catch(e){fai
  await t('gerant cannot set server flags',assertFails(updateDoc(doc(A,'restos',rid),{server:{alertes:true}})));
  await t('equipe cannot set alertCfg',assertFails(updateDoc(doc(D,'restos',rid),{alertCfg:{on:false}})));
  await t('equipe cannot set resaCfg',assertFails(updateDoc(doc(D,'restos',rid),{resaCfg:{on:true}})));
+ // ménage: the « photo obligatoire pour les employés » rule is the gérant's; the zone list is plan data any member may edit
+ await t('gerant sets chorePhotoStaff',assertSucceeds(updateDoc(doc(A,'restos',rid),{chorePhotoStaff:false})));
+ await t('equipe cannot set chorePhotoStaff',assertFails(updateDoc(doc(D,'restos',rid),{chorePhotoStaff:true})));
+ await t('gerant sets choreZones',assertSucceeds(updateDoc(doc(A,'restos',rid),{choreZones:['Cuisine','Terrasse']})));
+ await t('equipe sets choreZones',assertSucceeds(updateDoc(doc(D,'restos',rid),{choreZones:['Cuisine','Terrasse','Cave']})));
  await t('gerant writes sensorKeys',assertSucceeds(setDoc(doc(A,`restos/${rid}/sensorKeys/shelly`),{key:'k'})));
  await t('equipe cannot read sensorKeys',assertFails(getDoc(doc(D,`restos/${rid}/sensorKeys/shelly`))));
  await t('equipe cannot write sensorKeys',assertFails(setDoc(doc(D,`restos/${rid}/sensorKeys/gateway`),{token:'x'})));

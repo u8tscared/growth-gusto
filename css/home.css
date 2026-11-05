@@ -225,3 +225,4 @@
 .hm-dash>.ico{width:18px;height:18px;color:var(--faint);flex:none}
 @media (max-width:380px){.hm-svb{flex-direction:column;align-items:flex-start;gap:8px;padding:12px}}
 @media (prefers-reduced-motion:reduce){.hm-sa.in::after{animation:none}}
+.hm-date .rlogo{margin-right:4px}

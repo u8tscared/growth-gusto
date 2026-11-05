@@ -62,7 +62,9 @@ async function raise(rid, id, data) {
 /* ───────── e-mail ───────── */
 const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 /* same template as alMailHTML() in js/alertes.js (keep both in step) */
-function mailHTML({ resto, title, intro, items = [], stats = null, cta = "Ouvrir les alertes", foot = "" }) {
+function mailHTML({ resto, logo = "", title, intro, items = [], stats = null, cta = "Ouvrir les alertes", foot = "" }) {
+  /* the restaurant logo, only as an https URL: most mail clients block data: images */
+  const lg = typeof logo === "string" && /^https:\/\/[^\s"'<>]+$/.test(logo) && logo.length <= 2000 ? logo : "";
   const e = esc, col = { bad: ["#FFE9DE", "#C8432A"], warn: ["#FFF3D6", "#7A5A1A"], ok: ["#E3F5EA", "#1E7F55"], vio: ["#EFE9FF", "#3A10D8"] };
   const row = (it) => { const [bg, fg] = col[it.level] || col.vio; return `<tr><td style="padding:0 0 10px"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#FFFFFF;border:1.5px solid #E9DFCD;border-radius:16px"><tr><td width="44" style="padding:14px 0 14px 14px;vertical-align:top"><div style="width:30px;height:30px;border-radius:50%;background:${bg};color:${fg};font:800 15px/30px Arial,sans-serif;text-align:center">!</div></td><td style="padding:14px 14px 14px 10px;font-family:Arial,Helvetica,sans-serif"><div style="font-size:15px;font-weight:700;color:#1B1530">${e(it.text)}</div>${it.sub ? `<div style="font-size:13px;color:#615B74;margin-top:3px">${e(it.sub)}</div>` : ""}</td></tr></table></td></tr>`; };
   const st = stats ? `<tr><td style="padding:0 0 14px"><table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr>${stats.map(([v, l, lv]) => `<td width="${Math.floor(100 / stats.length)}%" style="padding:0 4px"><div style="background:#FFFFFF;border:1.5px solid #E9DFCD;border-radius:16px;padding:12px 10px;text-align:center;font-family:Arial,Helvetica,sans-serif"><div style="font-size:24px;font-weight:800;letter-spacing:-.5px;color:${lv ? (col[lv] || col.vio)[1] : "#1B1530"}">${e(v)}</div><div style="font-size:12px;color:#615B74;margin-top:2px">${e(l)}</div></div></td>`).join("")}</tr></table></td></tr>` : "";
@@ -72,7 +74,7 @@ function mailHTML({ resto, title, intro, items = [], stats = null, cta = "Ouvrir
 <tr><td style="padding:0 4px 16px;font-family:Arial,Helvetica,sans-serif;font-size:19px;font-weight:800;letter-spacing:-.4px;color:#1B1530">Growth <span style="color:#5B2BFF">Gusto</span></td></tr>
 <tr><td style="background:#FFFDF8;border:1.5px solid #E9DFCD;border-radius:24px;padding:22px 18px 12px">
 <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
-<tr><td style="padding:0 0 4px;font-family:Arial,Helvetica,sans-serif;font-size:13px;font-weight:700;color:#3A10D8">${e(resto)}</td></tr>
+${lg ? `<tr><td style="padding:0 0 10px"><img src="${e(lg)}" width="44" height="44" alt="${e(resto)}" style="display:block;width:44px;height:44px;border-radius:13px;object-fit:contain;background:#FFFFFF;border:1px solid #E9DFCD"></td></tr>` : ""}<tr><td style="padding:0 0 4px;font-family:Arial,Helvetica,sans-serif;font-size:13px;font-weight:700;color:#3A10D8">${e(resto)}</td></tr>
 <tr><td style="padding:0 0 6px;font-family:Arial,Helvetica,sans-serif;font-size:24px;line-height:28px;font-weight:800;letter-spacing:-.6px;color:#1B1530">${e(title)}</td></tr>
 ${intro ? `<tr><td style="padding:0 0 16px;font-family:Arial,Helvetica,sans-serif;font-size:14.5px;line-height:21px;color:#4A4560">${e(intro)}</td></tr>` : ""}
 ${st}${items.map(row).join("")}
@@ -124,7 +126,7 @@ async function sendPending(rid, resto) {
   go.sort((a, b2) => (a.level === "bad" ? -1 : 1) - (b2.level === "bad" ? -1 : 1) || (b2.at || 0) - (a.at || 0));
   const name = resto.name || "Votre restaurant", n = go.length;
   const ok = await send(list, `${go.some((a) => a.level === "bad") ? "⚠ " : ""}${n > 1 ? `${n} alertes` : go[0].text} · ${name}`,
-    mailHTML({ resto: name, title: n > 1 ? `${n} alertes à voir` : "1 alerte à voir", intro: "Ouvrez Growth Gusto pour voir le détail et marquer l'alerte comme vue.", items: go.slice(0, 8).map((a) => ({ level: a.level, text: a.text, sub: a.sub })) }));
+    mailHTML({ resto: name, logo: resto.logo, title: n > 1 ? `${n} alertes à voir` : "1 alerte à voir", intro: "Ouvrez Growth Gusto pour voir le détail et marquer l'alerte comme vue.", items: go.slice(0, 8).map((a) => ({ level: a.level, text: a.text, sub: a.sub })) }));
   if (!ok) return;
   const b2 = db().batch(); go.forEach((a) => b2.update(db().doc(`restos/${rid}/alerts/${a.id}`), { mailed: true, mailedAt: now })); await b2.commit();
 }
@@ -138,7 +140,7 @@ async function escalate(rid, resto) {
   if (cfg.esc.who.startsWith("x:")) to = { email: cfg.esc.who.slice(2) };
   else { const m = await db().doc(`restos/${rid}/members/${cfg.esc.who}`).get(); if (m.exists && m.get("email")) to = { email: m.get("email"), name: m.get("name") || "" }; }
   const b = db().batch(); due.forEach((a) => b.update(db().doc(`restos/${rid}/alerts/${a.id}`), { escalatedAt: now }));
-  if (to) { const name = resto.name || "Votre restaurant"; await send([to], `Relance · ${due.length > 1 ? `${due.length} alertes` : due[0].text} · ${name}`, mailHTML({ resto: name, title: "Personne n'a encore regardé", intro: `Ces alertes attendent depuis plus de ${cfg.esc.after} min.`, items: due.slice(0, 8).map((a) => ({ level: a.level, text: a.text, sub: a.sub })) })); }
+  if (to) { const name = resto.name || "Votre restaurant"; await send([to], `Relance · ${due.length > 1 ? `${due.length} alertes` : due[0].text} · ${name}`, mailHTML({ resto: name, logo: resto.logo, title: "Personne n'a encore regardé", intro: `Ces alertes attendent depuis plus de ${cfg.esc.after} min.`, items: due.slice(0, 8).map((a) => ({ level: a.level, text: a.text, sub: a.sub })) })); }
   await b.commit();
 }
 
@@ -211,7 +213,7 @@ async function alertesWeekly() {
       const items = [...obl.slice(0, 4).map(({ o, d }) => ({ level: d < 0 ? "bad" : "warn", text: o.name, sub: d < 0 ? `En retard de ${-d} j` : `Dans ${d} j` })), ...thrown.slice(0, 3).map((l) => ({ level: "warn", text: `${l.name} jeté`, sub: l.lostReason || "DLC dépassée" }))];
       const { list } = await recipients(r.id, cfg); if (!list.length) continue;
       const name = r.name || "Votre restaurant";
-      await send(list, `Votre semaine · ${name}`, mailHTML({ resto: name, title: "Votre semaine", intro: `Du ${short(from)} au ${short(to)}.`, cta: "Ouvrir Growth Gusto",
+      await send(list, `Votre semaine · ${name}`, mailHTML({ resto: name, logo: r.logo, title: "Votre semaine", intro: `Du ${short(from)} au ${short(to)}.`, cta: "Ouvrir Growth Gusto",
         stats: [[conf == null ? "–" : conf + " %", "conformité", conf == null ? "" : conf >= 95 ? "ok" : conf >= 80 ? "warn" : "bad"], [String(bad), "anomalies", bad ? "bad" : "ok"], [String(thrown.length), "DLC jetées", thrown.length ? "warn" : "ok"]],
         items: items.length ? items : [{ level: "ok", text: "Rien à prévoir", sub: "Aucune obligation dans les 30 jours" }] }));
     } catch (e) { logger.error("alertesWeekly", r.id, e); }
@@ -223,7 +225,7 @@ const onAlertCreated = onDocumentCreated({ document: "restos/{rid}/alerts/{aid}"
   const rs = await db().doc(`restos/${rid}`).get(); if (!rs.exists || rs.get("demo")) return; const resto = rs.data();
   if (a.type === "test") {
     const { list } = await recipients(rid, cfgOf(resto)); const name = resto.name || "Votre restaurant";
-    await send(list, `E-mail de test · ${name}`, mailHTML({ resto: name, title: "Les alertes arrivent bien", intro: "Ceci est un e-mail de test. Vous recevrez ici les alertes de votre restaurant.", items: [{ level: "ok", text: "Tout fonctionne", sub: "Envoyé depuis Alertes, Réglages" }] }));
+    await send(list, `E-mail de test · ${name}`, mailHTML({ resto: name, logo: resto.logo, title: "Les alertes arrivent bien", intro: "Ceci est un e-mail de test. Vous recevrez ici les alertes de votre restaurant.", items: [{ level: "ok", text: "Tout fonctionne", sub: "Envoyé depuis Alertes, Réglages" }] }));
     await ev.data.ref.update({ mailed: true, mailedAt: Date.now(), seen: true });
     return;
   }

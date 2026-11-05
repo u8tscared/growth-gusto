@@ -19,6 +19,8 @@ Object.assign(IC, {
   menUser: ["M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2", "c:12,7,4"],
   menDrop: ["M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z"],
   menUndo: ["M9 14 4 9l5-5", "M4 9h10.5a5.5 5.5 0 0 1 0 11H11"],
+  menPin: ["M20 10c0 4.99-5.54 10.19-7.4 11.8a1 1 0 0 1-1.2 0C9.54 20.19 4 14.99 4 10a8 8 0 0 1 16 0", "c:12,10,3"],
+  menRepeat: ["m17 2 4 4-4 4", "M3 11v-1a4 4 0 0 1 4-4h14", "m7 22-4-4 4-4", "M21 13v1a4 4 0 0 1-4 4H3"],
 });
 
 const MEN_ZONES = ["Cuisine", "Plonge", "Chambre froide", "Salle", "Sanitaires", "Bar"];
@@ -285,7 +287,7 @@ function menRow(o, showDay) {
 function menWeekView() {
   const t = dayKey(); const ws = addDays(menWeekStart(t), M.wk * 7); const days = [...Array(7)].map((_, i) => addDays(ws, i));
   if (!M.sel || M.sel < ws || M.sel > days[6]) M.sel = M.wk === 0 ? t : ws;
-  const per = days.map((k) => { const occ = menDay(k); const d = occ.filter(menIsDone).length; const miss = occ.filter((o) => o.st === "missed" || (o.st === "overdue" && k < t)).length; return { k, occ, d, miss, n: occ.length, pct: occ.length ? Math.round((d / occ.length) * 100) : null }; });
+  const per = days.map(menDayInfo);
   const comp = menCompliance(ws, days[6]); const sofar = per.filter((p) => p.k <= t).reduce((x, p) => ({ d: x.d + p.d, n: x.n + p.n }), { d: 0, n: 0 }); const s0 = parseDay(ws), e = parseDay(days[6]);
   const MO = ["janv.", "févr.", "mars", "avr.", "mai", "juin", "juil.", "août", "sept.", "oct.", "nov.", "déc."]; const mo = (d) => MO[d.getMonth()];
   const title = M.wk === 0 ? "Cette semaine" : M.wk === -1 ? "Semaine dernière" : M.wk === 1 ? "Semaine prochaine" : `Semaine du ${shortDate(ws)}`;
@@ -296,10 +298,7 @@ function menWeekView() {
   // phone: day strip + the selected day
   const strip = `<div class="men-strip st" style="--i:3">${per.map((p, i) => `<button class="men-day ${p.k === M.sel ? "on" : ""} ${p.k === t ? "today" : ""} ${p.k > t ? "fut" : ""}" data-act="menSel" data-v="${p.k}" aria-pressed="${p.k === M.sel}"><span>${MEN_DOW[i]}</span><b>${+p.k.slice(8)}</b><span class="men-cr ${p.miss ? "bad" : p.n && p.d === p.n ? "ok" : ""}">${menRing(p.pct ?? 0, 30, 14)}</span><i class="${p.miss ? "bad" : p.n && p.d === p.n ? "ok" : ""}">${p.n ? (p.miss ? `${p.miss} oubli${p.miss > 1 ? "s" : ""}` : `${p.d}/${p.n}`) : "–"}</i></button>`).join("")}</div>`;
   const sp = per.find((p) => p.k === M.sel) || per[0];
-  const byM = { ouverture: [], midi: [], fermeture: [] }; sp.occ.forEach((o) => byM[o.moment].push(o));
-  const roRow = (o) => `<div class="men-row ${o.st} ro" data-act="${o.log ? "menLog" : "menHist"}" data-id="${o.log ? o.log.id : o.c.id}" role="button" tabindex="0">${menMark(o.st)}<div class="tx"><b>${esc(o.c.name)}</b><em>${o.log ? `${esc(menBy(o.log))} · ${when(o.log.at)}${o.st === "late" ? " · en retard" : ""}` : o.st === "missed" ? "Non fait" : o.st === "overdue" ? "En retard, encore à faire" : esc([o.c.zone, menFreqTx(o.c)].filter(Boolean).join(" · "))}</em></div><span class="men-tags">${o.slot ? `<span class="men-tag">${menSlotTx(o.slot)}</span>` : ""}</span></div>`;
-  const list = `<div class="glass pad men-dl st" style="--i:4"><div class="row"><span class="lbl">${menCap(menLongDay(sp.k))}</span>${sp.n ? `<span class="pill ${sp.miss ? "bad" : sp.d === sp.n ? "ok" : "neu"}">${sp.miss ? `${sp.miss} oubli${sp.miss > 1 ? "s" : ""}` : `${sp.d}/${sp.n} fait`}</span>` : ""}</div>
-    ${sp.n ? MEN_MO.filter((g) => byM[g].length).map((g) => `<div class="men-dlg"><span class="men-dlh">${ico(MEN_MOMENTS[g].ic)}${MEN_MOMENTS[g].t}</span>${byM[g].map((o) => (sp.k === t ? menRow(o) : roRow(o))).join("")}</div>`).join("") : `<div class="empty" style="padding:18px 0 6px">Rien de prévu ce jour-là.</div>`}</div>`;
+  const list = menDayCard(sp, 4);
   // desktop: the classic plan-de-nettoyage grid
   const rows = menChores().filter((c) => days.some((k) => menOccOn(c, k).length));
   const mx = `<div class="glass men-mx st" style="--i:3"><table><thead><tr><th class="tn"><span class="lbl">Tâche</span></th>${per.map((p, i) => `<th class="${p.k === t ? "today" : ""}"><span>${MEN_DOW[i]}</span><b>${+p.k.slice(8)}</b><i class="men-bar"><i class="${p.k < t ? menPctCls(p.pct) : p.n && p.d === p.n ? "ok" : "acc"}" style="width:${p.pct ?? 0}%"></i></i></th>`).join("")}</tr></thead><tbody>
@@ -307,8 +306,41 @@ function menWeekView() {
     </tbody></table><div class="men-leg">${[["done", "Fait"], ["late", "Fait en retard"], ["overdue", "En retard"], ["missed", "Oublié"], ["todo", "À faire"], ["upcoming", "Prévu"]].map(([s, tx]) => `<span>${menMark(s, true)}${tx}</span>`).join("")}</div></div>`;
   return `${nav}<div class="men-wphone">${strip}${list}</div><div class="men-wdesk">${mx}</div>`;
 }
+/* one day's numbers (required tasks only) and its occurrences */
+function menDayInfo(k) {
+  const t = dayKey(); const occ = menDay(k); const R = occ.filter(menReq); const d = R.filter(menIsDone).length; const miss = R.filter((o) => o.st === "missed" || (o.st === "overdue" && k < t)).length;
+  return { k, occ, d, miss, n: R.length, pct: R.length ? Math.round((d / R.length) * 100) : null };
+}
+/* the selected day's card (week + month tabs): today's rows can be checked, other days open the log or the history */
+function menDayCard(sp, i) {
+  const t = dayKey(); const byM = { ouverture: [], midi: [], fermeture: [] }; sp.occ.forEach((o) => byM[o.moment].push(o));
+  const roRow = (o) => `<div class="men-row ${o.st} ro" data-act="${o.log ? "menLog" : "menHist"}" data-id="${o.log ? o.log.id : o.c.id}" role="button" tabindex="0">${menMark(o.st)}<div class="tx"><b>${esc(o.c.name)}</b><em>${o.log ? `${esc(menBy(o.log))} · ${when(o.log.at)}${o.st === "late" ? " · en retard" : ""}` : o.st === "missed" ? "Non fait" : o.st === "skip" ? "Facultatif · non fait" : o.st === "overdue" ? "En retard, encore à faire" : esc([o.c.zone, menFreqTx(o.c)].filter(Boolean).join(" · "))}</em></div><span class="men-tags">${!menReq(o) ? `<span class="men-tag opt">Facultatif</span>` : ""}${o.slot ? `<span class="men-tag">${menSlotTx(o.slot)}</span>` : ""}</span></div>`;
+  return `<div class="glass pad men-dl st" style="--i:${i}"><div class="row"><span class="lbl">${menCap(menLongDay(sp.k))}</span>${sp.n ? `<span class="pill ${sp.miss ? "bad" : sp.d === sp.n ? "ok" : "neu"}">${sp.miss ? `${sp.miss} oubli${sp.miss > 1 ? "s" : ""}` : `${sp.d}/${sp.n} fait`}</span>` : ""}</div>
+    ${sp.occ.length ? MEN_MO.filter((g) => byM[g].length).map((g) => `<div class="men-dlg"><span class="men-dlh">${ico(MEN_MOMENTS[g].ic)}${MEN_MOMENTS[g].t}</span>${byM[g].map((o) => (sp.k === t ? menRow(o) : roRow(o))).join("")}</div>`).join("") : `<div class="empty" style="padding:18px 0 6px">Rien de prévu ce jour-là.</div>`}</div>`;
+}
+
+/* month: a calendar of the plan. Each day shows how many tasks are due and a dot per task that is not a daily one
+   (weekly, monthly, every N days, dates…); past days are tinted by the result. Tap a day to see its tasks. */
+function menMonthView() {
+  const t = dayKey(); const base = parseDay(t); const m0 = new Date(base.getFullYear(), base.getMonth() + M.mo, 1); const ms = dayKey(m0); const me = menMonthEnd(ms);
+  if (!M.msel || M.msel < ms || M.msel > me) M.msel = M.mo === 0 ? t : ms;
+  const lead = (m0.getDay() + 6) % 7; const cells = [];
+  for (let k = ms; k <= me; k = addDays(k, 1)) {
+    const p = menDayInfo(k); const special = p.occ.filter((o) => o.c.freq !== "jour" && o.c.freq !== "service");
+    const tone = k < t || (k === t && p.n && p.d === p.n) ? (p.miss ? "bad" : p.n && p.d === p.n ? "ok" : p.n ? "warn" : "") : "";
+    cells.push(`<button class="men-mc ${k === t ? "today" : ""} ${k === M.msel ? "on" : ""} ${k > t ? "fut" : ""} ${tone}" data-act="menMsel" data-v="${k}" aria-pressed="${k === M.msel}" aria-label="${esc(menLongDay(k))} : ${p.occ.length} tâche${p.occ.length > 1 ? "s" : ""}"><b>${+k.slice(8)}</b><em>${p.occ.length || ""}</em><span class="men-mcd">${special.slice(0, 4).map((o) => `<i class="${o.st} ${menReq(o) ? "" : "opt"}"></i>`).join("")}</span></button>`);
+  }
+  const mc = menCompliance(ms, me);
+  const nav = `<div class="glass men-wnav st" style="--i:2"><button class="iconbtn" data-act="menMo" data-v="-1" aria-label="Mois précédent">${ico("back")}</button>
+    <div class="men-wt"><b>${menCap(MONTHS[m0.getMonth()])} ${m0.getFullYear()}</b><em>${M.mo === 0 ? "Ce mois-ci" : M.mo === 1 ? "Mois prochain" : M.mo === -1 ? "Mois dernier" : "Plan du mois"}</em></div>
+    <div class="men-wstat">${mc.tot ? `<span class="pill ${menPctCls(mc.pct)}">${mc.pct} % fait</span>` : ""}${mc.missed.length ? `<span class="pill bad">${mc.missed.length} oubli${mc.missed.length > 1 ? "s" : ""}</span>` : ""}</div>
+    <button class="iconbtn" data-act="menMo" data-v="1" aria-label="Mois suivant">${ico("chev")}</button></div>`;
+  const grid = `<div class="glass pad men-month st" style="--i:3"><div class="men-mgh">${MEN_DOW.map((d) => `<span>${d}</span>`).join("")}</div><div class="men-mg">${"<i></i>".repeat(lead)}${cells.join("")}</div>
+    <p class="note men-mleg"><span><i class="men-mcd-k"></i>Tâche hebdo, mensuelle ou à date</span><span><b class="mono">8</b>tâches ce jour-là</span></p></div>`;
+  return `${nav}<div class="men-mwrap">${grid}${menDayCard(menDayInfo(M.msel), 4)}</div>`;
+}
 function menCellTitle(o) {
-  const s = { done: "Fait", late: "Fait en retard", overdue: "En retard", missed: "Oublié", todo: "À faire", upcoming: "Prévu" }[o.st];
+  const s = { done: "Fait", late: "Fait en retard", overdue: "En retard", missed: "Oublié", todo: "À faire", upcoming: "Prévu", skip: "Facultatif, non fait" }[o.st];
   return `${o.c.name}${o.slot ? ` (${menSlotTx(o.slot).toLowerCase()})` : ""} · ${s}${o.log ? ` · ${menBy(o.log)} ${when(o.log.at)}` : ""}`;
 }
 
@@ -326,32 +358,60 @@ function menPlanView() {
     ${zc.length ? `<div class="men-zones">${zc.map((x) => `<div class="men-z"><span>${esc(x.z)}</span><i class="men-bar"><i class="${menPctCls(x.pct)}" style="width:${x.pct}%"></i></i><b class="mono">${x.pct}%</b></div>`).join("")}</div>` : ""}
     ${lastMiss.length ? `<div class="men-miss"><span class="lbl">Derniers oublis</span>${lastMiss.map((o) => `<div class="li tap" data-act="menHist" data-id="${o.c.id}" role="button" tabindex="0"><span class="men-mk missed sm">${ico("x")}</span><div class="tx"><b>${esc(o.c.name)}</b><em>${menCap(menLongDay(o.day))}${o.slot ? ` · ${menSlotTx(o.slot).toLowerCase()}` : ""}</em></div></div>`).join("")}</div>` : ""}</div>`;
   const byZ = {}; chores.forEach((c) => (byZ[c.zone || "Autre"] ||= []).push(c));
-  const from = addDays(t, -13); const ZO = [...MEN_ZONES, ...Object.keys(byZ).filter((z) => !MEN_ZONES.includes(z))].filter((z) => byZ[z]);
+  const from = addDays(t, -13); const ZL = menZoneList(); const ZO = [...ZL, ...Object.keys(byZ).filter((z) => !ZL.includes(z))].filter((z) => byZ[z]); const canEd = menCanEdit();
   const list = ZO.map((z, zi) => `<div class="glass pad men-plz st" style="--i:${3 + zi}"><div class="row"><span class="lbl">${esc(z)}</span><span class="sub">${byZ[z].length} tâche${byZ[z].length > 1 ? "s" : ""}</span></div>
-    ${byZ[z].map((c) => { const dots = []; for (let k = from; k <= t; k = addDays(k, 1)) menOccOn(c, k).forEach((o) => dots.push(menState(o))); return `<div class="li tap men-pl" data-act="menHist" data-id="${c.id}" role="button" tabindex="0"><div class="tx"><b>${esc(c.name)}</b><em>${esc(menFreqTx(c))} · ${esc(menMomentTx(c))}${c.who ? ` · ${esc(firstName(c.who))}` : ""}${c.photo ? " · photo" : ""}</em>${c.notes ? `<em class="men-meth">${ico("menDrop")}${esc(c.notes)}</em>` : ""}</div><span class="men-dots" aria-hidden="true">${dots.slice(-10).map((s) => `<i class="${s}"></i>`).join("")}</span>${ico("chev")}</div>`; }).join("")}</div>`).join("");
-  return `<div class="men-plan"><div class="men-pside">${card}<div class="glass pad men-pact st" style="--i:3"><button class="btn acc block" data-act="menEdit">${ico("plus")}Nouvelle tâche</button><button class="btn soft block" data-act="menStarter">${ico("sparkle")}Compléter avec le plan type HACCP</button><p class="note">Les points montrent les derniers jours de chaque tâche : vert fait, rouge oublié. Touchez une tâche pour son historique.</p></div></div><div class="men-plist">${list}</div></div>`;
+    ${byZ[z].map((c) => { const dots = []; for (let k = from; k <= t; k = addDays(k, 1)) menOccOn(c, k).forEach((o) => dots.push(menState(o))); return `<div class="li tap men-pl" data-act="menHist" data-id="${c.id}" role="button" tabindex="0"><div class="tx"><b>${esc(c.name)}${c.required ? "" : ` <span class="men-tag opt">Facultatif</span>`}</b><em>${esc(menFreqTx(c))} · ${esc(menMomentTx(c))}${c.who ? ` · ${esc(firstName(c.who))}` : ""}${c.photo ? " · photo" : ""}</em>${c.notes ? `<em class="men-meth">${ico("menDrop")}${esc(c.notes)}</em>` : ""}</div><span class="men-dots" aria-hidden="true">${dots.slice(-10).map((s) => `<i class="${s}"></i>`).join("")}</span>${canEd ? `<button class="men-ph gd men-pled" data-act="menEdit" data-id="${c.id}" aria-label="Modifier « ${esc(c.name)} »">${ico("edit")}</button>` : ico("chev")}</div>`; }).join("")}</div>`).join("");
+  return `<div class="men-plan"><div class="men-pside">${card}<div class="glass pad men-pact st" style="--i:3"><button class="btn acc block" data-act="menEdit">${ico("plus")}Nouvelle tâche</button><button class="btn soft block" data-act="menStarter">${ico("sparkle")}Compléter avec le plan type HACCP</button>${canEd ? `<button class="btn soft block" data-act="menZones">${ico("menCal")}Zones · ${ZL.length}</button>` : ""}${menIsBoss() ? menPhotoStaffSw() : ""}<p class="note">Les points montrent les derniers jours de chaque tâche : violet fait, rouge oublié. Touchez une tâche pour son historique${canEd ? ", le crayon pour la modifier" : ""}.</p></div></div><div class="men-plist">${list}</div></div>`;
 }
 
 /* ── sheets ── */
+/* who may change the plan: gérant, or a member with « modifier les réglages » (js/perms.js) */
+const menCanEdit = () => typeof PERMS === "undefined" || PERMS.cap("editSettings");
+const menIsBoss = () => DB.mode === "demo" || (typeof myRole === "function" && myRole() === "gerant");
 function menEditorHtml() {
   const d = S.ui.men; const names = menNames().filter((n) => n !== d.who);
-  const zones = MEN_ZONES.includes(d.zone) || !d.zone ? MEN_ZONES : [...MEN_ZONES, d.zone];
-  const sub = d.freq === "jours" ? `<div class="men-dows">${MEN_DOW.map((t, i) => `<button class="chip ${d.days.includes(menDowJs(i)) ? "on" : ""}" data-act="menEdDay" data-v="${menDowJs(i)}" aria-pressed="${d.days.includes(menDowJs(i))}">${t}</button>`).join("")}</div>`
-    : d.freq === "semaine" ? `<div class="men-dows">${MEN_DOW.map((t, i) => `<button class="chip ${d.wday === menDowJs(i) ? "on" : ""}" data-act="menEdWday" data-v="${menDowJs(i)}" aria-pressed="${d.wday === menDowJs(i)}">${t}</button>`).join("")}</div>`
-    : d.freq === "mois" ? `<div class="men-mgrid" role="group" aria-label="Jour du mois">${[...Array(31)].map((_, i) => `<button class="${+d.mday === i + 1 ? "on" : ""}" data-act="menEdMdaySet" data-v="${i + 1}" aria-pressed="${+d.mday === i + 1}">${i + 1}</button>`).join("")}</div><p class="note men-fnote">${ico("menCal")}${menFreqTx({ freq: "mois", mday: d.mday })}${d.mday > 28 ? ", ou le dernier jour si le mois est plus court" : ""}</p>`
-    : d.freq === "service" ? `<p class="note men-fnote">${ico("menMeal")}Deux pointages par jour : après le service du midi et à la fermeture.</p>` : "";
+  const ZL = menZoneList(); const zones = !d.zone || ZL.includes(d.zone) ? ZL : [...ZL, d.zone];
+  const dowChips = (multi) => `<div class="men-dows">${MEN_DOW.map((t, i) => { const v = menDowJs(i); const on = multi ? d.days.includes(v) : d.wday === v; return `<button class="chip ${on ? "on" : ""}" data-act="${multi ? "menEdDay" : "menEdWday"}" data-v="${v}" aria-pressed="${on}">${t}</button>`; }).join("")}</div>`;
+  const every = (unit, max) => `<div class="men-every"><span>${unit === "jours" ? "Tous les" : "Toutes les"}</span><button class="iconbtn" data-act="menEdEvery" data-v="-1" aria-label="Moins" ${d.every <= 2 ? "disabled" : ""}>−</button><b class="mono" aria-live="polite">${d.every}</b><button class="iconbtn" data-act="menEdEvery" data-v="1" aria-label="Plus" ${d.every >= max ? "disabled" : ""}>${ico("plus")}</button><span>${unit}</span></div>`;
+  const start = (lbl) => `<label class="men-start"><span>${lbl}</span><input class="input" type="date" id="menStart" value="${esc(d.start || dayKey())}"></label>`;
+  const sum = (extra = "") => `<p class="note men-fnote" id="menFsum">${ico("menRepeat")}<span>${esc(menFreqTx(menEdDoc(d)))}${extra}</span></p>`;
+  const sub = d.freq === "jours" ? dowChips(true) + sum()
+    : d.freq === "semaine" ? dowChips(false) + sum()
+    : d.freq === "mois" ? `<div class="men-mgrid" role="group" aria-label="Jour du mois">${[...Array(31)].map((_, i) => `<button class="${+d.mday === i + 1 ? "on" : ""}" data-act="menEdMdaySet" data-v="${i + 1}" aria-pressed="${+d.mday === i + 1}">${i + 1}</button>`).join("")}</div>${sum(d.mday > 28 ? ", ou le dernier jour si le mois est plus court" : "")}`
+    : d.freq === "ndays" ? `${every("jours", 90)}${start("À partir du")}${sum()}`
+    : d.freq === "nweeks" ? `${every("semaines", 26)}${dowChips(true)}${start("Semaine de départ")}${sum()}`
+    : d.freq === "dates" || d.freq === "once" ? `${menMiniCal(d)}${sum()}`
+    : d.freq === "service" ? `<p class="note men-fnote">${ico("menMeal")}Deux pointages par jour : après le service du midi et à la fermeture.</p>` : sum();
   return `<div class="h2" style="font-size:20px">${d._id ? "Modifier la tâche" : "Nouvelle tâche"}</div>
     <label class="field"><span>Tâche</span><input class="input" id="menName" maxlength="140" data-bind="ui.men.name" value="${esc(d.name)}" placeholder="Ex. Désinfecter les plans de travail" autocomplete="off"></label>
-    <div class="field"><span>Zone</span><div class="chips men-wrap">${zones.map((z) => `<button class="chip ${d.zone === z ? "on" : ""}" data-act="menEdSet" data-id="zone" data-v="${esc(z)}">${esc(z)}</button>`).join("")}</div></div>
+    <div class="field"><span class="men-fl">Zone<button class="men-flink" data-act="menZones" data-v="ed">${ico("edit")}Gérer les zones</button></span><div class="chips men-wrap">${zones.map((z) => `<button class="chip ${d.zone === z ? "on" : ""}" data-act="menEdSet" data-id="zone" data-v="${esc(z)}">${esc(z)}</button>`).join("")}${d._zoneIn ? "" : `<button class="chip men-add" data-act="menEdZone">${ico("plus")}Nouvelle zone</button>`}</div>
+      ${d._zoneIn ? `<div class="hstack"><input class="input" id="menZoneIn" maxlength="40" placeholder="Ex. Terrasse, Cave, Réserve" autocomplete="off" enterkeyhint="done" style="flex:1"><button class="btn acc sm" style="height:50px" data-act="menEdZoneOk">Ajouter</button></div>` : ""}</div>
     <div class="field"><span>Fréquence</span><div class="chips men-wrap">${MEN_FREQS.map(([k, t]) => `<button class="chip ${d.freq === k ? "on" : ""}" data-act="menEdFreq" data-v="${k}">${t}</button>`).join("")}</div>${sub}</div>
     ${d.freq !== "service" ? `<div class="field"><span>Moment</span><div class="men-mseg">${MEN_MO.map((k) => `<button class="${d.moment === k ? "on" : ""}" data-act="menEdSet" data-id="moment" data-v="${k}" aria-pressed="${d.moment === k}">${ico(MEN_MOMENTS[k].ic)}<span>${k === "midi" ? "Après le midi" : MEN_MOMENTS[k].t}</span></button>`).join("")}</div></div>` : ""}
+    <button class="men-sw ${d.required ? "on" : ""}" data-act="menEdReq" role="switch" aria-checked="${!!d.required}"><span class="ic">${ico("alert")}</span><span class="tx"><b>${d.required ? "Tâche obligatoire" : "Tâche facultative"}</b><em>${d.required ? "Comptée dans la conformité, signalée si elle est en retard" : "À faire si possible : jamais en retard, ni alerte ni oubli"}</em></span><i></i></button>
     <label class="field"><span>Produit et méthode <i class="men-opt">facultatif</i></span><input class="input" data-bind="ui.men.notes" value="${esc(d.notes)}" placeholder="Ex. Dégraissant + rinçage à l'eau claire" autocomplete="off"></label>
     <label class="field"><span>Comment faire <i class="men-opt">une étape par ligne</i></span><textarea class="input men-steps" rows="6" data-bind="ui.men.stepsTx" placeholder="1 étape par ligne">${esc(d.stepsTx || "")}</textarea>${d._gen ? `<em class="men-gd-flag">${ico("alert")}Notice générale proposée : adaptez-la à votre méthode.</em>` : ""}</label>
     <div class="field"><span>Responsable <i class="men-opt">facultatif</i></span><div class="chips men-wrap"><button class="chip ${!d.who ? "on" : ""}" data-act="menEdSet" data-id="who" data-v="">Toute l'équipe</button>${d.who ? `<button class="chip on" data-act="menEdSet" data-id="who" data-v="${esc(d.who)}">${esc(d.who)}</button>` : ""}${names.map((n) => `<button class="chip" data-act="menEdSet" data-id="who" data-v="${esc(n)}">${esc(n)}</button>`).join("")}${d._whoIn ? "" : `<button class="chip" data-act="menEdWho">${ico("plus")}Autre</button>`}</div>
       ${d._whoIn ? `<div class="hstack"><input class="input" id="menWhoIn" placeholder="Prénom" autocomplete="off" style="flex:1"><button class="btn acc sm" style="height:50px" data-act="menEdWhoOk">Ajouter</button></div>` : ""}</div>
-    <button class="men-sw ${d.photo ? "on" : ""}" data-act="menEdPhoto" role="switch" aria-checked="${!!d.photo}"><span class="ic">${ico("camera")}</span><span class="tx"><b>Photo obligatoire</b><em>Une photo de preuve est demandée au pointage</em></span><i></i></button>
+    <button class="men-sw ${d.photo ? "on" : ""}" data-act="menEdPhoto" role="switch" aria-checked="${!!d.photo}"><span class="ic">${ico("camera")}</span><span class="tx"><b>Photo obligatoire</b><em>${d.photo ? "Une photo de preuve est demandée à tout le monde, gérant compris" : menStaffPhotoOn() ? "Les employés prennent déjà une photo à chaque tâche (réglage du plan)" : "Une photo de preuve est demandée au pointage"}</em></span><i></i></button>
     ${d._id ? `<button class="btn ghost block" style="color:var(--bad)" data-act="menDel" data-id="${d._id}">${ico("trash")}Supprimer la tâche</button>` : ""}
     <div class="men-sfoot"><button class="btn acc block" data-act="menSave">${ico("check")}Enregistrer</button></div>`;
+}
+/* the editor's draft as a chore doc (also feeds the live summary line) */
+function menEdDoc(d) {
+  const f = d.freq; const per = f === "ndays" || f === "nweeks";
+  return { name: (d.name || "").trim(), zone: d.zone || "", freq: f, moment: f === "service" ? "midi" : d.moment, days: f === "jours" || f === "nweeks" ? d.days : [], wday: f === "semaine" ? d.wday : null, mday: f === "mois" ? d.mday : null,
+    every: per ? d.every : null, start: per ? d.start || dayKey() : null, dates: f === "dates" ? [...d.dates].sort() : f === "once" ? d.dates.slice(0, 1) : [], required: d.required !== false, who: d.who || "", notes: (d.notes || "").trim(), photo: !!d.photo };
+}
+/* small month calendar for « Dates précises » (multi) and « Une seule fois » (single) */
+function menMiniCal(d) {
+  const t = dayKey(); const cm = d._cm || (d.dates[0] && d.dates[0] > t ? d.dates[0] : t).slice(0, 8) + "01"; const m0 = parseDay(cm); const me = menMonthEnd(cm);
+  const lead = (m0.getDay() + 6) % 7; const cells = [];
+  for (let k = cm; k <= me; k = addDays(k, 1)) { const on = d.dates.includes(k); cells.push(`<button class="${on ? "on" : ""} ${k === t ? "today" : ""}" data-act="menEdDate" data-v="${k}" aria-pressed="${on}" ${k < t ? "disabled" : ""} aria-label="${esc(menLongDay(k))}">${+k.slice(8)}</button>`); }
+  const chips = d.dates.length ? `<div class="men-dsel">${d.dates.slice().sort().map((k) => `<button class="chip on" data-act="menEdDate" data-v="${k}" aria-label="Retirer le ${esc(menLongDay(k))}">${menDateTx(k)}${ico("x")}</button>`).join("")}</div>` : "";
+  return `<div class="men-mini"><div class="men-minih"><button class="iconbtn" data-act="menEdCm" data-v="-1" aria-label="Mois précédent" ${cm <= t.slice(0, 8) + "01" ? "disabled" : ""}>${ico("back")}</button><b>${menCap(MONTHS[m0.getMonth()])} ${m0.getFullYear()}</b><button class="iconbtn" data-act="menEdCm" data-v="1" aria-label="Mois suivant">${ico("chev")}</button></div>
+    <div class="men-mgrid men-mcal" role="group" aria-label="${d.freq === "once" ? "Choisir la date" : "Choisir les dates"}">${MEN_DOW.map((x) => `<span>${x[0]}</span>`).join("")}${"<span></span>".repeat(lead)}${cells.join("")}</div>${chips}
+    <p class="note" style="margin:6px 2px 0">${d.freq === "once" ? "Touchez le jour où la tâche est à faire." : "Touchez chaque jour où la tâche est à faire : plusieurs dates possibles."}</p></div>`;
 }
 const menEdRedraw = (focus) => { const b = $("#sheetBody"); const st = b.scrollTop; b.innerHTML = menEditorHtml(); b.scrollTop = st; if (focus) $(focus)?.focus(); };
 
@@ -374,18 +434,26 @@ function menHistSheet(c) {
   const c0 = addDays(menWeekStart(t), -21); const cells = [];
   for (let k = c0, n = 0; n < 28; k = addDays(k, 1), n++) { const os = menOccOn(c, k); os.forEach((o) => menState(o)); const st = !os.length ? "" : os.some((o) => o.st === "missed") ? "missed" : os.every(menIsDone) ? (os.some((o) => o.st === "late") ? "late" : "done") : os.some((o) => o.st === "overdue") ? "overdue" : os.some(menIsDone) ? "part" : os[0].st; cells.push({ k, st }); }
   return `<div class="h2" style="font-size:20px">${esc(c.name)}</div>
-    <div class="men-hmeta"><span class="pill neu">${esc(c.zone || "Sans zone")}</span><span class="pill neu">${esc(menFreqTx(c))}</span><span class="pill neu">${esc(menCap(menMomentTx(c)))}</span>${c.who ? `<span class="pill acc">${esc(c.who)}</span>` : ""}${c.photo ? `<span class="pill acc">Photo obligatoire</span>` : ""}</div>
+    <div class="men-hmeta"><span class="pill neu">${esc(c.zone || "Sans zone")}</span><span class="pill neu">${esc(menFreqTx(c))}</span><span class="pill neu">${esc(menCap(menMomentTx(c)))}</span>${c.who ? `<span class="pill acc">${esc(c.who)}</span>` : ""}${c.photo ? `<span class="pill acc">Photo obligatoire</span>` : ""}${c.required ? "" : `<span class="pill neu">Facultatif</span>`}</div>
     ${c.notes ? `<div class="note men-meth">${ico("menDrop")}${esc(c.notes)}</div>` : ""}
-    <div class="men-hstat"><div class="men-hs"><span class="lbl">30 derniers jours</span><b class="mono ${menPctCls(cp.pct)}">${cp.pct != null ? cp.pct + "%" : "–"}</b><em>${cp.tot ? `${cp.done}/${cp.tot} fait${cp.missed.length ? ` · ${cp.missed.length} oubli${cp.missed.length > 1 ? "s" : ""}` : ""}` : "Pas encore de données"}</em></div>
+    <div class="men-hstat"><div class="men-hs"><span class="lbl">30 derniers jours</span>${c.required ? `<b class="mono ${menPctCls(cp.pct)}">${cp.pct != null ? cp.pct + "%" : "–"}</b><em>${cp.tot ? `${cp.done}/${cp.tot} fait${cp.missed.length ? ` · ${cp.missed.length} oubli${cp.missed.length > 1 ? "s" : ""}` : ""}` : "Pas encore de données"}</em>` : `<b class="mono">${menLogsOf(c.id).filter((l) => l.day >= k30).length}</b><em>fois faite · tâche facultative, hors conformité</em>`}</div>
       <div class="men-cal" aria-label="4 dernières semaines">${MEN_DOW.map((d) => `<span>${d[0]}</span>`).join("")}${cells.map((x) => `<i class="${x.st} ${x.k === t ? "t" : ""} ${x.k > t ? "fut" : ""}" title="${shortDate(x.k)}"></i>`).join("")}</div></div>
     <div><span class="lbl">Derniers pointages</span>${logs.length ? `<div class="men-hl">${logs.slice(0, 8).map((l) => `<div class="li tap" data-act="menLog" data-id="${l.id}" role="button" tabindex="0"><span class="men-mk done sm">${menCheckSvg}</span><div class="tx"><b>${esc(l.by || nameOf(l.uid))}</b><em>${menCap(menLongDay(l.day))} · ${hm(l.at)}${l.slot ? ` · ${l.slot}` : ""}</em></div>${menHasPic(l) ? `<span class="men-ph">${menImg(l)}</span>` : ""}</div>`).join("")}</div>` : `<div class="empty" style="padding:14px 0 4px">Jamais pointée pour l'instant.</div>`}</div>
-    <div class="men-sfoot">${doBtn}<button class="btn ${doBtn ? "soft" : "acc"} block" data-act="menEdit" data-id="${c.id}">${ico("edit")}Modifier la tâche</button></div>`;
+    <div class="men-sfoot">${doBtn}${menCanEdit() ? `<button class="btn ${doBtn ? "soft" : "acc"} block" data-act="menEdit" data-id="${c.id}">${ico("edit")}Modifier la tâche, sa fréquence…</button>` : ""}</div>`;
 }
 
 /* ── photo proof: stored by core's upload() (IndexedDB on the device, or the asset store), the log keeps the id.
    Older logs may hold an inline data: URL in photoUrl: still displayed. ── */
-/* js/perms.js: the gérant can require a photo proof from this person for every chore */
-const menMustPhoto = () => typeof PERMS !== "undefined" && PERMS.must("chorePhoto");
+/* photo proof before a check: the task asks for one (c.photo), the gérant requires it from this person (js/perms.js chorePhoto),
+   or the restaurant rule « Photo obligatoire pour les employés » (resto.chorePhotoStaff, on by default) and the person is not a gérant */
+const menStaffPhotoOn = () => !(S.resto && S.resto.chorePhotoStaff === false);
+const menStaffPhoto = () => !!S.resto && menStaffPhotoOn() && typeof myRole === "function" && myRole() !== "gerant";
+const menMustPhoto = () => (typeof PERMS !== "undefined" && PERMS.must("chorePhoto")) || menStaffPhoto();
+const menNeedPhoto = (c) => !!(c && c.photo) || menMustPhoto();
+function menPhotoStaffSw() {
+  const on = menStaffPhotoOn();
+  return `<button class="men-sw ${on ? "on" : ""}" data-act="menPhotoStaff" role="switch" aria-checked="${on}"><span class="ic">${ico("camera")}</span><span class="tx"><b>Photo obligatoire pour les employés</b><em>${on ? "Chaque tâche cochée par un employé a sa photo de preuve" : "Seules les tâches « photo obligatoire » en demandent une"}</em></span><i></i></button>`;
+}
 const menPicMissing = (id) => typeof PHOTOS !== "undefined" && PHOTOS.missing && PHOTOS.missing[id];
 const menHasPic = (l) => !!(l && ((l.photoId && !menPicMissing(l.photoId)) || l.photoUrl));
 const menPicUrl = (l) => (typeof photoUrl === "function" ? (l.photoId && photoUrl(l.photoId)) || photoUrl(l.photoUrl) : l.photoUrl) || "";
@@ -402,7 +470,7 @@ async function menPhoto() {
 /* one check: optional photo proof, sound + haptics, log + audit event, undo toast, group / day celebration */
 async function menDoIt(a, v, c, slot) {
   const cid = c.id;
-  let ph = null; if (c.photo || menMustPhoto()) { toast("Photo de preuve obligatoire"); ph = await menPhoto(); if (!ph) return; }
+  let ph = null; if (menNeedPhoto(c)) { toast("Photo de preuve obligatoire"); ph = await menPhoto(); if (!ph) { toast("Tâche non cochée : la photo est obligatoire", "err"); return; } }
     a && a.classList && a.classList.add("press"); menSfx.check(); buzz(12);
     const by = menSigner(); M.just = v; M.justAt = Date.now();
     const evId = await DB.add("events", { type: "chore", text: `a fait « ${c.name} »${slot ? ` (${slot})` : ""}`, at: Date.now(), uid: S.me.id, by, ref: cid }).catch(() => "");
@@ -411,8 +479,8 @@ async function menDoIt(a, v, c, slot) {
     S.ui.menUndo = { logId, evId }; toastUndo(`${c.name.length > 34 ? c.name.slice(0, 32).trim() + "…" : c.name} : fait`); const ub = $("#toastTx button"); if (ub) ub.dataset.act = "menUndo";
     setTimeout(() => {
       const { groups } = menToday(); const occ = [...groups.ouverture, ...groups.midi, ...groups.fermeture]; const g = occ.find((o) => menKey(o) === v)?.moment;
-      if (g && occ.every(menIsDone)) { SFX.done(); buzz([12, 40, 12]); burst(); setTimeout(() => toast("Ménage du jour terminé, bravo !"), 1500); }
-      else if (g && groups[g].every(menIsDone)) { SFX.done(); buzz([8, 30, 8]); const el = $(`.men-gh[data-v="${g}"]`); const r = el?.getBoundingClientRect(); if (r) burst(r.left + r.width - 50, r.top + r.height / 2); }
+      if (g && occ.filter(menReq).every(menIsDone)) { SFX.done(); buzz([12, 40, 12]); burst(); setTimeout(() => toast("Ménage du jour terminé, bravo !"), 1500); }
+      else if (g && groups[g].filter(menReq).every(menIsDone)) { SFX.done(); buzz([8, 30, 8]); const el = $(`.men-gh[data-v="${g}"]`); const r = el?.getBoundingClientRect(); if (r) burst(r.left + r.width - 50, r.top + r.height / 2); }
     }, 380);
 }
 
@@ -424,6 +492,8 @@ Object.assign(ACT, {
   menGroup: (a, id, v) => { const open = a.getAttribute("aria-expanded") === "true"; M.open[v] = !open; a.setAttribute("aria-expanded", String(!open)); a.nextElementSibling?.classList.toggle("shut", open); $(".men-chev", a)?.classList.toggle("on", !open); SFX.tick(); },
   menWk: (a, id, v) => { M.wk += +v; M.sel = null; SFX.tick(); rerender(); },
   menSel: (a, id, v) => { M.sel = v; SFX.tick(); buzz(3); rerender(); },
+  menMo: (a, id, v) => { M.mo += +v; M.msel = null; SFX.tick(); rerender(); },
+  menMsel: (a, id, v) => { M.msel = v; SFX.tick(); buzz(3); rerender(); },
   menDo: async (a, id, v) => {
     if (!v || Date.now() - (M.busy[v] || 0) < 1500) return; // double tap (the photo picker may never answer if cancelled: time-boxed, not a lock)
     const [cid, day, slot] = v.split("|"); const raw = S.chores.find((x) => x.id === cid); if (!raw) return; const c = menNorm(raw);
@@ -451,13 +521,20 @@ Object.assign(ACT, {
 
   menEdit: (a, id) => {
     const c = id ? S.chores.find((x) => x.id === id) : null; const n = c ? menNorm(c) : null;
-    S.ui.men = n ? { _id: n.id, name: n.name, zone: n.zone || "", freq: n.freq, moment: n.moment, days: [...n.days], wday: n.wday == null ? null : +n.wday, mday: n.mday == null ? null : +n.mday, who: n.who || "", notes: n.notes || "", photo: !!n.photo }
-      : { name: "", zone: "Cuisine", freq: "jour", moment: "fermeture", days: [], wday: null, mday: null, who: "", notes: "", photo: false };
+    S.ui.men = n ? { _id: n.id, name: n.name, zone: n.zone || "", freq: n.freq, moment: n.moment, days: [...n.days], wday: n.wday == null ? null : +n.wday, mday: n.mday == null ? null : +n.mday, every: Math.max(2, n.every), start: n.start || "", dates: [...n.dates], required: n.required, who: n.who || "", notes: n.notes || "", photo: !!n.photo }
+      : { name: "", zone: menZoneList()[0] || "", freq: "jour", moment: "fermeture", days: [], wday: null, mday: null, every: 2, start: "", dates: [], required: true, who: "", notes: "", photo: false };
     if (n) { const g = menGuideOf(n); S.ui.men.stepsTx = g.steps.join("\n"); S.ui.men._gen = g.generic; S.ui.men._libTx = (Array.isArray(n.steps) && n.steps.length ? g.lib.steps : g.steps).join("\n"); } else { S.ui.men.stepsTx = ""; S.ui.men._libTx = ""; }
     openSheet(menEditorHtml()); if (!id) setTimeout(() => $("#menName")?.focus(), 450);
   },
   menEdSet: (a, id, v) => { S.ui.men[id] = v; SFX.tick(); menEdRedraw(); },
-  menEdFreq: (a, id, v) => { const d = S.ui.men; d.freq = v; if (v === "jours" && !d.days.length) d.days = [menDow(dayKey())]; if (v === "semaine" && d.wday == null) d.wday = 1; if (v === "mois" && d.mday == null) d.mday = 1; SFX.tick(); menEdRedraw(); },
+  menEdFreq: (a, id, v) => { const d = S.ui.men; d.freq = v; if ((v === "jours" || v === "nweeks") && !d.days.length) d.days = [menDow(dayKey())]; if (v === "semaine" && d.wday == null) d.wday = 1; if (v === "mois" && d.mday == null) d.mday = 1;
+    if ((v === "ndays" || v === "nweeks") && !d.start) d.start = dayKey(); if (v === "once" && d.dates.length > 1) d.dates = d.dates.slice(0, 1); SFX.tick(); menEdRedraw(); },
+  menEdEvery: (a, id, v) => { const d = S.ui.men; d.every = Math.max(2, Math.min(d.freq === "nweeks" ? 26 : 90, (+d.every || 2) + +v)); SFX.tick(); buzz(3); menEdRedraw(); },
+  menEdDate: (a, id, v) => { const d = S.ui.men; if (!menIsKey(v)) return; if (d.freq === "once") d.dates = d.dates[0] === v ? [] : [v]; else d.dates = d.dates.includes(v) ? d.dates.filter((x) => x !== v) : [...d.dates, v].sort(); SFX.tick(); buzz(3); menEdRedraw(); },
+  menEdCm: (a, id, v) => { const d = S.ui.men; const t = dayKey(); const cur = parseDay(d._cm || (d.dates[0] && d.dates[0] > t ? d.dates[0] : t).slice(0, 8) + "01"); cur.setMonth(cur.getMonth() + +v); const k = dayKey(cur); d._cm = k < t.slice(0, 8) + "01" ? t.slice(0, 8) + "01" : k; SFX.tick(); menEdRedraw(); },
+  menEdReq: () => { S.ui.men.required = !S.ui.men.required; SFX.tick(); buzz(4); menEdRedraw(); },
+  menEdZone: () => { S.ui.men._zoneIn = true; SFX.tick(); menEdRedraw("#menZoneIn"); },
+  menEdZoneOk: async () => { const d = S.ui.men; const z = menZoneClean($("#menZoneIn")?.value); d._zoneIn = false; if (z) { const ex = menZoneList().find((x) => x.toLowerCase() === z.toLowerCase()); d.zone = ex || z; if (!ex) { await menZonesSave([...menZoneList(), z]); toast(`Zone « ${z} » ajoutée`); } } SFX.tick(); menEdRedraw(); },
   menEdDay: (a, id, v) => { const d = S.ui.men; v = +v; d.days = d.days.includes(v) ? d.days.filter((x) => x !== v) : [...d.days, v].sort(); SFX.tick(); buzz(3); menEdRedraw(); },
   menEdWday: (a, id, v) => { S.ui.men.wday = +v; SFX.tick(); menEdRedraw(); },
   menEdMdaySet: (a, id, v) => { S.ui.men.mday = Math.max(1, Math.min(31, +v || 1)); SFX.tick(); buzz(3); menEdRedraw(); },
@@ -468,8 +545,10 @@ Object.assign(ACT, {
   menSave: async () => {
     const d = S.ui.men; d.name = ($("#menName")?.value ?? d.name ?? "").trim();
     if (!d.name) { SFX.err(); const i = $("#menName"); if (i) { i.classList.remove("shake"); void i.offsetWidth; i.classList.add("shake"); i.focus(); } return; }
-    if (d.freq === "jours" && !d.days.length) { SFX.err(); toast("Choisissez au moins un jour", "err"); return; }
-    const doc = { name: d.name, zone: d.zone || "", freq: d.freq, moment: d.freq === "service" ? "midi" : d.moment, days: d.freq === "jours" ? d.days : [], wday: d.freq === "semaine" ? d.wday : null, mday: d.freq === "mois" ? d.mday : null, who: d.who || "", notes: (d.notes || "").trim(), photo: !!d.photo };
+    if ((d.freq === "jours" || d.freq === "nweeks") && !d.days.length) { SFX.err(); toast("Choisissez au moins un jour", "err"); return; }
+    if (d.freq === "dates" && !d.dates.length) { SFX.err(); toast("Choisissez au moins une date", "err"); return; }
+    if (d.freq === "once" && !d.dates.length) { SFX.err(); toast("Choisissez la date", "err"); return; }
+    const doc = menEdDoc(d);
     { const tx = String(d.stepsTx || "").split("\n").map((x) => x.replace(/^\s*\d+[.)-]?\s*/, "").trim()).filter(Boolean); doc.steps = tx.join("\n") === String(d._libTx || "").split("\n").map((x) => x.trim()).filter(Boolean).join("\n") ? [] : tx; }
     if (d._id) await safe(DB.update("chores", d._id, doc)); else await safe(DB.add("chores", { ...doc, createdAt: Date.now() }));
     await logEvent("chore", `a ${d._id ? "modifié" : "ajouté"} la tâche de ménage « ${d.name} »`);
@@ -490,6 +569,61 @@ Object.assign(ACT, {
   choreEdit: (a, id) => ACT.menEdit(a, id),
   choreStarter: (a) => ACT.menStarter(a),
 });
+
+/* ── zones: the restaurant's list (resto.choreZones) — add, rename (every task of the zone follows), delete (its tasks go « sans zone ») ── */
+const menZoneClean = (z) => String(z || "").replace(/\s+/g, " ").trim().slice(0, 40);
+async function menZonesSave(list) {
+  list = [...new Set(list.map(menZoneClean).filter(Boolean))];
+  if (S.resto) S.resto.choreZones = list;
+  if (S.rid) await safe(DB.update("restos", S.rid, { choreZones: list })).catch(() => {});
+  return list;
+}
+function menZonesSheet() {
+  const Z = S.ui.menZ || {}; const L = menZoneList(); const n = (z) => S.chores.filter((c) => (c.zone || "") === z).length;
+  const row = (z, i) => {
+    const k = n(z);
+    if (Z.edit === z) return `<div class="men-zr ed"><input class="input" id="menZoneRen" maxlength="40" value="${esc(z)}" aria-label="Nouveau nom de la zone" autocomplete="off" enterkeyhint="done"><button class="btn soft sm" data-act="menZoneEdit" data-v="">Annuler</button><button class="btn acc sm" data-act="menZoneRenOk" data-v="${esc(z)}">OK</button></div>`;
+    if (Z.del === z) return `<div class="men-zr del"><div class="tx"><b>Supprimer « ${esc(z)} » ?</b><em>${k ? `${k} tâche${k > 1 ? "s" : ""} passer${k > 1 ? "ont" : "a"} « sans zone », rien n'est effacé` : "Aucune tâche dans cette zone"}</em></div><button class="btn soft sm" data-act="menZoneDel" data-v="">Annuler</button><button class="btn danger sm" data-act="menZoneDelOk" data-v="${esc(z)}">Supprimer</button></div>`;
+    return `<div class="men-zr st" style="--i:${i}"><span class="ic">${ico("menPin")}</span><div class="tx"><b>${esc(z)}</b><em>${k ? `${k} tâche${k > 1 ? "s" : ""}` : "Aucune tâche"}</em></div><button class="iconbtn" data-act="menZoneEdit" data-v="${esc(z)}" aria-label="Renommer ${esc(z)}">${ico("edit")}</button><button class="iconbtn" data-act="menZoneDel" data-v="${esc(z)}" aria-label="Supprimer ${esc(z)}">${ico("trash")}</button></div>`;
+  };
+  return `<div class="h2" style="font-size:20px">Zones du plan</div><p class="sub" style="margin:-6px 0 0">Renommer une zone renomme toutes ses tâches.</p>
+    <div class="men-zl">${L.map(row).join("") || `<div class="empty" style="padding:14px 0">Aucune zone pour l'instant.</div>`}</div>
+    <div class="hstack"><input class="input" id="menZoneNew" maxlength="40" placeholder="Nouvelle zone, ex. Terrasse" autocomplete="off" enterkeyhint="done" style="flex:1"><button class="btn acc sm" style="height:50px" data-act="menZoneAdd">${ico("plus")}Ajouter</button></div>
+    <div class="men-sfoot">${Z.back ? `<button class="btn acc block" data-act="menZonesBack">${ico("back")}Retour à la tâche</button>` : `<button class="btn acc block" data-act="sheetClose">Terminé</button>`}</div>`;
+}
+const menZRedraw = (focus) => { const b = $("#sheetBody"); if (!b) return; const st = b.scrollTop; b.innerHTML = menZonesSheet(); b.scrollTop = st; if (focus) { const i = $(focus); if (i) { i.focus(); i.select && i.select(); } } };
+Object.assign(ACT, {
+  menZones: (a, id, v) => { S.ui.menZ = { back: v === "ed" && S.ui.men ? 1 : 0 }; SFX.tap(); openSheet(menZonesSheet()); },
+  menZonesBack: () => { const d = S.ui.men; if (!d) return closeSheet(true); if (d.zone && !menZoneList().includes(d.zone)) d.zone = S.ui.menZ?.renamed?.[d.zone] ?? ""; SFX.tap(); openSheet(menEditorHtml()); },
+  menZoneEdit: (a, id, v) => { S.ui.menZ = { ...(S.ui.menZ || {}), edit: v || null, del: null }; SFX.tick(); menZRedraw(v ? "#menZoneRen" : null); },
+  menZoneDel: (a, id, v) => { S.ui.menZ = { ...(S.ui.menZ || {}), del: v || null, edit: null }; SFX.tick(); menZRedraw(); },
+  menZoneAdd: async () => { const z = menZoneClean($("#menZoneNew")?.value); if (!z) { SFX.err(); $("#menZoneNew")?.focus(); return; } if (menZoneList().some((x) => x.toLowerCase() === z.toLowerCase())) { SFX.err(); toast("Cette zone existe déjà", "err"); return; } await menZonesSave([...menZoneList(), z]); SFX.ok(); toast(`Zone « ${z} » ajoutée`); menZRedraw("#menZoneNew"); },
+  menZoneRenOk: async (a, id, v) => {
+    const to = menZoneClean($("#menZoneRen")?.value); const from = v; if (!to || to === from) { S.ui.menZ.edit = null; return menZRedraw(); }
+    const L = menZoneList(); if (L.some((x) => x !== from && x.toLowerCase() === to.toLowerCase())) { SFX.err(); toast("Une zone porte déjà ce nom", "err"); return; }
+    await menZonesSave(L.map((x) => (x === from ? to : x)));
+    const T = S.chores.filter((c) => (c.zone || "") === from); await Promise.all(T.map((c) => safe(DB.update("chores", c.id, { zone: to })).catch(() => {}))); T.forEach((c) => { c.zone = to; });
+    if (S.ui.men && S.ui.men.zone === from) S.ui.men.zone = to; (S.ui.menZ.renamed ||= {})[from] = to;
+    await logEvent("chore", `a renommé la zone de ménage « ${from} » en « ${to} »${T.length ? ` (${T.length} tâche${T.length > 1 ? "s" : ""})` : ""}`);
+    S.ui.menZ.edit = null; SFX.ok(); toast("Zone renommée"); menZRedraw();
+  },
+  menZoneDelOk: async (a, id, v) => {
+    const T = S.chores.filter((c) => (c.zone || "") === v); await Promise.all(T.map((c) => safe(DB.update("chores", c.id, { zone: "" })).catch(() => {}))); T.forEach((c) => { c.zone = ""; });
+    await menZonesSave(menZoneList().filter((x) => x !== v));
+    if (S.ui.men && S.ui.men.zone === v) S.ui.men.zone = "";
+    await logEvent("chore", `a supprimé la zone de ménage « ${v} »`);
+    S.ui.menZ.del = null; SFX.close(); toast("Zone supprimée"); menZRedraw();
+  },
+  // restaurant rule, gérant only (firestore.rules keeps it out of other members' writes)
+  menPhotoStaff: async (a) => {
+    if (!menIsBoss()) { SFX.err(); toast("Réservé au gérant", "err"); return; }
+    const on = !menStaffPhotoOn(); if (S.resto) S.resto.chorePhotoStaff = on; a && a.classList && (a.classList.toggle("on", on), a.setAttribute("aria-checked", String(on))); SFX.tick(); buzz(4);
+    await safe(DB.update("restos", S.rid, { chorePhotoStaff: on })).catch(() => {}); toast(on ? "Photo obligatoire pour les employés" : "Photo seulement pour les tâches qui la demandent"); rerender();
+  },
+});
+// enter = OK in the zone fields; the start date of « tous les N jours / semaines » refreshes the summary line
+document.addEventListener("keydown", (e) => { if (e.key !== "Enter" || !e.target || !e.target.id) return; const m = { menZoneIn: "menEdZoneOk", menZoneNew: "menZoneAdd", menZoneRen: "menZoneRenOk" }[e.target.id]; if (!m) return; e.preventDefault(); e.stopPropagation(); const b = $(`[data-act="${m}"]`); b ? b.click() : ACT[m](); }, true);
+document.addEventListener("change", (e) => { const el = e.target; if (!el || el.id !== "menStart" || !S.ui.men) return; if (menIsKey(el.value)) S.ui.men.start = el.value; const f = $("#menFsum span"); if (f) f.textContent = menFreqTx(menEdDoc(S.ui.men)); });
 
 /* HACCP starter plan for a small restaurant: [name, zone, moment, freq, extra, product / method, photo required] */
 const MEN_STARTER = [
