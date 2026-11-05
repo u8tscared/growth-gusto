@@ -1,0 +1,71 @@
+// ═══ Réservations (js/resa.js + reserver/) — rules to merge into firestore.rules ═══
+// WHERE: paste the two blocks below INSIDE `match /restos/{rid} { … }`, just ABOVE the generic `match /{col}/{doc} { … }`.
+// They only ADD rights for people without an account (Firestore grants a request if any matching rule allows it): members keep
+// reading/writing bookings and the public doc through the generic rule, nothing else changes.
+//
+// Model:
+//   restos/{rid}/public/resa     projection written by the app (any member): { name, address, phone, photo, msg, mail,
+//                                cfg:{ services, slot, maxPerSlot, maxService, closures, online, lead, maxOnline, horizon },
+//                                days:{ "YYYY-MM-DD": { "HH:MM": coversBooked } }, last?, updatedAt }   — no client data in it.
+//   restos/{rid}/bookings/{id}   a booking. The public page creates one with status "en ligne", in ONE batch that also adds its
+//                                covers to public/resa days[date][time] and sets public/resa.last = the booking id.
+// Guarantees: anyone can read the public doc (get only, never list); nobody without an account can read a booking;
+// an online booking needs online on, whitelisted fields of bounded size, 1..maxOnline covers, a time in the future past the
+// lead time, and a slot that stays within maxPerSlot (checked on the counter written in the same batch).
+
+      // ── réservations: public projection, read by the booking page ──
+      match /public/{doc} {
+        allow get: if doc == 'resa';
+        // the booking page adds the covers of the booking it creates in the same batch, and nothing else
+        allow update: if doc == 'resa' && resaCounterOk(rid);
+      }
+      // ── réservations: an online booking, created without an account ──
+      match /bookings/{bid} {
+        allow create: if resaOnlineOk(rid, bid);
+      }
+
+// ── and these functions next to the other helpers at the top (after `function unchanged(keys) …`) ──
+
+    function resaPubPath(rid) { return /databases/$(database)/documents/restos/$(rid)/public/resa; }
+    function resaBookingPath(rid, bid) { return /databases/$(database)/documents/restos/$(rid)/bookings/$(bid); }
+    function resaFieldsOk(b) {
+      return b.keys().hasOnly(['date', 'time', 'covers', 'name', 'phone', 'email', 'notes', 'status', 'source', 'createdAt', 'at'])
+        && b.keys().hasAll(['date', 'time', 'covers', 'name', 'phone', 'status', 'source', 'createdAt', 'at'])
+        && b.status == 'en ligne' && b.source == 'web'
+        && b.date is string && b.date.matches('^20[0-9]{2}-[01][0-9]-[0-3][0-9]$')
+        && b.time is string && b.time.matches('^[0-2][0-9]:[0-5][0-9]$')
+        && b.covers is int && b.covers >= 1
+        && b.name is string && b.name.size() >= 2 && b.name.size() <= 60
+        && b.phone is string && b.phone.size() >= 6 && b.phone.size() <= 25
+        && (!('email' in b) || (b.email is string && b.email.size() <= 100))
+        && (!('notes' in b) || (b.notes is string && b.notes.size() <= 300))
+        && b.createdAt is int && b.createdAt > request.time.toMillis() - 600000 && b.createdAt < request.time.toMillis() + 600000
+        && b.at is int && b.at < request.time.toMillis() + 400 * 86400000;
+    }
+    function resaOnlineOk(rid, bid) {
+      let b = request.resource.data;
+      let p = get(resaPubPath(rid)).data;
+      let pa = getAfter(resaPubPath(rid)).data;
+      let before = p.days.get(b.date, {}).get(b.time, 0);
+      return resaFieldsOk(b)
+        && p.cfg.online == true
+        && b.covers <= p.cfg.maxOnline
+        && b.at > request.time.toMillis() + p.cfg.lead * 3600000
+        && pa.last == bid
+        && pa.days[b.date][b.time] == before + b.covers
+        && (p.cfg.maxPerSlot == 0 || pa.days[b.date][b.time] <= p.cfg.maxPerSlot);
+    }
+    function resaCounterOk(rid) {
+      let n = request.resource.data;
+      let o = resource.data;
+      let bid = n.last;
+      let b = getAfter(resaBookingPath(rid, bid)).data;
+      return n.diff(o).affectedKeys().hasOnly(['days', 'last'])
+        && bid is string
+        && !exists(resaBookingPath(rid, bid))
+        && existsAfter(resaBookingPath(rid, bid))
+        && b.status == 'en ligne'
+        && n.days.diff(o.days).affectedKeys().hasOnly([b.date])
+        && n.days[b.date].diff(o.days.get(b.date, {})).affectedKeys().hasOnly([b.time])
+        && n.days[b.date][b.time] == o.days.get(b.date, {}).get(b.time, 0) + b.covers;
+    }

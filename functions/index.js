@@ -5,7 +5,7 @@ if (!admin.apps.length) admin.initializeApp();
 const { onSchedule } = require("firebase-functions/v2/scheduler");
 const mods = {};
 /* modules switched on in functions/.env (GG_MODULES): caisse needs its SumUp keys set as secrets before it can be deployed */
-for (const m of String(process.env.GG_MODULES || "sondes,alertes").split(",").map((x) => x.trim()).filter(Boolean)) {
+for (const m of String(process.env.GG_MODULES || "sondes,alertes,resa").split(",").map((x) => x.trim()).filter(Boolean)) {
   try { mods[m] = require("./src/" + m); } catch (e) { if (e.code !== "MODULE_NOT_FOUND") throw e; }
 }
 const TICKS = ["sondesTick", "caisseTick", "alertesTick"];

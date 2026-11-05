@@ -1,0 +1,169 @@
+/* Growth Gusto — public booking page. Same « Version 2 » look as the app: cream paper, ink, one violet, saffron. Standalone (no app CSS). */
+:root{
+  --bg:#FBF6EC;--paper:#FFFDF8;--ink:#1B1530;--ink-2:#4A4560;--muted:#615B74;--faint:#6E6880;
+  --rim:#E9DFCD;--rim-2:#DCCFB8;--edge-b:#E2D6C2;--cream-2:#F4EDE0;--cream-3:#F1E9DA;
+  --accent:#5B2BFF;--accent-ink:#3A10D8;--accent-edge:#2A0BA6;--wall:#4C1FEA;--tint:#EFE9FF;
+  --saffron:#F6B93B;--saffron-edge:#D99A1E;--saffron-tint:#FFF3D6;--saffron-ink:#7A5A1A;
+  --tomato:#EF5A3C;--tomato-tint:#FFE9DE;--bad:#C8432A;
+  --f:"Instrument Sans",system-ui,-apple-system,"Segoe UI",sans-serif;--d:"Bricolage Grotesque","Instrument Sans",system-ui,sans-serif;
+  --spring:cubic-bezier(.34,1.56,.64,1);--soft:cubic-bezier(.3,1.3,.5,1);
+  color-scheme:light;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--f);font-size:16px;-webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent}
+button,input,textarea{font:inherit;color:inherit}
+svg{width:18px;height:18px;flex:none;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.rv{max-width:520px;margin:0 auto;padding:0 0 28px;min-height:100vh;min-height:100dvh;display:flex;flex-direction:column}
+
+/* hero: the violet grid wall */
+.rv-hero{background-color:var(--wall);background-image:linear-gradient(rgba(255,255,255,.08) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.08) 1px,transparent 1px);background-size:22px 22px;color:#fff;padding:calc(env(safe-area-inset-top,0px) + 26px) 20px 58px;border-radius:0 0 32px 32px}
+.rv-hero.slim{padding-bottom:40px}
+.rv-hero-in{display:flex;align-items:center;gap:16px;animation:rvRise .7s var(--soft) both}
+.rv-ph{width:76px;height:76px;flex:none;border-radius:24px;background:#FFFDF8;display:grid;place-items:center;overflow:hidden;box-shadow:0 4px 0 #2A0BA6}
+.rv-ph img{width:100%;height:100%;object-fit:cover}
+.rv-ph span{font-family:var(--d);font-size:28px;font-weight:780;color:var(--accent);letter-spacing:-.03em}
+.rv-hn{min-width:0;display:flex;flex-direction:column;gap:3px}
+.rv-k{font-size:13.5px;font-weight:650;color:#D9D2FF}
+.rv-hn h1{margin:0;font-family:var(--d);font-variation-settings:"opsz" 96,"wdth" 90;font-size:30px;font-weight:780;letter-spacing:-.035em;line-height:1.02;overflow-wrap:anywhere}
+.rv-hn p{margin:2px 0 0;display:flex;align-items:center;gap:6px;font-size:13.5px;font-weight:550;color:#E4DEFF}
+.rv-hn p svg{width:15px;height:15px}
+
+/* the card that holds the steps */
+.rv-card{position:relative;margin:-34px 12px 0;background:var(--paper);border:1.5px solid var(--rim);border-radius:28px;box-shadow:0 2px 0 #EFE6D6,0 30px 60px -30px rgba(27,21,48,.35);padding:20px 18px 22px;display:flex;flex-direction:column;gap:22px;transition:opacity .5s,transform .6s var(--soft)}
+.rv-card.in{opacity:0;transform:translateY(24px)}
+.rv-msgline{margin:0;font-size:14px;line-height:1.45;color:var(--saffron-ink);background:var(--saffron-tint);border-radius:16px;padding:10px 13px}
+.rv-step{display:flex;flex-direction:column;gap:12px}
+.rv-sh{display:flex;align-items:baseline;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.rv-sh b{font-family:var(--d);font-size:20px;font-weight:740;letter-spacing:-.025em}
+.rv-sh span{font-size:13.5px;font-weight:650;color:var(--accent-ink)}
+.rv-hint{margin:-2px 0 0;font-size:13px;color:var(--muted)}
+.rv-hint a{color:var(--accent-ink);font-weight:700}
+
+/* covers */
+.rv-cov{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;margin:0 -18px;padding:2px 18px 6px}
+.rv-cov::-webkit-scrollbar{display:none}
+.rv-cov button{all:unset;cursor:pointer;flex:none;width:52px;height:52px;border-radius:50%;display:grid;place-items:center;font-family:var(--d);font-size:20px;font-weight:760;background:#fff;box-shadow:0 0 0 1.5px var(--rim-2) inset,0 3px 0 var(--edge-b);margin-bottom:3px;transition:transform .25s var(--spring),background .2s,color .2s,box-shadow .2s}
+.rv-cov button:active{transform:translateY(3px);box-shadow:0 0 0 1.5px var(--rim-2) inset}
+.rv-cov button.on{background:var(--accent);color:#fff;box-shadow:0 3px 0 var(--accent-edge);animation:rvPop .4s var(--spring)}
+
+/* days */
+.rv-days{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;margin:0 -18px;padding:2px 18px 6px;scroll-snap-type:x proximity;scroll-padding:0 18px}
+.rv-days::-webkit-scrollbar{display:none}
+.rv-d{all:unset;cursor:pointer;position:relative;flex:none;width:62px;height:76px;border-radius:18px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;background:#fff;box-shadow:0 0 0 1.5px var(--rim-2) inset,0 3px 0 var(--edge-b);margin-bottom:3px;scroll-snap-align:start;transition:transform .25s var(--spring),background .2s,color .2s}
+.rv-d em{font-style:normal;font-size:12px;font-weight:650;color:var(--muted)}
+.rv-d b{font-family:var(--d);font-size:22px;font-weight:760;letter-spacing:-.03em;line-height:1.1;display:flex}
+.rv-d i{font-style:normal;font-size:11px;font-weight:650;color:var(--faint)}
+.rv-d:active{transform:translateY(3px)}
+.rv-d.off{opacity:.5}
+.rv-d[disabled]{opacity:.35;cursor:default;box-shadow:0 0 0 1.5px var(--rim) inset}
+.rv-d.on{background:var(--ink);color:#fff;box-shadow:0 3px 0 #000;opacity:1}
+.rv-d.on em,.rv-d.on i{color:#B9B3CC}
+.rv-dp b svg{width:22px;height:22px;color:var(--accent)}
+.rv-dp input{position:absolute;inset:0;opacity:0;width:100%;height:100%;border:0;cursor:pointer}
+
+/* times */
+.rv-svc{display:flex;flex-direction:column;gap:8px}
+.rv-svc+.rv-svc{margin-top:6px}
+.rv-svch{font-size:13.5px;font-weight:700;color:var(--ink-2)}
+.rv-times{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.rv-t{all:unset;cursor:pointer;height:50px;border-radius:15px;display:grid;place-items:center;font-family:var(--d);font-size:17.5px;font-weight:740;letter-spacing:-.02em;background:#fff;box-shadow:0 0 0 1.5px var(--rim-2) inset,0 3px 0 var(--edge-b);margin-bottom:3px;transition:transform .22s var(--spring),background .2s,color .2s;animation:rvRise .5s var(--soft) both;animation-delay:calc(var(--i,0) * 22ms)}
+.rv-t:active{transform:translateY(3px);box-shadow:0 0 0 1.5px var(--rim-2) inset}
+.rv-t.on{background:var(--accent);color:#fff;box-shadow:0 3px 0 var(--accent-edge)}
+.rv-t.off{color:#B4ADBF;text-decoration:line-through;box-shadow:0 0 0 1.5px var(--rim) inset;background:transparent;cursor:default}
+.rv-none{font-size:14.5px;color:var(--ink-2);background:var(--cream-2);border-radius:16px;padding:14px;line-height:1.5}
+.rv-none a{color:var(--accent-ink);font-weight:700}
+.rv-link{all:unset;cursor:pointer;display:inline;color:var(--accent-ink);font-weight:700;text-decoration:underline;text-underline-offset:3px}
+
+/* form */
+.rv-form{display:flex;flex-direction:column;gap:12px;border-top:1.5px dashed var(--rim-2);padding-top:20px;animation:rvRise .6s var(--soft) both}
+.rv-sum{display:flex;align-items:center;flex-wrap:wrap;gap:6px 8px;background:var(--tint);color:var(--accent-ink);border-radius:16px;padding:12px 14px;font-size:14.5px}
+.rv-sum svg{width:16px;height:16px;color:var(--accent)}
+.rv-sum>span{display:inline-flex;align-items:center;gap:6px;margin-right:10px;white-space:nowrap}
+.rv-f{display:flex;flex-direction:column;gap:6px}
+.rv-f>span{font-size:13.5px;font-weight:650;color:var(--ink-2)}
+.rv-f>span i{font-style:normal;font-weight:550;color:var(--faint)}
+.rv-f input,.rv-f textarea{width:100%;height:54px;border-radius:16px;border:1.5px solid var(--rim-2);background:#fff;padding:0 15px;font-size:17px;font-weight:550;outline:none;transition:border-color .2s,box-shadow .2s;-webkit-appearance:none;appearance:none}
+.rv-f textarea{height:auto;min-height:54px;padding:13px 15px;line-height:1.4;resize:vertical;font-size:16px}
+.rv-f input::placeholder,.rv-f textarea::placeholder{color:#9A93A8}
+.rv-f input:focus,.rv-f textarea:focus{border-color:var(--accent);box-shadow:0 0 0 4px rgba(91,43,255,.14)}
+.rv-err{display:flex;gap:9px;align-items:center;font-size:14px;font-weight:650;color:var(--bad);background:var(--tomato-tint);border-radius:14px;padding:11px 13px;animation:rvShake .4s}
+.rv-legal{margin:0;text-align:center;font-size:12px;color:var(--faint)}
+
+/* buttons */
+.rv-btn{all:unset;box-sizing:border-box;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:9px;height:56px;padding:0 20px;border-radius:17px;background:var(--accent);color:#fff;font-weight:700;font-size:16.5px;box-shadow:0 4px 0 var(--accent-edge);margin-bottom:4px;transition:transform .24s var(--spring),box-shadow .24s,background .2s;text-align:center}
+.rv-btn:active{transform:translateY(4px);box-shadow:none}
+.rv-btn.big{height:60px;font-size:18px}
+.rv-btn.soft{background:var(--paper);color:var(--ink);box-shadow:0 0 0 1.5px var(--rim-2) inset,0 4px 0 var(--edge-b)}
+.rv-btn.soft:active{box-shadow:0 0 0 1.5px var(--rim-2) inset}
+.rv-btn[disabled]{background:#E4DCF7;color:var(--accent-ink);box-shadow:0 4px 0 #CFC3F2;cursor:default}
+.rv-btn[disabled]:active{transform:none}
+@media (hover:hover){.rv-btn:not([disabled]):hover{background:#6538FF}.rv-btn.soft:hover{background:#fff}.rv-d:not(.on):not([disabled]):hover,.rv-t:not(.on):not(.off):hover,.rv-cov button:not(.on):hover{background:#F7F0E3}}
+.rv-spin{width:18px;height:18px;border-radius:50%;border:2.5px solid rgba(58,16,216,.25);border-top-color:var(--accent-ink);animation:rvSpin .7s linear infinite}
+
+/* done */
+.rv-done{align-items:center;text-align:center;gap:14px;padding-top:28px}
+.rv-done h2{margin:0;font-family:var(--d);font-size:32px;font-weight:780;letter-spacing:-.035em;animation:rvRise .6s .35s var(--soft) both}
+.rv-done>p{margin:-4px 0 4px;font-size:15px;color:var(--ink-2);max-width:320px;line-height:1.45;animation:rvRise .6s .45s var(--soft) both}
+.rv-anim{position:relative;width:120px;height:120px}
+.rv-anim svg{width:120px;height:120px;stroke-width:0}
+.rv-anim .c1{fill:var(--accent);transform-origin:60px 60px;animation:rvBloom .7s var(--spring) both}
+.rv-anim .ck{fill:none;stroke:#fff;stroke-width:9;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:80;stroke-dashoffset:80;animation:rvDraw .45s .38s ease-out forwards}
+.rv-anim i{position:absolute;left:50%;top:50%;width:9px;height:9px;margin:-4.5px;border-radius:3px;background:var(--saffron);opacity:0;transform:rotate(var(--a)) translateY(0);animation:rvConf .9s calc(.3s + var(--d)) cubic-bezier(.2,.7,.3,1) forwards}
+.rv-anim i:nth-child(3n){background:var(--tomato);border-radius:50%}
+.rv-anim i:nth-child(3n+1){background:#9EC5FF;width:7px;height:12px}
+.rv-ticket{width:100%;max-width:360px;background:#fff;border:1.5px solid var(--rim);border-radius:22px;box-shadow:0 3px 0 var(--edge-b);overflow:hidden;text-align:left;animation:rvTicket .8s .55s var(--soft) both;margin:6px 0 6px}
+.rv-tk-h{background:var(--ink);color:#fff;font-family:var(--d);font-size:17px;font-weight:740;letter-spacing:-.02em;padding:13px 16px;position:relative}
+.rv-tk-h::after{content:"";position:absolute;left:10px;right:10px;bottom:-5px;height:10px;background:radial-gradient(circle at 5px 5px,#fff 4px,transparent 4.5px) 0 0/14px 10px repeat-x}
+.rv-tk-g{display:grid;grid-template-columns:1fr 1fr;gap:12px 14px;padding:18px 16px 16px}
+.rv-tk-g em{display:block;font-style:normal;font-size:12px;font-weight:650;color:var(--faint)}
+.rv-tk-g b{display:block;font-family:var(--d);font-size:18px;font-weight:740;letter-spacing:-.02em;overflow-wrap:anywhere}
+.rv-tk-g div:first-child b::first-letter{text-transform:uppercase}
+.rv-done .rv-btn{width:100%;max-width:360px;animation:rvRise .6s .7s var(--soft) both}
+.rv-done .rv-btn.soft{animation-delay:.78s}
+.rv-done .rv-link{margin-top:4px;font-size:14.5px}
+
+/* message (closed, unknown link, offline) */
+.rv-msg{align-items:center;text-align:center;gap:12px;padding:28px 20px}
+.rv-msg h2{margin:0;font-family:var(--d);font-size:24px;font-weight:760;letter-spacing:-.03em}
+.rv-msg p{margin:0;color:var(--ink-2);line-height:1.5;max-width:330px}
+.rv-msg .rv-btn{width:100%;max-width:340px}
+.rv-msg-ic{width:60px;height:60px;border-radius:50%;background:var(--saffron-tint);color:var(--saffron-ink);display:grid;place-items:center}
+.rv-msg-ic svg{width:28px;height:28px}
+
+.rv-foot{margin-top:auto;padding:22px 16px 0;text-align:center;font-size:12.5px;color:var(--faint)}
+.rv-foot a{color:var(--ink-2);font-weight:650;text-decoration:none}
+
+/* loading skeleton */
+.sk{background:linear-gradient(90deg,#F4EDE0,#FBF6EC,#F4EDE0);background-size:200% 100%;animation:rvSk 1.2s linear infinite;border-radius:14px}
+.rv-hero .sk{background:linear-gradient(90deg,rgba(255,255,255,.14),rgba(255,255,255,.28),rgba(255,255,255,.14));background-size:200% 100%}
+.rv-ph.sk{box-shadow:none}
+.sk-t{display:block;width:180px;height:28px}.sk-s{display:block;width:120px;height:14px;margin-top:6px}
+.sk-b{height:64px}.sk-b.short{height:120px}
+
+/* embed (iframe on the restaurant's website) */
+.embed .rv{min-height:0}
+.embed .rv-hero{border-radius:24px 24px 0 0;padding:20px 18px 50px}
+.embed .rv-ph{width:56px;height:56px;border-radius:18px}
+.embed .rv-hn h1{font-size:24px}
+.embed .rv-card{margin:-30px 0 0;border-radius:24px}
+.embed .rv-foot{padding-top:14px}
+
+@media (min-width:600px){
+  .rv{padding-top:28px}
+  .rv-hero{border-radius:32px;margin:0 12px;padding:30px 26px 64px}
+  .rv-hn h1{font-size:36px}
+  .rv-card{margin:-40px 28px 0;padding:24px 24px 26px}
+  .rv-cov,.rv-days{margin:0 -24px;padding-left:24px;padding-right:24px;scroll-padding:0 24px}
+  .rv-cov{flex-wrap:wrap;overflow:visible;margin:0;padding:2px 0 4px}
+  .embed .rv{padding-top:0}.embed .rv-hero{margin:0}.embed .rv-card{margin:-30px 0 0}
+}
+@keyframes rvRise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+@keyframes rvPop{from{transform:scale(.8)}to{transform:none}}
+@keyframes rvSpin{to{transform:rotate(360deg)}}
+@keyframes rvSk{to{background-position:-200% 0}}
+@keyframes rvShake{20%,60%{transform:translateX(-5px)}40%,80%{transform:translateX(5px)}}
+@keyframes rvBloom{from{transform:scale(0)}to{transform:scale(1)}}
+@keyframes rvDraw{to{stroke-dashoffset:0}}
+@keyframes rvConf{0%{opacity:1;transform:rotate(var(--a)) translateY(0) scale(.6)}70%{opacity:1}100%{opacity:0;transform:rotate(var(--a)) translateY(-86px) scale(1) rotate(180deg)}}
+@keyframes rvTicket{from{opacity:0;transform:translateY(30px) rotate(-3deg)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-delay:0s!important;transition-duration:.01ms!important}}
