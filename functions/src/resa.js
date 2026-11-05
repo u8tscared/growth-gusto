@@ -1,4 +1,4 @@
-/* Growth Gusto — server side of the reservations (js/resa.js, reserver/). Firebase Functions v2, Node 20, region europe-west9.
+/* Growth Gusto — server side of the reservations (js/resa.js, reserver/). Firebase Functions v2, Node 22, region europe-west9.
    Exports (functions/index.js picks them up):
      onResaBooking  Firestore trigger, any write on restos/{rid}/bookings/{bid}: sends the client the right e-mail (Brevo) and makes sure
                     the booking has its private manage key. E-mails: demande reçue (validation mode), confirmée (online, phone booking with

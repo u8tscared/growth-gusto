@@ -1,4 +1,4 @@
-/* Growth Gusto — « Caisse connectée », server part (Firebase Cloud Functions v2, Node 20, region europe-west9).
+/* Growth Gusto — « Caisse connectée », server part (Firebase Cloud Functions v2, Node 22, region europe-west9).
  *
  *   caisseApi   HTTPS (POST JSON, Authorization: Bearer <Firebase ID token>) called by js/caisse.js:
  *               op "start"      → { url }  OAuth 2 authorization URL (SumUp, Square, Lightspeed K-Series), state saved in caisseStates/{state}

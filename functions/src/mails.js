@@ -1,4 +1,4 @@
-/* Growth Gusto — account e-mails (js/auth.js). Firebase Functions, Node 20, region europe-west9. Few e-mails on purpose:
+/* Growth Gusto — account e-mails (js/auth.js). Firebase Functions, Node 22, region europe-west9. Few e-mails on purpose:
      1. the 6-digit code that validates an e-mail/password account   (mailSendCode / mailVerifyCode, HTTPS callables)
      2. « Bienvenue » once per account                                  (mailOnUserCreated, v1 auth trigger: free, no scheduler)
      3. « Plus que 3 jours d'essai » and 4. « Dernier jour d'essai »    (mailsTick, called by the lead's single 15-min job)
@@ -205,8 +205,8 @@ const mailVerifyCode = onCall({ region: REGION, secrets: [BREVO_KEY], cors: true
   return { ok: true, verified: true };
 });
 
-/* ───────── v1 auth trigger: every new account (Google, e-mail). Free (no Cloud Scheduler). ───────── */
-const mailOnUserCreated = functionsV1.region(REGION).runWith({ secrets: [BREVO_KEY] }).auth.user().onCreate(async (u) => {
+/* ───────── v1 auth trigger: every new account (Google, e-mail). Free (no Cloud Scheduler). 1st gen functions do not exist in europe-west9 (Paris), so this one runs in europe-west1. ───────── */
+const mailOnUserCreated = functionsV1.region("europe-west1").runWith({ secrets: [BREVO_KEY] }).auth.user().onCreate(async (u) => {
   if (!u.email) return;
   if (isGoogle(u) || u.emailVerified) { try { await welcome(u.uid, u); } catch (e) { logger.error("mails: welcome", u.uid, e); } return; }
   /* e-mail/password: wait for the code (mailVerifyCode sends it); mailsTick sends it anyway after 24 h */

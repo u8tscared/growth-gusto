@@ -1,4 +1,4 @@
-/* Growth Gusto — server side of the alerts (js/alertes.js). Firebase Functions v2, Node 20, region europe-west9.
+/* Growth Gusto — server side of the alerts (js/alertes.js). Firebase Functions v2, Node 22, region europe-west9.
    Cost: no Cloud Scheduler job of its own. The lead's single scheduled job (functions/index.js) calls
      alertesTick()   every 15 min  → missed rounds, out-of-range readings, DLC + obligations (once a day), grouped e-mails, escalation
      alertesWeekly() Monday 07:00 Europe/Paris → the weekly report e-mail

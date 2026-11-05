@@ -1,5 +1,5 @@
 /* Growth Gusto — server part of « Sondes connectées » (wireless fridge / freezer / cold-room thermometers).
-   Firebase Cloud Functions v2, Node 20, region europe-west9.
+   Firebase Cloud Functions v2, Node 22, region europe-west9.
 
    Exports
    - sondesIngest (HTTPS)  : webhook for any gateway able to send HTTP (Milesight / LoRaWAN network servers, TTN, ChirpStack,
