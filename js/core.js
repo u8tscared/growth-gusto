@@ -280,7 +280,22 @@ const ALLERGENS = [
 const allergenOf = (id) => ALLERGENS.find((a) => a.id === id);
 const ROLES = { gerant: "Gérant", chef: "Chef", equipe: "Équipe" };
 const ZONES = ["Réserve sèche", "Chambre froide 1", "Chambre froide 2", "Bar", "Congélateur"];
-const UNITS = ["kg", "g", "L", "pièce", "bourriche", "colis", "botte"];
+const UNITS = ["kg", "g", "L", "PCE", "DZ", "pièce", "bourriche", "colis", "botte"];
+/* units: base list of a picker + PCE/DZ + the restaurant's own units (resto.units) + any unit already used; « + Autre » adds a custom one */
+const UNIT_NAMES = { PCE: "pièce", DZ: "douzaine" };
+function unitsFor(base, cur) {
+  const own = (S.resto && Array.isArray(S.resto.units) ? S.resto.units : []); let loc = []; try { loc = JSON.parse(localStorage.getItem("gg-units-" + (S.rid || "")) || "[]"); } catch (e) {}
+  const used = (S.products || []).map((p) => p.unit).filter(Boolean);
+  const all = [...base, "PCE", "DZ", ...own, ...loc, ...used, cur].filter((u) => u && String(u).trim());
+  const seen = new Set(); return all.filter((u) => { const k = String(u).trim().toLowerCase(); if (seen.has(k)) return false; seen.add(k); return true; });
+}
+function unitSave(u) {
+  u = String(u || "").trim().slice(0, 16); if (!u) return "";
+  try { const k = "gg-units-" + (S.rid || ""); const l = JSON.parse(localStorage.getItem(k) || "[]"); if (!l.includes(u)) { l.push(u); localStorage.setItem(k, JSON.stringify(l)); } } catch (e) {}
+  if (S.resto && S.rid && myRole() === "gerant") { const units = [...new Set([...(S.resto.units || []), u])]; S.resto.units = units; try { DB.update("restos", S.rid, { units }).catch(() => {}); } catch (e) {} }
+  return u;
+}
+/* « + Autre » chip in a unit picker: data-pick = the action the unit chips use; an inline field appears, Enter/OK adds the chip and selects it */
 const ACTIONS = ["Produits déplacés dans un autre frigo", "Thermostat réglé", "Porte mal fermée, refermée", "Technicien appelé", "Produits jetés"];
 const nameOf = (uid) => (uid === S.me.id ? (S.me.name || "Vous") : (S.profiles[uid]?.name || S.members.find((m) => m.id === uid)?.name || "Quelqu'un"));
 const said = (uid, text) => (uid === S.me.id ? `Vous avez ${String(text).replace(/^a /, "")}` : `${firstName(nameOf(uid))} ${text}`);
@@ -965,6 +980,20 @@ async function saveCsv(name, rows) {
 
 /* install card + update toast actions */
 Object.assign(ACT, {
+  unitNew: (a) => {
+    const wrap = a.parentElement; if (!wrap || $(".unit-new", wrap)) { const i = wrap && $(".unit-new input", wrap); i && i.focus(); return; }
+    const box = document.createElement("span"); box.className = "unit-new";
+    box.innerHTML = `<input class="input" maxlength="16" placeholder="Ex. barquette" aria-label="Nouvelle unité" autocomplete="off" enterkeyhint="done"><button class="btn acc sm" type="button">OK</button>`;
+    a.after(box); a.hidden = true; const inp = $("input", box); setTimeout(() => inp.focus(), 30); SFX.tick();
+    const done = () => {
+      const u = unitSave(inp.value); box.remove(); a.hidden = false; if (!u) return;
+      let chip = [...wrap.querySelectorAll(".chip")].find((c) => c !== a && (c.dataset.v || "").toLowerCase() === u.toLowerCase());
+      if (!chip) { const tpl = [...wrap.querySelectorAll(".chip")].find((c) => c !== a && c.dataset.act); if (!tpl) return; chip = tpl.cloneNode(false); chip.classList.remove("on"); chip.dataset.v = u; chip.textContent = u; a.before(chip); chip.classList.add("pop"); }
+      chip.click(); toast(`Unité « ${u} » ajoutée`);
+    };
+    $("button", box).addEventListener("click", (e) => { e.stopPropagation(); done(); });
+    inp.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); e.stopPropagation(); done(); } else if (e.key === "Escape") { e.stopPropagation(); box.remove(); a.hidden = false; } });
+  },
   appUpdate: (a) => { SFX.tap(); $("#toast").classList.remove("on"); UPD.apply(a.dataset.v); },
   installApp: async () => {
     if (!installEvt) return; SFX.tap(); const ev = installEvt;

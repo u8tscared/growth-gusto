@@ -15,7 +15,7 @@ const NOTE_TABS = [["Recettes", "ntChef", "Recettes"], ["Procédures", "shield",
 /* the 14 regulated allergens come from core (ALLERGENS); v1/v2 recipes stored "fruits_coque": read as "fruitscoque" */
 const NOTE_ALLERGENS = (typeof ALLERGENS !== "undefined" ? ALLERGENS : []).map((a) => [a.id, a.t]);
 const noteAlId = (k) => (k === "fruits_coque" ? "fruitscoque" : String(k || ""));
-const NOTE_UNITS = ["g", "kg", "ml", "cl", "L", "pièce", "c. à s.", "c. à c.", "pincée", "botte", "feuille"];
+const NOTE_UNITS = ["g", "kg", "ml", "cl", "L", "PCE", "DZ", "pièce", "c. à s.", "c. à c.", "pincée", "botte", "feuille"];
 const noteKind = (n) => (n.cat === "Recettes" ? "Recettes" : n.cat === "Hygiène" || n.cat === "Procédures" ? "Procédures" : "Notes");
 const noteSplit = (t) => String(t || "").split(/\n+/).map((s) => s.replace(/^\s*(\d+\s*[.)\-–:]|[-•*·])\s*/, "").trim()).filter(Boolean);
 const noteSteps = (n) => (Array.isArray(n.steps) ? n.steps.map((s) => String(s || "").trim()).filter(Boolean) : noteKind(n) === "Notes" ? [] : noteSplit(n.body));
@@ -255,7 +255,7 @@ VIEWS.note = {
     const ingsHTML = `<div class="glass pad st nt-esec" style="--i:3"><div class="nt-ehead"><span class="lbl">Ingrédients</span>
         <label class="nt-eport"><span>Pour</span><input class="input mono nt-eportin" data-bind="ui.note.portions" inputmode="decimal" autocomplete="off" value="${esc(N.portions)}" placeholder="4" aria-label="Nombre de portions"><span>portions</span></label></div>
       <div class="nt-erows">${N.ingredients.map((g, i) => `<div class="nt-erow"><input class="input nt-n" data-bind="ui.note.ingredients.${i}.name" data-nkey="ing" data-i="${i}" value="${esc(g.name)}" placeholder="Ingrédient" aria-label="Ingrédient ${i + 1}" enterkeyhint="next"><input class="input mono nt-q" data-bind="ui.note.ingredients.${i}.qty" data-nkey="ing" data-i="${i}" inputmode="decimal" value="${esc(g.qty)}" placeholder="Qté" aria-label="Quantité" enterkeyhint="next"><input class="input nt-u" list="ntUnits" data-bind="ui.note.ingredients.${i}.unit" data-nkey="ing" data-i="${i}" value="${esc(g.unit)}" placeholder="g" aria-label="Unité" enterkeyhint="next"><button class="iconbtn nt-del" data-act="noteIngDel" data-v="${i}" aria-label="Retirer l'ingrédient">${ico("x")}</button>${noteELinkHTML(g, i)}</div>`).join("")}</div>
-      <datalist id="ntUnits">${NOTE_UNITS.map((u) => `<option value="${esc(u)}">`).join("")}</datalist>
+      <datalist id="ntUnits">${unitsFor(NOTE_UNITS).map((u) => `<option value="${esc(u)}">`).join("")}</datalist>
       <button class="btn ghost sm" data-act="noteIngAdd" style="align-self:flex-start">${ico("plus")}Ajouter un ingrédient</button></div>
       <div class="glass pad st nt-esec" style="--i:4"><span class="lbl">Allergènes</span><p class="note" style="margin:0">Ceux des ingrédients liés au stock s'ajoutent tout seuls. Touchez un allergène pour l'ajouter ou le confirmer.</p><div class="nt-als nt-alsed" id="ntAlEd">${noteAlEdHTML(N)}</div></div>
       ${noteCarteEdHTML(N)}`;

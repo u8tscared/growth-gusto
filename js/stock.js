@@ -17,7 +17,7 @@ Object.assign(IC, {
 });
 
 const STK_ZONE_ORDER = ["Chambre froide", "Chambre froide 1", "Chambre froide 2", "Chambre froide 3", "Congélateur", "Cuisine", "Légumerie", "Réserve sèche", "Réserve", "Cave", "Bar"];
-const STK_UNITS = ["kg", "g", "L", "pièce", "bouteille", "fût", "botte", "boîte", "colis", "bourriche", "plateau"];
+const STK_UNITS = ["kg", "g", "L", "PCE", "DZ", "bouteille", "fût", "botte", "boîte", "colis", "bourriche", "plateau"];
 const STK_SS = "gg-stk-cm";
 
 /* ───────── helpers ───────── */
@@ -657,7 +657,7 @@ function stkEdOpen(pid) {
 function stkProdSheet(p, isNew, presetZone) {
   const real = S.fridges.map((f) => (f.name || "").trim()).filter(Boolean);
   const zones = [...new Set([...stkZones(), ...real, stkRealZone("Chambre froide"), stkRealZone("Congélateur"), "Réserve sèche", "Cave", "Bar"])].sort((a, b) => stkZoneRank(a) - stkZoneRank(b) || a.localeCompare(b, "fr"));
-  const units = [...new Set([...STK_UNITS, ...UNITS, ...S.products.map((x) => x.unit).filter(Boolean)])];
+  const units = unitsFor(STK_UNITS, p.unit);
   const sups = [...new Set([...S.products.map((x) => x.supplier), ...S.receptions.map((r) => r.supplier), ...S.lots.map((l) => l.supplier)].filter(Boolean))].sort((a, b) => a.localeCompare(b, "fr"));
   const zone = p.zone || presetZone || S.stkZone || zones[0]; const unit = p.unit || "kg";
   const E = !isNew ? stkEstimate(p) : null;
@@ -668,7 +668,7 @@ function stkProdSheet(p, isNew, presetZone) {
     <div class="field"><span>Allergènes</span><div id="pAl">${stkPAHtml(p.name || "")}</div></div>
     <div class="field"><span>Zone</span><div class="chips stk-pick" data-k="zone">${zones.map((z) => `<button class="chip ${z === zone ? "on" : ""}" data-act="stkPick" data-v="${esc(z)}">${esc(z)}</button>`).join("")}<button class="chip stk-newz" data-act="stkNewZone">${ico("plus")}Autre</button></div><input class="input" id="pZone" value="${esc(zone)}" placeholder="Nom de la zone" hidden></div>
     <div class="field" id="pFamF" ${stkZoneKind(zone) === "sec" || stkZoneKind(zone) === "cave" ? "hidden" : ""}><span>Étagère au froid <em class="stk-opt">ordre HACCP, du haut vers le bas</em></span><div class="chips stk-famc" data-k="fam">${STK_FAM.map(([k, t], i) => `<button class="chip ${k === fam ? "on" : ""}" data-act="stkFamPick" data-v="${k}"><i class="stk-fn f-${k}">${i + 1}</i>${esc(t)}</button>`).join("")}</div></div>
-    <div class="field"><span>Unité de comptage</span><div class="chips stk-pick" data-k="unit">${units.map((u) => `<button class="chip ${u === unit ? "on" : ""}" data-act="stkPick" data-v="${esc(u)}">${esc(u)}</button>`).join("")}</div><input type="hidden" id="pUnit" value="${esc(unit)}"></div>
+    <div class="field"><span>Unité de comptage</span><div class="chips stk-pick" data-k="unit">${units.map((u) => `<button class="chip ${u === unit ? "on" : ""}" data-act="stkPick" data-v="${esc(u)}">${esc(u)}</button>`).join("")}<button class="chip unit-add" data-act="unitNew">${ico("plus")}Autre</button></div><input type="hidden" id="pUnit" value="${esc(unit)}"></div>
     <div class="grid2"><label class="field"><span>Prix d'achat <em class="stk-opt">€ / <span class="pUnitL">${esc(unit)}</span></em></span><input class="input mono" id="pPrice" inputmode="decimal" value="${p.price > 0 ? fmt(p.price, 2) : ""}" placeholder="Facultatif" autocomplete="off"></label>
       <label class="field"><span>Fournisseur</span><input class="input" id="pSup" list="stkSupList" value="${esc(p.supplier || "")}" placeholder="Facultatif" autocomplete="off"><datalist id="stkSupList">${sups.map((s) => `<option value="${esc(s)}">`).join("")}</datalist></label></div>
     <label class="field"><span>À commander sous <em class="stk-opt">seuil d'alerte, facultatif</em></span><div class="stk-inu"><input class="input mono" id="pMin" inputmode="decimal" value="${p.minQty > 0 ? stkN(p.minQty) : ""}" placeholder="Aucun seuil" autocomplete="off"><span class="pUnitL">${esc(unit)}</span></div></label>

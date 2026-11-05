@@ -313,3 +313,9 @@ body{font-family:var(--f);color:var(--ink);font-size:15.5px;letter-spacing:-.003
 .li.tap+.li.tap{border-top:1px solid var(--line);box-shadow:none}
 .check{background:var(--accent)}
 .toast .check{background:var(--accent)}
+
+/* « + Autre » unit chip and its inline field (core.js ACT.unitNew) */
+.unit-add{border-style:dashed!important}
+.unit-new{display:inline-flex;gap:6px;align-items:center;animation:unitIn .25s ease}
+@keyframes unitIn{from{opacity:0;transform:translateX(-6px)}to{opacity:1;transform:none}}
+.unit-new .input{width:130px;height:36px;padding:0 10px;font-size:14px}

@@ -10,7 +10,7 @@ Object.assign(IC, {
 });
 TAB_OF.reception = "more";
 
-const REC_UNITS = ["kg", "pièce", "carton", "L"];
+const REC_UNITS = ["kg", "PCE", "DZ", "carton", "L"];
 const REC_TYPES = [
   { k: "frais", t: "Frais", max: 4 },
   { k: "ultra", t: "Ultra-frais", max: 2 },
@@ -144,7 +144,7 @@ function recApply(L, name) {
     L.memo = { at: last.at, same: last.same, off };
   } else {
     const p = S.products.find((x) => recNorm(x.name) === recNorm(name));
-    if (p && p.unit && REC_UNITS.includes(p.unit)) L.unit = p.unit;
+    if (p && p.unit) L.unit = p.unit;
     recSetType(L, recGuessType(name)); L.memo = null;
   }
 }
@@ -227,7 +227,7 @@ function recCard(L, i) {
   const today = dayKey(); const ty = recTypeOf(L); const st = recTempState(L);
   const dlcCustom = L.dlc && !REC_DLC.some((d) => addDays(today, d) === L.dlc);
   const dd = L.dlc ? daysUntil(L.dlc) : null;
-  const units = REC_UNITS.includes(L.unit) || !L.unit ? REC_UNITS : [...REC_UNITS, L.unit];
+  const units = [...new Set([...REC_UNITS, ...((S.resto && S.resto.units) || []), ...(L.unit ? [L.unit] : [])])];
   const memo = L.memo ? `<div class="rec-memo">${ico("recSpark")}<span>${L.memo.same ? "Comme la dernière livraison" : "Déjà reçu"} (${recAgo(L.memo.at)}) : quantité, frigo${L.memo.off ? ` et DLC J+${L.memo.off}` : ""} pré-remplis.</span></div>` : "";
   return `<div class="glass rec-card ${R.anim2 === "slide" && !editing ? "slide" : ""} ${editing ? "editing" : ""}" id="recCard" data-line="${i}">
     <div class="row rec-card-h"><span class="lbl">${editing ? `Modifier · produit ${n}` : `Produit ${n}`}</span>${editing ? `<button class="btn ghost sm" style="color:var(--bad)" data-act="recRm" data-i="${i}">${ico("trash")}Retirer</button>` : ""}</div>
@@ -237,7 +237,7 @@ function recCard(L, i) {
       ${memo}
     </div>
     <div class="rec-cgrid"><div class="rec-ccol">
-    <div class="rec-f"><span class="lbl">Quantité</span><div class="rec-qty"><input class="input mono" id="recQty" data-bind="rec.cur.qty" value="${esc(L.qty)}" inputmode="decimal" placeholder="0" enterkeyhint="done" aria-label="Quantité"><div class="rec-units">${units.map((u) => `<button class="chip ${L.unit === u ? "on" : ""}" data-act="recUnit" data-v="${esc(u)}">${esc(u)}</button>`).join("")}</div></div></div>
+    <div class="rec-f"><span class="lbl">Quantité</span><div class="rec-qty"><input class="input mono" id="recQty" data-bind="rec.cur.qty" value="${esc(L.qty)}" inputmode="decimal" placeholder="0" enterkeyhint="done" aria-label="Quantité"><div class="rec-units">${units.map((u) => `<button class="chip ${L.unit === u ? "on" : ""}" data-act="recUnit" data-v="${esc(u)}">${esc(u)}</button>`).join("")}<button class="chip unit-add" data-act="unitNew">${ico("plus")}Autre</button></div></div></div>
     <div class="rec-f rec-temp ${st}" id="recTemp">
       <div class="row"><span class="lbl">Température à cœur</span>${recCold(L) ? `<span class="pill ${st === "bad" ? "bad" : st === "ok" ? "ok" : "neu"}" id="recTmax">seuil ${fmt(L.tmax, 0)} °C</span>` : ""}</div>
       <div class="chips rec-types">${REC_TYPES.map((T) => `<button class="chip ${ty === T.k ? "on" : ""}" data-act="recType" data-v="${T.k}">${T.t}</button>`).join("")}</div>
