@@ -298,7 +298,10 @@ const LB_ROLLS = [
   { id: "dk11209", name: "DK-11209", w: 62, h: 29, t: "62 × 29 mm", d: "Prédécoupées, 800 par rouleau. La plus pratique.", rec: true },
   { id: "dk22205", name: "DK-22205", w: 62, h: 0, t: "62 mm en continu", d: "L'imprimante coupe à la longueur voulue." },
   { id: "dk11201", name: "DK-11201", w: 90, h: 29, t: "29 × 90 mm", d: "Prédécoupées, allongées : imprimées en travers." },
+  { id: "dk22251", name: "DK-22251", w: 62, h: 0, t: "62 mm continu noir/rouge", d: "Noir et rouge, pour les Brother QL-810Wc et QL-820NWB.", red: true },
 ];
+/* models that print red with the DK-22251 roll; « Autre imprimante » prints red when the restaurant says it is a colour printer */
+const LB_RED_MODELS = ["ql810wc", "ql820nwb"];
 function lbPrinterCfg() {
   const p = S.resto?.printer; let model = null, roll = "dk11209", mode = "airprint";
   if (p && typeof p === "object") { model = p.model || null; roll = p.roll || roll; mode = p.mode || mode; }
@@ -307,10 +310,15 @@ function lbPrinterCfg() {
   if (!LB_ROLLS.some((r) => r.id === roll)) roll = "dk11209";
   const M = LB_MODELS.find((m) => m.id === model);
   const ok = p && typeof p === "object" ? p.ok || null : null, scanOk = p && typeof p === "object" ? p.scanOk || null : null;
-  return { model, roll, ok, scanOk, mode: mode === "image" ? "image" : "airprint", name: M ? M.name : typeof p === "string" ? p : "", short: M ? M.short : "imprimante" };
+  /* colour: off by default, on by itself with the black/red roll on a model known to print red */
+  const color = p && typeof p === "object" && typeof p.color === "boolean" ? p.color : roll === "dk22251" && LB_RED_MODELS.includes(model || "ql810wc");
+  return { model, roll, ok, scanOk, color, mode: mode === "image" ? "image" : "airprint", name: M ? M.name : typeof p === "string" ? p : "", short: M ? M.short : "imprimante" };
 }
 const lbRoll = () => LB_ROLLS.find((r) => r.id === lbPrinterCfg().roll) || LB_ROLLS[0];
-async function lbPrinterSave(patch) { const c = lbPrinterCfg(); await safe(DB.update("restos", S.rid, { printer: { model: c.model, roll: c.roll, mode: c.mode, ok: c.ok, scanOk: c.scanOk, ...patch } })); }
+async function lbPrinterSave(patch) { const c = lbPrinterCfg(); const p = S.resto?.printer; const keep = p && typeof p === "object" && typeof p.color === "boolean" ? { color: p.color } : {};
+  await safe(DB.update("restos", S.rid, { printer: { model: c.model, roll: c.roll, mode: c.mode, ok: c.ok, scanOk: c.scanOk, ...keep, ...patch } })); }
+/* red ink is real only with the black/red roll on a red-capable Brother, or on « Autre imprimante » set as colour */
+function lbRedOk() { const c = lbPrinterCfg(); if (!c.color) return false; const m = c.model || "ql810wc"; return m === "other" || (c.roll === "dk22251" && LB_RED_MODELS.includes(m)); }
 /* last print, remembered on this device */
 function lbLastPrint() { try { return JSON.parse(localStorage.getItem("gg-lastprint-" + S.rid) || "null"); } catch (e) { return null; } }
 function lbLastPrintTx() { const p = lbLastPrint(); if (!p) return "Aucune impression pour l'instant."; return `Dernière impression : ${when(p.at)} · ${p.n > 1 ? `${p.n} étiquettes` : "1 étiquette"}${p.name ? ` (${p.name})` : ""}`; }
@@ -325,15 +333,15 @@ function lbAllergens(l) {
   return ids.map((id) => ((typeof allergenOf === "function" && allergenOf(id)) || {}).t || id).filter(Boolean);
 }
 /* ───────────── design de l'étiquette ─────────────
-   resto.labelStyle: absent (= Classique) / "big" (old string form) / { preset, dlc, qr, txt, alg, lot, dates, qty, brand, code }.
-   Thermal printing is black only: the designs differ by layout and type size. Read with lbStyle(), everywhere lbTagHtml runs. */
+   resto.labelStyle: absent (= Classique) / "big" (old string form) / { preset, dlc, qr, txt, alg, lot, dates, qty, brand, code, rdlc, ralg }.
+   Thermal printing is black, plus red on the DK-22251 roll (rdlc: DLC en rouge, ralg: allergènes en rouge, drawn red only when lbRedOk()). Read with lbStyle(), everywhere lbTagHtml runs. */
 const LB_STYLES = [
-  { id: "classic", name: "Classique", d: "QR, nom, DLC, traçabilité", v: { dlc: 2, qr: 2, txt: 2, alg: true, lot: true, dates: true, qty: false, brand: false, code: true } },
-  { id: "big", name: "DLC en grand", d: "La date se lit de loin", v: { dlc: 4, qr: 1, txt: 2, alg: false, lot: false, dates: false, qty: false, brand: false, code: true } },
-  { id: "compact", name: "Compacte", d: "Plus d'infos, plus petit", v: { dlc: 1, qr: 1, txt: 1, alg: true, lot: true, dates: true, qty: true, brand: false, code: true } },
-  { id: "logo", name: "Avec logo", d: "Le restaurant en tête", v: { dlc: 2, qr: 2, txt: 2, alg: true, lot: true, dates: true, qty: false, brand: true, code: true } },
+  { id: "classic", name: "Classique", d: "QR, nom, DLC, traçabilité", v: { dlc: 2, qr: 2, txt: 2, alg: true, lot: true, dates: true, qty: false, brand: false, code: true, rdlc: false, ralg: false } },
+  { id: "big", name: "DLC en grand", d: "La date se lit de loin", v: { dlc: 4, qr: 1, txt: 2, alg: false, lot: false, dates: false, qty: false, brand: false, code: true, rdlc: false, ralg: false } },
+  { id: "compact", name: "Compacte", d: "Plus d'infos, plus petit", v: { dlc: 1, qr: 1, txt: 1, alg: true, lot: true, dates: true, qty: true, brand: false, code: true, rdlc: false, ralg: false } },
+  { id: "logo", name: "Avec logo", d: "Le restaurant en tête", v: { dlc: 2, qr: 2, txt: 2, alg: true, lot: true, dates: true, qty: false, brand: true, code: true, rdlc: false, ralg: false } },
 ];
-const LB_SKEYS = ["dlc", "qr", "txt", "alg", "lot", "dates", "qty", "brand", "code"];
+const LB_SKEYS = ["dlc", "qr", "txt", "alg", "lot", "dates", "qty", "brand", "code", "rdlc", "ralg"];
 const LB_SMAX = { dlc: [1, 4], qr: [0, 3], txt: [1, 3] };
 function lbStyle(raw) {
   const r = raw !== undefined ? raw : S.resto && S.resto.labelStyle;
@@ -379,7 +387,8 @@ function lbLabelH(l, roll, st) { if (roll.h) return roll.h; return lbGeom(l, rol
 function lbTagHtml(l, roll, st) {
   roll = roll || lbRoll(); st = st || lbStyle(); const G = lbGeom(l, roll, st); const op = l.status === "opened"; const nm = l.name || "";
   const br = G.brand ? `<span class="br">${G.brand.logo ? `<img src="${esc(G.brand.logo)}" alt="" referrerpolicy="no-referrer">` : ""}<i>${esc(G.brand.name)}</i></span>` : "";
-  return `<div class="lb-tag ${roll.h ? "" : "cont"} st-${st.preset}${G.qr ? "" : " noqr"}" style="--w:${roll.w};--h:${G.H};--q:${G.qr};--fn:${G.fn};--fd:${G.fd};--fs:${G.fs};--fc:${G.fc};--nl:${G.nl}">${G.qr ? `<span class="q">${qrSvg(l.code || l.id)}</span>` : ""}<div class="t">${br}<b class="n">${esc(nm.replace(/ (%|°C?)/g, " $1"))}</b>
+  const red = (st.rdlc || st.ralg) && lbRedOk();
+  return `<div class="lb-tag ${roll.h ? "" : "cont"} st-${st.preset}${G.qr ? "" : " noqr"}${red && st.rdlc ? " rd" : ""}${red && st.ralg ? " ra" : ""}" style="--w:${roll.w};--h:${G.H};--q:${G.qr};--fn:${G.fn};--fd:${G.fd};--fs:${G.fs};--fc:${G.fc};--nl:${G.nl}">${G.qr ? `<span class="q">${qrSvg(l.qr || l.code || l.id)}</span>` : ""}<div class="t">${br}<b class="n">${esc(nm.replace(/ (%|°C?)/g, " $1"))}</b>
     <span class="k">${op ? "DLC après ouverture" : "DLC"}</span><span class="d">${lbDate(dlcOf(l))}</span>
     ${G.meta ? `<span class="m">${esc(G.meta)}</span>` : ""}${G.qty ? `<span class="x">${esc(G.qty)}</span>` : ""}${G.alg.length ? `<span class="a">Allergènes : ${esc(G.alg.join(", "))}</span>` : ""}
     ${st.code && l.code ? `<span class="c">${esc(l.code)}</span>` : ""}</div></div>`;
@@ -446,7 +455,8 @@ function lbPaintText(g, el, o, y0) {
   const er = el.getBoundingClientRect(); if (!er.width || !er.height) return;
   const cs = getComputedStyle(el); const fsz = parseFloat(cs.fontSize) || 12;
   const ox = (x) => x - o.left, oy = (y) => y0 + y - o.top;
-  const bw = parseFloat(cs.borderTopWidth) || 0; g.fillStyle = "#000"; if (bw) g.fillRect(ox(er.left), oy(er.top), er.width, Math.max(1, bw));
+  const bw = parseFloat(cs.borderTopWidth) || 0; g.fillStyle = cs.borderTopColor || "#000"; if (bw) g.fillRect(ox(er.left), oy(er.top), er.width, Math.max(1, bw));
+  g.fillStyle = cs.color || "#000"; /* black, or red for « DLC en rouge » */
   g.save(); g.beginPath(); g.rect(ox(er.left) - 1, oy(er.top) - 1, er.width + 2, er.height + 2); g.clip();
   g.font = `${cs.fontStyle === "italic" ? "italic " : ""}${cs.fontWeight} ${fsz}px ${cs.fontFamily}`; g.textBaseline = "alphabetic";
   try { g.letterSpacing = cs.letterSpacing && cs.letterSpacing !== "normal" ? cs.letterSpacing : "0px"; } catch (e) {}
@@ -489,7 +499,7 @@ async function labelPng(lots, noLogo) {
     g.fillStyle = "#fff"; g.fillRect(0, y0, W, hs[i]);
     const qe = $(".q", t);
     if (qe) {
-      const r = qe.getBoundingClientRect(); const q = qrcode(0, "M"); q.addData(l.code || l.id); q.make(); const n = q.getModuleCount(); const s = r.width / (n + 2);
+      const r = qe.getBoundingClientRect(); const q = qrcode(0, "M"); q.addData(l.qr || l.code || l.id); q.make(); const n = q.getModuleCount(); const s = r.width / (n + 2);
       const qx = r.left - o.left + s, qy = y0 + r.top - o.top + s; g.fillStyle = "#000";
       for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) if (q.isDark(y, x)) { const a = Math.round(qx + x * s), b = Math.round(qy + y * s); g.fillRect(a, b, Math.round(qx + (x + 1) * s) - a, Math.round(qy + (y + 1) * s) - b); }
     }
@@ -660,8 +670,9 @@ Object.assign(ACT, {
   labelPrint: async (a) => { const lots = (a.dataset.ids || "").split(",").map((i) => lbLot(i)).filter(Boolean); if (!lots.length) return; const p = $("#prAnim"); if (p) { p.classList.remove("go"); void p.offsetWidth; p.classList.add("go"); } await lbPrintLots(lots); },
   lotPrint: (a, id) => { lbQrClose(true); SFX.tap(); if (lbPrinterCfg().mode === "image") return openLabel([id]); const l = lbLot(id); if (l) lbPrintLots([l]); },
   lbPrintTest: async (a) => {
-    const demo = { id: "test", name: "Étiquette test", status: "in", dlc: addDays(dayKey(), 3), createdAt: Date.now(), lot: "TEST", code: "GG-TEST01", allergens: ["lait"] };
+    const demo = lbTestLot(Date.now()); /* the one source of truth: what prints is what the scan check expects */
     if (a) a.disabled = true; const ok = await lbPrintLots([demo], true); if (a) a.disabled = false;
+    if (ok) lbTestAt(demo.createdAt);
     if (ok) { logEvent("lot", "a imprimé une étiquette test"); lbwAfterPrint(); }
   },
 });
@@ -706,6 +717,7 @@ function lbPrinterPatch() {
   $$(".lb-sel").forEach((s) => { const b = s.closest("[data-act]"); if (b && /^printer/.test(b.dataset.act)) s.classList.toggle("on", b.classList.contains("on")); });
   $$(".lb-mseg .knob").forEach((k) => (k.style.transform = `translateX(${c.mode === "image" ? 100 : 0}%)`));
   $$("[data-lb=last]").forEach((e) => (e.textContent = lbLastPrintTx()));
+  $$("[data-lb=color]").forEach((e) => (e.innerHTML = lbColorHTML()));
   const t = lbTestMode(); $$(".lb-testcard").forEach((k) => { k.classList.toggle("on", t); const sw = $(".lb-sw", k); if (sw) sw.classList.toggle("on", t); const em = $(".tx em", k); if (em) em.textContent = t ? "Activé" : "Désactivé"; const r = $("[role=switch]", k); if (r) r.setAttribute("aria-checked", t); });
   lbStatusPatch();
 }
@@ -799,7 +811,7 @@ function lbwSteps() {
       help: [["Je ne trouve pas le nom", "Il est imprimé sur le carton et sur le côté du rouleau, par exemple DK-11209. Le 62 × 29 mm prédécoupé est le plus courant."]] },
     { k: "test", ill: "test", t: "Imprimez un test", s: `Touchez Imprimer, choisissez ${q810 ? "Brother QL-810W" : nm}, puis Imprimer.`, b: [`Format papier : ${lbFmtTx(roll)}.`, "Le téléphone retient ce choix pour la suite."], body: "test", noNext: true,
       help: [["La fenêtre d'impression ne s'ouvre pas", "Sur iPhone, ouvrez Growth Gusto dans Safari ou depuis son icône sur l'écran d'accueil. Sinon, réglez « Comment imprimer » sur Image à enregistrer, plus bas."]] },
-    { k: "scan", ill: "scan", t: "Scannez l'étiquette", s: "Visez le QR de l'étiquette qui vient de sortir.", b: ["Le bip confirme que tout fonctionne."], body: "scan", noNext: true,
+    { k: "scan", ill: "scan", t: "Scannez l'étiquette", s: "Visez le QR de l'étiquette qui vient de sortir.", b: ["Vérifiez la DLC, le lot et le code, ligne par ligne."], body: "scan", noNext: true,
       help: [["Le QR ne se lit pas", "Approchez à 10 cm, évitez les reflets et gardez le téléphone immobile. Une étiquette pâle ou rayée : vérifiez le rouleau (étape 2)."], ["Pas de caméra", "Tapez le code imprimé sous le QR : GG-TEST01."]] },
   ];
 }
@@ -809,7 +821,7 @@ function lbwBodyHTML(S1) {
   if (S1.body === "test") return `<button class="btn acc block lbw-print" data-act="lbPrintTest">${ico("printer")}Imprimer l'étiquette test</button>
     <div class="lbw-q ${LBW.printed ? "on" : ""}"><b>L'étiquette est bien sortie ?</b><div class="lbw-yn"><button class="btn soft" data-act="lbwNo">Non</button><button class="btn acc" data-act="lbwYes">Oui</button></div></div>
     <div class="lbw-fail" ${LBW.fail ? "" : "hidden"}><b>Voyons ça ensemble</b>${lbFaqHtml(true)}<button class="btn soft block" data-act="lbPrintTest">${ico("printer")}Réessayer</button></div>`;
-  if (S1.body === "scan") return lbScanTestHTML(true);
+  if (S1.body === "scan") return lbScanTestHTML(true, "test");
   return "";
 }
 function lbwStepHTML(i, dir) {
@@ -868,7 +880,7 @@ function lbwFinish() {
 }
 
 /* ───────────── test du scan (après l'impression) : la caméra lit l'étiquette test ───────────── */
-const LBT = { stream: null, own: false, raf: 0, state: "off", done: false, last: 0, cv: null, cool: 0 };
+const LBT = { stream: null, own: false, raf: 0, state: "off", done: false, last: 0, cv: null, cool: 0, mode: "test", res: null };
 const lbtBox = () => $$("[data-lbt=box]").filter((b) => b.isConnected && b.offsetParent !== null).pop() || null;
 function lbtMsg() {
   const st = LBT.state;
@@ -878,19 +890,20 @@ function lbtMsg() {
   if (st === "live") return "";
   return `<button class="lbt-start" data-act="lbtCam"><span>${ico("camera")}</span><b>Activer la caméra</b></button>`;
 }
-function lbScanTestHTML(inWizard) {
-  return `<div class="lbt ${LBT.done ? "ok" : ""}" data-lbt="box" data-state="${LBT.done ? "ok" : LBT.stream ? "live" : LBT.state === "live" ? "off" : LBT.state}">
-    <div class="lbt-cam"><video playsinline muted autoplay></video><div class="lbt-vf"><i></i><i></i><i></i><i></i><b></b></div><div class="lbt-msg">${LBT.done ? "" : lbtMsg()}</div>
-      <div class="lbt-win"><div class="lbt-sealw">${lbSealSvg()}</div><b>Tout fonctionne</b><span>Impression et scan validés.</span></div></div>
-    <form class="lbt-code" data-lb="tcode" novalidate><input class="input mono" placeholder="${LB_TESTCODE}" autocomplete="off" autocapitalize="characters" spellcheck="false" enterkeyhint="go" aria-label="Code sous le QR"><button class="btn soft sm" type="submit">OK</button></form>
-    ${inWizard ? "" : `<p class="note lbt-note">Imprimez d'abord une étiquette test, puis visez son QR.</p>`}</div>`;
+function lbScanTestHTML(inWizard, mode) {
+  if (mode) LBT.mode = mode; const real = LBT.mode === "real";
+  return `<div class="lbt ${LBT.done ? "ok" : ""}${LBT.res ? " res" : ""}" data-lbt="box" data-state="${LBT.done ? "ok" : LBT.stream ? "live" : LBT.state === "live" ? "off" : LBT.state}">
+    <div class="lbt-cam"><video playsinline muted autoplay></video><div class="lbt-vf"><i></i><i></i><i></i><i></i><b></b></div><div class="lbt-msg">${LBT.res ? "" : lbtMsg()}</div></div>
+    <div class="lbt-res" data-lbt="res" aria-live="polite">${LBT.res ? lbvHTML(LBT.res, true) : ""}</div>
+    <form class="lbt-code" data-lb="tcode" novalidate><input class="input mono" placeholder="${real ? "GG-…" : LB_TESTCODE}" autocomplete="off" autocapitalize="characters" spellcheck="false" enterkeyhint="go" aria-label="Code sous le QR"><button class="btn soft sm" type="submit">OK</button></form>
+    ${inWizard ? "" : `<p class="note lbt-note">${real ? "Visez le QR de n'importe quelle étiquette du restaurant." : "Imprimez d'abord une étiquette test, puis visez son QR."}</p>`}</div>`;
 }
 function lbtSetState(st) {
   LBT.state = st; const b = lbtBox(); if (!b) return; if (LBT.done) return;
-  b.dataset.state = st; const m = $(".lbt-msg", b); if (m) m.innerHTML = lbtMsg();
+  b.dataset.state = st; const m = $(".lbt-msg", b); if (m && !LBT.res) m.innerHTML = lbtMsg();
 }
 async function lbtStart() {
-  const box = lbtBox(); if (!box || LBT.done) return;
+  const box = lbtBox(); if (!box || LBT.done || LBT.res) return;
   if (LBT.stream) { lbtAttach(); return; }
   if (LB.stream && LB.track && LB.track.readyState === "live" && S.route !== "scan") { clearTimeout(LB.parkT); LB.track.enabled = true; LBT.stream = LB.stream; LBT.own = false; }
   else {
@@ -916,7 +929,7 @@ function lbtStop() {
 }
 function lbtLoop() {
   LBT.raf = requestAnimationFrame(lbtLoop);
-  const b = lbtBox(); if (!b || document.hidden || LBT.done) { lbtStop(); return; }
+  const b = lbtBox(); if (!b || document.hidden || LBT.done || LBT.res) { lbtStop(); return; }
   const v = $("video", b); if (v.srcObject !== LBT.stream) { v.srcObject = LBT.stream; v.play().catch(() => {}); }
   const now = performance.now(); if (now - LBT.last < 110 || now < LBT.cool || v.readyState < 2 || !v.videoWidth || !window.jsQR) return; LBT.last = now;
   const vw = v.videoWidth, vh = v.videoHeight, side = Math.min(vw, vh) * 0.9, sx = (vw - side) / 2, sy = (vh - side) / 2, N = 400;
@@ -925,21 +938,108 @@ function lbtLoop() {
   let r = null; try { r = jsQR(g.getImageData(0, 0, N, N).data, N, N, { inversionAttempts: "dontInvert" }); } catch (e) {}
   if (r && r.data) lbtCheck(r.data);
 }
-function lbtCheck(raw, typed) {
-  const code = lbParseCode(raw); const b = lbtBox(); const l = code !== LB_TESTCODE ? lbFind(raw) : null;
-  if (code === LB_TESTCODE || l) { lbtWin(l); return; }
-  LBT.cool = performance.now() + 1500; SFX.err(); buzz([30, 40, 30]);
-  if (b) { b.classList.remove("miss"); void b.offsetWidth; b.classList.add("miss"); setTimeout(() => b.classList.remove("miss"), 700); }
-  toast(/^GG-/.test(code) ? `Code ${code} inconnu : visez l'étiquette test` : typed ? "Tapez le code sous le QR, par exemple GG-TEST01" : "Ce QR n'est pas une étiquette Growth Gusto", "err");
+/* ───────────── vérification : ce que le scan a lu, champ par champ ─────────────
+   The test label: one record, lbTestLot(at), is both what lbPrintTest prints and what the check expects. Its QR carries the printed
+   DLC and lot (« GG-TEST01 DLC:2026-11-08 LOT:T261105 »; every scanner still reads the code), so the check compares the paper
+   with the app. A real label: the code resolves through S.lots (lbFind, like the main scanner) and the card shows the lot record. */
+const lbTestKey = () => "gg-lbtest-" + S.rid;
+function lbTestAt(set) {
+  try { if (set) { localStorage.setItem(lbTestKey(), String(set)); return set; } return +localStorage.getItem(lbTestKey()) || null; } catch (e) { return set || null; }
 }
-async function lbtWin(l) {
-  LBT.done = true; lbtStop(); SFX.scan(); buzz([14, 50, 20]);
+function lbTestLot(at) {
+  at = at || lbTestAt() || Date.now(); const day = dayKey(new Date(at)); const lot = "T" + day.slice(2).replace(/-/g, ""); const dlc = addDays(day, 3);
+  return { id: "test", name: "Étiquette test", status: "in", dlc, createdAt: at, lot, code: LB_TESTCODE, allergens: ["lait"], test: true, qr: `${LB_TESTCODE} DLC:${dlc} LOT:${lot}` };
+}
+window.lbTestLot = lbTestLot;
+/* what the QR itself carries, beyond the code */
+function lbQrFields(raw) {
+  const s = String(raw || "").toUpperCase(); const d = s.match(/DLC:(\d{4}-\d{2}-\d{2})/), l = s.match(/LOT:([0-9A-Z-]{1,20})/);
+  return { dlc: d ? d[1] : null, lot: l ? l[1] : null };
+}
+const lbDateTx = (ts) => (ts ? lbDate(dayKey(new Date(ts))) : "–");
+/* builds the verification: rows of { k, v, ok (true / false / null = nothing to compare), exp (expected, when different), big } */
+function lbVerify(raw, typed) {
+  const code = lbParseCode(raw); const q = lbQrFields(raw); const resto = (S.resto && S.resto.name) || "Ce restaurant";
+  const gg = /^GG-[0-9A-Z]{4,8}$/.test(code);
+  if (LBT.mode !== "real" || code === LB_TESTCODE) {
+    if (code === LB_TESTCODE) {
+      const E = lbTestLot(); const dlcR = q.dlc || E.dlc, lotR = q.lot || E.lot;
+      const D = lbDays(dlcR); const dOk = dlcR === E.dlc, lOk = lotR === E.lot;
+      const rows = [
+        { k: "DLC", v: lbDate(dlcR), sub: D.txt, ok: dOk, exp: dOk ? "" : lbDate(E.dlc), big: true },
+        { k: "Code", v: code, ok: true },
+        { k: "Produit", v: E.name, ok: true },
+        { k: "Lot", v: lotR, ok: lOk, exp: lOk ? "" : E.lot },
+        { k: "Reçu le", v: lbDateTx(E.createdAt), ok: true },
+        { k: "Allergènes", v: lbAllergens(E).join(", ") || "Aucun", ok: true },
+        { k: "Restaurant", v: resto, ok: true },
+      ];
+      const bad = !dOk || !lOk;
+      return { rows, ok: !bad, test: true, title: bad ? "Ce n'est pas la dernière étiquette test" : "Tout correspond",
+        todo: bad ? "Cette étiquette test a été imprimée un autre jour. Imprimez-en une nouvelle, puis scannez-la." : "", typed };
+    }
+    if (LBT.mode !== "real") {
+      const l = gg ? lbFind(code) : null;
+      if (!l) return { ok: false, title: gg ? "Code inconnu" : "QR non reconnu", rows: [{ k: "Code lu", v: gg ? code : String(raw || "").slice(0, 28) || "–", ok: false, exp: LB_TESTCODE }],
+        todo: gg ? "Ce code n'est pas l'étiquette test. Visez le QR de l'étiquette test, ou tapez GG-TEST01." : "Ce QR n'est pas une étiquette Growth Gusto. Visez le QR de l'étiquette test imprimée.", typed };
+    }
+  }
+  const l = gg ? lbFind(code) : null;
+  if (!l) return { ok: false, title: gg ? "Code inconnu ici" : "QR non reconnu", rows: [{ k: "Code lu", v: gg ? code : String(raw || "").slice(0, 28) || "–", ok: false, exp: "un code GG-… de ce restaurant" }],
+    todo: gg ? "Aucun produit de ce restaurant ne porte ce code. Vérifiez le code tapé, ou réimprimez l'étiquette depuis la fiche du produit." : "Ce QR n'est pas une étiquette Growth Gusto.", typed };
+  const op = l.status === "opened"; const out = !(l.status === "in" || l.status === "opened"); const dk = dlcOf(l); const D = lbDays(dk); const alg = lbAllergens(l);
+  const rows = [
+    { k: op ? "DLC après ouverture" : "DLC", v: dk ? lbDate(dk) : "Sans DLC", sub: D.txt, ok: D.d == null || D.d >= 0, exp: D.d != null && D.d < 0 ? "dépassée" : "", big: true },
+    { k: "Code", v: l.code || code, ok: true },
+    { k: "Produit", v: l.name || "–", ok: true },
+    { k: "Lot", v: l.lot || "Non renseigné", ok: l.lot ? true : null },
+    { k: op && l.openedAt ? "Ouvert le" : "Reçu le", v: op && l.openedAt ? `${lbDateTx(l.openedAt)} à ${hm(l.openedAt)}` : lbDateTx(l.createdAt), ok: true },
+    { k: "Allergènes", v: alg.join(", ") || "Aucun", ok: true },
+    { k: "Restaurant", v: resto, ok: true },
+  ];
+  if (out) rows.splice(1, 0, { k: "Statut", v: l.status === "lost" ? "Jeté" : "Déjà utilisé", ok: false, exp: "en stock" });
+  const bad = rows.some((r) => r.ok === false);
+  return { rows, ok: !bad, lot: l.id, title: bad ? (out ? "Ce produit n'est plus en stock" : "DLC dépassée") : "Tout correspond",
+    todo: bad ? (out ? "L'étiquette est restée sur un contenant : retirez-la, ou réimprimez la bonne." : "Ne servez pas ce produit : ouvrez sa fiche pour le jeter.") : "", typed };
+}
+const LBV_OK = `<svg viewBox="0 0 24 24"><path d="M6 12.5l4 4 8-9"/></svg>`, LBV_NO = `<svg viewBox="0 0 24 24"><path d="M7 7l10 10M17 7 7 17"/></svg>`;
+function lbvRow(r, i) {
+  const st = r.ok === false ? "bad" : r.ok ? "ok" : "neu";
+  const mark = r.ok === false ? `<i class="lbv-m bad">${LBV_NO}<span>${r.exp === "dépassée" ? "dépassée" : "différent"}</span></i>` : r.ok ? `<i class="lbv-m ok">${LBV_OK}</i>` : `<i class="lbv-m neu">–</i>`;
+  const exp = r.exp && r.exp !== "dépassée" ? `<small>attendu : <span>${esc(r.exp)}</span></small>` : "";
+  if (r.big) return `<div class="lbv-dlc ${st}" style="--i:${i}"><span class="lbv-k">${esc(r.k)}</span><b class="lbv-dv">${esc(r.v)}</b>${r.sub ? `<em>${esc(r.sub)}</em>` : ""}${exp}${mark}</div>`;
+  return `<div class="lbv-r ${st}${/^Code/.test(r.k) ? " code" : ""}" style="--i:${i}"><span class="lbv-k">${esc(r.k)}</span><span class="lbv-v"><b>${esc(r.v)}</b>${exp}</span>${mark}</div>`;
+}
+function lbvHTML(R, still) {
+  const n = R.rows.filter((r) => r.ok !== null).length, good = R.rows.filter((r) => r.ok === true).length;
+  return `<div class="lbv ${R.ok ? "ok" : "bad"} ${still ? "still" : ""}" style="--n:${R.rows.length}">
+    <div class="lbv-head">${R.ok ? `<span class="lbv-seal">${lbSealSvg()}</span>` : `<span class="lbv-x">${LBV_NO}</span>`}<div class="tx"><b>${esc(R.title)}</b><em>${R.ok ? `${good} vérifications sur ${n}` : R.typed ? "Code tapé" : "Lu par la caméra"}</em></div></div>
+    <div class="lbv-rows">${R.rows.map((r, i) => lbvRow(r, i)).join("")}</div>
+    ${R.todo ? `<p class="lbv-todo" style="--i:${R.rows.length}">${esc(R.todo)}</p>` : ""}
+    <div class="lbv-act" style="--i:${R.rows.length + 1}">${R.lot ? `<button class="btn soft" data-act="lot" data-id="${R.lot}">Fiche du produit</button>` : !R.ok && R.test === undefined && LBT.mode !== "real" ? `<button class="btn soft" data-act="lbPrintTest">${ico("printer")}Réimprimer</button>` : R.test && !R.ok ? `<button class="btn soft" data-act="lbPrintTest">${ico("printer")}Réimprimer</button>` : ""}<button class="btn ${R.ok || R.lot ? "soft" : "acc"}" data-act="lbtAgain">${ico("scan")}${R.ok || R.lot ? "Nouveau scan" : "Réessayer"}</button></div></div>`;
+}
+function lbtCheck(raw, typed) {
+  const R = lbVerify(raw, typed); LBT.res = R; lbtStop();
+  const boxes = $$("[data-lbt=box]").filter((b) => b.isConnected);
+  boxes.forEach((b) => { b.classList.add("res"); b.classList.toggle("bad", !R.ok); const r = $("[data-lbt=res]", b); if (r) r.innerHTML = lbvHTML(R); const i = $(".lbt-code input", b); if (i) i.value = ""; });
+  const card = boxes.length && $(".lbv", boxes[boxes.length - 1]); if (card) setTimeout(() => card.scrollIntoView({ block: "nearest", behavior: "smooth" }), 80);
+  if (R.ok) { lbtWin(R); return; }
+  SFX.err(); buzz([30, 40, 30]);
+}
+async function lbtWin(R) {
+  LBT.done = true; SFX.scan(); buzz([14, 50, 20]);
   $$("[data-lbt=box]").forEach((b) => { b.classList.add("ok"); b.dataset.state = "ok"; });
-  setTimeout(() => { SFX.done(); const s = $("[data-lbt=box].ok .lbt-sealw"); if (s) { const r = s.getBoundingClientRect(); burst(r.left + r.width / 2, r.top + r.height / 2); } }, 380);
+  const t = 260 + R.rows.length * 110;
+  setTimeout(() => { SFX.done(); const s = $$("[data-lbt=box].ok .lbv-seal").pop(); if (s && s.offsetParent) { const r = s.getBoundingClientRect(); burst(r.left + r.width / 2, r.top + r.height / 2); } }, t);
   $$("[data-lbt=fin]").forEach((x) => { x.textContent = "Terminer"; x.classList.remove("soft"); x.classList.add("acc", "lbw-pop"); });
-  if (l) toast(`Étiquette de ${l.name} reconnue`);
   await lbPrinterSave({ scanOk: Date.now(), ...(lbPrinterCfg().ok ? {} : { ok: Date.now() }) });
-  logEvent("lot", "a validé le scan d'une étiquette test"); lbStatusPatch();
+  logEvent("lot", R.test ? "a validé le scan d'une étiquette test" : "a vérifié une étiquette au scan"); lbStatusPatch();
+}
+/* back to the camera */
+function lbtAgain() {
+  LBT.res = null; LBT.done = false; LBT.state = "off"; LBT.cool = performance.now() + 900;
+  $$("[data-lbt=box]").forEach((b) => { b.classList.remove("res", "ok", "bad"); b.dataset.state = "off"; const r = $("[data-lbt=res]", b); if (r) r.innerHTML = ""; const m = $(".lbt-msg", b); if (m) m.innerHTML = lbtMsg(); });
+  lbtStart();
 }
 document.addEventListener("submit", (e) => { const f = e.target; if (!f.dataset || f.dataset.lb !== "tcode") return; e.preventDefault(); const i = $("input", f); const v = (i && i.value || "").trim(); if (!v) { i && i.focus(); return; } if (i) i.blur(); lbtCheck(v, true); });
 document.addEventListener("visibilitychange", () => { if (document.hidden) lbtStop(); });
@@ -947,12 +1047,21 @@ document.addEventListener("visibilitychange", () => { if (document.hidden) lbtSt
 /* ───────────── choix du design de l'étiquette ───────────── */
 const lbsOpt = (k, label, vals) => { const st = lbStyle(); return `<div class="lbs-row"><span class="lbs-l">${label}</span><div class="lbs-seg" role="radiogroup">${vals.map(([v, t]) => `<button class="${st[k] === v ? "on" : ""}" data-act="lbStyleOpt" data-id="${k}" data-v="${v}" role="radio" aria-checked="${st[k] === v}">${t}</button>`).join("")}</div></div>`; };
 const lbsTog = (k, label) => { const on = lbStyle()[k]; return `<button class="lbs-tog ${on ? "on" : ""}" data-act="lbStyleOpt" data-id="${k}" data-v="${on ? 0 : 1}" role="switch" aria-checked="${on}"><span>${label}</span><span class="lb-sw ${on ? "on" : ""}"><i></i></span></button>`; };
+/* red: only offered on a colour printer; the toggles act when the red ink is really there */
+function lbsRedHTML() {
+  const c = lbPrinterCfg(); if (!c.color) return "";
+  const red = lbRedOk(); const m = c.model || "ql810wc";
+  const hint = m === "zd421" ? "La Zebra ZD421d imprime en noir seulement." : "Le rouge demande le rouleau noir/rouge DK-22251.";
+  return `<div class="lbs-red ${red ? "" : "off"}">${red ? `<div class="lbs-togs">${lbsTog("rdlc", "DLC en rouge")}${lbsTog("ralg", "Allergènes en rouge")}</div>` : ""}
+    <p class="lbs-rnote"><span class="lbx-ink"><i></i><i></i></span><span>${hint}${!red && LB_RED_MODELS.includes(m) ? ` <button class="lbs-rbtn" data-act="printerRoll" data-v="dk22251">Choisir ce rouleau</button>` : ""}</span></p></div>`;
+}
 function lbsCustHTML() {
   const st = lbStyle(); const P = LB_STYLES.find((p) => p.id === st.preset);
   return `${lbsOpt("dlc", "Taille de la DLC", [[1, "Petite"], [2, "Normale"], [3, "Grande"], [4, "Géante"]])}
     ${lbsOpt("qr", "QR code", [[0, "Sans"], [1, "Petit"], [2, "Normal"], [3, "Grand"]])}
     <p class="lbs-warn" ${st.qr ? "hidden" : ""}>Sans QR, l'étiquette ne se scanne plus : il reste le code à taper.</p>
     ${lbsOpt("txt", "Taille du texte", [[1, "Petit"], [2, "Normal"], [3, "Grand"]])}
+    ${lbsRedHTML()}
     <div class="lbs-togs">${lbsTog("dates", "Date de réception ou d'ouverture")}${lbsTog("lot", "Numéro de lot")}${lbsTog("alg", "Allergènes")}${lbsTog("qty", "Quantité et fournisseur")}${lbsTog("brand", "Nom et logo du restaurant")}${lbsTog("code", "Code sous le texte")}</div>
     <button class="btn soft sm lbs-reset" data-act="lbStyleReset" ${st.custom ? "" : "disabled"}>${ico("lbUndo")}Revenir au modèle « ${esc(P.name)} »</button>`;
 }
@@ -978,6 +1087,12 @@ function lbStylePatch(all) {
 }
 async function lbStyleSave(v) { if (S.resto) S.resto.labelStyle = v; lbStylePatch(); await safe(DB.update("restos", S.rid, { labelStyle: v })); }
 
+/* « Imprimante couleur » (printer settings) */
+function lbColorHTML() {
+  const c = lbPrinterCfg(); const red = lbRedOk(); const m = c.model || "ql810wc";
+  const em = !c.color ? "Noir seulement" : red ? "Noir et rouge" : m === "zd421" ? "Cette Zebra imprime en noir" : "Rouge avec le rouleau DK-22251";
+  return `<button class="lbs-tog lbx-color ${c.color ? "on" : ""}" data-act="printerColor" role="switch" aria-checked="${c.color}"><span class="ic lbx-ink"><i></i><i></i></span><span class="tx"><b>Imprimante couleur</b><em>${em}</em></span><span class="lb-sw ${c.color ? "on" : ""}"><i></i></span></button>`;
+}
 /* status at the top of the Imprimante screen */
 function lbStatusHTML() {
   const c = lbPrinterCfg(); const ok = lbWizardDone(); const roll = lbRoll();
@@ -993,21 +1108,29 @@ Object.assign(ACT, {
   lbwYes: async () => {
     LBW.fail = false; await lbPrinterSave({ ok: Date.now(), model: lbPrinterCfg().model || "ql810wc" });
     if (lbTestMode()) await safe(DB.update("restos", S.rid, { printTest: false }));
-    SFX.ok(); buzz([10, 30, 10]); LBT.done = false; lbwGo(LBW.step + 1, "r"); lbPrinterPatch();
+    SFX.ok(); buzz([10, 30, 10]); LBT.done = false; LBT.res = null; LBT.mode = "test"; lbwGo(LBW.step + 1, "r"); lbPrinterPatch();
   },
   lbwNo: () => {
     LBW.fail = true; SFX.tap(); const f = $$("[data-lbw] .lbw-fail"); f.forEach((x) => { x.hidden = false; x.classList.remove("lbw-pop"); void x.offsetWidth; x.classList.add("lbw-pop"); const d = $("details", x); if (d) d.open = true; });
     if (f[0]) setTimeout(() => f[0].scrollIntoView({ block: "nearest", behavior: "smooth" }), 60);
   },
   lbwAlt: () => { LBW.alt = !LBW.alt; SFX.tick(); $$("[data-lbw] .lbw-alt").forEach((e) => (e.hidden = !LBW.alt)); $$("[data-lb=mname]").forEach((e) => (e.textContent = LBW.alt ? "Choisissez votre imprimante" : "Ce n'est pas cette imprimante ?")); },
-  lbwRedo: () => { LBW.open = true; $$("[data-lb=wizwrap]").forEach((e) => e.classList.remove("closed")); LBW.step = 0; LBW.fail = false; LBW.printed = false; LBT.done = false; SFX.tap(); lbStatusPatch(); lbwPaint("r"); const w = $("[data-lbw]"); if (w) setTimeout(() => w.scrollIntoView({ block: "start", behavior: "smooth" }), 80); },
+  lbwRedo: () => { LBW.open = true; $$("[data-lb=wizwrap]").forEach((e) => e.classList.remove("closed")); LBW.step = 0; LBW.fail = false; LBW.printed = false; LBT.done = false; LBT.res = null; SFX.tap(); lbStatusPatch(); lbwPaint("r"); const w = $("[data-lbw]"); if (w) setTimeout(() => w.scrollIntoView({ block: "start", behavior: "smooth" }), 80); },
   lbwFinish: () => { SFX.tap(); lbwFinish(); },
   lbtCam: () => { SFX.tap(); LBT.state = "off"; lbtStart(); },
   lbScanTest: () => {
-    SFX.tap(); LBT.done = false; LBT.state = "off";
-    openSheet(`<div class="lbt-sheet"><div style="text-align:center"><div class="h2" style="font-size:20px">Tester le scan</div><div class="sub">Visez le QR de l'étiquette test imprimée</div></div>${lbScanTestHTML()}<button class="btn soft block" data-act="lbPrintTest">${ico("printer")}Imprimer une étiquette test</button></div>`);
+    SFX.tap(); LBT.done = false; LBT.state = "off"; LBT.res = null;
+    openSheet(`<div class="lbt-sheet"><div style="text-align:center"><div class="h2" style="font-size:20px">Tester le scan</div><div class="sub">Visez le QR de l'étiquette test imprimée</div></div>${lbScanTestHTML(false, "test")}<button class="btn soft block" data-act="lbPrintTest">${ico("printer")}Imprimer une étiquette test</button></div>`);
     setTimeout(lbtStart, 380);
   },
+  /* any real label of the restaurant: the same field-by-field card, from the lot record */
+  lbVerifyReal: () => {
+    SFX.tap(); LBT.done = false; LBT.state = "off"; LBT.res = null;
+    openSheet(`<div class="lbt-sheet"><div style="text-align:center"><div class="h2" style="font-size:20px">Vérifier une étiquette</div><div class="sub">Ce que le scan lit, champ par champ</div></div>${lbScanTestHTML(false, "real")}</div>`);
+    setTimeout(lbtStart, 380);
+  },
+  lbtAgain: () => { SFX.tap(); lbtAgain(); },
+  printerColor: async () => { const on = !lbPrinterCfg().color; await lbPrinterSave({ color: on }); SFX.tick(); buzz(6); lbPrinterPatch(); lbStylePatch(true); },
   lbStyleSet: (a, id, v) => { if (!LB_STYLES.some((p) => p.id === v)) return; SFX.tick(); buzz(6); lbStyleSave({ preset: v }); a.classList.remove("lbs-pop"); void a.offsetWidth; a.classList.add("lbs-pop"); },
   lbStyleOpt: (a, k, v) => {
     if (!LB_SKEYS.includes(k)) return; const st = lbStyle(); const P = LB_STYLES.find((p) => p.id === st.preset);
@@ -1030,6 +1153,7 @@ VIEWS.imprimante = {
     return `<div class="inner narrow lb-print">${topBar("Imprimante")}<div class="lb-pgrid"><div class="lb-pcol">
       <div class="glass pad st lbx-hero" style="--i:1">${lbStatusHTML()}
         <div class="lbx-tests"><button class="btn acc" data-act="lbPrintTest">${ico("printer")}Imprimer un test</button><button class="btn soft" data-act="lbScanTest">${ico("scan")}Tester le scan</button></div>
+        <button class="lbx-verify" data-act="lbVerifyReal"><span class="ic">${ico("qr")}</span><span class="tx"><b>Vérifier une vraie étiquette</b><em>Scannez une étiquette du restaurant</em></span>${ico("chev")}</button>
         <p class="note lb-last" data-lb="last">${esc(lbLastPrintTx())}</p></div>
       <div class="glass pad st lbx-wiz ${closed ? "closed" : ""}" style="--i:2" data-lb="wizwrap"><span class="lbl">Installation pas à pas</span>
         <div class="li tap lbx-redo" data-act="lbwRedo" role="button" tabindex="0"><span class="ic">${ico("lbUndo")}</span><div class="tx"><b>Refaire la configuration</b><em>7 étapes illustrées, 3 minutes</em></div>${ico("chev")}</div>
@@ -1038,6 +1162,7 @@ VIEWS.imprimante = {
       <div class="glass pad st" style="--i:3"><span class="lbl">Design de l'étiquette</span>${lbStylePickerHTML()}</div>
       <div class="glass pad st" style="--i:4"><span class="lbl">Rouleau</span>
         <div class="lbx-rolls">${LB_ROLLS.map((r) => `<button class="lbw-roll ${c.roll === r.id ? "on" : ""}" data-act="printerRoll" data-v="${r.id}" aria-pressed="${c.roll === r.id}">${lbRollVis(r)}<span class="tx"><b>${r.name}${r.rec ? ` <i>Conseillé</i>` : ""}</b><em>${r.t}</em></span>${lbSel(c.roll === r.id)}</button>`).join("")}</div>
+        <div data-lb="color">${lbColorHTML()}</div>
         <span class="lbl">Comment imprimer</span>
         <div class="seg lb-mseg" style="margin-top:10px"><span class="knob" style="width:calc(50% - 4px);transform:translateX(${c.mode === "image" ? 100 : 0}%)"></span><button class="${c.mode === "airprint" ? "on" : ""}" data-act="printerMode" data-v="airprint">Fenêtre d'impression</button><button class="${c.mode === "image" ? "on" : ""}" data-act="printerMode" data-v="image">Image à enregistrer</button></div>
         <p class="note" style="margin:10px 0 0">Fenêtre d'impression : le téléphone envoie l'étiquette par le Wi-Fi (AirPrint). Image : vous l'enregistrez et l'imprimez vous-même.</p></div>

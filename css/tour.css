@@ -94,3 +94,7 @@
   .gt-card,.gt-body.in,.gt-hi,.gt-hero i,.gt-card.nudge{animation:none!important}
 }
 .gt .gt-card:focus,.gt .gt-card:focus-visible{outline:none!important;box-shadow:0 3px 0 #E2D6C2,0 26px 50px -22px rgba(27,21,48,.55)!important}
+/* a target with close neighbours (sidebar lines, tabs): the frame hugs it and the white ring is drawn inside, so it never touches the next one */
+.gt-spot.tight{box-shadow:inset 0 0 0 2px rgba(255,253,248,.95),0 0 0 200vmax rgba(27,21,48,.58)}
+.gt-spot.tight::after{inset:0}
+.gt-card[data-side=l] .gt-notch{display:block;left:100%!important;border-left:0;border-bottom:0}
