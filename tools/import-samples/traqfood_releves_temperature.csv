@@ -1,0 +1,364 @@
+Traqfood - Export des relevés de température
+Établissement : Le Bistrot des Halles
+
+Date du relevé;Heure;Enceinte;Température relevée (°C);Conformité;Action corrective;Opérateur
+21/09/2026;08:55;Chambre froide positive;2,7;Conforme;;Léa
+21/09/2026;08:55;Frigo de service;3,8;Conforme;;Léa
+21/09/2026;08:55;Saladette;3,5;Conforme;;Léa
+21/09/2026;08:55;Congélateur;-19,3;Conforme;;Julie
+21/09/2026;18:20;Chambre froide positive;2,5;Conforme;;Léa
+21/09/2026;18:20;Frigo de service;3,4;Conforme;;Julie
+21/09/2026;18:20;Saladette;3,7;Conforme;;Léa
+21/09/2026;18:20;Congélateur;-18,3;Conforme;;Léa
+22/09/2026;08:55;Chambre froide positive;1,8;Conforme;;Julie
+22/09/2026;08:55;Frigo de service;3,3;Conforme;;Léa
+22/09/2026;08:55;Saladette;2,9;Conforme;;Karim
+22/09/2026;08:55;Congélateur;-20;Conforme;;Karim
+22/09/2026;18:20;Chambre froide positive;2,4;Conforme;;Julie
+22/09/2026;18:20;Frigo de service;3,2;Conforme;;Léa
+22/09/2026;18:20;Saladette;3,3;Conforme;;Léa
+22/09/2026;18:20;Congélateur;-20,4;Conforme;;Léa
+23/09/2026;08:55;Chambre froide positive;2,2;Conforme;;Julie
+23/09/2026;08:55;Frigo de service;3,7;Conforme;;Julie
+23/09/2026;08:55;Saladette;3,2;Conforme;;Léa
+23/09/2026;08:55;Congélateur;-20;Conforme;;Julie
+23/09/2026;18:20;Chambre froide positive;2,9;Conforme;;Julie
+23/09/2026;18:20;Frigo de service;3,4;Conforme;;Léa
+23/09/2026;18:20;Saladette;3,1;Conforme;;Karim
+23/09/2026;18:20;Congélateur;-20,6;Conforme;;Julie
+24/09/2026;08:55;Chambre froide positive;2,1;Conforme;;Léa
+24/09/2026;08:55;Frigo de service;3,7;Conforme;;Karim
+24/09/2026;08:55;Saladette;3,4;Conforme;;Julie
+24/09/2026;08:55;Congélateur;-18,4;Conforme;;Karim
+24/09/2026;18:20;Chambre froide positive;2;Conforme;;Karim
+24/09/2026;18:20;Frigo de service;3,2;Conforme;;Léa
+24/09/2026;18:20;Saladette;3,5;Conforme;;Léa
+24/09/2026;18:20;Congélateur;-18,3;Conforme;;Karim
+25/09/2026;08:55;Chambre froide positive;2,4;Conforme;;Julie
+25/09/2026;08:55;Frigo de service;3,3;Conforme;;Karim
+25/09/2026;08:55;Saladette;3;Conforme;;Karim
+25/09/2026;08:55;Congélateur;-20,7;Conforme;;Julie
+25/09/2026;18:20;Chambre froide positive;2,1;Conforme;;Karim
+25/09/2026;18:20;Frigo de service;2,7;Conforme;;Léa
+25/09/2026;18:20;Saladette;2,8;Conforme;;Julie
+25/09/2026;18:20;Congélateur;-19,8;Conforme;;Karim
+26/09/2026;08:55;Chambre froide positive;2,3;Conforme;;Julie
+26/09/2026;08:55;Frigo de service;2,5;Conforme;;Karim
+26/09/2026;08:55;Saladette;3,8;Conforme;;Julie
+26/09/2026;08:55;Congélateur;-19,7;Conforme;;Karim
+26/09/2026;18:20;Chambre froide positive;2,1;Conforme;;Léa
+26/09/2026;18:20;Frigo de service;3,7;Conforme;;Julie
+26/09/2026;18:20;Saladette;2,9;Conforme;;Julie
+26/09/2026;18:20;Congélateur;-19,5;Conforme;;Léa
+27/09/2026;08:55;Chambre froide positive;1,7;Conforme;;Julie
+27/09/2026;08:55;Frigo de service;2,4;Conforme;;Léa
+27/09/2026;08:55;Saladette;3,4;Conforme;;Karim
+27/09/2026;08:55;Congélateur;-18,7;Conforme;;Léa
+27/09/2026;18:20;Chambre froide positive;2,3;Conforme;;Karim
+27/09/2026;18:20;Frigo de service;3,6;Conforme;;Karim
+27/09/2026;18:20;Saladette;3,1;Conforme;;Karim
+27/09/2026;18:20;Congélateur;-18,4;Conforme;;Karim
+28/09/2026;08:55;Chambre froide positive;2,6;Conforme;;Julie
+28/09/2026;08:55;Frigo de service;3,6;Conforme;;Léa
+28/09/2026;08:55;Saladette;3,4;Conforme;;Karim
+28/09/2026;08:55;Congélateur;-18,8;Conforme;;Karim
+28/09/2026;18:20;Chambre froide positive;2,6;Conforme;;Karim
+28/09/2026;18:20;Frigo de service;3,3;Conforme;;Karim
+28/09/2026;18:20;Saladette;2,8;Conforme;;Julie
+28/09/2026;18:20;Congélateur;-19,5;Conforme;;Julie
+29/09/2026;08:55;Chambre froide positive;2,4;Conforme;;Léa
+29/09/2026;08:55;Frigo de service;2,4;Conforme;;Karim
+29/09/2026;08:55;Saladette;3,2;Conforme;;Julie
+29/09/2026;08:55;Congélateur;-18,6;Conforme;;Léa
+29/09/2026;18:20;Chambre froide positive;1,5;Conforme;;Karim
+29/09/2026;18:20;Frigo de service;3,3;Conforme;;Léa
+29/09/2026;18:20;Saladette;3,6;Conforme;;Julie
+29/09/2026;18:20;Congélateur;-20;Conforme;;Léa
+30/09/2026;08:55;Chambre froide positive;2,5;Conforme;;Karim
+30/09/2026;08:55;Frigo de service;2,7;Conforme;;Léa
+30/09/2026;08:55;Saladette;3;Conforme;;Karim
+30/09/2026;08:55;Congélateur;-18,6;Conforme;;Karim
+30/09/2026;18:20;Chambre froide positive;1,7;Conforme;;Julie
+30/09/2026;18:20;Frigo de service;2,6;Conforme;;Julie
+30/09/2026;18:20;Saladette;3,3;Conforme;;Julie
+30/09/2026;18:20;Congélateur;-19,5;Conforme;;Léa
+01/10/2026;08:55;Chambre froide positive;2,1;Conforme;;Julie
+01/10/2026;08:55;Frigo de service;3,6;Conforme;;Léa
+01/10/2026;08:55;Saladette;3,8;Conforme;;Léa
+01/10/2026;08:55;Congélateur;-20;Conforme;;Léa
+01/10/2026;18:20;Chambre froide positive;1,9;Conforme;;Léa
+01/10/2026;18:20;Frigo de service;2,8;Conforme;;Karim
+01/10/2026;18:20;Saladette;3;Conforme;;Julie
+01/10/2026;18:20;Congélateur;-20,3;Conforme;;Karim
+02/10/2026;08:55;Chambre froide positive;2;Conforme;;Karim
+02/10/2026;08:55;Frigo de service;3;Conforme;;Karim
+02/10/2026;08:55;Saladette;3,9;Conforme;;Julie
+02/10/2026;08:55;Congélateur;-20,1;Conforme;;Léa
+02/10/2026;18:20;Chambre froide positive;1,9;Conforme;;Léa
+02/10/2026;18:20;Frigo de service;3,2;Conforme;;Julie
+02/10/2026;18:20;Saladette;3,2;Conforme;;Léa
+02/10/2026;18:20;Congélateur;-20,3;Conforme;;Léa
+03/10/2026;08:55;Chambre froide positive;2,6;Conforme;;Léa
+03/10/2026;08:55;Frigo de service;2,4;Conforme;;Léa
+03/10/2026;08:55;Saladette;3,2;Conforme;;Léa
+03/10/2026;08:55;Congélateur;-18,8;Conforme;;Karim
+03/10/2026;18:20;Chambre froide positive;2,4;Conforme;;Karim
+03/10/2026;18:20;Frigo de service;2,7;Conforme;;Karim
+03/10/2026;18:20;Saladette;3,9;Conforme;;Julie
+03/10/2026;18:20;Congélateur;-19,8;Conforme;;Léa
+04/10/2026;08:55;Chambre froide positive;1,6;Conforme;;Julie
+04/10/2026;08:55;Frigo de service;2,8;Conforme;;Léa
+04/10/2026;08:55;Saladette;3,7;Conforme;;Karim
+04/10/2026;08:55;Congélateur;-20,1;Conforme;;Julie
+04/10/2026;18:20;Chambre froide positive;2,4;Conforme;;Karim
+04/10/2026;18:20;Frigo de service;3,8;Conforme;;Julie
+04/10/2026;18:20;Saladette;2,8;Conforme;;Karim
+04/10/2026;18:20;Congélateur;-18,3;Conforme;;Karim
+05/10/2026;08:55;Chambre froide positive;1,9;Conforme;;Julie
+05/10/2026;08:55;Frigo de service;3,7;Conforme;;Léa
+05/10/2026;08:55;Saladette;3,8;Conforme;;Léa
+05/10/2026;08:55;Congélateur;-20,1;Conforme;;Léa
+05/10/2026;18:20;Chambre froide positive;1,5;Conforme;;Julie
+05/10/2026;18:20;Frigo de service;2,9;Conforme;;Karim
+05/10/2026;18:20;Saladette;2,9;Conforme;;Julie
+05/10/2026;18:20;Congélateur;-18,7;Conforme;;Julie
+06/10/2026;08:55;Chambre froide positive;1,6;Conforme;;Karim
+06/10/2026;08:55;Frigo de service;2,6;Conforme;;Léa
+06/10/2026;08:55;Saladette;3,5;Conforme;;Julie
+06/10/2026;08:55;Congélateur;-20,3;Conforme;;Léa
+06/10/2026;18:20;Chambre froide positive;2,6;Conforme;;Julie
+06/10/2026;18:20;Frigo de service;3,4;Conforme;;Julie
+06/10/2026;18:20;Saladette;2,8;Conforme;;Karim
+06/10/2026;18:20;Congélateur;-20,2;Conforme;;Karim
+07/10/2026;08:55;Chambre froide positive;2,2;Conforme;;Léa
+07/10/2026;08:55;Frigo de service;2,4;Conforme;;Julie
+07/10/2026;08:55;Saladette;4;Conforme;;Léa
+07/10/2026;08:55;Congélateur;-20,1;Conforme;;Karim
+07/10/2026;18:20;Chambre froide positive;2,2;Conforme;;Léa
+07/10/2026;18:20;Frigo de service;2,6;Conforme;;Julie
+07/10/2026;18:20;Saladette;3,2;Conforme;;Julie
+07/10/2026;18:20;Congélateur;-19,1;Conforme;;Julie
+08/10/2026;08:55;Chambre froide positive;1,9;Conforme;;Julie
+08/10/2026;08:55;Frigo de service;2,4;Conforme;;Karim
+08/10/2026;08:55;Saladette;4,1;Conforme;;Julie
+08/10/2026;08:55;Congélateur;-19,3;Conforme;;Léa
+08/10/2026;18:20;Chambre froide positive;2,6;Conforme;;Léa
+08/10/2026;18:20;Frigo de service;3,4;Conforme;;Karim
+08/10/2026;18:20;Saladette;3,4;Conforme;;Karim
+08/10/2026;18:20;Congélateur;-18,6;Conforme;;Julie
+09/10/2026;08:55;Chambre froide positive;1,8;Conforme;;Julie
+09/10/2026;08:55;Frigo de service;2,7;Conforme;;Karim
+09/10/2026;08:55;Saladette;3,5;Conforme;;Julie
+09/10/2026;08:55;Congélateur;-18,8;Conforme;;Léa
+09/10/2026;18:20;Chambre froide positive;1,8;Conforme;;Karim
+09/10/2026;18:20;Frigo de service;2,7;Conforme;;Léa
+09/10/2026;18:20;Saladette;3,9;Conforme;;Julie
+09/10/2026;18:20;Congélateur;-19;Conforme;;Karim
+10/10/2026;08:55;Chambre froide positive;1,9;Conforme;;Léa
+10/10/2026;08:55;Frigo de service;3,3;Conforme;;Léa
+10/10/2026;08:55;Saladette;2,8;Conforme;;Léa
+10/10/2026;08:55;Congélateur;-18,3;Conforme;;Karim
+10/10/2026;18:20;Chambre froide positive;2,2;Conforme;;Karim
+10/10/2026;18:20;Frigo de service;3,4;Conforme;;Julie
+10/10/2026;18:20;Saladette;3,6;Conforme;;Julie
+10/10/2026;18:20;Congélateur;-18,6;Conforme;;Léa
+11/10/2026;08:55;Chambre froide positive;2,7;Conforme;;Karim
+11/10/2026;08:55;Frigo de service;3,4;Conforme;;Léa
+11/10/2026;08:55;Saladette;4,1;Conforme;;Julie
+11/10/2026;08:55;Congélateur;-18,5;Conforme;;Julie
+11/10/2026;18:20;Chambre froide positive;2;Conforme;;Léa
+11/10/2026;18:20;Frigo de service;2,6;Conforme;;Julie
+11/10/2026;18:20;Saladette;2,9;Conforme;;Karim
+11/10/2026;18:20;Congélateur;-18,3;Conforme;;Léa
+12/10/2026;08:55;Chambre froide positive;2,7;Conforme;;Karim
+12/10/2026;08:55;Frigo de service;3,8;Conforme;;Julie
+12/10/2026;08:55;Saladette;4;Conforme;;Julie
+12/10/2026;08:55;Congélateur;-20,1;Conforme;;Léa
+12/10/2026;18:20;Chambre froide positive;2,3;Conforme;;Julie
+12/10/2026;18:20;Frigo de service;3,2;Conforme;;Julie
+12/10/2026;18:20;Saladette;3,8;Conforme;;Karim
+12/10/2026;18:20;Congélateur;-19,6;Conforme;;Julie
+13/10/2026;08:55;Chambre froide positive;1,8;Conforme;;Léa
+13/10/2026;08:55;Frigo de service;3,4;Conforme;;Léa
+13/10/2026;08:55;Saladette;4;Conforme;;Julie
+13/10/2026;08:55;Congélateur;-20,4;Conforme;;Léa
+13/10/2026;18:20;Chambre froide positive;2,1;Conforme;;Julie
+13/10/2026;18:20;Frigo de service;2,6;Conforme;;Karim
+13/10/2026;18:20;Saladette;3,7;Conforme;;Karim
+13/10/2026;18:20;Congélateur;-20,1;Conforme;;Léa
+14/10/2026;08:55;Chambre froide positive;2,5;Conforme;;Karim
+14/10/2026;08:55;Frigo de service;2,8;Conforme;;Léa
+14/10/2026;08:55;Saladette;3,4;Conforme;;Julie
+14/10/2026;08:55;Congélateur;-18,7;Conforme;;Léa
+14/10/2026;18:20;Chambre froide positive;1,8;Conforme;;Julie
+14/10/2026;18:20;Frigo de service;3,2;Conforme;;Karim
+14/10/2026;18:20;Saladette;3,7;Conforme;;Karim
+14/10/2026;18:20;Congélateur;-18,7;Conforme;;Karim
+15/10/2026;08:55;Chambre froide positive;2,4;Conforme;;Julie
+15/10/2026;08:55;Frigo de service;3,8;Conforme;;Léa
+15/10/2026;08:55;Saladette;3,2;Conforme;;Karim
+15/10/2026;08:55;Congélateur;-20,2;Conforme;;Karim
+15/10/2026;18:20;Chambre froide positive;2,4;Conforme;;Karim
+15/10/2026;18:20;Frigo de service;2,7;Conforme;;Léa
+15/10/2026;18:20;Saladette;3,5;Conforme;;Léa
+15/10/2026;18:20;Congélateur;-20,2;Conforme;;Julie
+16/10/2026;08:55;Chambre froide positive;2,7;Conforme;;Karim
+16/10/2026;08:55;Frigo de service;3,9;Conforme;;Karim
+16/10/2026;08:55;Saladette;2,7;Conforme;;Julie
+16/10/2026;08:55;Congélateur;-19,8;Conforme;;Julie
+16/10/2026;18:20;Chambre froide positive;2,7;Conforme;;Léa
+16/10/2026;18:20;Frigo de service;2,9;Conforme;;Léa
+16/10/2026;18:20;Saladette;3;Conforme;;Julie
+16/10/2026;18:20;Congélateur;-19,5;Conforme;;Julie
+17/10/2026;08:55;Chambre froide positive;2,3;Conforme;;Julie
+17/10/2026;08:55;Frigo de service;3,5;Conforme;;Karim
+17/10/2026;08:55;Saladette;3;Conforme;;Karim
+17/10/2026;08:55;Congélateur;-20,7;Conforme;;Julie
+17/10/2026;18:20;Chambre froide positive;1,9;Conforme;;Léa
+17/10/2026;18:20;Frigo de service;2,9;Conforme;;Léa
+17/10/2026;18:20;Saladette;4,1;Conforme;;Julie
+17/10/2026;18:20;Congélateur;-20,5;Conforme;;Julie
+18/10/2026;08:55;Chambre froide positive;2;Conforme;;Julie
+18/10/2026;08:55;Frigo de service;3,7;Conforme;;Léa
+18/10/2026;08:55;Saladette;3,5;Conforme;;Julie
+18/10/2026;08:55;Congélateur;-19,8;Conforme;;Léa
+18/10/2026;18:20;Chambre froide positive;2,8;Conforme;;Julie
+18/10/2026;18:20;Frigo de service;2,4;Conforme;;Julie
+18/10/2026;18:20;Saladette;3,9;Conforme;;Léa
+18/10/2026;18:20;Congélateur;-19,3;Conforme;;Léa
+19/10/2026;08:55;Chambre froide positive;2,7;Conforme;;Karim
+19/10/2026;08:55;Frigo de service;2,5;Conforme;;Julie
+19/10/2026;08:55;Saladette;2,8;Conforme;;Karim
+19/10/2026;08:55;Congélateur;-19,9;Conforme;;Julie
+19/10/2026;18:20;Chambre froide positive;2,1;Conforme;;Léa
+19/10/2026;18:20;Frigo de service;3,6;Conforme;;Julie
+19/10/2026;18:20;Saladette;3,8;Conforme;;Karim
+19/10/2026;18:20;Congélateur;-20,1;Conforme;;Léa
+20/10/2026;08:55;Chambre froide positive;1,6;Conforme;;Léa
+20/10/2026;08:55;Frigo de service;3,2;Conforme;;Karim
+20/10/2026;08:55;Saladette;3,8;Conforme;;Julie
+20/10/2026;08:55;Congélateur;-20,3;Conforme;;Julie
+20/10/2026;18:20;Chambre froide positive;2,9;Conforme;;Léa
+20/10/2026;18:20;Frigo de service;3;Conforme;;Karim
+20/10/2026;18:20;Saladette;3,5;Conforme;;Julie
+20/10/2026;18:20;Congélateur;-19,7;Conforme;;Léa
+21/10/2026;08:55;Chambre froide positive;2,3;Conforme;;Léa
+21/10/2026;08:55;Frigo de service;3;Conforme;;Julie
+21/10/2026;08:55;Saladette;2,9;Conforme;;Karim
+21/10/2026;08:55;Congélateur;-19,7;Conforme;;Léa
+21/10/2026;18:20;Chambre froide positive;1,8;Conforme;;Karim
+21/10/2026;18:20;Frigo de service;3,2;Conforme;;Karim
+21/10/2026;18:20;Saladette;3,2;Conforme;;Karim
+21/10/2026;18:20;Congélateur;-20,2;Conforme;;Léa
+22/10/2026;08:55;Chambre froide positive;2,9;Conforme;;Julie
+22/10/2026;08:55;Frigo de service;3,5;Conforme;;Karim
+22/10/2026;08:55;Saladette;3,8;Conforme;;Julie
+22/10/2026;08:55;Congélateur;-19;Conforme;;Julie
+22/10/2026;18:20;Chambre froide positive;2,8;Conforme;;Léa
+22/10/2026;18:20;Frigo de service;2,6;Conforme;;Julie
+22/10/2026;18:20;Saladette;2,8;Conforme;;Léa
+22/10/2026;18:20;Congélateur;-20,3;Conforme;;Julie
+23/10/2026;08:55;Chambre froide positive;2,6;Conforme;;Karim
+23/10/2026;08:55;Frigo de service;3;Conforme;;Karim
+23/10/2026;08:55;Saladette;3,9;Conforme;;Julie
+23/10/2026;08:55;Congélateur;-18,3;Conforme;;Julie
+23/10/2026;18:20;Chambre froide positive;1,7;Conforme;;Julie
+23/10/2026;18:20;Frigo de service;2,9;Conforme;;Karim
+23/10/2026;18:20;Saladette;2,8;Conforme;;Karim
+23/10/2026;18:20;Congélateur;-19,5;Conforme;;Julie
+24/10/2026;08:55;Chambre froide positive;2,8;Conforme;;Léa
+24/10/2026;08:55;Frigo de service;2,8;Conforme;;Julie
+24/10/2026;08:55;Saladette;3,9;Conforme;;Karim
+24/10/2026;08:55;Congélateur;-18,4;Conforme;;Léa
+24/10/2026;18:20;Chambre froide positive;1,7;Conforme;;Julie
+24/10/2026;18:20;Frigo de service;6,8;Non conforme;Porte mal fermée, refermée;Léa
+24/10/2026;18:20;Saladette;3,7;Conforme;;Julie
+24/10/2026;18:20;Congélateur;-18,7;Conforme;;Léa
+25/10/2026;08:55;Chambre froide positive;2,7;Conforme;;Léa
+25/10/2026;08:55;Frigo de service;3,2;Conforme;;Karim
+25/10/2026;08:55;Saladette;3,7;Conforme;;Léa
+25/10/2026;08:55;Congélateur;-20,4;Conforme;;Karim
+25/10/2026;18:20;Chambre froide positive;2,8;Conforme;;Karim
+25/10/2026;18:20;Frigo de service;2,6;Conforme;;Julie
+25/10/2026;18:20;Saladette;3,8;Conforme;;Karim
+25/10/2026;18:20;Congélateur;-18,3;Conforme;;Karim
+26/10/2026;08:55;Chambre froide positive;2,3;Conforme;;Léa
+26/10/2026;08:55;Frigo de service;2,4;Conforme;;Léa
+26/10/2026;08:55;Saladette;2,9;Conforme;;Léa
+26/10/2026;08:55;Congélateur;-20,5;Conforme;;Julie
+26/10/2026;18:20;Chambre froide positive;2;Conforme;;Karim
+26/10/2026;18:20;Frigo de service;3,5;Conforme;;Léa
+26/10/2026;18:20;Saladette;3;Conforme;;Léa
+26/10/2026;18:20;Congélateur;-18,3;Conforme;;Léa
+27/10/2026;08:55;Chambre froide positive;1,7;Conforme;;Léa
+27/10/2026;08:55;Frigo de service;2,6;Conforme;;Léa
+27/10/2026;08:55;Saladette;3;Conforme;;Julie
+27/10/2026;08:55;Congélateur;-19,1;Conforme;;Julie
+27/10/2026;18:20;Chambre froide positive;2;Conforme;;Léa
+27/10/2026;18:20;Frigo de service;3,1;Conforme;;Julie
+27/10/2026;18:20;Saladette;3,5;Conforme;;Julie
+27/10/2026;18:20;Congélateur;-20,5;Conforme;;Karim
+28/10/2026;08:55;Chambre froide positive;1,6;Conforme;;Karim
+28/10/2026;08:55;Frigo de service;2,7;Conforme;;Julie
+28/10/2026;08:55;Saladette;3,7;Conforme;;Léa
+28/10/2026;08:55;Congélateur;-19,9;Conforme;;Julie
+28/10/2026;18:20;Chambre froide positive;1,6;Conforme;;Karim
+28/10/2026;18:20;Frigo de service;3,1;Conforme;;Julie
+28/10/2026;18:20;Saladette;3,5;Conforme;;Léa
+28/10/2026;18:20;Congélateur;-20;Conforme;;Karim
+29/10/2026;08:55;Chambre froide positive;2,8;Conforme;;Julie
+29/10/2026;08:55;Frigo de service;2,5;Conforme;;Léa
+29/10/2026;08:55;Saladette;3,1;Conforme;;Karim
+29/10/2026;08:55;Congélateur;-20,4;Conforme;;Léa
+29/10/2026;18:20;Chambre froide positive;2;Conforme;;Julie
+29/10/2026;18:20;Frigo de service;2,9;Conforme;;Léa
+29/10/2026;18:20;Saladette;3,6;Conforme;;Julie
+29/10/2026;18:20;Congélateur;-19,4;Conforme;;Karim
+30/10/2026;08:55;Chambre froide positive;2,8;Conforme;;Léa
+30/10/2026;08:55;Frigo de service;3,3;Conforme;;Léa
+30/10/2026;08:55;Saladette;2,8;Conforme;;Julie
+30/10/2026;08:55;Congélateur;-20,2;Conforme;;Léa
+30/10/2026;18:20;Chambre froide positive;2,2;Conforme;;Léa
+30/10/2026;18:20;Frigo de service;2,7;Conforme;;Julie
+30/10/2026;18:20;Saladette;3,6;Conforme;;Julie
+30/10/2026;18:20;Congélateur;-19,2;Conforme;;Karim
+31/10/2026;08:55;Chambre froide positive;2,1;Conforme;;Julie
+31/10/2026;08:55;Frigo de service;3;Conforme;;Léa
+31/10/2026;08:55;Saladette;3,1;Conforme;;Julie
+31/10/2026;08:55;Congélateur;-18,4;Conforme;;Karim
+31/10/2026;18:20;Chambre froide positive;1,6;Conforme;;Léa
+31/10/2026;18:20;Frigo de service;3,6;Conforme;;Karim
+31/10/2026;18:20;Saladette;2,8;Conforme;;Julie
+31/10/2026;18:20;Congélateur;-18,8;Conforme;;Julie
+01/11/2026;08:55;Chambre froide positive;2,3;Conforme;;Karim
+01/11/2026;08:55;Frigo de service;2,7;Conforme;;Léa
+01/11/2026;08:55;Saladette;4;Conforme;;Léa
+01/11/2026;08:55;Congélateur;-18,6;Conforme;;Karim
+01/11/2026;18:20;Chambre froide positive;2,5;Conforme;;Karim
+01/11/2026;18:20;Frigo de service;3,6;Conforme;;Léa
+01/11/2026;18:20;Saladette;2,7;Conforme;;Julie
+01/11/2026;18:20;Congélateur;-18,7;Conforme;;Léa
+02/11/2026;08:55;Chambre froide positive;2,7;Conforme;;Julie
+02/11/2026;08:55;Frigo de service;2,9;Conforme;;Karim
+02/11/2026;08:55;Saladette;4;Conforme;;Julie
+02/11/2026;08:55;Congélateur;-20;Conforme;;Léa
+02/11/2026;18:20;Chambre froide positive;2;Conforme;;Léa
+02/11/2026;18:20;Frigo de service;2,9;Conforme;;Karim
+02/11/2026;18:20;Saladette;3,4;Conforme;;Léa
+02/11/2026;18:20;Congélateur;-20,4;Conforme;;Léa
+03/11/2026;08:55;Chambre froide positive;2,2;Conforme;;Karim
+03/11/2026;08:55;Frigo de service;3,7;Conforme;;Léa
+03/11/2026;08:55;Saladette;2,9;Conforme;;Karim
+03/11/2026;08:55;Congélateur;-19,3;Conforme;;Karim
+03/11/2026;18:20;Chambre froide positive;2,3;Conforme;;Léa
+03/11/2026;18:20;Frigo de service;3,5;Conforme;;Julie
+03/11/2026;18:20;Saladette;2,7;Conforme;;Karim
+03/11/2026;18:20;Congélateur;-20,4;Conforme;;Karim
+04/11/2026;08:55;Chambre froide positive;1,7;Conforme;;Julie
+04/11/2026;08:55;Frigo de service;2,4;Conforme;;Julie
+04/11/2026;08:55;Saladette;3,8;Conforme;;Léa
+04/11/2026;08:55;Congélateur;-18,7;Conforme;;Julie
+04/11/2026;18:20;Chambre froide positive;1,7;Conforme;;Karim
+04/11/2026;18:20;Frigo de service;3,6;Conforme;;Karim
+04/11/2026;18:20;Saladette;2,8;Conforme;;Julie
+04/11/2026;18:20;Congélateur;-19,4;Conforme;;Karim

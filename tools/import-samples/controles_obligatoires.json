@@ -1,0 +1,37 @@
+{
+  "controles": [
+    {
+      "controle": "Vérification des extincteurs",
+      "prestataire": "SÉCURIFEU",
+      "telephone": "01 23 45 67 89",
+      "periodicite": "Annuelle",
+      "dernier_passage": "2026-03-10"
+    },
+    {
+      "controle": "Dératisation / désinsectisation",
+      "prestataire": "Hygiène 3D Services",
+      "periodicite": "Trimestrielle",
+      "dernier_passage": "2026-08-27",
+      "contrat": "HD-2231"
+    },
+    {
+      "controle": "Nettoyage hotte et conduits",
+      "prestataire": "Net'Hotte",
+      "periodicite": "Semestrielle",
+      "dernier_passage": "2026-04-19",
+      "prochaine_echeance": "2026-11-20"
+    },
+    {
+      "controle": "Analyses microbiologiques",
+      "prestataire": "Labo Rhône Analyses",
+      "periodicite": "tous les 6 mois",
+      "dernier_passage": "2026-10-06"
+    },
+    {
+      "controle": "Contrôle de la balance",
+      "prestataire": "Métrologie Pro",
+      "periodicite": "Tous les 2 ans",
+      "dernier_passage": "2025-10-01"
+    }
+  ]
+}

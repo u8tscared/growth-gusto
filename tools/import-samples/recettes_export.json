@@ -1,0 +1,43 @@
+[
+  {
+    "nom": "Velouté de céleri, noisettes",
+    "portions": 10,
+    "allergenes": "céleri, lait, fruits à coque",
+    "etapes": "1. Éplucher et tailler le céleri. 2. Suer au beurre. 3. Mouiller, cuire 25 min. 4. Mixer, crémer, servir avec les noisettes.",
+    "ingredients": [
+      {
+        "nom": "Céleri rave",
+        "quantite": "1,5",
+        "unite": "kg"
+      },
+      {
+        "nom": "Crème liquide 35% UHT",
+        "quantite": "20",
+        "unite": "cl"
+      },
+      {
+        "nom": "Noisettes décortiquées",
+        "quantite": "80",
+        "unite": "g"
+      }
+    ]
+  },
+  {
+    "nom": "Mousse au chocolat",
+    "portions": 8,
+    "allergenes": "oeufs, lait",
+    "etapes": "Fondre le chocolat\nMonter les blancs\nIncorporer délicatement",
+    "ingredients": [
+      {
+        "nom": "Chocolat noir 70%",
+        "quantite": "250",
+        "unite": "g"
+      },
+      {
+        "nom": "Oeufs frais plein air",
+        "quantite": "6",
+        "unite": "pièce"
+      }
+    ]
+  }
+]
