@@ -14,3 +14,6 @@ window.GG_STRIPE = { essentiel: null, complet: null };
 window.GG_ACTIVATION = { "GG-ESSENTIEL-2026": "essentiel", "GG-COMPLET-2026": "complet" };
 /* where « contactez-nous » writes */
 window.GG_CONTACT = "contact@growthgusto.fr";
+
+/* server modules deployed with functions/ (tools/SERVER.md): the app shows them as active */
+window.GG_SERVER = { sondes: true, alertes: true, resa: true };
