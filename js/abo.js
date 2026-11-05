@@ -14,7 +14,7 @@ const AB_PACKS = {
   complet: { t: "Complet", price: 99, tag: "Toute la gestion du restaurant", feats: ["Tout Essentiel", "Stock & inventaire", "Tickets de caisse", "Tableau de bord", "Finances", "Pointeuse", "Planning", "Employés & salaires", "Plusieurs restaurants"] },
 };
 /* areas that belong to the pack Complet: with a paid Essentiel they show an upgrade card instead (during the trial everything is open) */
-const AB_COMPLET = { stock: "Stock & inventaire", tickets: "Tickets de caisse", tzEdit: "Tickets de caisse", dashboard: "Tableau de bord", finance: "Finances", pointeuse: "Pointeuse", planning: "Planning", staff: "Employés & salaires" };
+const AB_COMPLET = { stock: "Stock & inventaire", tickets: "Tickets de caisse", tzEdit: "Tickets de caisse", dashboard: "Tableau de bord", finance: "Finances", pointeuse: "Pointeuse", planning: "Planning", staff: "Employés & salaires", caisse: "Caisse connectée", caisseMap: "Caisse connectée", sites: "Multi-restaurant" };
 const AB_MONTHS = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"];
 const abDate = (ts) => { const d = new Date(ts); return `${d.getDate()} ${AB_MONTHS[d.getMonth()]}${d.getFullYear() !== new Date().getFullYear() ? " " + d.getFullYear() : ""}`; };
 const abJours = (n) => `${n} jour${n > 1 ? "s" : ""}`;
