@@ -422,8 +422,8 @@ const onData = debounce(() => { loadProfiles(); refresh(); renderChrome(); }, 60
 /* ───────────────────────── chrome: side nav + tab bar ───────────────────────── */
 const NAV = [
   ["home", "home", "Aujourd'hui"], ["releve", "therm", "Relevés"], ["frigos", "snow", "Frigos"], ["sondes", "sdProbe", "Sondes connectées"], ["scan", "scan", "Scanner"], ["reception", "truck", "Réception"],
-  ["sep", "", "Cuisine"], ["notes", "book", "Recettes & allergènes"], ["menage", "spray", "Planning ménage"],
-  ["sep", "", "Gestion"], ["dashboard", "dash", "Tableau de bord"], ["finance", "euro", "Finances"], ["stock", "box", "Stock & inventaire"], ["tickets", "receipt", "Tickets de caisse"], ["registre", "shield", "Registre HACCP"], ["obligations", "calcheck", "Obligations & contrôles"],
+  ["sep", "", "Cuisine"], ["notes", "book", "Recettes & allergènes"], ["menage", "spray", "Planning ménage"], ["hygiene", "hygPot", "Hygiène"],
+  ["sep", "", "Gestion"], ["dashboard", "dash", "Tableau de bord"], ["finance", "euro", "Finances"], ["stock", "box", "Stock & inventaire"], ["tickets", "receipt", "Tickets de caisse"], ["caisse", "cxPlug", "Caisse connectée"], ["registre", "shield", "Registre HACCP"], ["obligations", "calcheck", "Obligations & contrôles"],
   ["sep", "", "Équipe"], ["pointeuse", "clock", "Pointeuse"], ["planning", "cal", "Planning"], ["equipe", "users", "Équipe & salaires"], ["avis", "star", "Votre avis"],
   ["sep", "", "Restaurant"], ["alertes", "alBell", "Alertes"], ["sites", "store", "Mes établissements"], ["imprimante", "printer", "Imprimante"], ["reglages", "sliders", "Réglages"],
 ];

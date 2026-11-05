@@ -165,11 +165,24 @@ async function tkSyncStock(t) {
     const q = num(l.quantite) || 0; if (q <= 0) continue; const ln = tkLinkOf(l.libelle);
     if (ln && ln.ignore) continue;
     const p = ln && tkProd(ln.productId);
-    if (!p) { if (!tkHasRecipe(l)) res.unlinked.push({ libelle: l.libelle, q }); continue; }
+    if (!p) {
+      /* ticket de caisse connectée (js/caisse.js, recipeStock) : un plat relié à une fiche recette sort ses ingrédients liés au stock */
+      const r = t.recipeStock && typeof noteUsePlan === "function" ? tkRecipeFor(l) : null;
+      if (r) {
+        const k = (q * (num(l.per) || 1)) / (num(r.portions) || 1); let rows = []; try { rows = noteUsePlan(r, k).rows || []; } catch (e) {}
+        for (const x of rows) {
+          const doc = { productId: x.p.id, name: x.p.name, qty: -Math.round(x.q * 1000) / 1000, unit: x.p.unit || "", kind: "vente", ref: t.id, refType: "ticket", day: t.date, at: t.at || Date.now(), uid: S.me.id, by: S.me.name || "", libelle: l.libelle, soldQty: q, soldUnit: "", recipe: r.id };
+          try { if (typeof stockMove === "function") await stockMove(doc, { silent: true }); else await DB.add("moves", doc); res.done.push(doc); } catch (e) { console.warn(e); }
+        }
+        if (rows.length) { res.recipes = (res.recipes || 0) + 1; continue; }
+      }
+      if (!tkHasRecipe(l)) res.unlinked.push({ libelle: l.libelle, q }); continue;
+    }
     const qty = -Math.round(q * (num(ln.factor) || 1) * 1000) / 1000;
     const doc = { productId: p.id, name: p.name, qty, unit: p.unit || "", kind: "vente", ref: t.id, refType: "ticket", day: t.date, at: t.at || Date.now(), uid: S.me.id, by: S.me.name || "", libelle: l.libelle, soldQty: q, soldUnit: ln.soldUnit || "" };
     try { if (typeof stockMove === "function") await stockMove(doc); else await DB.add("moves", doc); res.done.push(doc); } catch (e) { console.warn(e); }
   }
+  if (res.recipes) logEvent("stock", `ventes de la caisse du ${shortDate(t.date)} : ingrédients de ${tkPl(res.recipes, "plat")} déduits du stock`, { ref: t.id });
   if (res.done.length && typeof stockMove !== "function") logEvent("stock", `ventes du ${shortDate(t.date)} déduites du stock (${tkPl(res.done.length, "produit")})`, { ref: t.id });
   return res;
 }
@@ -209,7 +222,7 @@ VIEWS.tickets = {
     const top = tkTop(14).slice(0, 6);
 
     const tParts = tT ? Math.max(...tT.list.map((t) => (t.parts || []).length || 1)) : 0;
-    const todayCard = tT ? `<div class="glass pad st tk-today" style="--i:1"><div class="hstack"><span class="ic ok">${ico("check")}</span><div style="flex:1;min-width:0"><b class="h3">Ticket du jour saisi</b><div class="sub"><span class="mono tk-nw">${tT.has ? tkEur(tT.total) : "CA non saisi"}</span> <span class="tk-nw">· ${tkCount(tT.list)}</span>${tT.covers ? ` <span class="tk-nw">· ${tkN(tT.covers)} couverts</span>` : ""}${tParts > 1 ? ` <span class="tk-nw">· ${tParts} parties</span>` : ""}</div></div><button class="btn soft sm" data-act="tzOpen" data-id="${tT.list[0].id}">${ico("edit")}Modifier</button></div><div class="tk-today-b"><button class="btn ghost sm" data-act="tzAddPart" data-id="${tT.list[0].id}">${ico("tkparts")}Ajouter une partie</button><button class="btn ghost sm" data-act="tzOther">${ico("plus")}Autre jour</button></div></div>`
+    const todayCard = tT ? `<div class="glass pad st tk-today" style="--i:1"><div class="hstack"><span class="ic ok">${ico("check")}</span><div style="flex:1;min-width:0"><b class="h3">${tT.list.some((t) => t.source === "caisse") ? "Ventes de la caisse" : "Ticket du jour saisi"}</b><div class="sub"><span class="mono tk-nw">${tT.has ? tkEur(tT.total) : "CA non saisi"}</span> <span class="tk-nw">· ${tkCount(tT.list)}</span>${tT.covers ? ` <span class="tk-nw">· ${tkN(tT.covers)} couverts</span>` : ""}${tParts > 1 ? ` <span class="tk-nw">· ${tParts} parties</span>` : ""}</div></div><button class="btn soft sm" data-act="tzOpen" data-id="${tT.list[0].id}">${ico("edit")}Modifier</button></div><div class="tk-today-b"><button class="btn ghost sm" data-act="tzAddPart" data-id="${tT.list[0].id}">${ico("tkparts")}Ajouter une partie</button><button class="btn ghost sm" data-act="tzOther">${ico("plus")}Autre jour</button></div></div>`
       : `<div class="glass pad st tk-today" style="--i:1"><div class="hstack"><span class="ic">${ico("receipt")}</span><div style="min-width:0"><b class="h3">Ticket Z du jour</b><div class="sub">Plats vendus, chiffre d'affaires et couverts, en 30 secondes.</div></div></div>
         <button class="btn acc block" data-act="tzManual">${ico("edit")}Saisir le ticket du jour</button>
         ${S.cap.sample ? `<button class="btn soft block" data-act="tzPick">${ico("camera")}Scanner le ticket (photos)</button>` : ""}
