@@ -297,7 +297,7 @@ function unitSave(u) {
 }
 /* « + Autre » chip in a unit picker: data-pick = the action the unit chips use; an inline field appears, Enter/OK adds the chip and selects it */
 const ACTIONS = ["Produits déplacés dans un autre frigo", "Thermostat réglé", "Porte mal fermée, refermée", "Technicien appelé", "Produits jetés"];
-const nameOf = (uid) => (uid === S.me.id ? (S.me.name || "Vous") : (S.profiles[uid]?.name || S.members.find((m) => m.id === uid)?.name || "Quelqu'un"));
+const nameOf = (uid, r) => (uid === "sonde" ? ((r && r.by) || "Sonde") : uid === S.me.id ? (S.me.name || "Vous") : (S.profiles[uid]?.name || S.members.find((m) => m.id === uid)?.name || "Quelqu'un"));
 const said = (uid, text) => (uid === S.me.id ? `Vous avez ${String(text).replace(/^a /, "")}` : `${firstName(nameOf(uid))} ${text}`);
 const avatar = (uid, sm = false) => { const p = S.profiles[uid] || (uid === S.me.id ? S.me : null); const n = p?.name || S.members.find((m) => m.id === uid)?.name || ""; if (!n && !p?.avatarUrl) return `<span class="ava${sm ? " sm" : ""}" style="background:rgba(14,19,48,.08);color:var(--muted)">${ico("users").replace('class="ico ', `style="width:${sm ? 11 : 15}px;height:${sm ? 11 : 15}px" class="ico `)}</span>`; const img = p?.avatarUrl ? `<img src="${esc(p.avatarUrl)}" alt="">` : esc(initials(n)); return `<span class="ava${sm ? " sm" : ""}" style="background:${p?.color && !p.avatarUrl ? esc(p.color) : colorFor(uid)}" title="${esc(n)}">${img}</span>`; };
 const fridgeName = (id) => S.fridges.find((f) => f.id === id)?.name || "—";
@@ -421,7 +421,7 @@ const onData = debounce(() => { loadProfiles(); refresh(); renderChrome(); }, 60
 
 /* ───────────────────────── chrome: side nav + tab bar ───────────────────────── */
 const NAV = [
-  ["home", "home", "Aujourd'hui"], ["releve", "therm", "Relevés"], ["frigos", "snow", "Frigos"], ["scan", "scan", "Scanner"], ["reception", "truck", "Réception"],
+  ["home", "home", "Aujourd'hui"], ["releve", "therm", "Relevés"], ["frigos", "snow", "Frigos"], ["sondes", "sdProbe", "Sondes connectées"], ["scan", "scan", "Scanner"], ["reception", "truck", "Réception"],
   ["sep", "", "Cuisine"], ["notes", "book", "Recettes & allergènes"], ["menage", "spray", "Planning ménage"],
   ["sep", "", "Gestion"], ["dashboard", "dash", "Tableau de bord"], ["finance", "euro", "Finances"], ["stock", "box", "Stock & inventaire"], ["tickets", "receipt", "Tickets de caisse"], ["registre", "shield", "Registre HACCP"], ["obligations", "calcheck", "Obligations & contrôles"],
   ["sep", "", "Équipe"], ["pointeuse", "clock", "Pointeuse"], ["planning", "cal", "Planning"], ["equipe", "users", "Équipe & salaires"], ["avis", "star", "Votre avis"],
