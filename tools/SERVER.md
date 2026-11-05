@@ -33,4 +33,5 @@ Avec `caisse` : `firebase functions:secrets:set SUMUP_CLIENT_ID`, `SUMUP_CLIENT_
 
 - **mails** (`functions/src/mails.js`) : `mailSendCode` / `mailVerifyCode` (appelables : code à 6 chiffres haché dans `_codes`, 10 min, 5 essais, 5 envois/h, puis `emailVerified`) ; `mailOnUserCreated` (déclencheur v1 sur les comptes : « Bienvenue », Google tout de suite, e-mail après le code) ; `mailsTick` (essai J-3 et dernier jour, une fois par restaurant, 9–19 h). Expéditeur bonjour@growthgusto.fr, compteur partagé `_meta/brevo`. Drapeau app : `GG_SERVER.mails`.
 - **mailInvite** (`functions/src/mails.js`, appelable, gérant seulement) : envoie une invitation d'équipe par e-mail (code + lien, 40 par restaurant et par jour).
+- **admin** (`functions/src/admin.js`) : `adminDeleteUser` (appelable, admins Growth Gusto seulement) supprime un compte, ses restaurants, ses adhésions et sa connexion. Bouton corbeille dans Admin → Comptes.
 - **resa** (`functions/src/resa.js`) : `onResaBooking` (déclencheur sur les réservations : mails au client via Brevo) et `resaTick` (rappels de la veille).

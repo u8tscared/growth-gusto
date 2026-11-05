@@ -207,3 +207,12 @@
 .ab-ash .lbl{font-size:13px;font-weight:650;letter-spacing:0;text-transform:none;color:var(--ink-2)}
 @media (min-width:960px){.ab-hero{padding:26px 28px}.ab-ht h2{font-size:34px}}
 .ab-actf .input::placeholder{font-family:var(--f);letter-spacing:0;text-transform:none}
+/* admin: delete an account */
+.ab-ul .li{gap:10px}
+.ab-udel{flex:none;color:#C8432A}
+.ab-delsh{text-align:center;display:flex;flex-direction:column;gap:10px}
+.ab-delsh .sub{margin:0}
+.ab-delic{width:56px;height:56px;border-radius:50%;display:grid;place-items:center;margin:0 auto 4px;background:#FFE9DE;color:#C8432A}
+.ab-delic .ico{width:26px;height:26px}
+.ab-delw{font-weight:700;color:#C8432A}
+.ab-delsh .btn.danger{background:#C8432A;color:#fff;border-color:#9E2F1B}

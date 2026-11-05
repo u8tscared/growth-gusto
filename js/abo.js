@@ -241,7 +241,7 @@ function abAdminUsers() {
   const L = (A.users || []).filter((u) => !q || [u.name, u.email, u.id].some((x) => String(x || "").toLowerCase().includes(q))).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
   if (A.loading && !A.users) return `<div class="glass empty"><div class="ic">${ico("clock")}</div><b>Chargement…</b></div>`;
   if (!L.length) return `<div class="glass empty"><div class="ic">${ico("abUsers")}</div><b>${q ? "Aucun compte ne correspond" : "Aucun compte"}</b></div>`;
-  return `<div class="glass pad ab-ul">${L.slice(0, 500).map((u) => { const n = (u.restos || []).length; return `<div class="li"><span class="ab-mono" style="--s:40px">${esc(initials(u.name || u.email || "?"))}</span><div class="tx"><b>${esc(u.name || firstName(String(u.email || "").split("@")[0]) || "Sans nom")}</b><em>${esc(u.email || u.id)}</em></div><span class="pill ${n ? "acc" : "neu"}">${n} resto${n > 1 ? "s" : ""}</span></div>`; }).join("")}</div>`;
+  return `<div class="glass pad ab-ul">${L.slice(0, 500).map((u) => { const n = (u.restos || []).length; const me = u.id === S.me.id || u.id === DB.uid; return `<div class="li"><span class="ab-mono" style="--s:40px">${esc(initials(u.name || u.email || "?"))}</span><div class="tx"><b>${esc(u.name || firstName(String(u.email || "").split("@")[0]) || "Sans nom")}</b><em>${esc(u.email || u.id)}</em></div><span class="pill ${n ? "acc" : "neu"}">${n} resto${n > 1 ? "s" : ""}</span>${me ? "" : `<button class="iconbtn ab-udel" data-act="abUserDel" data-id="${esc(u.id)}" aria-label="Supprimer ${esc(u.email || u.name || "ce compte")}" title="Supprimer ce compte">${ico("trash")}</button>`}</div>`; }).join("")}</div>`;
 }
 VIEWS.admin = {
   noResto: true, nav: "more",
@@ -285,6 +285,26 @@ Object.assign(ACT, {
   abAdmOpen: (a, id) => { SFX.tap(); abAdmSheet(id); },
   abAdmTab: (a, id, v) => { if (AB.tab === v) return; AB.tab = v; AB.q = ""; SFX.tick(); rerender(); },
   abAdmReload: () => { SFX.tap(); abAdminFetch(true); },
+  /* delete an account for good (functions/src/admin.js adminDeleteUser): its own restaurants, its memberships, its sign-in */
+  abUserDel: (a, id) => {
+    const A = AB.admin || {}; const u = (A.users || []).find((x) => x.id === id); if (!u) return;
+    const own = (A.restos || []).filter((r) => r.owner === id); const who = esc(u.email || u.name || id);
+    S.ui.abDel = { id, email: u.email || "" };
+    openSheet(`<div class="ab-delsh"><span class="ab-delic">${ico("trash")}</span><div class="h2">Supprimer ce compte ?</div>
+      <p class="sub"><b>${who}</b> ne pourra plus se connecter. ${own.length ? `Ses restaurants sont effacés avec toutes leurs données : <b>${own.map((r) => esc(r.name || r.id)).join(", ")}</b>.` : "Il n'a créé aucun restaurant."} Il est retiré des équipes dont il fait partie.</p>
+      <p class="sub ab-delw">C'est définitif : rien ne peut être récupéré.</p>
+      <button class="btn danger block" data-act="abUserDelGo">${ico("trash")}Supprimer définitivement</button><button class="btn ghost block" data-act="sheetClose">Annuler</button></div>`);
+  },
+  abUserDelGo: async (a) => {
+    const st = S.ui.abDel; if (!st || st.busy) return; st.busy = true; a && a.setAttribute("disabled", ""); if (a) a.innerHTML = `${ico("clock")}Suppression…`;
+    try {
+      if (DB.mode !== "db" || typeof AUTH === "undefined" || !AUTH.call) throw { code: "demo" };
+      const r = await AUTH.call("adminDeleteUser", { uid: st.id, email: st.email });
+      const A = AB.admin || {}; A.users = (A.users || []).filter((x) => x.id !== st.id); A.restos = (A.restos || []).filter((x) => x.owner !== st.id);
+      closeSheet(); SFX.ok(); toast(`Compte ${r.email || st.email || ""} supprimé${r.restos && r.restos.length ? ` avec ${r.restos.length} restaurant${r.restos.length > 1 ? "s" : ""}` : ""}`); refresh(); abAdminFetch(true);
+    } catch (e) { const c = String((e && e.code) || "").replace(/^functions\//, ""); console.warn("adminDeleteUser", c || e); st.busy = false; a && a.removeAttribute("disabled"); if (a) a.innerHTML = `${ico("trash")}Supprimer définitivement`; SFX.err();
+      toast(c === "demo" ? "Possible seulement avec un compte en ligne." : c === "permission-denied" ? "Réservé aux administrateurs Growth Gusto." : c === "not-found" ? "Ce compte n'existe plus." : c === "failed-precondition" ? "Vous ne pouvez pas supprimer votre propre compte ici." : "Suppression impossible : le serveur n'est peut-être pas encore à jour.", "err"); }
+  },
   abAdmPack: (a, id, v) => { S.ui.abAdm.pack = v; SFX.tick(); abAdmSheet(S.ui.abAdm.id); },
   abAdmDur: (a, id, v) => { S.ui.abAdm.dur = +v; SFX.tick(); abAdmSheet(S.ui.abAdm.id); },
   abAdmGrant: () => {
