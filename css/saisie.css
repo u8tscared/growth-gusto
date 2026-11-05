@@ -1,0 +1,100 @@
+/* Saisie rapide : dictée + sonde Bluetooth (V2 crème et violet) */
+
+/* Relevé: Dicter / Sonde row */
+.sai-bar{display:flex;gap:10px;align-items:stretch}
+.sai-bar .btn{height:50px;border-radius:16px;font-size:15.5px;gap:8px}
+.sai-bar .btn .ico{width:20px;height:20px}
+.sai-dict{flex:1.4;background:var(--accent);color:#fff;box-shadow:0 4px 0 var(--accent-edge)}
+.sai-dict:active{transform:translateY(4px);box-shadow:none}
+.sai-bt{flex:1;min-width:0;padding:0 14px}
+.sai-bt .ico{color:var(--accent)}
+.sai-bt.paired{background:var(--tint);box-shadow:0 0 0 1.5px #D9CCFF inset,0 4px 0 #CDBDFF;color:var(--accent-ink)}
+.sai-bt:active{transform:translateY(4px);box-shadow:0 0 0 1.5px var(--rim-2) inset}
+.sai-bar:only-child .btn{flex:1}
+@media (min-width:821px){.rel-page > .sai-bar{max-width:420px;width:100%;align-self:center}}
+
+/* « Prendre avec la sonde » inside a card / sheet */
+.sai-probe{all:unset;box-sizing:border-box;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:9px;width:100%;height:48px;padding:0 16px;border-radius:16px;font-family:var(--f);font-weight:700;font-size:15px;color:var(--accent-ink);background:var(--tint);box-shadow:0 0 0 1.5px #D9CCFF inset,0 3px 0 #CDBDFF;margin-bottom:3px;transition:transform .2s var(--spring),box-shadow .2s}
+.sai-probe .ico{width:20px;height:20px;color:var(--accent)}
+.sai-probe:active{transform:translateY(3px);box-shadow:0 0 0 1.5px #D9CCFF inset}
+.sai-probe:focus-visible{outline:2.5px solid var(--accent);outline-offset:2px}
+.sai-probe.busy{cursor:progress;color:var(--faint)}
+.sai-probe.busy .ico{animation:saiPulse 1s ease-in-out infinite}
+.sai-rec{margin-top:10px}
+
+/* voice sheet */
+.sai-v{display:flex;flex-direction:column;gap:14px}
+.sai-mh{display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center;padding-top:16px}
+.sai-mic{all:unset;box-sizing:border-box;cursor:pointer;position:relative;width:84px;height:84px;border-radius:50%;display:grid;place-items:center;background:var(--paper);color:var(--accent);box-shadow:0 0 0 1.5px var(--rim-2) inset,0 5px 0 var(--edge-b);transition:transform .25s var(--spring),background .25s,color .25s,box-shadow .25s}
+.sai-mic .ico{width:34px;height:34px;position:relative;z-index:1}
+.sai-mic i{position:absolute;inset:0;border-radius:50%;border:2px solid var(--accent);opacity:0;pointer-events:none}
+.sai-mic.on{background:var(--accent);color:#fff;box-shadow:0 5px 0 var(--accent-edge)}
+.sai-mic.on i{animation:saiRing 1.8s var(--ease) infinite}
+.sai-mic.on i + i{animation-delay:.9s}
+.sai-mic:active{transform:translateY(5px);box-shadow:none}
+.sai-mic:focus-visible{outline:2.5px solid var(--accent);outline-offset:4px}
+.sai-said{font-family:var(--d);font-weight:720;font-size:18px;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;letter-spacing:-.025em;line-height:1.2;color:var(--ink);min-height:26px;max-width:32ch;overflow-wrap:anywhere}
+.sai-ph{color:var(--faint);font-weight:650}
+.sai-hint{margin:0;font-size:14px;font-weight:600;color:var(--muted);min-height:18px}
+.sai-hint:empty{display:none}
+.sai-list{display:flex;flex-direction:column;gap:8px}
+.sai-list:empty{display:none}
+.sai-line{display:flex;align-items:center;gap:12px;padding:10px 8px 10px 12px;border-radius:18px;background:var(--paper);border:1.5px solid var(--rim);box-shadow:0 2px 0 #EFE6D6;min-width:0}
+.sai-line .ic{width:40px;height:40px;flex:none}
+.sai-line .tx{flex:1;min-width:0;display:flex;flex-direction:column}
+.sai-line .tx b{font-family:var(--f);font-weight:700;font-size:15.5px;color:var(--ink)}
+.sai-line .tx em{font-style:normal;font-size:12.5px;font-weight:600;color:var(--muted)}
+.sai-line.bad{border-color:#F6C3B5;background:#FFF6F2}
+.sai-line.bad .tx em{color:var(--bad)}
+.sai-line.pk .tx em{color:var(--warn)}
+.sai-line.pop{animation:saiPop .5s var(--spring)}
+.sai-line.pop .sai-lcd{animation:saiBump .5s var(--spring)}
+.sai-lcd{flex:none;min-width:66px;height:36px;padding:0 10px;border-radius:10px;display:grid;place-items:center;background:#1B1530;color:#9EF5C4;font:700 17px/1 var(--lcd);letter-spacing:-.03em;box-shadow:0 2px 0 #000}
+.sai-lcd.bad{color:#FF9C86}
+.sai-lcd.pk{color:var(--saffron)}
+.sai-alert{display:flex;align-items:center;gap:10px;padding:11px 14px;border-radius:16px;background:var(--tomato-tint);color:var(--bad);font-weight:650;font-size:14px;line-height:1.3}
+.sai-alert[hidden]{display:none}
+.sai-alert .ico{width:20px;height:20px;flex:none}
+.sai-alert.pop{animation:saiPop .45s var(--spring)}
+.sai-rm{width:36px;height:36px;flex:none;border-radius:50%}
+.sai-rm .ico{width:16px;height:16px}
+.sai-v .btn[disabled]{opacity:.45;pointer-events:none}
+
+/* Bluetooth sheets */
+.sai-bts,.sai-ios{display:flex;flex-direction:column;gap:14px}
+.sai-ios{text-align:center}
+.sai-ios .sub,.sai-bts .sub{margin:4px auto 0;max-width:34ch}
+.sai-bigic{width:60px;height:60px;margin:0 auto 10px;display:grid;place-items:center}
+.sai-bigic .ico{width:28px;height:28px}
+.sai-ios .h2,.sai-bts .h2{font-size:21px}
+.sai-steps{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px;text-align:left}
+.sai-steps li{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:16px;background:var(--paper);border:1.5px solid var(--rim);font-weight:650;font-size:15px;color:var(--ink)}
+.sai-steps .mono{width:28px;height:28px;flex:none;border-radius:50%;display:grid;place-items:center;background:var(--tint);color:var(--accent-ink);font-weight:760;font-size:14px}
+.sai-ios a.btn{text-decoration:none;display:flex;align-items:center;justify-content:center;gap:8px}
+.sai-ios .note{margin:0}
+.sai-kinds{display:flex;flex-direction:column;gap:10px}
+.sai-kind{all:unset;box-sizing:border-box;cursor:pointer;display:flex;align-items:center;gap:12px;padding:12px 14px 12px 12px;border-radius:20px;background:var(--paper);box-shadow:0 0 0 1.5px var(--rim-2) inset,0 4px 0 var(--edge-b);transition:transform .2s var(--spring),box-shadow .2s;margin-bottom:4px}
+.sai-kind:active{transform:translateY(4px);box-shadow:0 0 0 1.5px var(--rim-2) inset}
+.sai-kind:focus-visible{outline:2.5px solid var(--accent);outline-offset:2px}
+.sai-kind .ic{width:44px;height:44px;flex:none}
+.sai-kind .tx{flex:1;min-width:0;display:flex;flex-direction:column}
+.sai-kind .tx b{font-weight:700;font-size:15.5px;color:var(--ink)}
+.sai-kind .tx em{font-style:normal;font-size:13px;font-weight:600;color:var(--muted)}
+.sai-kind > .ico{width:18px;height:18px;color:var(--faint)}
+.sai-err{margin:0;padding:10px 12px;border-radius:14px;background:var(--tomato-tint);color:var(--bad);font-weight:650;font-size:14px;text-align:center}
+.sai-bts .note{margin:0;text-align:center}
+.sai-dev{display:flex;align-items:center;gap:12px;min-width:0}
+.sai-dev .ic{width:48px;height:48px;flex:none}
+.sai-dev .tx{flex:1;min-width:0;display:flex;flex-direction:column}
+.sai-dev .tx b{font-family:var(--d);font-weight:740;font-size:19px;letter-spacing:-.02em}
+.sai-dev .tx em{font-style:normal;font-size:13px;font-weight:600;color:var(--muted)}
+.sai-test{display:flex;flex-direction:column;align-items:center;gap:8px;padding:18px 12px;border-radius:22px;background:var(--cream-2)}
+.sai-test .rel-lcd{min-width:132px;height:64px;font-size:30px;border-radius:14px;display:grid;place-items:center;font-family:var(--lcd);font-weight:700;background:#1B1530;color:#9EF5C4;box-shadow:0 3px 0 #000}
+.sai-test .rel-lcd.off{background:#EFE6D6;color:#B5AA98;box-shadow:none}
+.sai-test em{font-style:normal;font-size:13.5px;font-weight:600;color:var(--muted);text-align:center}
+
+@keyframes saiRing{0%{transform:scale(1);opacity:.55}100%{transform:scale(1.7);opacity:0}}
+@keyframes saiPop{0%{transform:translateY(8px) scale(.96);opacity:0}100%{transform:none;opacity:1}}
+@keyframes saiBump{0%{transform:scale(.8)}60%{transform:scale(1.08)}100%{transform:scale(1)}}
+@keyframes saiPulse{50%{opacity:.35}}
+@media (prefers-reduced-motion:reduce){.sai-mic.on i,.sai-line.pop,.sai-line.pop .sai-lcd,.sai-probe.busy .ico{animation:none}}

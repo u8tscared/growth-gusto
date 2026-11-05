@@ -235,7 +235,7 @@ VIEWS.releve = {
       const t = relSuggest(f); S.temp[f.id] = t; const isOpen = S.open === f.id;
       return `<div class="glass fr ${isOpen ? "open" : ""} st" style="--i:${i + 3}" data-fr="${f.id}"><div class="head" data-act="frOpen" data-id="${f.id}" role="button" tabindex="0" aria-expanded="${isOpen}"><span class="ic">${relIco(f)}</span><div style="flex:1;min-width:0"><b class="h3 rel-ell" style="display:block">${esc(f.name)}</b><div class="who"><span class="rel-ell">Seuil ${relRange(f)}${last ? ` · dernier ${fmt(last.value)}°` : " · premier relevé"}</span></div></div><span class="pend"></span></div>
         <div class="dial"><div><div class="dz">${relDial(f.id, f, t)}${relIsService(f) ? relCtxHtml(f.id, f) : ""}
-          ${relPhHtml(f.id)}
+          ${typeof saisieProbeBtn === "function" ? saisieProbeBtn(f.id) : ""}${relPhHtml(f.id)}
           <button class="btn acc block" data-act="saveReading" data-id="${f.id}">${ico("check")}<span data-tlv="${f.id}" data-pre="Valider">Valider ${fmt(t)} °C</span></button>
         </div></div></div></div>`;
     }).join("");
@@ -247,6 +247,7 @@ VIEWS.releve = {
     return `<div class="inner rel-page">${topBar("Relevé des frigos")}
       ${relDayStrip(day)}
       <div class="seg st" style="--i:1" id="slotSeg"><span class="knob" style="width:calc(50% - 4px);transform:translateX(${slot === "soir" ? "100%" : "0"})"></span><button class="${slot === "midi" ? "on" : ""}" data-act="slot" data-v="midi">Midi</button><button class="${slot === "soir" ? "on" : ""}" data-act="slot" data-v="soir">Soir</button></div>
+      ${typeof saisieBar === "function" ? saisieBar() : ""}
       ${sum}
       <div class="rel-grid">${cards}</div>
       <p class="note st" style="--i:9;text-align:center">Chaque relevé est daté et signé par la personne connectée. Une correction garde l'ancienne valeur dans le registre.</p></div>`;
@@ -642,7 +643,7 @@ Object.assign(ACT, {
     const f = relFr(fid); if (!f) return; const key = "s-" + fid; const last = S.readings.find((x) => x.fridgeId === fid);
     if (S.temp[key] == null) S.temp[key] = last ? last.value : relTypeOf(f).t;
     openSheet(`<div class="row" style="justify-content:flex-start"><span class="ic warn">${relIco(f)}</span><div style="flex:1;min-width:0"><b class="h3 rel-ell" style="display:block">${esc(f.name)}</b><div class="sub">Relevé pendant le service · ${hm(Date.now())}</div></div></div>
-      <div class="dz rel-fixdz">${relDial(key, f, S.temp[key])}</div>
+      <div class="dz rel-fixdz">${relDial(key, f, S.temp[key])}${typeof saisieProbeBtn === "function" ? saisieProbeBtn(key) : ""}</div>
       <p class="note" style="margin:0">Au repos ${relRange(f)}. Pendant le service, jusqu'à <b>${relDeg(relSvcMax(f))} °C</b> est noté comme pic, pas comme non-conformité. Au-delà, une action corrective est demandée.</p>
       <button class="btn acc block" data-act="relSvcSave" data-id="${fid}">${ico("check")}<span data-tlv="${key}" data-pre="Enregistrer">Enregistrer ${fmt(S.temp[key])} °C</span></button>`);
   },
@@ -855,7 +856,7 @@ function relFixOpen(rid, keep) {
   if (!keep || S.temp[key] == null) { S.temp[key] = r.value; S.ui.relWhy = ""; }
   const t = S.temp[key];
   openSheet(`<div class="row" style="justify-content:flex-start"><button class="iconbtn" data-act="relEdit" data-id="${rid}" aria-label="Retour">${ico("back")}</button><div style="flex:1;min-width:0"><b class="h3 rel-ell" style="display:block">Corriger ${esc(f.name)}</b><div class="sub">Relevé du ${relSlotName(r.slot)} · avant ${fmt(r.value)} °C</div></div></div>
-    <div class="dz rel-fixdz">${relDial(key, f, t)}${relIsService(f) ? relCtxHtml(key, f) : ""}</div>
+    <div class="dz rel-fixdz">${relDial(key, f, t)}${relIsService(f) ? relCtxHtml(key, f) : ""}${typeof saisieProbeBtn === "function" ? saisieProbeBtn(key) : ""}</div>
     <div class="field"><span>Pourquoi ? (facultatif)</span><div class="rel-why">${["Faute de frappe", "Thermomètre mal lu", "Nouvelle mesure", "Mauvais frigo"].map((w) => `<button class="chip ${S.ui.relWhy === w ? "on" : ""}" data-act="relWhy" data-v="${w}">${w}</button>`).join("")}</div></div>
     <button class="btn acc block" data-act="relFixSave" data-id="${rid}">${ico("check")}<span data-tlv="${key}" data-pre="Enregistrer">Enregistrer ${fmt(t)} °C</span></button>`);
 }
