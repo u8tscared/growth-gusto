@@ -132,27 +132,70 @@ function staffCost(from, to) {
 }
 window.staffCost = staffCost;
 
-/* ───────────── legal reminders (planning, HCR) ───────────── */
-function rhLegal(sid, mon) {
-  const days = rhWeekDays(mon); const out = { day: {}, week: [] }; const add = (d, lvl, t) => (out.day[d] ||= []).push({ lvl, t });
-  const ivs = rhShiftsOf(sid, addDays(mon, -1), addDays(mon, 6)).map(rhIv).sort((x, y) => x.s - y.s);
-  let total = 0, worked = 0; const defPost = rhStaff(sid)?.post;
+/* ───────────── legal reminders (HCR, indicative, never blocking) ─────────────
+   Convention collective HCR (avenant n° 1 du 13 juillet 2004 et suivants), from memory, to be confirmed by the accountant:
+   max. per day 11 h for cooks, 11 h 30 for the other staff, 12 h for night watchmen (Code du travail default: 10 h); 11 h of rest
+   in a row between two days (so 13 h of amplitude at most); 48 h max. in one week, 46 h on average over 12 weeks; 2 days off a week
+   (not necessarily in a row). Overtime counted from the 36th hour: +10 % up to 39 h, +20 % from 40 to 43 h, +50 % beyond. */
+const rhIsNight = (p) => /veill/i.test(p?.role || "");
+function rhDayCap(p, cuis) { return rhIsNight(p) ? [720, "12 h max. pour un veilleur de nuit"] : cuis ? [660, "11 h max. en cuisine"] : [690, "11 h 30 max."]; }
+/* intervals of one person: planned shifts, or worked sessions from the time clock */
+function rhIvsPlan(sid, from, to) { return rhShiftsOf(sid, from, to).map(rhIv).sort((x, y) => x.s - y.s); }
+function rhLegalOf(sid, mon, ivs) {
+  const days = rhWeekDays(mon); const out = { day: {}, week: [] }; const add = (d, lvl, t, k) => (out.day[d] ||= []).push({ lvl, t, k });
+  let total = 0, worked = 0; const p = rhStaff(sid); const defPost = p?.post;
   days.forEach((d) => {
     const l = ivs.filter((v) => v.day === d); if (!l.length) return; worked++;
     const w = l.reduce((x, v) => x + v.w, 0); total += w;
-    const cuis = l.some((v) => (v.sh.post || defPost) === "cuisine"); const lim = cuis ? 660 : 690;
-    if (w > lim) add(d, "bad", `${rhDur(w)} de travail ce jour : ${cuis ? "11 h max. en cuisine" : "11 h 30 max."} (HCR)`);
-    else if (w > 600) add(d, "warn", `${rhDur(w)} ce jour : au-delà de 10 h, vérifiez la convention`);
-    const amp = Math.max(...l.map((v) => v.e)) - Math.min(...l.map((v) => v.s)); if (amp > 780) add(d, "bad", `Amplitude de ${rhDur(amp)} : 13 h max. (HCR)`);
+    const cuis = l.some((v) => (v.sh.post || defPost) === "cuisine"); const [lim, lt] = rhDayCap(p, cuis);
+    if (w > lim) add(d, "bad", `${rhDur(w)} de travail ce jour : ${lt} (HCR)`, `${rhDur(w)} de travail`);
   });
-  for (let i = 1; i < ivs.length; i++) { const p = ivs[i - 1], c = ivs[i]; if (c.day !== p.day && days.includes(c.day)) { const gap = c.s - p.e; if (gap < 660) add(c.day, "bad", `Repos de ${rhDur(Math.max(0, gap))} seulement depuis la veille : 11 h minimum`); } }
-  if (total > 48 * 60) out.week.push({ lvl: "bad", t: `${rhDur(total)} sur la semaine : 48 h maximum` });
-  else if (total > 46 * 60) out.week.push({ lvl: "warn", t: `${rhDur(total)} : pas plus de 46 h en moyenne sur 12 semaines` });
-  if (worked >= 7) out.week.push({ lvl: "bad", t: "Aucun jour de repos dans la semaine" });
-  else if (worked === 6) out.week.push({ lvl: "warn", t: "Un seul jour de repos : 2 jours en HCR" });
+  /* daily rest: 11 h in a row, so one note per day at most: the short night first, otherwise the day's amplitude (13 h max.) */
+  for (let i = 1; i < ivs.length; i++) { const a = ivs[i - 1], c = ivs[i]; if (c.day !== a.day && days.includes(c.day)) { const gap = c.s - a.e; if (gap < 660) add(c.day, "bad", `Repos de ${rhDur(Math.max(0, gap))} depuis la veille : 11 h minimum`, `Repos ${rhDur(Math.max(0, gap))}`); } }
+  days.forEach((d) => {
+    const l = ivs.filter((v) => v.day === d); if (!l.length || (out.day[d] || []).some((x) => x.t.startsWith("Repos"))) return;
+    const amp = Math.max(...l.map((v) => v.e)) - Math.min(...l.map((v) => v.s)); if (amp > 780) add(d, "bad", `Amplitude de ${rhDur(amp)} : 13 h max. (11 h de repos)`, `Amplitude ${rhDur(amp)}`);
+  });
+  if (total > 48 * 60) out.week.push({ lvl: "bad", t: `${rhDur(total)} sur la semaine : 48 h maximum`, k: `${rhDur(total)} > 48 h` });
+  if (worked >= 7) out.week.push({ lvl: "bad", t: "Aucun jour de repos dans la semaine : 2 jours en HCR", k: "Aucun jour off" });
+  else if (worked === 6) out.week.push({ lvl: "warn", t: "Un seul jour de repos : 2 jours en HCR", k: "1 seul jour off" });
+  out.total = total; out.worked = worked;
   out.count = out.week.length + Object.values(out.day).reduce((x, l) => x + l.length, 0);
   out.bad = out.week.some((x) => x.lvl === "bad") || Object.values(out.day).some((l) => l.some((x) => x.lvl === "bad"));
   return out;
+}
+const rhLegal = (sid, mon) => rhLegalOf(sid, mon, rhIvsPlan(sid, addDays(mon, -1), addDays(mon, 6)));
+/* hours of one week: planned, clocked, and the hours that count: a day with punches counts what was clocked; once someone clocks in
+   that week, a past day without punch counts 0 and today / the days to come count what is planned. No punch at all = the planning. */
+function rhWeekPlan(sid, mon) {
+  const sun = addDays(mon, 6), today = dayKey(); const sh = rhShiftsOf(sid, addDays(mon, -1), sun); const dm = rhDayMin(sid, addDays(mon, -1), sun);
+  const has = Object.keys(dm).some((d) => d >= mon); const keep = (d) => !(dm[d] && dm[d].sessions.length) && (!has || d >= today);
+  const ivs = [];
+  Object.values(dm).forEach((v) => v.sessions.forEach((x) => { const e = x.open ? Date.now() : x.out; if (e) ivs.push({ s: x.in / 60000, e: e / 60000, w: x.w / 60000, day: x.day, sh: {} }); }));
+  sh.filter((x) => keep(x.day)).forEach((x) => ivs.push(rhIv(x)));
+  return { ivs: ivs.sort((a, b) => a.s - b.s), dm, sh, has, keep };
+}
+function rhWeekHours(sid, mon) {
+  const W = rhWeekPlan(sid, mon); const days = rhWeekDays(mon); const today = dayKey();
+  const plan = W.sh.filter((s) => s.day >= mon).reduce((x, s) => x + rhShiftMin(s), 0);
+  const punch = days.reduce((x, d) => x + (W.dm[d]?.min || 0), 0);
+  const used = W.ivs.filter((v) => v.day >= mon).reduce((x, v) => x + v.w, 0);
+  const src = !W.has ? "prévu" : days[6] < today ? "pointé" : "pointé + prévu";
+  return { plan, punch, has: W.has, used, src, days: new Set(W.ivs.filter((v) => v.day >= mon).map((v) => v.day)).size, ivs: W.ivs };
+}
+/* 46 h on average over 12 consecutive weeks (the weeks with hours; the shown week is the last one) */
+function rhAvg12(sid, mon) {
+  const ws = []; for (let i = 11; i >= 0; i--) { const h = rhWeekHours(sid, addDays(mon, -7 * i)).used; if (h) ws.push(h); }
+  return { avg: ws.length ? ws.reduce((x, y) => x + y, 0) / ws.length : 0, n: ws.length };
+}
+const W_SRC = (h, d) => (h.ivs.some((v) => v.day === d && !v.sh.id) ? "pointé" : "prévu");
+/* everything the hours card and the export need for one person and one week */
+function rhHoursOf(p, mon) {
+  const h = rhWeekHours(p.id, mon); const ot = rhOT(h.used); const a12 = rhAvg12(p.id, mon);
+  const lg = rhLegalOf(p.id, mon, h.ivs); const alerts = [];
+  lg.week.forEach((x) => alerts.push({ ...x, src: h.src })); Object.entries(lg.day).sort().forEach(([d, l]) => l.forEach((x) => alerts.push({ ...x, src: W_SRC(h, d), d })));
+  if (a12.n >= 2 && a12.avg > 46 * 60) alerts.push({ lvl: "bad", t: `${rhHh(a12.avg)} en moyenne sur ${a12.n} semaines : 46 h maximum`, k: `Moyenne ${rhDur(a12.avg)} > 46 h`, src: "moyenne" });
+  return { ...h, ot, a12, alerts, bad: alerts.some((x) => x.lvl === "bad") };
 }
 
 /* ═══════════════════════ POINTEUSE ═══════════════════════ */
@@ -328,14 +371,14 @@ function rhPlanStats(mon) {
   const per = ppl.map((p) => {
     const sh = rhShiftsOf(p.id, mon, days[6]); const min = sh.reduce((x, s) => x + rhShiftMin(s), 0);
     const worked = Object.values(rhDayMin(p.id, mon, days[6])).reduce((x, v) => x + v.min, 0); const gross = rhWeekGross(min, p);
-    return { p, sh, min, worked, legal: rhLegal(p.id, mon), gross, loaded: gross * (1 + rhCh(p) / 100) };
+    return { p, sh, min, worked, legal: rhLegal(p.id, mon), h: rhHoursOf(p, mon), gross, loaded: gross * (1 + rhCh(p) / 100) };
   });
   const dayMin = days.map((d) => per.reduce((x, r) => x + r.sh.filter((s) => s.day === d).reduce((y, s) => y + rhShiftMin(s), 0), 0));
   const dayCost = days.map((d) => per.reduce((x, r) => x + r.sh.filter((s) => s.day === d).reduce((y, s) => y + rhShiftMin(s) / 60 * rhLoadedRate(r.p), 0), 0));
   const tot = per.reduce((x, r) => x + r.min, 0), worked = per.reduce((x, r) => x + r.worked, 0), loaded = per.reduce((x, r) => x + r.loaded, 0), gross = per.reduce((x, r) => x + r.gross, 0);
-  const alerts = per.reduce((x, r) => x + r.legal.count, 0); const noRate = per.filter((r) => r.min && !rhRate(r.p)).length;
+  const alerts = per.filter((r) => r.h.alerts.length).length, alBad = per.some((r) => r.h.bad); const noRate = per.filter((r) => r.min && !rhRate(r.p)).length;
   let sales = null; if (boss && typeof salesBetween === "function") { try { sales = salesBetween(mon, days[6]); } catch (e) {} }
-  return { days, per, dayMin, dayCost, tot, worked, loaded, gross, alerts, boss, noRate, sales };
+  return { days, per, dayMin, dayCost, tot, worked, loaded, gross, alerts, alBad, boss, noRate, sales };
 }
 VIEWS.planning = {
   render() {
@@ -348,7 +391,7 @@ VIEWS.planning = {
       <div class="glass"><span class="lbl">Prévu</span><b class="mono">${rhHh(st.tot)}</b><em>${nPl} personne${nPl > 1 ? "s" : ""}</em></div>
       <div class="glass"><span class="lbl">Pointé</span><b class="mono">${rhHh(st.worked)}</b><em>${st.tot ? `${Math.round(st.worked / st.tot * 100)} % du prévu` : "rien de prévu"}</em></div>
       ${st.boss ? `<div class="glass"><span class="lbl">Coût estimé</span><b class="mono">${rhEur(st.loaded)}</b><em>${rhEur(st.gross)} brut${st.sales && st.sales.ht ? ` · <b class="${st.loaded / st.sales.ht > 0.38 ? "rh-bad" : "rh-ok"}">${Math.round(st.loaded / st.sales.ht * 100)} % du CA</b>` : ""}</em></div>` : ""}
-      <div class="glass ${st.alerts ? "rh-kbad" : "rh-kok"}"><span class="lbl">Règles</span><b class="mono">${st.alerts || "OK"}</b><em>${st.alerts ? `alerte${st.alerts > 1 ? "s" : ""} légale${st.alerts > 1 ? "s" : ""}` : "repos et durées respectés"}</em></div>
+      <div class="glass ${st.alerts ? (st.alBad ? "rh-kbad" : "rh-kwarn") : "rh-kok"}${mgr ? " rh-ktap" : ""}"${mgr && st.alerts ? ` data-act="rhHrJump" role="button" tabindex="0"` : ""}><span class="lbl">Règles HCR</span><b class="mono">${st.alerts ? `${st.alerts}` : "OK"}</b><em>${st.alerts ? `personne${st.alerts > 1 ? "s" : ""} à vérifier` : "repos et durées respectés"}</em></div>
     </div>`;
     const nav = `<div class="rh-bar st" style="--i:1"><div class="hstack rh-wnav"><button class="iconbtn" data-act="rhPlanWeek" data-v="-7" aria-label="Semaine précédente">${ico("back")}</button><div class="rh-wl"><b>${rhWeekLbl(mon)}</b><em>${thisW ? "cette semaine" : mon < rhMonday() ? "semaine passée" : "à venir"}</em></div><button class="iconbtn" data-act="rhPlanWeek" data-v="7" aria-label="Semaine suivante">${ico("rhfwd")}</button>${thisW ? "" : `<button class="chip" data-act="rhPlanWeek" data-v="0">Aujourd'hui</button>`}</div>
       ${mgr ? `<button class="btn soft sm rh-copyb" data-act="rhCopyWeek" aria-label="Copier la semaine d'avant" title="Copier la semaine d'avant">${ico("rhcopy")}<span>Copier la semaine d'avant</span></button>` : ""}</div>`;
@@ -359,7 +402,7 @@ VIEWS.planning = {
       const rows = per.map((r) => {
         const c = rhNum(r.p.weeklyHours, 35) * 60; const pct = Math.min(100, Math.round(r.min / Math.max(c, 1) * 100));
         return `<div class="rh-g-r${r.legal.bad ? " bad" : ""}"><span class="rh-g-p">${rhAva(r.p, 32)}<span><b>${esc(rhFirst(r.p))}</b><em>${esc(r.p.role || RH_CONTRACTS[r.p.contract] || "")}</em></span></span>
-          ${days.map((d) => { const l = r.sh.filter((s) => s.day === d); const lg = r.legal.day[d] || []; return `<div class="rh-cell${d === today ? " today" : ""}${lg.length ? " " + (lg.some((x) => x.lvl === "bad") ? "lbad" : "lwarn") : ""}"${mgr ? ` data-act="rhCell" data-id="${esc(r.p.id)}" data-v="${d}" data-cell="${esc(r.p.id)}|${d}"` : ""}>${l.map((s) => rhShiftChip(s, mgr)).join("")}${lg.length ? `<span class="rh-lg" title="${esc(lg.map((x) => x.t).join("\n"))}">${ico("alert")}<span>${esc(lg[0].t.split(" : ")[0])}</span></span>` : ""}${mgr && !l.length ? `<span class="rh-add">${ico("plus")}</span>` : ""}</div>`; }).join("")}
+          ${days.map((d) => { const l = r.sh.filter((s) => s.day === d); const lg = r.legal.day[d] || []; return `<div class="rh-cell${d === today ? " today" : ""}${lg.length ? " " + (lg.some((x) => x.lvl === "bad") ? "lbad" : "lwarn") : ""}"${mgr ? ` data-act="rhCell" data-id="${esc(r.p.id)}" data-v="${d}" data-cell="${esc(r.p.id)}|${d}"` : ""}>${l.map((s) => rhShiftChip(s, mgr)).join("")}${lg.length ? `<span class="rh-lg" title="${esc(lg.map((x) => x.t).join("\n"))}">${ico("alert")}<span>${esc(lg[0].k || lg[0].t.split(" : ")[0])}</span></span>` : ""}${mgr && !l.length ? `<span class="rh-add">${ico("plus")}</span>` : ""}</div>`; }).join("")}
           <span class="rh-g-t"><b class="mono">${rhHh(r.min)}</b><i class="rh-bar-c"><i style="width:${pct}%" class="${r.min > c && c ? "over" : ""}"></i></i><em>${r.worked ? `pointé ${rhHh(r.worked)}` : `contrat ${rhHh(c)}`}</em></span></div>`;
       }).join("");
       const foot = `<div class="rh-g-f"><span>Par jour</span>${days.map((d, i) => `<span><b class="mono">${st.dayMin[i] ? rhHh(st.dayMin[i]) : "–"}</b>${st.boss && st.dayCost[i] ? `<em class="mono">${rhEur(st.dayCost[i])}</em>` : ""}</span>`).join("")}<span><b class="mono">${rhHh(st.tot)}</b>${st.boss ? `<em class="mono">${rhEur(st.loaded)}</em>` : ""}</span></div>`;
@@ -376,11 +419,11 @@ VIEWS.planning = {
       }).join("");
       body = `${strip}<div class="glass rh-dayv st" style="--i:4" id="rhDayV"><div class="row rh-dv-h"><b>${rhDayLbl(d, true)}</b><span class="mono">${rhHh(st.dayMin[di])}${st.boss && st.dayCost[di] ? ` · ${rhEur(st.dayCost[di])}` : ""}</span></div>${list}<p class="note rh-swipe">Glissez vers la gauche ou la droite pour changer de jour.</p></div>`;
     }
-    const wkAl = per.filter((r) => r.legal.week.length).map((r) => r.legal.week.map((x) => `<div class="rh-lgl ${x.lvl}">${ico("alert")}<span><b>${esc(rhFirst(r.p))}</b> · ${esc(x.t)}</span></div>`).join("")).join("");
+    const hrs = mgr ? rhHoursCard(st, mon) : "";
     const legend = `<div class="rh-legend st" style="--i:6">${Object.values(RH_POSTS).map((p) => `<span><i style="background:${p.c}"></i>${p.t}</span>`).join("")}</div>`;
-    return `<div class="inner wide rh-plan">${topBar("Planning", { right })}${nav}${kpi}${hint}${body}${wkAl ? `<div class="glass pad st rh-wal" style="--i:5"><div class="lbl">Rappels légaux de la semaine</div>${wkAl}</div>` : ""}${legend}
+    return `<div class="inner wide rh-plan">${topBar("Planning", { right })}${nav}${kpi}${hint}${body}${hrs}${legend}
       ${st.boss && st.noRate ? `<p class="note st" style="--i:7">${st.noRate} personne${st.noRate > 1 ? "s" : ""} sans taux horaire : coût incomplet. <button class="btn ghost" data-go="staff">Compléter les fiches</button></p>` : ""}
-      <p class="note st" style="--i:8">Repères HCR (indicatifs) : 11 h de repos entre deux journées, 11 h de travail par jour en cuisine (11 h 30 sinon), 13 h d'amplitude, 48 h par semaine, 2 jours de repos.${st.boss ? " Coût chargé estimé avec les charges de chaque fiche." : ""}</p></div>`;
+      <p class="note st" style="--i:8">Repères HCR (indicatifs, jamais bloquants) : 11 h de travail par jour en cuisine, 11 h 30 en salle, 11 h de repos entre deux journées, 48 h par semaine, 46 h en moyenne sur 12 semaines, 2 jours de repos.${st.boss ? " Coût chargé estimé avec les charges de chaque fiche." : ""}</p></div>`;
   },
   after(v) {
     /* phone: swipe between days */
@@ -440,6 +483,59 @@ function rhFSum() {
 }
 function rhFRead() { const F = S.ui.rhF; if (!F) return; const g = (id) => $("#" + id)?.value; F.start = g("rhFs") || F.start; F.end = g("rhFe") || F.end; F.note = g("rhFn") ?? F.note; if (F.split) F.split = [g("rhFs2") || F.split[0], g("rhFe2") || F.split[1]]; }
 document.addEventListener("input", (e) => { if (e.target.closest && e.target.closest(".rh-shs")) { rhFRead(); const s = $("#rhFsum"); if (s) s.innerHTML = rhFSum(); } });
+
+/* hours card (managers): planned vs clocked, overtime bands, 12-week average, HCR chips. Never blocks anything. */
+const rhAlShort = (a) => `${a.d ? RH_DSHORT[(parseDay(a.d).getDay() + 6) % 7] + " · " : ""}${a.k || a.t.split(" : ")[0]}`;
+function rhHoursCard(st, mon) {
+  const rows = st.per.filter((r) => r.min || r.h.punch || r.h.alerts.length).map((r, i) => {
+    const h = r.h; const c = rhNum(r.p.weeklyHours, 35) * 60; const al = h.alerts; const bad = al.filter((x) => x.lvl === "bad");
+    const chips = al.slice(0, 2).map((a) => `<span class="rh-wchip ${a.lvl}">${ico("alert")}<span>${esc(rhAlShort(a))}</span></span>`).join("") + (al.length > 2 ? `<span class="rh-wchip more">+${al.length - 2}</span>` : "");
+    return `<button class="rh-hr${bad.length ? " bad" : al.length ? " warn" : ""}" data-act="rhHrOpen" data-id="${esc(r.p.id)}">
+      <span class="rh-hr-p">${rhAva(r.p, 36)}<span><b>${esc(rhFirst(r.p))}</b><em>contrat ${rhHh(c)}</em></span></span>
+      <span class="rh-hr-n"><span><em>Prévu</em><b class="mono">${rhHh(h.plan)}</b></span><span><em>Pointé</em><b class="mono">${h.has ? rhHh(h.punch) : "–"}</b></span><span class="${h.ot.h ? "sup" : ""}"><em>Sup.</em><b class="mono">${h.ot.h ? rhHh(h.ot.h * 60) : "0"}</b></span></span>
+      ${chips ? `<span class="rh-hr-c">${chips}</span>` : ""}</button>`;
+  }).join("");
+  const nAl = st.per.filter((r) => r.h.alerts.length).length;
+  return `<div class="glass rh-hrs st" style="--i:5">
+    <div class="row rh-hd"><div><div class="h3">Heures de la semaine</div><div class="sub">${nAl ? `${nAl} personne${nAl > 1 ? "s" : ""} à vérifier` : "Rien à signaler côté durées et repos"}</div></div><button class="btn soft sm" data-act="rhPayExport">${ico("download")}<span>Export paie</span></button></div>
+    <div class="rh-hrl">${rows || `<p class="sub">Rien de prévu ni de pointé cette semaine.</p>`}</div>
+    <p class="note">Heures sup. calculées sur le pointé dès qu'il existe, sinon sur le prévu. Repères HCR, à vérifier avec votre comptable.</p>
+  </div>`;
+}
+function rhHrSheet(sid) {
+  const p = rhStaff(sid); const mon = S.ui.rhPlanWeek || rhMonday(); const h = rhHoursOf(p, mon); const c = rhNum(p.weeklyHours, 35) * 60; const boss = rhIsBoss();
+  const band = (lbl, v) => `<span class="${v ? "on" : ""}"><em>${lbl}</em><b class="mono">${v ? rhHh(v * 60) : "–"}</b></span>`;
+  return `<div class="rh-hrs-s">
+    <div class="rh-act-hd">${rhAva(p, 52)}<div><div class="h2">${esc(p.name)}</div><div class="sub">Semaine du ${rhWeekLbl(mon)} · contrat ${rhHh(c)}</div></div></div>
+    <div class="rh-act-kpi"><span><b class="mono">${rhHh(h.plan)}</b>prévu</span><span><b class="mono">${h.has ? rhHh(h.punch) : "–"}</b>pointé</span><span><b class="mono">${h.a12.n ? rhHh(h.a12.avg) : "–"}</b>moy. ${h.a12.n || 12} sem.</span></div>
+    <div><div class="lbl">Heures sup. (sur le ${h.src})</div><div class="rh-bands">${band("+10 %", h.ot.b10)}${band("+20 %", h.ot.b20)}${band("+50 %", h.ot.b50)}</div>${boss && rhRate(p) && h.ot.h ? `<p class="note">Majoration estimée : ${rhEur(h.ot.bonus * rhRate(p), 2)} brut.</p>` : ""}</div>
+    ${h.alerts.length ? `<div><div class="lbl">Repères HCR</div>${h.alerts.map((a) => `<div class="rh-lgl ${a.lvl}">${ico("alert")}<span>${a.d ? `<b>${rhDayLbl(a.d, true)}</b> · ` : ""}${esc(a.t)} <em>(${esc(a.src)})</em></span></div>`).join("")}</div>` : `<div class="rh-allok">${ico("check")}<span>Durées, repos et jours off dans les clous.</span></div>`}
+    <p class="note">Indicatif, jamais bloquant. Max. ${rhDayCap(p, p.post === "cuisine")[1].replace(" max.", "").replace("max. ", "")} par jour, 11 h de repos entre deux journées, 48 h par semaine, 46 h en moyenne sur 12 semaines, 2 jours de repos.</p>
+  </div>`;
+}
+/* monthly CSV for payroll: weeks belong to the month of their Sunday (full weeks, so overtime stays weekly) */
+function rhPayWeeks(m0) {
+  const end = dayKey(new Date(parseDay(m0).getFullYear(), parseDay(m0).getMonth() + 1, 0)); let mon = rhMonday(m0); if (addDays(mon, 6) < m0) mon = addDays(mon, 7);
+  const out = []; while (addDays(mon, 6) <= end) { out.push(mon); mon = addDays(mon, 7); } return out;
+}
+function rhPayCsv(m0) {
+  const boss = rhIsBoss(); const weeks = rhPayWeeks(m0); const d = parseDay(m0); const ml = `${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
+  const head = ["Employé", "Contrat", "Heures contrat / sem.", "Semaine du", "au", "Heures prévues", "Heures pointées", "Heures retenues", "Source", "HS +10 % (h)", "HS +20 % (h)", "HS +50 % (h)", "Jours travaillés", "Moyenne 12 sem. (h)", "Repères HCR", ...(boss ? ["Taux horaire brut", "Brut estimé"] : [])];
+  const rows = [[`Heures et heures supplémentaires · ${ml} · ${S.resto?.name || ""}`], [], head];
+  const totals = [];
+  rhPeople({ all: true }).forEach((p) => {
+    let tP = 0, tC = 0, tU = 0, t10 = 0, t20 = 0, t50 = 0, tG = 0, any = false;
+    weeks.forEach((mon) => {
+      const h = rhHoursOf(p, mon); if (!h.plan && !h.punch) return; any = true; const g = rhWeekGross(h.used, p);
+      tP += h.plan; tC += h.punch; tU += h.used; t10 += h.ot.b10; t20 += h.ot.b20; t50 += h.ot.b50; tG += g;
+      rows.push([p.name, RH_CONTRACTS[p.contract] || p.contract || "", fmt(rhNum(p.weeklyHours, 35), 2), `${shortDate(mon)}/${mon.slice(0, 4)}`, `${shortDate(addDays(mon, 6))}/${addDays(mon, 6).slice(0, 4)}`, rhDec(h.plan), h.has ? rhDec(h.punch) : "", rhDec(h.used), h.src, fmt(h.ot.b10, 2), fmt(h.ot.b20, 2), fmt(h.ot.b50, 2), h.days, h.a12.n ? rhDec(h.a12.avg) : "", h.alerts.map((a) => `${a.d ? shortDate(a.d) + " " : ""}${a.t} (${a.src})`).join(" ; "), ...(boss ? [rhRate(p) ? fmt(rhRate(p), 2) : "", rhRate(p) ? fmt(g, 2) : ""] : [])]);
+    });
+    if (any) totals.push([p.name, RH_CONTRACTS[p.contract] || p.contract || "", rhDec(tP), rhDec(tC), rhDec(tU), fmt(t10, 2), fmt(t20, 2), fmt(t50, 2), ...(boss ? [rhRate(p) ? fmt(tG, 2) : ""] : [])]);
+  });
+  return [...rows, [], [`Total ${ml}`], ["Employé", "Contrat", "Heures prévues", "Heures pointées", "Heures retenues", "HS +10 % (h)", "HS +20 % (h)", "HS +50 % (h)", ...(boss ? ["Brut estimé"] : [])], ...totals, [],
+    ["Semaines complètes rattachées au mois de leur dimanche. Heures retenues = pointées dès qu'il existe un pointage dans la semaine, sinon prévues."],
+    ["Heures supplémentaires (convention HCR) : +10 % de la 36e à la 39e heure, +20 % de la 40e à la 43e, +50 % au-delà. Repères indicatifs à valider par le cabinet de paie."]];
+}
 
 /* send / print */
 function rhPlanText(mon) {
@@ -737,6 +833,15 @@ Object.assign(ACT, {
     try { await navigator.clipboard.writeText(txt); closeSheet(true); SFX.ok(); toast("Planning copié : collez-le dans votre message"); } catch (e) { closeSheet(true); toast("Copie impossible sur cet appareil.", "err"); }
   },
   rhPrint: () => { closeSheet(true); rhPrintPlan(S.ui.rhPlanWeek || rhMonday()); },
+  rhHrOpen: (a, id) => { if (!rhIsMgr() || !rhStaff(id)) return; SFX.tap(); openSheet(rhHrSheet(id)); },
+  rhHrJump: () => { const c = $(".rh-hrs"); if (!c) return; SFX.tap(); c.scrollIntoView({ behavior: "smooth", block: "start" }); c.classList.remove("rh-flash"); void c.offsetWidth; c.classList.add("rh-flash"); },
+  rhPayExport: () => {
+    if (!rhIsMgr()) return; SFX.tap(); const t = dayKey(); const m0 = t.slice(0, 8) + "01"; const pm = parseDay(m0); pm.setMonth(pm.getMonth() - 1); const pm0 = dayKey(pm);
+    const opt = [[m0, `Ce mois-ci (${MONTHS[parseDay(m0).getMonth()]})`], [pm0, `Mois dernier (${MONTHS[pm.getMonth()]})`]];
+    openSheet(`<div class="h2">Export paie du mois</div><p class="sub">Un fichier CSV (Excel) pour le comptable : heures prévues et pointées, heures sup. par taux, repères HCR, par semaine et par personne.</p>
+      <div>${opt.map(([k, l]) => { const w = rhPayWeeks(k); return `<div class="li tap" role="button" tabindex="0" data-act="rhPayGo" data-v="${k}"><span class="ic">${ico("download")}</span><div class="tx"><b>${l}</b><em>${w.length} semaine${w.length > 1 ? "s" : ""}${w.length ? ` · du ${shortDate(w[0])} au ${shortDate(addDays(w[w.length - 1], 6))}` : ""}</em></div>${ico("chev")}</div>`; }).join("")}</div>`);
+  },
+  rhPayGo: (a, id, v) => { if (!v) return; closeSheet(true); const slug = (S.resto?.name || "resto").normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/gi, "-").toLowerCase(); saveCsv(`heures-paie-${slug}-${v.slice(0, 7)}.csv`, rhPayCsv(v)); },
 
   /* employés */
   rhEmp: (a, id) => {
