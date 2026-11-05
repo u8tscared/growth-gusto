@@ -47,7 +47,7 @@ const ccWeakPin = (c) => /^(\d)\1{3}$/.test(c) || ["1234", "4321", "0123", "9876
 const ccMembers = () => [...S.members].sort((a, b) => (a.joinedAt || 0) - (b.joinedAt || 0));
 const ccMember = (id) => S.members.find((m) => m.id === id);
 const ccColor = (m) => (m && m.color) || colorFor(m ? m.id : "x");
-const ccAva = (m, size = 56) => `<span class="cc-ava" style="--s:${size}px;--c:${esc(ccColor(m))}">${esc(initials(m?.name || "") || "?")}</span>`;
+const ccAva = (m, size = 56) => m && m.photo ? `<span class="cc-ava img" style="--s:${size}px;--c:${esc(ccColor(m))}"><img src="${esc(m.photo)}" alt=""></span>` : `<span class="cc-ava" style="--s:${size}px;--c:${esc(ccColor(m))}">${esc(initials(m?.name || "") || "?")}</span>`;
 const ccLocalMode = () => DB.mode === "local";
 /* accounts (js/auth.js): the restaurant's owner can neither be demoted nor removed; a member with an e-mail is an account, the others are kitchen profiles */
 const ccCloud = () => !!DB.uid;
@@ -71,11 +71,12 @@ const ccNeedsLock = () => ccLocalMode() && !!S.resto && !ccNoLock();
 /* gérant sees everything; chef and équipe don't see money (finances, salaires, tableau de bord).
    Other areas call it guarded: typeof canSee === "function" ? canSee("finance") : true */
 const CC_GERANT_ONLY = new Set(["dashboard", "finance", "finances", "staff", "salaires", "salaries", "marges", "expenses", "couts"]);
-function canSee(area) { return myRole() === "gerant" || !CC_GERANT_ONLY.has(String(area || "")); }
+/* with js/perms.js: each person's own access (perms on the member doc; legacy members keep the rule above) */
+function canSee(area) { if (typeof PERMS !== "undefined") return PERMS.routeAllowed(area); return myRole() === "gerant" || !CC_GERANT_ONLY.has(String(area || "")); }
 /* router guard: a forbidden route never opens (side nav, tabs, deep links, other areas' go()) */
 const ccGo0 = go;
 go = function (route) {
-  if (S.resto && !canSee(route)) { SFX.err(); buzz([20, 40, 20]); toast("Réservé au gérant", "err"); if (S.route && canSee(S.route)) return; return ccGo0.call(this, "home", {}, { replace: true }); }
+  if (S.resto && !canSee(route)) { SFX.err(); buzz([20, 40, 20]); if (VIEWS.noaccess) return ccGo0.call(this, "noaccess", { route }, arguments[2] || {}); toast("Réservé au gérant", "err"); if (S.route && canSee(S.route)) return; return ccGo0.call(this, "home", {}, { replace: true }); }
   return ccGo0.apply(this, arguments);
 };
 
@@ -96,7 +97,7 @@ function ccOnMembers(rows) {
   if (!ccLocalMode()) return;
   const ghosts = ccLS.get("gg-ghosts", {})[S.rid] || {};
   Object.entries(ghosts).forEach(([id, g]) => { if (!rows.find((m) => m.id === id)) S.profiles[id] = { name: g.name, color: g.color }; });
-  rows.forEach((m) => { S.profiles[m.id] = { ...(S.profiles[m.id] || {}), name: m.name || (m.id === S.me.id ? S.me.name : "") || S.profiles[m.id]?.name || "", color: m.color || colorFor(m.id) }; });
+  rows.forEach((m) => { S.profiles[m.id] = { ...(S.profiles[m.id] || {}), name: m.name || (m.id === S.me.id ? S.me.name : "") || S.profiles[m.id]?.name || "", color: m.color || colorFor(m.id), ...(m.photo ? { avatarUrl: m.photo } : {}) }; });
   if (!rows.length) { if (CC.locked) ccUnlock(); return; }
   const me = rows.find((m) => m.id === S.me.id);
   if (me) { S.me.name = me.name || S.me.name; S.me.color = me.color; S.isOwner = (me.role || "equipe") === "gerant"; ccSaveWho(); }
@@ -358,13 +359,13 @@ VIEWS.equipe = {
     const mark = (x) => (cloud && ccIsAccount(x) ? (ccIsOwner(x.id) ? ` <span class="cc-lk" title="Propriétaire">${ico("shield")}</span>` : "") : ccHasPin(x) ? ` <span class="cc-lk" title="Protégé par un code">${ico("lock")}</span>` : "");
     const nopin = (x) => !(cloud && ccIsAccount(x)) && !ccHasPin(x) ? `<span class="cc-nopin">Code à créer</span>` : "";
     const sub = (x, mine, last) => (cloud && ccIsAccount(x) ? esc(x.email || "Compte") : cloud ? "Profil cuisine · sans compte" : "") + (mine.length ? `${cloud ? " · " : ""}${mine.length} action${mine.length > 1 ? "s" : ""} · ${ccAgo(last.at)}` : cloud ? "" : "Aucune action");
-    const row = (x) => { const mine = S.events.filter((e) => e.uid === x.id); const last = mine[0]; return `<div class="li tap cc-mrow" data-act="ccMember" data-id="${x.id}">${ccAva(x, 44)}<div class="tx"><b><span class="cc-nm">${esc(x.name || nameOf(x.id))}</span>${x.id === S.me.id ? `<span class="cc-you">vous</span>` : ""}${mark(x)}</b><em>${nopin(x)}${sub(x, mine, last)}</em></div><span class="pill ${x.role === "gerant" ? "acc" : x.role === "chef" ? "warn" : "neu"}">${ROLES[x.role] || "Équipe"}</span>${ico("chev")}</div>`; };
+    const row = (x) => { const mine = S.events.filter((e) => e.uid === x.id); const last = mine[0]; return `<div class="li tap cc-mrow" data-act="ccMember" data-id="${x.id}">${ccAva(x, 44)}<div class="tx"><b><span class="cc-nm">${esc(x.name || nameOf(x.id))}</span>${x.id === S.me.id ? `<span class="cc-you">vous</span>` : ""}${mark(x)}</b><em>${nopin(x)}${sub(x, mine, last)}</em>${canManage && typeof PERMS !== "undefined" ? `<em class="cc-acc">${esc(PERMS.summary(x.id).short)}</em>` : ""}</div><span class="pill ${x.role === "gerant" ? "acc" : x.role === "chef" ? "warn" : "neu"}">${x.role !== "gerant" && x.poste && typeof PERMS !== "undefined" && PERMS.POSTES[x.poste] ? PERMS.POSTES[x.poste][0] : ROLES[x.role] || "Équipe"}</span>${ico("chev")}</div>`; };
     return `<div class="inner cc-wide">${topBar("Équipe", { right: canManage ? `<button class="btn acc sm" data-act="ccMemberNew">${ico("plus")}Ajouter</button>` : "" })}
-      ${local ? `<div class="cc-hero st" style="--i:1"><span class="cc-hero-ic">${ico("users")}</span><div style="flex:1;min-width:0"><b>Qui signe ?</b><span>Chacun signe à son nom.</span></div><button class="btn sm cc-hero-btn" data-act="whoami">${ico("swap")}Changer</button></div>` : cloud && canManage ? `<div class="cc-hero st" style="--i:1"><span class="cc-hero-ic">${ico("auLink")}</span><div style="flex:1;min-width:0"><b>Invitez votre équipe</b><span>Lien, code ou QR · chacun son compte</span></div><button class="btn sm cc-hero-btn" data-act="auInvite">${ico("auLink")}Inviter</button></div>` : ""}
+      ${local ? `<div class="cc-hero st" style="--i:1"><span class="cc-hero-ic">${ico("users")}</span><div style="flex:1;min-width:0"><b>Qui signe ?</b><span>Chacun signe à son nom.</span></div><button class="btn sm cc-hero-btn" data-act="whoami">${ico("swap")}Changer</button></div>` : cloud && canManage ? `<div class="cc-hero st" style="--i:1"><span class="cc-hero-ic">${ico("auLink")}</span><div style="flex:1;min-width:0"><b>Invitez votre équipe</b><span>Vous choisissez ce que chacun voit</span></div><button class="btn sm cc-hero-btn" data-act="auInvite">${ico("plus")}Inviter</button></div><button class="btn ghost sm st cc-invl" style="--i:1" data-act="auInvList">Invitations en cours${ico("chev")}</button>` : ""}
       <div class="cc-cols"><div class="cc-col"><div class="glass pad st" style="--i:2"><div class="row" style="margin-bottom:2px"><span class="lbl">${ms.length} personne${ms.length > 1 ? "s" : ""}</span>${!canManage ? `<span class="note">Seul un gérant peut modifier l'équipe</span>` : ""}</div>
         ${ms.length ? ms.map(row).join("") : `<div class="empty">Personne pour l'instant.</div>`}
-        ${canManage ? `<button class="li tap cc-addrow" data-act="ccMemberNew"><span class="cc-ava plus" style="--s:44px">${ico("plus")}</span><div class="tx"><b>${cloud ? "Ajouter un profil cuisine" : "Ajouter un équipier"}</b><em>${cloud ? "Sans compte : prénom, rôle, couleur et code facultatif" : "Prénom, rôle, couleur et code facultatif"}</em></div></button>` : ""}</div>
-      <p class="note st" style="--i:4">Gérant : gère l'équipe et les réglages. Chef et Équipe : relevés, réceptions, étiquettes, stock et ménage, sans les chiffres (finances, salaires, tableau de bord). ${cloud ? "Un profil cuisine sert à pointer et signer sans compte." : "Chacun entre avec son code à 4 chiffres."}</p></div>
+        ${canManage ? `<button class="li tap cc-addrow" data-act="ccMemberNew"><span class="cc-ava plus" style="--s:44px">${ico("plus")}</span><div class="tx"><b>Ajouter un équipier</b><em>Vous choisissez ce qu'il voit et doit faire</em></div></button>` : ""}</div>
+      <p class="note st" style="--i:4">Touchez une personne pour régler ses accès et ce qui est obligatoire pour elle. ${cloud ? "Un profil cuisine sert à pointer et signer sans compte." : "Chacun entre avec son code à 4 chiffres."}</p></div>
       <div class="cc-col"><div class="glass pad st" style="--i:3"><div class="row"><span class="lbl">Qui a fait quoi</span><button class="btn ghost sm" data-go="registre">Registre${ico("chev")}</button></div>
         ${ev.length ? ev.map((e) => `<div class="li cc-ev">${avatar(e.uid)}<div class="tx"><b style="white-space:normal">${esc(said(e.uid, e.text))}</b><em>${when(e.at)}</em></div></div>`).join("") : `<div class="empty" style="padding:16px 0 6px">Les actions de chacun apparaîtront ici.</div>`}</div></div></div></div>`;
   },
@@ -378,19 +379,28 @@ function ccMemberSheet(id) {
   const evIco = (t) => (t === "reading" ? "therm" : t === "team" ? "users" : t === "out" || t === "lost" ? "out" : "check");
   openSheet(`<div class="cc-mhead">${ccAva(m, 72)}<div style="min-width:0"><div class="h2">${esc(m.name || "Sans nom")}${isMe ? ` <span class="cc-you">vous</span>` : ""}</div><div class="sub">${ROLES[m.role] || "Équipe"}${owner ? " · propriétaire" : ""} · depuis le ${m.joinedAt ? shortDate(dayKey(new Date(m.joinedAt))) : "–"}${acct ? (m.email ? ` · ${esc(m.email)}` : "") : ccHasPin(m) ? " · code actif" : " · code à créer"}</div></div></div>
     <div class="cc-kpis"><div><b class="mono">${ev.length}</b><span>actions</span></div><div><b class="mono">${today}</b><span>aujourd'hui</span></div><div><b class="mono">${reads}</b><span>relevés</span></div></div>
+    ${typeof PERMS !== "undefined" && (canManage || isMe) ? ccAccessHTML(m, canManage && !isMe && !owner) : ""}
     <div><span class="lbl">Activité récente</span>${ev.length ? ev.slice(0, 6).map((e) => `<div class="li"><span class="ic cc-evic">${ico(evIco(e.type))}</span><div class="tx"><b style="white-space:normal">${esc(String(e.text).replace(/^a /, "A "))}</b><em>${when(e.at)}</em></div></div>`).join("") : `<div class="empty" style="padding:14px 0">Aucune action pour l'instant.</div>`}</div>
     <div class="cc-acts">${local && !isMe ? `<button class="btn acc block" data-act="ccPick" data-id="${id}">${ico("swap")}Passer sur ${esc(firstName(m.name) || "ce profil")}</button>` : ""}
-      ${(local || cloud) && (canManage || isMe) ? `<button class="btn soft block" data-act="ccMemberEdit" data-id="${id}">${ico("edit")}${cloud && canManage && !isMe && !owner ? "Modifier le rôle" : "Modifier"}</button>` : ""}
+      ${(local || cloud) && (canManage || isMe) ? `<button class="btn soft block" data-act="ccMemberEdit" data-id="${id}">${ico("edit")}${"Modifier le profil"}</button>` : ""}
       ${local && isMe ? `<button class="btn soft block" data-act="ccPinChange">${ico("lock")}${ccHasPin(m) ? "Changer mon code" : "Créer mon code"}</button>` : ""}
       ${(local || cloud) && canManage && !isMe && !acct && ccHasPin(m) ? `<button class="btn soft block" data-act="ccPinReset" data-id="${id}">${ico("lock")}Réinitialiser son code</button>` : ""}
       ${(local || cloud) && canManage && !isMe && !owner ? `<button class="btn danger block" data-act="ccMemberDel" data-id="${id}">${ico("trash")}Retirer de l'équipe</button>` : ""}
       ${cloud && isMe && !owner ? `<button class="btn danger block" data-act="auLeave">${ico("out")}Quitter l'équipe</button>` : ""}</div>`);
 }
+/* « Accès et obligations »: what the person sees and must do (js/perms.js), and the button that reopens the flow */
+function ccAccessHTML(m, edit) {
+  const s = PERMS.summary(m.id); const fn = esc(firstName(m.name) || "Il");
+  const list = (arr, cls) => arr.map((t) => `<li><span class="pm-b ${cls}"></span>${esc(t)}</li>`).join("");
+  return `<div class="cc-accb"><div class="row"><span class="lbl">Accès et obligations</span>${s.admin ? `<span class="pill acc">Accès à tout</span>` : ""}</div>
+    ${s.admin ? `<p class="sub" style="margin:4px 0 0">${fn} gère le restaurant avec vous : tout, y compris l'équipe et l'abonnement.</p>` : `<div class="pm-rec cc-accr"><div class="pm-rc"><b class="pm-rt">${fn} peut</b><ul>${list(s.can.slice(0, 20), "ok") || `<li><span class="pm-b"></span>pointer et signer</li>`}</ul></div>${s.must.length ? `<div class="pm-rc must"><b class="pm-rt">${fn} doit</b><ul>${list(s.must, "sa")}</ul></div>` : ""}</div>`}
+    ${edit ? `<button class="btn soft block" data-act="pmEdit" data-id="${m.id}">${ico("shield")}Changer ses accès</button>` : ""}</div>`;
+}
 function ccFormSheet() {
   const F = CC.form; const isNew = !F.id; const m = F.id ? ccMember(F.id) : null; const canRole = myRole() === "gerant" && !ccIsOwner(F.id);
   openSheet(`<div class="cc-fhead"><span id="ccfPrev">${ccAva({ id: F.id || "new", name: F.name || "?", color: F.color }, 72)}</span><div class="h2">${isNew ? "Nouvel équipier" : "Modifier le profil"}</div></div>
     <label class="field"><span>Prénom</span><input class="input" id="ccfName" value="${esc(F.name)}" placeholder="Ex. Léa" autocomplete="off" maxlength="40" enterkeyhint="done"></label>
-    ${canRole ? `<div class="field"><span>Rôle</span><div class="cc-seg">${Object.entries(ROLES).map(([k, t]) => `<button class="${F.role === k ? "on" : ""}" data-act="ccFormRole" data-v="${k}">${t}</button>`).join("")}</div></div>` : ""}
+    ${canRole && typeof PERMS === "undefined" ? `<div class="field"><span>Rôle</span><div class="cc-seg">${Object.entries(ROLES).map(([k, t]) => `<button class="${F.role === k ? "on" : ""}" data-act="ccFormRole" data-v="${k}">${t}</button>`).join("")}</div></div>` : ""}
     <div class="field"><span>Couleur</span><div class="cc-swatches">${PALETTE.map((c) => `<button class="${F.color === c ? "on" : ""}" style="--c:${c}" data-act="ccFormColor" data-v="${c}" aria-label="Couleur"></button>`).join("")}</div></div>
     ${!isNew && ccIsOwner(F.id) ? `<p class="note" style="margin-top:-4px">${ico("shield")}Propriétaire du restaurant : toujours gérant.</p>` : ""}
     ${isNew ? `<label class="field"><span>Code à 4 chiffres <em class="cc-opt">facultatif</em></span><input class="input mono cc-pinin" id="ccfPin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off" placeholder="Sinon, créé à sa 1re connexion"></label>
@@ -421,6 +431,7 @@ VIEWS.reglages = {
         <div class="li tap" data-act="restoSwitch"><span class="ic w-sk">${ico("store")}</span><div class="tx"><b>Établissements</b><em>${S.restos.length} · changer ou en ajouter un</em></div>${ico("chev")}</div>
         ${typeof abRow === "function" ? abRow() : ""}
         <div class="li tap" data-go="equipe"><span class="ic w-mi">${ico("users")}</span><div class="tx"><b>Équipe</b><em>${S.members.length} personne${S.members.length > 1 ? "s" : ""}</em></div>${ico("chev")}</div>
+        ${typeof ACT.tourStart === "function" ? `<div class="li tap" data-act="tourStart"><span class="ic w-sa">${ico("sparkle")}</span><div class="tx"><b>Revoir la visite guidée</b><em>Les écrans clés en 1 minute</em></div>${ico("chev")}</div>` : ""}
         <div class="li tap" data-go="imprimante"><span class="ic w-nd">${ico("printer")}</span><div class="tx"><b>Imprimante</b><em>${esc(typeof lbPrinterCfg === "function" ? (lbPrinterCfg().name || "À choisir") : "À choisir")}</em></div>${ico("chev")}</div>
       </div></div><div class="cc-col">
       <div class="lbl st cc-sec" style="--i:3">Cet appareil</div>
@@ -573,7 +584,7 @@ Object.assign(ACT, {
 
   /* équipe */
   ccMember: (a, id) => ccMemberSheet(id),
-  ccMemberNew: () => { if (myRole() !== "gerant") { toast("Seul un gérant peut ajouter quelqu'un.", "err"); return; } const used = S.members.map((m) => m.color); CC.form = { id: null, name: "", role: "equipe", color: PALETTE.find((c) => !used.includes(c)) || PALETTE[S.members.length % PALETTE.length], clearPin: false }; ccFormSheet(); },
+  ccMemberNew: () => { if (myRole() !== "gerant") { toast("Seul un gérant peut ajouter quelqu'un.", "err"); return; } if (typeof PERMS !== "undefined") { closeSheet(true); return PERMS.flow({ from: "equipe", connect: DB.uid ? "" : "local" }); } const used = S.members.map((m) => m.color); CC.form = { id: null, name: "", role: "equipe", color: PALETTE.find((c) => !used.includes(c)) || PALETTE[S.members.length % PALETTE.length], clearPin: false }; ccFormSheet(); },
   ccMemberEdit: (a, id) => { const m = ccMember(id); if (!m) { ACT.meRename(); return; } CC.form = { id, name: m.name || "", role: m.role || "equipe", color: ccColor(m), clearPin: false }; ccFormSheet(); },
   ccFormRole: (a, id, v) => { CC.form.role = v; $$(".cc-seg button").forEach((b) => b.classList.toggle("on", b.dataset.v === v)); SFX.tick(); },
   ccFormColor: (a, id, v) => { CC.form.color = v; $$(".cc-swatches button").forEach((b) => b.classList.toggle("on", b.dataset.v === v)); const pv = $("#ccfPrev"); if (pv) pv.innerHTML = ccAva({ id: CC.form.id || "new", name: $("#ccfName").value || "?", color: v }, 72); SFX.tick(); buzz(4); },

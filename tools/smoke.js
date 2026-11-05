@@ -8,6 +8,7 @@ const set=(id,v)=>page.evaluate(([id,v])=>{const e=document.getElementById(id);i
 await set('obName','Chemin des Sarments');await page.evaluate(()=>ACT.obNext());await page.waitForTimeout(600);await set('obMe','Marceau');
 await page.evaluate(()=>ACT.obCreate());await page.waitForTimeout(2500);
 if(!(await page.evaluate(()=>!!S.resto)))throw new Error('onboarding did not create a restaurant');
+await page.evaluate(()=>DB.add('fridges',{name:'Chambre froide',type:'cfp',min:0,max:4,order:0}));await page.waitForTimeout(400);
 await page.evaluate(()=>ACT.obFinish());await page.waitForTimeout(900);
 await shot('02-home');
 await page.evaluate(()=>go('releve'));await page.waitForTimeout(800);await shot('03-releve');

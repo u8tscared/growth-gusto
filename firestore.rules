@@ -4,9 +4,10 @@ rules_version = '2';
 //   users/{uid}                      { name, email, photo, restos: [rid] }       the person's own profile and restaurant list
 //   restos/{rid}                     { name, owner, createdAt, plan: essai|essentiel|complet|suspendu, pack, trialEnds, paidUntil… }   one restaurant
 //                                    (the commercial fields are set by the gérant with an activation code, or by a Growth Gusto admin: js/abo.js)
-//   restos/{rid}/members/{memberId}  { name, email, role: gerant|chef|equipe, joinedAt }  memberId = uid (account) or a kitchen profile id
+//   restos/{rid}/members/{memberId}  { name, email, role: gerant|chef|equipe, joinedAt, perms? }  memberId = uid (account) or a kitchen profile id
+//                                    perms (optional map): employee permissions, set only by a gérant (or copied from the invite on join)
 //   restos/{rid}/{collection}/{id}   fridges, readings, lots, products, tickets, staff… (members only)
-//   invites/{code}                   { rid, restoName, role, createdBy, createdAt, expiresAt (ms), uses }
+//   invites/{code}                   { rid, restoName, role, perms?, createdBy, createdAt, expiresAt (ms), uses }
 service cloud.firestore {
   match /databases/{database}/documents {
 
@@ -21,6 +22,8 @@ service cloud.firestore {
     function isGerant(rid) { return isMember(rid) && get(memberPath(rid)).data.role == 'gerant'; }
     function ownerOf(rid) { return get(restoPath(rid)).data.owner; }
     function validRole(r) { return r in ['gerant', 'chef', 'equipe']; }
+    // perms is optional; when present it must be a map
+    function validPerms(d) { return !('perms' in d) || d.perms is map; }
     function unchanged(keys) { return !request.resource.data.diff(resource.data).affectedKeys().hasAny(keys); }
     // the Growth Gusto team (js/config.js GG_ADMINS, keep both lists in sync): the admin space (js/abo.js) reads every restaurant and
     // account, and grants, extends or suspends access. A verified e-mail (or Google) is required, so nobody can claim the address.
@@ -50,23 +53,27 @@ service cloud.firestore {
       // ── team: only a gérant manages it ──
       match /members/{mid} {
         allow read: if isMember(rid) || isAdmin();
-        allow create: if signedIn() && validRole(request.resource.data.role) && (
-             // the owner's own gérant membership, written in the same batch as the restaurant
-             (mid == me() && request.resource.data.role == 'gerant' && getAfter(restoPath(rid)).data.owner == me())
-             // a gérant adds someone (an account or a kitchen profile)
+        allow create: if signedIn() && validRole(request.resource.data.role) && validPerms(request.resource.data) && (
+             // the owner's own gérant membership, written in the same batch as the restaurant (no perms: a gérant has them all)
+             (mid == me() && request.resource.data.role == 'gerant' && getAfter(restoPath(rid)).data.owner == me()
+              && !('perms' in request.resource.data))
+             // a gérant adds someone (an account or a kitchen profile), perms included
           || isGerant(rid)
-             // joining with a valid invite code: the role is the invite's, never chosen by the newcomer
+             // joining with a valid invite code: the role and perms are the invite's, never chosen by the newcomer
           || (mid == me()
               && request.resource.data.invite is string
               && exists(invitePath(request.resource.data.invite))
               && get(invitePath(request.resource.data.invite)).data.rid == rid
               && get(invitePath(request.resource.data.invite)).data.role == request.resource.data.role
-              && get(invitePath(request.resource.data.invite)).data.expiresAt > request.time.toMillis())
+              && get(invitePath(request.resource.data.invite)).data.expiresAt > request.time.toMillis()
+              && (('perms' in get(invitePath(request.resource.data.invite)).data)
+                    ? request.resource.data.get('perms', null) == get(invitePath(request.resource.data.invite)).data.perms
+                    : !('perms' in request.resource.data)))
         );
-        // a gérant edits anyone but cannot demote the owner; anyone edits their own name/photo/PIN but never their role
-        allow update: if validRole(request.resource.data.role) && (
+        // a gérant edits anyone (role, perms) but cannot demote the owner; anyone edits their own name/photo/PIN but never their role or perms
+        allow update: if validRole(request.resource.data.role) && validPerms(request.resource.data) && (
              (isGerant(rid) && (mid != ownerOf(rid) || request.resource.data.role == 'gerant'))
-          || (mid == me() && isMember(rid) && unchanged(['role', 'invite']))
+          || (mid == me() && isMember(rid) && unchanged(['role', 'invite', 'perms']))
         );
         // a gérant removes someone (never the owner); anyone can leave, except the owner;
         // the owner removes anyone, themselves included, when deleting the restaurant (the app empties every subcollection first)
@@ -95,9 +102,10 @@ service cloud.firestore {
       allow create: if isGerant(request.resource.data.rid)
                     && request.resource.data.createdBy == me()
                     && validRole(request.resource.data.role)
+                    && validPerms(request.resource.data)
                     && request.resource.data.uses == 0
                     && request.resource.data.expiresAt is number;
-      allow update: if isGerant(resource.data.rid) && unchanged(['rid', 'createdBy'])
+      allow update: if isGerant(resource.data.rid) && unchanged(['rid', 'createdBy']) && validPerms(request.resource.data)
                     // a newcomer counts their use, nothing else
                     || (signedIn()
                         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['uses', 'lastUsedAt'])

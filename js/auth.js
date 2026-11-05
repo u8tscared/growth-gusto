@@ -513,7 +513,7 @@ const AUTH = {
         <button class="au-ghost" type="button" data-act="auReauthCancel">Annuler</button></form>`;
     }
     if (s === "create") {
-      const C = (U.create ||= { name: "", type: "bistrot", frs: ["Chambre froide", "Frigo de service 1", "Frigo de service 2", "Congélateur"], me: "" });
+      const C = (U.create ||= { name: "", type: "bistrot", frs: [], me: "" });
       const needName = !(this.user && this.user.displayName);
       return `${top()}${head("Créons votre restaurant.", "Tout se modifie ensuite dans Réglages.")}
         ${this.packHTML(3)}
@@ -522,7 +522,6 @@ const AUTH = {
           ${needName ? `<label class="au-f"><span class="au-lbl">Votre prénom</span><div class="au-in"><input class="au-input" id="auRMe" autocomplete="given-name" maxlength="40" placeholder="Il signe vos relevés" value="${esc(C.me)}">${okI}</div></label>` : ""}
           <label class="au-f"><span class="au-lbl">Nom du restaurant</span><div class="au-in"><input class="au-input" id="auRName" autocomplete="organization" maxlength="80" placeholder="Chemin des Sarments" value="${esc(C.name)}">${okI}</div></label>
           <div class="au-f"><span class="au-lbl" id="auTypeL">Type de cuisine</span><div class="au-chips" role="radiogroup" aria-labelledby="auTypeL">${AU_TYPES.map(([k, t]) => `<button type="button" class="au-chip ${C.type === k ? "on" : ""}" role="radio" aria-checked="${C.type === k}" data-act="auType" data-v="${k}">${t}</button>`).join("")}</div></div>
-          <div class="au-f"><span class="au-lbl" id="auFrL">Vos équipements froids</span><div class="au-chips" role="group" aria-labelledby="auFrL">${AU_FRIDGES.map(([n, , lo, hi]) => `<button type="button" class="au-chip au-fr ${C.frs.includes(n) ? "on" : ""}" aria-pressed="${C.frs.includes(n)}" data-act="auFr" data-v="${esc(n)}">${auFrHTML(n, lo, hi, C.frs.includes(n))}</button>`).join("")}</div></div>
           <div class="au-prev" id="auPrev" aria-live="polite"><div class="au-pvh"><span class="au-pm">R</span><div class="au-pvn"><b>Votre restaurant</b><em></em></div><span class="au-pvtag">Aperçu</span></div><div class="au-pvl"></div></div>
           <button class="au-tac au-primary au-submit${busy("create")}" type="submit"><span class="au-bl">Créer mon restaurant</span>${dots}</button>
         </form>`;
@@ -652,9 +651,9 @@ const AUTH = {
     const pm = $(".au-pm", p), ini = initials(n || "R");
     if (pm.textContent !== ini) { pm.textContent = ini; pm.classList.remove("au-pop"); void pm.offsetWidth; pm.classList.add("au-pop"); }
     $("b", p).textContent = n || "Votre restaurant"; $("b", p).classList.toggle("empty", !n);
-    $("em", p).textContent = `${t} · ${C.frs.length} équipement${C.frs.length > 1 ? "s" : ""} froid${C.frs.length > 1 ? "s" : ""}`;
+    $("em", p).textContent = C.frs.length ? `${t} · ${C.frs.length} équipement${C.frs.length > 1 ? "s" : ""} froid${C.frs.length > 1 ? "s" : ""}` : t;
     const rows = AU_FRIDGES.filter(([f]) => C.frs.includes(f)).slice(0, 3);
-    $(".au-pvl", p).innerHTML = rows.length ? rows.map(([f, , lo, hi], i) => `<div class="au-pvr"><span class="t">${["07:30", "07:35", "07:40"][i]}</span><span class="n">${esc(f)}</span><span class="s">${lo}/${hi} °C</span></div>`).join("") + (C.frs.length > 3 ? `<div class="au-pvr more">+ ${C.frs.length - 3} autre${C.frs.length - 3 > 1 ? "s" : ""} à relever</div>` : "") : `<div class="au-pvr more">Aucun équipement froid pour l'instant</div>`;
+    $(".au-pvl", p).innerHTML = rows.length ? rows.map(([f, , lo, hi], i) => `<div class="au-pvr"><span class="t">${["07:30", "07:35", "07:40"][i]}</span><span class="n">${esc(f)}</span><span class="s">${lo}/${hi} °C</span></div>`).join("") + (C.frs.length > 3 ? `<div class="au-pvr more">+ ${C.frs.length - 3} autre${C.frs.length - 3 > 1 ? "s" : ""} à relever</div>` : "") : `<div class="au-pvr more">Vos frigos s'ajoutent à l'étape suivante</div>`;
     p.classList.toggle("on", !!n);
     this.labelSync();
   },
@@ -681,7 +680,7 @@ const AUTH = {
       auLS.del("gg-plan"); this.setBusy("");
       /* js/onboard.js: the app opens on the onboarding (logo, adresse, équipe, imprimante…) once the kitchen moment has played */
       if (typeof OB !== "undefined" && OB.handoff) return OB.handoff(rid, C, name);
-      this.celebrate(`C'est prêt${name ? ", " + firstName(name) : ""} !`, `${C.name} · ${C.frs.length} équipement${C.frs.length > 1 ? "s" : ""} à relever`, rid);
+      this.celebrate(`C'est prêt${name ? ", " + firstName(name) : ""} !`, C.frs.length ? `${C.name} · ${C.frs.length} équipement${C.frs.length > 1 ? "s" : ""} à relever` : C.name, rid);
     } catch (x) { console.warn("create", x); this.fail(x); }
   },
   celebrate(t, sub, rid) {
@@ -725,7 +724,7 @@ const AUTH = {
     this.setBusy("join");
     try {
       const b = fs.batch();
-      b.set(fs.doc(`restos/${inv.rid}/members/${u.uid}`), { name: u.displayName || firstName(String(u.email || "").split("@")[0]), email: u.email || "", photo: u.photoURL || "", role: inv.role || "equipe", joinedAt: now, invite: J.code });
+      b.set(fs.doc(`restos/${inv.rid}/members/${u.uid}`), { name: u.displayName || inv.name || firstName(String(u.email || "").split("@")[0]), email: u.email || "", photo: u.photoURL || "", role: inv.role || "equipe", joinedAt: now, invite: J.code, ...(inv.perms ? { perms: inv.perms } : {}), ...(inv.poste ? { poste: inv.poste } : {}), ...(!u.photoURL && inv.photo ? { photo: inv.photo } : {}) });
       b.set(fs.collection("users").doc(u.uid), { restos: FV.arrayUnion(inv.rid) }, { merge: true });
       b.update(fs.collection("invites").doc(J.code), { uses: FV.increment(1), lastUsedAt: now });
       b.set(fs.doc(`restos/${inv.rid}/events/e${now.toString(36)}`), { type: "team", text: `a rejoint ${inv.restoName || "l'équipe"}`, at: now, uid: u.uid });
@@ -802,9 +801,10 @@ const AUTH = {
         ${demo ? `<div class="banner">${ico("alert")}<span>Démo : ce lien est un exemple, il ne fonctionne pas.</span></div>` : ""}
         <div class="grid2 au-g2">${navigator.share ? `<button class="btn acc" data-act="auInvShare">${ico("share")}Partager</button>` : ""}<button class="btn ${navigator.share ? "soft" : "acc"}" data-act="auInvCopy" data-v="link">${ico("auCopy")}Copier le lien</button>${navigator.share ? "" : `<button class="btn soft" data-act="auInvCopy" data-v="code">${ico("auKey")}Copier le code</button>`}</div>
         <button class="btn ghost block" data-act="auInvNew">Créer une autre invitation</button>`
+      : typeof PERMS !== "undefined" ? `<button class="btn acc block" data-act="pmInvite">${ico("plus")}Inviter quelqu'un</button>`
       : `<div class="lbl">Son rôle</div><div class="au-roles" role="radiogroup">${roles}</div>
         <button class="btn acc block au-submit" data-act="auInvCreate" id="auInvGo"><span>${ico("auLink")}Créer le lien d'invitation</span><span class="au-spin" aria-hidden="true"></span></button>`}
-      ${pend.length ? `<div class="lbl au-pendl">Invitations en cours</div><div class="glass pad au-pend">${pend.map((x) => { const d = Math.max(0, Math.ceil((x.expiresAt - Date.now()) / 864e5)); return `<div class="li"><span class="ic">${ico((AU_ROLES[x.role] || AU_ROLES.equipe).ic)}</span><div class="tx"><b class="mono">${esc(auFmtCode(x.code))}</b><em>${esc((AU_ROLES[x.role] || AU_ROLES.equipe).t)} · ${x.uses ? `${x.uses} a rejoint` : "personne encore"} · expire dans ${d} j</em></div><button class="iconbtn sm" data-act="auInvRevoke" data-id="${esc(x.code)}" aria-label="Annuler l'invitation ${esc(auFmtCode(x.code))}">${ico("trash")}</button></div>`; }).join("")}</div>` : V.list === null && DB.uid ? `<div class="au-jload"><span class="au-spin"></span>Invitations en cours…</div>` : ""}
+      ${pend.length ? `<div class="lbl au-pendl">Invitations en cours</div><div class="glass pad au-pend">${pend.map((x) => { const d = Math.max(0, Math.ceil((x.expiresAt - Date.now()) / 864e5)); return `<div class="li"><span class="ic">${ico((AU_ROLES[x.role] || AU_ROLES.equipe).ic)}</span><div class="tx"><b class="mono">${esc(auFmtCode(x.code))}</b><em>${x.name ? esc(firstName(x.name)) + " · " : ""}${esc(x.perms && x.perms.level === "staff" ? (x.poste && typeof PERMS !== "undefined" && PERMS.POSTES[x.poste] ? PERMS.POSTES[x.poste][0] : "Équipier") : (AU_ROLES[x.role] || AU_ROLES.equipe).t)} · ${x.uses ? `${x.uses} a rejoint` : "personne encore"} · expire dans ${d} j</em></div><button class="iconbtn sm" data-act="auInvRevoke" data-id="${esc(x.code)}" aria-label="Annuler l'invitation ${esc(auFmtCode(x.code))}">${ico("trash")}</button></div>`; }).join("")}</div>` : V.list === null && DB.uid ? `<div class="au-jload"><span class="au-spin"></span>Invitations en cours…</div>` : ""}
     </div>`;
   },
   invPaint(open) { if (open || !$("#sheetBody .au-inv")) openSheet(this.invHTML()); else $("#sheetBody").innerHTML = this.invHTML(); },
@@ -1180,7 +1180,10 @@ Object.assign(ACT, {
   auSignOutOk: () => { closeSheet(true); AUTH.signOut(); },
   auDemoSignup: () => { SFX.tap(); AUTH.openWelcome({ screen: AUTH.cfg ? "email" : "soon", tab: "up" }); },
   auDemoLeave: () => AUTH.leaveDemo(),
-  auInvite: () => AUTH.inviteSheet(),
+  /* gérant with an account (or the demo): the « Nouvel équipier » flow (js/perms.js) asks what the person sees, then makes the invitation */
+  auInvite: () => (typeof PERMS !== "undefined" && DB.mode !== "local" && myRole() === "gerant" ? PERMS.flow({ from: "invite", connect: "invite" }) : AUTH.inviteSheet()),
+  auInvList: () => AUTH.inviteSheet(),
+  pmInvite: () => { closeSheet(true); PERMS.flow({ from: "invite", connect: "invite" }); },
   auInvRole: (a, id, v) => { S.ui.auInv.role = v; $$("#sheetBody .au-role").forEach((b) => { const on = b.dataset.v === v; b.classList.toggle("on", on); b.setAttribute("aria-checked", on); }); SFX.tick(); buzz(4); },
   auInvCreate: () => AUTH.invCreate(),
   auInvShare: () => AUTH.invShare(),

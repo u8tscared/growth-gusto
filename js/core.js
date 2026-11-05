@@ -414,6 +414,9 @@ const NAV = [
 ];
 const TABS = [["home", "home", "Accueil"], ["frigos", "snow", "Frigos"], ["scan", "scan", ""], ["stock", "box", "Stock"], ["more", "grid", "Plus"]];
 const TAB_OF = { home: "home", frigos: "frigos", frigo: "frigos", releve: "home", scan: "scan", stock: "stock", reception: "more", tickets: "more", registre: "more", notes: "more", note: "more", menage: "more", equipe: "more", imprimante: "more", reglages: "more", more: "more", dashboard: "more", finance: "more", obligations: "more", pointeuse: "more", planning: "more", avis: "more" };
+/* employee access (js/perms.js): a route the gérant switched off for this person is hidden everywhere and guarded in go() */
+const permOk = (r) => { try { return typeof PERMS === "undefined" || !PERMS.routeAllowed ? true : PERMS.routeAllowed(r) !== false; } catch (e) { return true; } };
+const navAllowed = () => { const out = []; NAV.forEach((n) => { if (n[0] !== "sep" && !permOk(n[0])) return; if (n[0] === "sep" && out.length && out[out.length - 1][0] === "sep") out.pop(); out.push(n); }); while (out.length && out[out.length - 1][0] === "sep") out.pop(); return out; };
 function urgentCount() { return activeLots().filter((l) => (daysUntil(dlcOf(l)) ?? 99) <= 1).length; }
 function renderChrome() {
   const side = $("#side");
@@ -421,7 +424,7 @@ function renderChrome() {
   const pend = S.fridges.length - todayStats(S.slot || slotNow()).done; /* current service only */
   side.innerHTML = `<div class="brand">${appIcon(36)}<span>Growth <span class="gg-b">Gusto</span></span></div>
     ${S.resto ? `<button class="nav" data-act="restoSwitch" style="background:var(--glass-2);margin-bottom:10px"><span style="width:28px;height:28px;flex:none;border-radius:9px;display:grid;place-items:center;background:#F6B93B;color:#1B1530;box-shadow:0 2px 0 #D99A1E;font-size:11px;font-weight:800">${esc(initials(S.resto.name))}</span><span style="flex:1;min-width:0;text-align:left"><b style="display:block;color:var(--ink);font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(S.resto.name)}</b><span style="font-size:11.5px">${S.restos.length} établissement${S.restos.length > 1 ? "s" : ""}</span></span>${ico("down")}</button>` : ""}
-    <div class="navs">${NAV.map(([r, i, t]) => r === "sep" ? `<div class="sep">${t}</div>` : `<button class="nav ${navOn === r ? "on" : ""}" data-go="${r}">${ico(i)}<span class="nt">${t}</span>${r === "home" && urgentCount() ? `<span class="count">${urgentCount()}</span>` : ""}${r === "releve" && pend > 0 && S.fridges.length ? `<span class="count" style="background:var(--warn)">${pend}</span>` : ""}</button>`).join("")}</div>
+    <div class="navs">${navAllowed().map(([r, i, t]) => r === "sep" ? `<div class="sep">${t}</div>` : `<button class="nav ${navOn === r ? "on" : ""}" data-go="${r}">${ico(i)}<span class="nt">${t}</span>${r === "home" && urgentCount() ? `<span class="count">${urgentCount()}</span>` : ""}${r === "releve" && pend > 0 && S.fridges.length ? `<span class="count" style="background:var(--warn)">${pend}</span>` : ""}</button>`).join("")}</div>
     <div class="me" data-go="reglages" role="button" tabindex="0" title="Réglages">${avatar(S.me.id)}<div style="min-width:0;flex:1"><b>${esc(S.me.name || "Vous")}</b><em>${ROLES[myRole()]}</em></div>${ico("sliders")}</div>`;
   const sv = $(".navs", side);
   if (sv) {
@@ -437,9 +440,10 @@ function renderChrome() {
     tb.dataset.built = 1;
     tb.innerHTML = `<span class="ind" id="ind"></span>` + TABS.map(([r, i, t]) => `<button class="tab" data-tab="${r}" aria-label="${t || "Scanner"}">${r === "scan" ? `<span class="fab">${ico("scan")}</span>` : `${ico(i)}${t}`}</button>`).join("");
   }
+  $$(".tab", tb).forEach((b) => { const r = b.dataset.tab; b.style.display = r === "home" || r === "more" || permOk(r) ? "" : "none"; });
   $$(".tab", tb).forEach((b) => { const was = b.classList.contains("on"), now = b.dataset.tab === on; b.classList.toggle("on", now); if (now && !was && tb.dataset.on) { b.classList.remove("pop"); void b.offsetWidth; b.classList.add("pop"); } });
   tb.dataset.on = on;
-  const idx = TABS.findIndex((t) => t[0] === on); const ind = $("#ind");
+  const vis = TABS.filter((t) => t[0] === "home" || t[0] === "more" || permOk(t[0])); const idx = vis.findIndex((t) => t[0] === on); const ind = $("#ind");
   if (ind) { ind.style.opacity = on === "scan" ? 0 : 1; ind.style.transform = `translateX(calc(${idx} * (100% + 12px)))`; }
   const noTabs = ["onboarding", "reception", "note", "tzEdit"].includes(S.route) || !!(VIEWS[S.route] && VIEWS[S.route].hideTabs) || !S.resto;
   tb.classList.toggle("hide", noTabs); document.documentElement.classList.toggle("tabs", !noTabs);
@@ -455,6 +459,7 @@ function go(route, params = {}, { back = false, replace = false, tab = false } =
   const key = route + "|" + JSON.stringify(params || {}), now = Date.now();
   if (!back && key === lastNav.k && now - lastNav.t < 450 && route === S.route) return;
   lastNav = { k: key, t: now };
+  if (route !== "home" && route !== "locked" && !permOk(route)) { params = { from: route }; route = "locked"; }
   if (!replace && !back) { S.history.push({ route: S.route, params: S.params }); if (S.history.length > 40) S.history.shift(); }
   if (route === "reception" && (!S.rec || S.rec.done || (params.fresh && !(S.rec.lines || []).length))) S.rec = { step: 1, supplier: "", bl: "", lines: [], done: null, open: 0 };
   if (route === "stock") { S.zone = S.zone || null; }
@@ -530,6 +535,7 @@ const banner = () => (S.slow && DB.mode === "db" ? `<div class="banner st">${ico
 
 /* ───────────────────────── views ───────────────────────── */
 const VIEWS = {};
+VIEWS.locked = { render() { return `<div class="inner narrow">${topBar("Accès réservé")}<div class="glass empty st" style="--i:1"><div class="ic">${ico("lock")}</div><b>Cet espace n'est pas ouvert pour vous</b>Demandez au gérant du restaurant si vous devez y accéder.<div style="margin-top:14px"><button class="btn acc" data-go="home">Retour à l'accueil</button></div></div></div>`; } };
 
 /* ───────────────────────── sheets ───────────────────────── */
 /* Focus: opening moves focus into the sheet (the dialog itself, so no keyboard pops up on phones), Tab stays inside it while it is open
@@ -817,7 +823,7 @@ function registerSW() {
    to the foreground. A new v means the code running here is old: with nothing in progress the app reloads silently (caches dropped,
    so the reload is guaranteed fresh); otherwise a toast offers « Mettre à jour ». sessionStorage guards against reload loops:
    one reload attempt per version per session, after which the version is simply adopted. */
-const APP_V = "2026-11-05.1";
+const APP_V = "2026-11-05.2";
 const UPD = {
   running: null, offered: null,
   get: (k, store) => { try { return store.getItem(k); } catch (e) { return null; } },

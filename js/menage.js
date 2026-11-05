@@ -241,7 +241,7 @@ function menRow(o, showDay) {
   const canDo = !dn && o.st !== "missed" && (o.st !== "upcoming" || showDay);
   const sub = dn ? `<span class="men-who">${esc(menBy(l))} · ${when(l.at)}${o.st === "late" ? " · en retard" : ""}</span>` : [showDay ? menWhenTx(o) : "", c.zone, c.notes].filter(Boolean).map(esc).join(" · ");
   const per = !showDay && (c.freq === "semaine" || c.freq === "mois") ? `<span class="men-tag">${c.freq === "mois" ? "Mensuel" : "Hebdo"}</span>` : "";
-  const tags = `${per}${o.slot ? `<span class="men-tag">${menSlotTx(o.slot)}</span>` : ""}${c.who && !dn ? `<span class="men-tag who">${esc(firstName(c.who))}</span>` : ""}${c.photo && !dn ? `<span class="men-tag ph" title="Photo obligatoire">${ico("camera")}</span>` : ""}${o.st === "overdue" ? `<span class="pill bad"><span class="dot"></span>En retard</span>` : ""}`;
+  const tags = `${per}${o.slot ? `<span class="men-tag">${menSlotTx(o.slot)}</span>` : ""}${c.who && !dn ? `<span class="men-tag who">${esc(firstName(c.who))}</span>` : ""}${(c.photo || menMustPhoto()) && !dn ? `<span class="men-tag ph" title="Photo obligatoire">${ico("camera")}</span>` : ""}${o.st === "overdue" ? `<span class="pill bad"><span class="dot"></span>En retard</span>` : ""}`;
   const gd = !dn ? `<button class="men-ph gd" data-act="menGuide" data-id="${c.id}" aria-label="Comment faire : ${esc(c.name)}">${ico("book")}</button>` : "";
   const right = dn ? (menHasPic(l) ? `<button class="men-ph" data-act="menLog" data-id="${l.id}" aria-label="Voir la photo">${menImg(l)}</button>` : `<button class="men-ph add" data-act="menPhotoAdd" data-id="${l.id}" aria-label="Ajouter une photo de preuve">${ico("camera")}</button>`) : "";
   const act = canDo ? `data-act="menDo" data-v="${k}" aria-label="Marquer « ${esc(c.name)} » comme fait"` : dn ? `data-act="menLog" data-id="${l.id}" aria-label="Détails de « ${esc(c.name)} »"` : `data-act="menHist" data-id="${c.id}"`;
@@ -352,6 +352,8 @@ function menHistSheet(c) {
 
 /* ── photo proof: stored by core's upload() (IndexedDB on the device, or the asset store), the log keeps the id.
    Older logs may hold an inline data: URL in photoUrl: still displayed. ── */
+/* js/perms.js: the gérant can require a photo proof from this person for every chore */
+const menMustPhoto = () => typeof PERMS !== "undefined" && PERMS.must("chorePhoto");
 const menPicMissing = (id) => typeof PHOTOS !== "undefined" && PHOTOS.missing && PHOTOS.missing[id];
 const menHasPic = (l) => !!(l && ((l.photoId && !menPicMissing(l.photoId)) || l.photoUrl));
 const menPicUrl = (l) => (typeof photoUrl === "function" ? (l.photoId && photoUrl(l.photoId)) || photoUrl(l.photoUrl) : l.photoUrl) || "";
@@ -368,7 +370,7 @@ async function menPhoto() {
 /* one check: optional photo proof, sound + haptics, log + audit event, undo toast, group / day celebration */
 async function menDoIt(a, v, c, slot) {
   const cid = c.id;
-  let ph = null; if (c.photo) { toast("Photo de preuve obligatoire"); ph = await menPhoto(); if (!ph) return; }
+  let ph = null; if (c.photo || menMustPhoto()) { toast("Photo de preuve obligatoire"); ph = await menPhoto(); if (!ph) return; }
     a && a.classList && a.classList.add("press"); menSfx.check(); buzz(12);
     const by = menSigner(); M.just = v; M.justAt = Date.now();
     const evId = await DB.add("events", { type: "chore", text: `a fait « ${c.name} »${slot ? ` (${slot})` : ""}`, at: Date.now(), uid: S.me.id, by, ref: cid }).catch(() => "");

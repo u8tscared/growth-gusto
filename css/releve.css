@@ -455,3 +455,7 @@
 .rel-tc i{width:8px;height:8px}
 .rel-tc em{margin-left:auto;font-family:var(--f);font-size:13px;font-weight:550;color:var(--muted)}
 .rel-tc.more{color:var(--accent-ink);font-weight:700;font-size:13.5px}
+
+.rel-phb.must{border-style:solid;border-color:var(--accent);color:var(--accent-ink);background:var(--tint)}
+.rel-phb.must small{color:var(--accent-ink)}
+.rel-ph.need{animation:relShake .45s var(--ease)}

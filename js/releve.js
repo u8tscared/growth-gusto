@@ -105,7 +105,7 @@ function relBulkOk(f) {
   return relTouched().has(f.id) && S.temp[f.id] != null && relIn(f, S.temp[f.id]);
 }
 /* « Tout est conforme » appears once two fridges have a measured, in-range value for this round */
-function relAllBtn(pending) { return pending.filter(relBulkOk).length >= 2 ? `<button class="btn soft block rel-all" data-act="relAll">${ico("sparkle")}Tout est conforme</button>` : ""; }
+function relAllBtn(pending) { if (relPhMust()) return ""; return pending.filter(relBulkOk).length >= 2 ? `<button class="btn soft block rel-all" data-act="relAll">${ico("sparkle")}Tout est conforme</button>` : ""; }
 function relSyncAll() {
   const w = $("#viewport .view:not(.leave) #relAllW"); if (!w) return;
   const rs = readingsFor(dayKey(), S.slot); const html = relAllBtn(S.fridges.filter((f) => !rs.find((r) => r.fridgeId === f.id)));
@@ -126,11 +126,14 @@ function relDial(key, f, t) {
 /* optional photo on a reading (display, thermometer…): never required, one tap, kept with the reading */
 const relPhOf = (key) => (S.ui.relPh || {})[key];
 const relPhSrc = (r) => (r && ((r.photoId && typeof photoUrl === "function" && photoUrl(r.photoId)) || (typeof photoUrl === "function" ? photoUrl(r.photoUrl) : r.photoUrl))) || "";
+const relPhMust = () => { try { return typeof PERMS !== "undefined" && PERMS.must && !!PERMS.must("readingPhoto"); } catch (e) { return false; } };
+/* the gérant can require a photo to validate a reading: no photo yet → open the camera instead of saving */
+function relPhNeeded(key) { const p = relPhOf(key); if (!relPhMust() || (p && !p.busy && (p.photoId || p.photoUrl))) return false; SFX.err(); buzz([10, 30, 10]); toast("Photo obligatoire pour valider ce relevé"); const w = $(`#ph-${key}`); if (w) { w.classList.remove("need"); void w.offsetWidth; w.classList.add("need"); } ACT.relPhoto(null, key); return true; }
 function relPhHtml(key) {
   const p = relPhOf(key);
   if (p && p.busy) return `<div class="rel-ph" id="ph-${key}"><span class="rel-phb busy"><i class="rel-spin"></i>Photo…</span></div>`;
   if (p && p.src) return `<div class="rel-ph has" id="ph-${key}"><img src="${esc(p.src)}" alt="Photo du relevé"><span class="rel-pht">Photo jointe</span><button class="iconbtn" data-act="relPhotoRm" data-id="${key}" aria-label="Retirer la photo">${ico("x")}</button></div>`;
-  return `<div class="rel-ph" id="ph-${key}"><button class="rel-phb" data-act="relPhoto" data-id="${key}">${ico("camera")}Ajouter une photo<small>facultatif</small></button></div>`;
+  return `<div class="rel-ph" id="ph-${key}"><button class="rel-phb${relPhMust() ? " must" : ""}" data-act="relPhoto" data-id="${key}">${ico("camera")}${relPhMust() ? "Prendre la photo<small>obligatoire</small>" : "Ajouter une photo<small>facultatif</small>"}</button></div>`;
 }
 function relPhSync(key) { const w = $(`#ph-${key}`); if (w) w.outerHTML = relPhHtml(key); }
 function relPhThumb(r) { const src = relPhSrc(r); return src ? `<img class="rel-phs" src="${esc(src)}"${r.photoId ? ` data-photo="${esc(r.photoId)}"` : ""} alt="Photo">` : ""; }
@@ -529,6 +532,7 @@ Object.assign(ACT, {
     const f = relFr(id); const t = S.temp[id];
     if (!f || t == null || isNaN(t) || !relOnce(a)) return;
     if (relDoneNow(id)) { rerender(); return; }
+    if (relPhNeeded(id)) return;
     const ctx = relIsService(f) ? relCtxOf(id, f) : "";
     if (!relIn(f, t)) { if (relPeakOk(f, t, ctx)) { await commitReading(id, t, true, "", { ctx, peak: true }); return; } relCorrSheet(f, t, "corr", id); return; }
     await commitReading(id, t, true, "", ctx ? { ctx } : {});

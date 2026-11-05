@@ -221,7 +221,7 @@ VIEWS.home = {
     </section>`;
 
     const QA = [["releve", "therm", "Relevé", "c1", pend.length], ["reception", "truck", "Réception", "c2", homeRecLive() ? "•" : 0], ["scan", "scan", "Scanner", "c3", 0], ["menage", "spray", "Ménage", "c4", ch.due.length], ["stock", "list", "Inventaire", "c5", 0]];
-    const qa = `<nav class="hm-qa st" style="--i:2" aria-label="Actions rapides">${QA.map(([r, ic, t, c, n]) => `<button class="${c}" ${r === "releve" && pend.length ? `data-act="homeFridge" data-id="${pend[0].id}"` : `data-go="${r}"`}${r === "reception" && !homeRecLive() ? ' data-fresh="1"' : ""}><span class="qi">${ico(ic)}${n ? `<span class="bdg mono">${n}</span>` : ""}</span><span class="ql">${t}</span></button>`).join("")}</nav>`;
+    const qa = `<nav class="hm-qa st" style="--i:2" aria-label="Actions rapides">${QA.filter((q) => typeof permOk !== "function" || permOk(q[0])).map(([r, ic, t, c, n]) => `<button class="${c}" ${r === "releve" && pend.length ? `data-act="homeFridge" data-id="${pend[0].id}"` : `data-go="${r}"`}${r === "reception" && !homeRecLive() ? ' data-fresh="1"' : ""}><span class="qi">${ico(ic)}${n ? `<span class="bdg mono">${n}</span>` : ""}</span><span class="ql">${t}</span></button>`).join("")}</nav>`;
 
     const stat = (lbl, val, sub, go, tone, bar) => `<button class="hm-stat ${tone || ""}" data-go="${go}"><span class="sl">${lbl}</span><span class="sv mono">${val == null ? "–" : `<span class="hm-n" data-to="${val}">0</span>${bar != null ? "<small>%</small>" : ""}`}</span>${bar != null ? `<span class="sb"><i style="--w:${bar}%"></i></span>` : ""}<span class="ss">${sub}</span></button>`;
     const stats = `<section class="hm-stats st" style="--i:4" aria-label="Chiffres du jour">

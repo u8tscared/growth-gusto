@@ -252,7 +252,7 @@ function recCard(L, i) {
     <div class="rec-f"><span class="lbl">Ranger dans</span>${ty === "surg" && S.fridges.length && !S.fridges.some((f) => f.max <= -15) ? `<p class="note rec-dry">Aucun congélateur dans Frigos : choisissez où le ranger.</p>` : ""}<div class="chips rec-fr">${S.fridges.map((f) => `<button class="chip ${L.fridgeId === f.id ? "on" : ""}" data-act="recFr" data-v="${f.id}">${recFrIco(f)}${esc(f.name)}</button>`).join("") || `<span class="note">Aucun frigo : ajoutez-en dans Frigos.</span>`}</div></div>
     <div class="rec-f rec-proof">
       ${L.photoUrl ? `<div class="rec-ph has"><span class="th ${L.ocr === "busy" ? "scan" : ""}"><img src="${esc(L.photoUrl)}" alt="Étiquette sanitaire"></span><span class="tx"><b>Photo prise</b><em>${L.ocr === "busy" ? "Lecture de l'étiquette…" : L.ocr === "fail" ? "Lecture impossible, la photo reste en preuve." : "Preuve gardée au registre."}</em></span><button class="iconbtn rec-x" data-act="recPhoto" aria-label="Reprendre la photo">${ico("camera")}</button><button class="iconbtn rec-x" data-act="recPhotoRm" aria-label="Retirer la photo">${ico("x")}</button></div>`
-        : `<button class="rec-ph" data-act="recPhoto"><span class="ic">${ico("camera")}</span><span class="tx"><b>Photo de l'étiquette</b><em>${S.cap.sample ? "Lot et DLC lus automatiquement" : "Facultatif · preuve sanitaire"}</em></span>${ico("chev")}</button>`}
+        : `<button class="rec-ph" data-act="recPhoto"><span class="ic">${ico("camera")}</span><span class="tx"><b>Photo de l'étiquette</b><em>${recMustPhoto() ? "Obligatoire · preuve sanitaire" : S.cap.sample ? "Lot et DLC lus automatiquement" : "Facultatif · preuve sanitaire"}</em></span>${ico("chev")}</button>`}
       ${L.ocr && typeof L.ocr === "object" ? `<div class="ocr">${Object.entries(L.ocr).filter(([, v]) => v).map(([k, v], j) => `<span style="--i:${j}">${esc(k)} : ${esc(v)}</span>`).join("")}</div>` : ""}
       <label class="rec-lot"><span class="lbl">N° de lot</span><input class="input mono" data-bind="rec.cur.lot" value="${esc(L.lot)}" placeholder="facultatif" autocomplete="off" enterkeyhint="done"></label>
     </div>
@@ -466,11 +466,14 @@ async function recExpenseSync(r, amt) {
   const bl = recBl(r.bl);
   return DB.add("expenses", { day: dayKey(new Date(r.at)), cat: "achats", supplier: r.supplier || "", label: `Livraison ${r.supplier || ""}${bl ? ` · BL ${bl}` : ""}`.trim(), amountHT: amt, receptionId: r.id, at: Date.now(), by: S.me.id });
 }
+/* js/perms.js: the gérant can make the sanitary-label photo compulsory for this person */
+const recMustPhoto = () => typeof PERMS !== "undefined" && PERMS.must("receptionPhoto");
 function recCommitCur() {
   const R = recState(); const L = R.cur;
   if (!L.name.trim()) { recNudge("#recName", "Quel produit ? Tapez son nom."); return false; }
   if (recCold(L) && num(L.temp) == null) { recNudge("#recTemp", "Il manque la température."); return false; }
   if (recNeedDlc(L) && !L.dlc) { recNudge("#recDlc", "Choisissez la DLC."); return false; }
+  if (recMustPhoto() && !L.photoUrl) { recNudge(".rec-ph", "Photo obligatoire : prenez l'étiquette sanitaire."); return false; }
   L.name = L.name.trim(); L.temp = num(L.temp) == null ? "" : fmt(num(L.temp));
   const clean = { ...L, memo: null, applied: null };
   if (R.edit >= 0) R.lines[R.edit] = clean; else R.lines.push(clean);
@@ -602,6 +605,7 @@ Object.assign(ACT, {
     const R = recState();
     const und = R.lines.findIndex((L) => !recOk(L) && !L.decision);
     if (und >= 0) { recNudge(`[data-ctl="${und}"]`, `${R.lines[und].name} : à décider.`); return; }
+    if (recMustPhoto()) { const np = R.lines.findIndex((L) => !L.photoUrl && L.decision !== "refuse"); if (np >= 0) { SFX.err(); toast(`${R.lines[np].name} : photo de l'étiquette obligatoire.`, "err"); return ACT.recFix({ dataset: { i: String(np) } }); } }
     if (R.saving) return; R.saving = true; a.setAttribute("disabled", "");
     const now = Date.now();
     const lines = R.lines.map((L) => { const refused = L.decision === "refuse"; const reserve = L.decision === "reserve"; const out = {

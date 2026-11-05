@@ -1,4 +1,4 @@
-// Firestore rules test (68 cases) against the emulator. From a folder with firebase.json {"emulators":{"firestore":{"port":8085}}} and @firebase/rules-unit-testing installed
+// Firestore rules test (89 cases) against the emulator. From a folder with firebase.json {"emulators":{"firestore":{"port":8085}}} and @firebase/rules-unit-testing installed
 // (e.g. /tmp/gg/v4-fb): cp firestore.rules . && npx firebase emulators:exec --only firestore --project demo-gg "node rules.test.js"
 const {initializeTestEnvironment,assertSucceeds,assertFails}=require('@firebase/rules-unit-testing');
 const {doc,getDoc,setDoc,updateDoc,deleteDoc,writeBatch,collection,query,where,getDocs,arrayUnion,increment}=require('firebase/firestore');
@@ -44,6 +44,29 @@ const t=async(name,p)=>{try{await p;pass++;console.log('ok  ',name)}catch(e){fai
  await t('owner renames resto',assertSucceeds(updateDoc(doc(A,'restos',rid),{name:'Bistrot 2'})));
  await t('owner cannot hand ownership by update',assertFails(updateDoc(doc(A,'restos',rid),{owner:'zed'})));
  await t('gerant revokes invite',assertSucceeds(deleteDoc(doc(A,'invites','OLDCODE1'))));
+ // employee permissions (members.perms, invites.perms)
+ const E=db('emma'),F=db('frank'),P={stock:true,haccp:false,finances:false};
+ await t('gerant creates invite with perms',assertSucceeds(setDoc(doc(A,'invites','PERM0001'),{rid,restoName:'Bistrot',role:'equipe',perms:P,createdBy:'alice',createdAt:now,expiresAt:now+7*864e5,uses:0})));
+ await t('gerant creates invite without perms',assertSucceeds(setDoc(doc(A,'invites','NOPERM01'),{rid,restoName:'Bistrot',role:'equipe',createdBy:'alice',createdAt:now,expiresAt:now+7*864e5,uses:0})));
+ await t('invite perms must be a map',assertFails(setDoc(doc(A,'invites','PERMBAD1'),{rid,role:'equipe',perms:'all',createdBy:'alice',createdAt:now,expiresAt:now+1e9,uses:0})));
+ await t('gerant adds a member with perms',assertSucceeds(setDoc(doc(A,`restos/${rid}/members/m200`),{name:'Inès',role:'equipe',joinedAt:now,perms:P})));
+ await t('gerant sets perms on an existing member',assertSucceeds(updateDoc(doc(A,`restos/${rid}/members/m123`),{perms:{stock:true}})));
+ await t('member perms must be a map',assertFails(updateDoc(doc(A,`restos/${rid}/members/m123`),{perms:true})));
+ await t('join with different perms fails',(()=>{const b=writeBatch(F);b.set(doc(F,`restos/${rid}/members/frank`),{name:'F',role:'equipe',joinedAt:now,invite:'PERM0001',perms:{...P,finances:true}});return assertFails(b.commit())})());
+ await t('join without perms when invite has perms fails',(()=>{const b=writeBatch(F);b.set(doc(F,`restos/${rid}/members/frank`),{name:'F',role:'equipe',joinedAt:now,invite:'PERM0001'});return assertFails(b.commit())})());
+ await t('join with perms when invite has none fails',(()=>{const b=writeBatch(F);b.set(doc(F,`restos/${rid}/members/frank`),{name:'F',role:'equipe',joinedAt:now,invite:'NOPERM01',perms:P});return assertFails(b.commit())})());
+ await t('emma joins copying the invite perms (batch)',(()=>{const b=writeBatch(E);b.set(doc(E,`restos/${rid}/members/emma`),{name:'Emma',role:'equipe',joinedAt:now,invite:'PERM0001',perms:P});b.set(doc(E,'users','emma'),{restos:arrayUnion(rid)},{merge:true});b.update(doc(E,'invites','PERM0001'),{uses:increment(1),lastUsedAt:now});return assertSucceeds(b.commit())})());
+ await t('frank joins without perms with an invite without perms',assertSucceeds(setDoc(doc(F,`restos/${rid}/members/frank`),{name:'Frank',role:'equipe',joinedAt:now,invite:'NOPERM01'})));
+ await t('equipe cannot set her own perms',assertFails(updateDoc(doc(E,`restos/${rid}/members/emma`),{perms:{...P,finances:true}})));
+ await t('equipe cannot remove her own perms',assertFails(setDoc(doc(E,`restos/${rid}/members/emma`),{name:'Emma',role:'equipe',joinedAt:now,invite:'PERM0001'})));
+ await t('equipe cannot change her own role',assertFails(updateDoc(doc(E,`restos/${rid}/members/emma`),{role:'chef'})));
+ await t('equipe without perms cannot give herself perms',assertFails(updateDoc(doc(F,`restos/${rid}/members/frank`),{perms:{finances:true}})));
+ await t('equipe cannot set perms of someone else',assertFails(updateDoc(doc(E,`restos/${rid}/members/m123`),{perms:{finances:true}})));
+ await t('equipe renames herself (perms kept)',assertSucceeds(updateDoc(doc(E,`restos/${rid}/members/emma`),{name:'Emma B'})));
+ await t('member without perms renames himself',assertSucceeds(updateDoc(doc(F,`restos/${rid}/members/frank`),{name:'Franck'})));
+ await t('gerant changes emma perms',assertSucceeds(updateDoc(doc(A,`restos/${rid}/members/emma`),{perms:{stock:false}})));
+ await t('gerant changes invite perms',assertSucceeds(updateDoc(doc(A,'invites','PERM0001'),{perms:{stock:true}})));
+ await t('owner bootstrap with perms fails',(()=>{const b=writeBatch(F);b.set(doc(F,'restos','r7'),{name:'F',owner:'frank',createdAt:now,plan:'essai'});b.set(doc(F,'restos/r7/members/frank'),{name:'F',role:'gerant',joinedAt:now,perms:P});return assertFails(b.commit())})());
  // carol: import (first batch, then the rest)
  await t('import batch 1',(()=>{const b=writeBatch(C);b.set(doc(C,'restos','r9'),{name:'Chez C',owner:'carol',createdAt:now,plan:'essai',importedAt:now});b.set(doc(C,'restos/r9/members/carol'),{role:'gerant',name:'C',joinedAt:now});b.set(doc(C,'users','carol'),{restos:arrayUnion('r9')},{merge:true});return assertSucceeds(b.commit())})());
  await t('import batch 2 (data + local profiles)',(()=>{const b=writeBatch(C);for(let i=0;i<50;i++)b.set(doc(C,`restos/r9/readings/x${i}`),{v:i});b.set(doc(C,'restos/r9/members/local'),{role:'gerant',name:'Paul'});b.set(doc(C,'restos/r9/members/m1'),{role:'equipe',name:'Léo'});return assertSucceeds(b.commit())})());

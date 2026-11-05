@@ -2,6 +2,15 @@
 <html lang="fr">
 <head>
 <meta charset="utf-8">
+<script>/* the app lives at app.growthgusto.fr: the old github.io address forwards there (same path, query and hash).
+   A device that only kept data locally (« sans compte ») on github.io stays put, so nothing is lost. */
+(function(){try{if(location.hostname!=="u8tscared.github.io")return;var l={};try{l=JSON.parse(localStorage.getItem("gg-local")||"{}")||{}}catch(e){}
+if(l.restos&&Object.keys(l.restos).length)return;var p=location.pathname.replace(/^\/growth-gusto/,"")||"/";
+if(/^\/site(\/|$)/.test(p)){location.replace("https://growthgusto.fr/");return}
+var sa=navigator.standalone===true||(window.matchMedia&&matchMedia("(display-mode: standalone)").matches);
+if(sa){document.addEventListener("DOMContentLoaded",function(){var d=document.createElement("div");d.id="ggMoved";d.setAttribute("style","position:fixed;inset:0;z-index:99999;background:#FBF6EC;color:#1B1530;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;padding:32px;text-align:center;font:500 16px/1.45 'Instrument Sans',system-ui,sans-serif");
+d.innerHTML='<img src="icons/icon.svg" width="84" height="84" alt=""><b style="font:780 26px/1.15 \'Bricolage Grotesque\',system-ui,sans-serif;letter-spacing:-.02em">Growth Gusto a une nouvelle adresse</b><span style="max-width:330px;color:#4A4560">Ouvrez <b>app.growthgusto.fr</b>, connectez-vous, puis ajoutez-la à l\'écran d\'accueil. Vous pourrez ensuite supprimer cette icône.</span><a href="https://app.growthgusto.fr/" style="display:inline-block;padding:16px 26px;border-radius:18px;background:#5B2BFF;color:#fff;font-weight:700;text-decoration:none;box-shadow:0 4px 0 #2A0BA6">Ouvrir app.growthgusto.fr</a>';document.body.appendChild(d)});return}
+location.replace("https://app.growthgusto.fr"+p+location.search+location.hash)}catch(e){}})();</script>
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#FBF6EC">
 <meta name="description" content="Relevés HACCP, étiquettes, stock, allergènes, équipe et finances : toute la cuisine de votre restaurant dans une app.">
@@ -65,6 +74,8 @@
 <link rel="stylesheet" href="css/avis.css">
 <link rel="stylesheet" href="css/auth.css">
 <link rel="stylesheet" href="css/v2.css">
+<link rel="stylesheet" href="css/perms.css">
+<link rel="stylesheet" href="css/tour.css">
 <style>html,body{margin:0;background:#FBF6EC}body{font:14px "Instrument Sans",system-ui}[hidden]{display:none!important}</style>
 <script>try{if(matchMedia("(display-mode: standalone)").matches||navigator.standalone)document.documentElement.classList.add("standalone")}catch(e){}</script>
 </head>
@@ -110,7 +121,9 @@ if(!ok){window.GG_OLD=1;document.addEventListener("DOMContentLoaded",function(){
 <script src="js/oblig.js"></script>
 <script src="js/rh.js"></script>
 <script src="js/avis.js"></script>
+<script src="js/perms.js"></script>
 <script src="js/auth.js"></script>
+<script src="js/tour.js"></script>
 <script src="js/main.js"></script>
 </body>
 </html>
