@@ -88,6 +88,7 @@
 .ab-kpi>b{font-size:28px;font-weight:800;letter-spacing:-.05em;line-height:1.05}
 .ab-kpi>b.ok{color:var(--ok)}.ab-kpi>b.acc{color:var(--accent-ink)}.ab-kpi>b.bad{color:var(--bad)}
 .ab-seg .knob{width:calc(50% - 4px)}
+.ab-seg3 .knob{width:calc(33.333% - 2.67px)}
 .ab-search{display:flex;align-items:center;gap:10px;position:relative}
 .ab-search>.ico{position:absolute;left:15px;width:18px;height:18px;color:var(--muted);pointer-events:none}
 .ab-search .input{padding-left:42px;height:48px}
@@ -116,8 +117,10 @@
 .ab-dur{padding:2px 0}
 
 /* ── desktop / tablet ── */
+@media (min-width:900px){
+  .ab-packs{grid-template-columns:repeat(3,1fr)}
+}
 @media (min-width:600px){
-  .ab-packs{grid-template-columns:1fr 1fr}
   .ab-kpis{grid-template-columns:repeat(4,1fr)}
 }
 @media (min-width:960px){

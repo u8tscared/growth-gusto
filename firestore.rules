@@ -2,7 +2,7 @@ rules_version = '2';
 // Growth Gusto · Firestore security rules (paste in Firebase console → Firestore Database → Règles → Publier).
 // Data model:
 //   users/{uid}                      { name, email, photo, restos: [rid] }       the person's own profile and restaurant list
-//   restos/{rid}                     { name, owner, createdAt, plan: essai|essentiel|complet|suspendu, pack, trialEnds, paidUntil… }   one restaurant
+//   restos/{rid}                     { name, owner, createdAt, plan: essai|essentiel|pro|complet|suspendu, pack, trialEnds, paidUntil… }   one restaurant
 //                                    (the commercial fields are set by the gérant with an activation code, or by a Growth Gusto admin: js/abo.js)
 //   restos/{rid}/members/{memberId}  { name, email, role: gerant|chef|equipe, joinedAt, perms? }  memberId = uid (account) or a kitchen profile id
 //                                    perms (optional map): employee permissions, set only by a gérant (or copied from the invite on join)

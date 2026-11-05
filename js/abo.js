@@ -1,20 +1,27 @@
-/* Growth Gusto — abonnement (area prefix « ab »): 14-day trial, the two packs (Essentiel 49 € · Complet 99 € HT/mois), activation
+/* Growth Gusto — abonnement (area prefix « ab »): 14-day trial, the three packs (Essentiel 59 € · Pro 109 € · Complet 169 € HT/mois), activation
    codes, gentle gating once the trial is over, and the Growth Gusto admin space (GG_ADMINS: every restaurant, every account).
    State on the restaurant doc (restos/{rid}):
-     plan: "essai" | "essentiel" | "complet" | "suspendu"   pack: "essentiel" | "complet" (the pack chosen on the site, Complet by default)
+     plan: "essai" | "essentiel" | "pro" | "complet" | "suspendu"   pack: "essentiel" | "pro" | "complet" (the pack chosen on the site, Complet by default)
      trialEnds (ms) · paidAt, paidUntil (ms | null = unlimited), activatedBy, activationCode · grantedBy, grantedAt · suspended { at, by, plan, pack }
-   abPlan(resto?) → { plan: "essai" | "essentiel" | "complet" | "expire" | "suspendu" | "demo", pack, feat ("essentiel" | "complet": what is
+   abPlan(resto?) → { plan: "essai" | "essentiel" | "pro" | "complet" | "expire" | "suspendu" | "demo", pack, feat (the pack whose areas are
    open), open (writes allowed), days, ends, until, why }. Hooks for other areas: abBlocked(col), abRefuse(col) (called by DB in core.js),
    abTile() / abRow() (menu Plus and Réglages, js/compte.js). Config: window.GG_STRIPE, GG_ACTIVATION, GG_CONTACT (js/config.js). */
 "use strict";
 
 const AB_DAY = 864e5, AB_TRIAL = 14;
 const AB_PACKS = {
-  essentiel: { t: "Essentiel", price: 49, tag: "L'hygiène, tenue au propre", feats: ["Relevés HACCP", "Étiquettes & DLC", "Réception des livraisons", "Registre sanitaire", "Planning ménage", "Fiches process", "Équipe illimitée"] },
-  complet: { t: "Complet", price: 99, tag: "Toute la gestion du restaurant", feats: ["Tout Essentiel", "Stock & inventaire", "Tickets de caisse", "Tableau de bord", "Finances", "Pointeuse", "Planning", "Employés & salaires", "Plusieurs restaurants"] },
+  essentiel: { t: "Essentiel", price: 59, tag: "Toute l'hygiène et le HACCP", feats: ["Relevés et sondes", "Étiquettes & DLC", "Réception des livraisons", "Plan de nettoyage", "Fiches recettes & allergènes", "Mode contrôle & PMS", "Registre & rappel de lot", "Équipe illimitée"] },
+  pro: { t: "Pro", price: 109, tag: "L'hygiène, la salle et la caisse", feats: ["Tout Essentiel", "Réservations", "Plan de salle", "Caisse connectée & tickets Z", "Stock & inventaire", "Tableau de bord"] },
+  complet: { t: "Complet", price: 169, tag: "Toute la gestion du restaurant", feats: ["Tout Pro", "Pointeuse", "Planning", "Employés & salaires", "Finances & banque", "Pennylane", "Plusieurs restaurants"] },
 };
-/* areas that belong to the pack Complet: with a paid Essentiel they show an upgrade card instead (during the trial everything is open) */
-const AB_COMPLET = { stock: "Stock & inventaire", tickets: "Tickets de caisse", tzEdit: "Tickets de caisse", dashboard: "Tableau de bord", finance: "Finances", pointeuse: "Pointeuse", planning: "Planning", staff: "Employés & salaires", caisse: "Caisse connectée", caisseMap: "Caisse connectée", sites: "Multi-restaurant" };
+const AB_ORDER = ["essentiel", "pro", "complet"], AB_LVL = { essentiel: 1, pro: 2, complet: 3 };
+const abPk = (x) => AB_LVL[x] ? x : "complet";
+/* areas that need a higher pack: with a paid Essentiel or Pro they show an upgrade card instead (during the trial everything is open) */
+const AB_GATE = {
+  resa: ["pro", "Réservations"], plan: ["pro", "Plan de salle"], stock: ["pro", "Stock & inventaire"], tickets: ["pro", "Tickets de caisse"], tzEdit: ["pro", "Tickets de caisse"], dashboard: ["pro", "Tableau de bord"], caisse: ["pro", "Caisse connectée"], caisseMap: ["pro", "Caisse connectée"],
+  finance: ["complet", "Finances"], pennylane: ["complet", "Pennylane"], pointeuse: ["complet", "Pointeuse"], planning: ["complet", "Planning"], staff: ["complet", "Employés & salaires"], sites: ["complet", "Multi-restaurant"],
+};
+const abHas = (route, p = abPlan()) => !AB_GATE[route] || AB_LVL[p.feat] >= AB_LVL[AB_GATE[route][0]];
 const AB_MONTHS = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"];
 const abDate = (ts) => { const d = new Date(ts); return `${d.getDate()} ${AB_MONTHS[d.getMonth()]}${d.getFullYear() !== new Date().getFullYear() ? " " + d.getFullYear() : ""}`; };
 const abJours = (n) => `${n} jour${n > 1 ? "s" : ""}`;
@@ -40,9 +47,9 @@ function abPlan(r = S.resto) {
   const now = Date.now();
   if (!r) return { plan: "essai", pack: "complet", feat: "complet", open: true, days: AB_TRIAL, ends: now + AB_TRIAL * AB_DAY, pct: 1 };
   if (DB.mode === "demo") return { plan: "demo", pack: "complet", feat: "complet", open: true, days: null };
-  const pack = r.pack === "essentiel" ? "essentiel" : "complet";
+  const pack = abPk(r.pack);
   if (r.plan === "suspendu") return { plan: "suspendu", pack, feat: "complet", open: false, days: 0 };
-  if (r.plan === "essentiel" || r.plan === "complet") {
+  if (AB_LVL[r.plan]) {
     const until = +r.paidUntil || 0;
     if (until && until < now) return { plan: "expire", why: "paid", pack: r.plan, feat: "complet", open: false, days: 0, ends: until };
     return { plan: r.plan, pack: r.plan, feat: r.plan, open: true, until: until || null, days: until ? Math.max(0, Math.ceil((until - now) / AB_DAY)) : null, since: r.paidAt || r.grantedAt || null };
@@ -56,7 +63,7 @@ function abPlan(r = S.resto) {
 function abStamp(r) {
   const ends = Date.now() + AB_TRIAL * AB_DAY;
   if (r === S.resto && r.id && S.rid === r.id && DB.mode !== "demo" && !AB.stamped[r.id] && abGerant()) {
-    AB.stamped[r.id] = true; const patch = { plan: "essai", pack: r.pack === "essentiel" ? "essentiel" : "complet", trialEnds: ends };
+    AB.stamped[r.id] = true; const patch = { plan: "essai", pack: abPk(r.pack), trialEnds: ends };
     Object.assign(r, patch); DB.update("restos", r.id, patch).catch((e) => console.warn("trial stamp", e && e.code));
   }
   return ends;
@@ -88,7 +95,7 @@ function abBlockSheet() {
   const p = abPlan(); const g = abGerant();
   const T = p.plan === "suspendu" ? ["Accès suspendu", "L'accès à ce restaurant a été suspendu par Growth Gusto. Vos données sont conservées et restent consultables : contactez-nous pour le rétablir."]
     : p.why === "paid" ? ["Votre abonnement est arrivé à échéance", "Vos données sont conservées et restent consultables. Renouvelez votre pack pour continuer à enregistrer."]
-    : ["Votre essai est terminé", `Merci d'avoir essayé Growth Gusto. Vos données sont conservées et restent consultables. Pour continuer à enregistrer, choisissez un pack : ${AB_PACKS.essentiel.price} € ou ${AB_PACKS.complet.price} € HT par mois, sans engagement.`];
+    : ["Votre essai est terminé", `Merci d'avoir essayé Growth Gusto. Vos données sont conservées et restent consultables. Pour continuer à enregistrer, choisissez un pack : ${AB_PACKS.essentiel.price} €, ${AB_PACKS.pro.price} € ou ${AB_PACKS.complet.price} € HT par mois, sans engagement.`];
   SFX.err(); buzz([14, 30, 14]);
   openSheet(`<div class="ab-block"><span class="ab-blockic ${p.plan === "suspendu" ? "bad" : ""}">${ico(p.plan === "suspendu" ? "abPause" : "lock")}</span><div class="h2">${T[0]}</div><p class="sub">${T[1]}</p>
     ${S.route === "abonnement" ? "" : `<button class="btn acc block" data-act="abGoAbo">${ico("abPack")}${g ? (p.plan === "suspendu" ? "Voir mon abonnement" : "Choisir mon pack") : "Voir l'abonnement"}</button>`}
@@ -103,20 +110,21 @@ function abStrip() {
   return `<div class="ab-strip ${p.open ? "warn" : "bad"} st" style="--i:0" data-go="abonnement" role="button" tabindex="0">${ico(p.open ? "clock" : "lock")}<span>${tx}</span><em>${cta}${ico("chev")}</em></div>`;
 }
 function abUpgrade(route) {
-  const t = AB_COMPLET[route] || "Cette fonction"; const g = abGerant();
+  const [k, t] = AB_GATE[route] || ["complet", "Cette fonction"]; const g = abGerant(), P = AB_PACKS[k];
+  const list = AB_ORDER.slice(Math.min(AB_LVL[abPlan().feat] || 1, AB_LVL[k] - 1), AB_LVL[k]).flatMap((x) => AB_PACKS[x].feats.slice(1));
   return `<div class="inner narrow">${topBar(t)}
-    <div class="glass ab-up st" style="--i:1"><span class="ab-upic">${ico("abPack")}</span><div class="lbl">Pack Complet</div><h2 class="h2">${esc(t)} fait partie du pack Complet</h2>
-      <p class="sub">Stock & inventaire, tickets de caisse, tableau de bord, finances, pointeuse, planning, employés & salaires, plusieurs restaurants : ${AB_PACKS.complet.price} € HT par mois, sans engagement.</p>
-      <ul class="ab-feats">${AB_PACKS.complet.feats.slice(1).map((f) => `<li>${ico("check")}${f}</li>`).join("")}</ul>
-      ${g ? `<button class="btn acc block" data-go="abonnement">${ico("abPack")}Passer à Complet</button>` : `<p class="note" style="text-align:center">Votre restaurant est au pack Essentiel. Demandez au gérant de passer à Complet.</p>`}</div></div>`;
+    <div class="glass ab-up st" style="--i:1"><span class="ab-upic">${ico("abPack")}</span><div class="lbl">Pack ${P.t}</div><h2 class="h2">${esc(t)} fait partie du pack ${P.t}</h2>
+      <p class="sub">${P.tag} : ${P.price} € HT par mois, sans engagement.</p>
+      <ul class="ab-feats">${list.map((f) => `<li>${ico("check")}${f}</li>`).join("")}</ul>
+      ${g ? `<button class="btn acc block" data-go="abonnement">${ico("abPack")}Passer à ${P.t}</button>` : `<p class="note" style="text-align:center">Votre restaurant est au pack ${AB_PACKS[abPlan().feat].t}. Demandez au gérant de passer à ${P.t}.</p>`}</div></div>`;
 }
 /* wrap the areas once every js/<area>.js has loaded (abo.js comes right after compte.js) */
 function abWrap() {
-  Object.keys(AB_COMPLET).forEach((r) => {
+  Object.keys(AB_GATE).forEach((r) => {
     const V = VIEWS[r]; if (!V || V._ab) return; V._ab = true;
     const r0 = V.render, a0 = V.after;
-    V.render = function (p) { return abPlan().feat === "essentiel" ? abUpgrade(r) : r0.call(this, p); };
-    if (a0) V.after = function (v) { if (abPlan().feat !== "essentiel") return a0.call(this, v); };
+    V.render = function (p) { return abHas(r) ? r0.call(this, p) : abUpgrade(r); };
+    if (a0) V.after = function (v) { if (abHas(r)) return a0.call(this, v); };
   });
   const H = VIEWS.home; if (H && !H._ab) { H._ab = true; const h0 = H.render; H.render = function (p) { const html = h0.call(this, p); const b = abStrip(); return b && html.includes("</header>") ? html.replace("</header>", "</header>" + b) : html; }; }
 }
@@ -127,7 +135,7 @@ window.addEventListener("gg:ready", () => { let f = null; try { f = sessionStora
 /* ───────────────────────── Abonnement ───────────────────────── */
 VIEWS.abonnement = {
   render() {
-    const p = abPlan(), g = abGerant(), stripe = window.GG_STRIPE || {}, online = !!(stripe.essentiel || stripe.complet);
+    const p = abPlan(), g = abGerant(), stripe = window.GG_STRIPE || {}, online = AB_ORDER.some((k) => stripe[k]);
     const C = +(2 * Math.PI * 42).toFixed(2);
     const ring = p.plan === "essai" ? `<div class="ring ab-ring"><svg viewBox="0 0 100 100"><circle class="tr" cx="50" cy="50" r="42" fill="none" stroke-width="8"/><circle class="br" cx="50" cy="50" r="42" fill="none" stroke-width="8" stroke-linecap="round" stroke-dasharray="${C}" stroke-dashoffset="${(C * (1 - p.pct)).toFixed(2)}"/></svg><div class="num"><span><b class="mono">${p.days}</b><small>${p.days > 1 ? "jours" : "jour"}</small></span></div></div>`
       : `<div class="ab-seal ${p.open ? "ok" : "off"}">${ico(p.plan === "suspendu" ? "abPause" : p.open ? "check" : "lock")}</div>`;
@@ -137,20 +145,20 @@ VIEWS.abonnement = {
       : p.plan === "demo" ? ["Démo", "Tout est ouvert", "Créez votre compte pour démarrer votre essai gratuit de 14 jours, sans carte bancaire."]
       : ["Abonnement actif", `Pack ${AB_PACKS[p.plan].t}`, `${p.until ? `Jusqu'au ${abDate(p.until)}${p.days != null && p.days <= 7 ? ` · ${abJours(p.days)}` : ""}.` : "Mensuel, sans engagement : résiliable à tout moment."}${p.since ? ` Activé le ${abDate(p.since)}.` : ""} Utilisateurs illimités.`];
     const hero = `<section class="ab-hero ${p.plan} st" style="--i:1">${ring}<div class="ab-ht"><span class="ab-eyebrow">${H[0]}</span><h2>${H[1]}</h2><p>${H[2]}</p></div></section>`;
-    const paid = p.plan === "essentiel" || p.plan === "complet";
+    const paid = !!AB_LVL[p.plan];
     const card = (k, i) => {
       const P = AB_PACKS[k], cur = paid && p.plan === k, best = k === "complet";
       const cta = !g ? "" : cur ? `<button class="btn soft block" disabled>${ico("check")}Pack actuel</button>`
-        : paid && k === "essentiel" ? `<button class="btn soft block" data-act="abContact" data-v="${k}">${ico("abMail")}Nous écrire</button>`
+        : paid && AB_LVL[k] < AB_LVL[p.plan] ? `<button class="btn soft block" data-act="abContact" data-v="${k}">${ico("abMail")}Nous écrire</button>`
         : `<button class="btn ${best ? "acc" : "soft"} block" data-act="abChoose" data-v="${k}">${paid ? "Passer à " : "Choisir "}${P.t}</button>`;
       return `<article class="glass ab-pack ${k} ${cur ? "cur" : ""} st" style="--i:${i}">
         <div class="ab-ph"><div><span class="lbl">Pack</span><h3 class="ab-pn">${P.t}</h3></div>${cur ? `<span class="pill ok">Votre pack</span>` : best ? `<span class="pill acc">Recommandé</span>` : ""}</div>
         <div class="ab-price"><b class="mono">${P.price} €</b><span>HT / mois</span></div>
         <p class="ab-ptag">${P.tag}</p>
-        <ul class="ab-feats">${P.feats.map((f, j) => `<li class="${j === 0 && k === "complet" ? "all" : ""}">${ico("check")}${f}</li>`).join("")}</ul>${cta}</article>`;
+        <ul class="ab-feats">${P.feats.map((f, j) => `<li class="${j === 0 && k !== "essentiel" ? "all" : ""}">${ico("check")}${f}</li>`).join("")}</ul>${cta}</article>`;
     };
-    const packs = `<div class="ab-packs">${card("essentiel", 2)}${card("complet", 3)}</div>
-      <div class="ab-common st" style="--i:4">${["Mensuel, sans engagement", "Essai gratuit 14 jours", "Utilisateurs illimités", "Données hébergées en France"].map((t) => `<span>${ico("check")}${t}</span>`).join("")}</div>`;
+    const packs = `<div class="ab-packs">${AB_ORDER.map((k, i) => card(k, 2 + i)).join("")}</div>
+      <div class="ab-common st" style="--i:5">${["Mensuel, sans engagement", "Essai gratuit 14 jours", "Utilisateurs illimités", "Données hébergées en France"].map((t) => `<span>${ico("check")}${t}</span>`).join("")}</div>`;
     const act = !g || p.plan === "demo" || paid ? (g ? "" : `<p class="note st ab-ro" style="--i:5">${ico("lock")}Seul le gérant peut choisir le pack ou saisir un code d'activation.</p>`)
       : `<div class="glass pad ab-act st" style="--i:5"><div class="ab-acth"><span class="ic">${ico("abKey")}</span><div><b>${online ? "J'ai un code d'activation" : "Activer mon abonnement"}</b><em>${online ? "Reçu de Growth Gusto après votre commande" : "Le paiement en ligne arrive. En attendant, contactez-nous : vous recevez un code d'activation."}</em></div></div>
         ${online ? "" : `<a class="btn soft block ab-mailto" href="${abMailto(p.pack)}">${ico("abMail")}Nous écrire</a><p class="note ab-addr">${esc(window.GG_CONTACT || "")} · réponse dans la journée, du lundi au samedi</p>`}
@@ -161,8 +169,8 @@ VIEWS.abonnement = {
   after() { if (AB.flash) { AB.flash = false; const h = $(".ab-hero"); h && h.classList.add("pop"); } },
 };
 function abMailto(pack) {
-  const r = S.resto || {}; const subj = `Abonnement Growth Gusto · Pack ${AB_PACKS[pack === "essentiel" ? "essentiel" : "complet"].t} · ${r.name || ""}`;
-  const body = `Bonjour,\n\nJe souhaite activer le pack ${AB_PACKS[pack === "essentiel" ? "essentiel" : "complet"].t} pour ${r.name || "mon restaurant"}.\nIdentifiant du restaurant : ${S.rid || ""}\nE-mail du compte : ${abEmail() || "(sans compte)"}\n\nMerci !`;
+  const r = S.resto || {}; const P = AB_PACKS[abPk(pack)]; const subj = `Abonnement Growth Gusto · Pack ${P.t} · ${r.name || ""}`;
+  const body = `Bonjour,\n\nJe souhaite activer le pack ${P.t} pour ${r.name || "mon restaurant"}.\nIdentifiant du restaurant : ${S.rid || ""}\nE-mail du compte : ${abEmail() || "(sans compte)"}\n\nMerci !`;
   return `mailto:${window.GG_CONTACT || ""}?subject=${encodeURIComponent(subj)}&body=${encodeURIComponent(body)}`;
 }
 async function abActivate(raw, errEl, inp) {
@@ -170,7 +178,7 @@ async function abActivate(raw, errEl, inp) {
   const fail = (m) => { SFX.err(); buzz([30, 50, 30]); if (errEl) errEl.textContent = m; if (inp) { inp.classList.remove("shake"); void inp.offsetWidth; inp.classList.add("shake"); inp.focus(); } };
   if (!abGerant()) return fail("Seul le gérant peut activer l'abonnement.");
   if (!code) return fail("Saisissez votre code d'activation.");
-  const plan = (window.GG_ACTIVATION || {})[code]; if (plan !== "essentiel" && plan !== "complet") return fail("Code inconnu. Vérifiez-le, ou écrivez-nous.");
+  const plan = (window.GG_ACTIVATION || {})[code]; if (!AB_LVL[plan]) return fail("Code inconnu. Vérifiez-le, ou écrivez-nous.");
   if (!S.rid || !S.resto) return fail("Aucun restaurant ouvert.");
   const patch = { plan, pack: plan, paidAt: Date.now(), paidUntil: null, activatedBy: abEmail() || S.me.name || S.me.id, activationCode: code };
   try { await DB.update("restos", S.rid, patch); } catch (e) { return fail("Impossible d'enregistrer pour l'instant. Vérifiez la connexion et réessayez."); }
@@ -185,7 +193,7 @@ document.addEventListener("submit", (e) => { const f = e.target; if (!f.dataset 
 Object.assign(ACT, {
   abGoAbo: () => { closeSheet(true); go("abonnement"); },
   abChoose: (a, id, v) => {
-    const k = v === "essentiel" ? "essentiel" : "complet"; const url = (window.GG_STRIPE || {})[k];
+    const k = abPk(v); const url = (window.GG_STRIPE || {})[k];
     SFX.tap(); buzz(6);
     if (url) { const u = url + (url.includes("?") ? "&" : "?") + "client_reference_id=" + encodeURIComponent(S.rid || "") + (abEmail() ? "&prefilled_email=" + encodeURIComponent(abEmail()) : ""); try { window.open(u, "_blank", "noopener"); } catch (e) { location.href = u; } return; }
     openSheet(`<div class="ab-block"><span class="ab-blockic">${ico("abPack")}</span><div class="lbl">Pack ${AB_PACKS[k].t} · ${AB_PACKS[k].price} € HT/mois</div><div class="h2">Paiement en ligne bientôt disponible</div><p class="sub">Pour activer votre abonnement, écrivez-nous : nous vous envoyons un code d'activation dans la journée. Sans engagement, résiliable à tout moment.</p>
@@ -234,7 +242,7 @@ function abAdminList() {
   return L.slice(0, 300).map((r, i) => { const p = abPlan(r); return `<button class="glass ab-cl st" style="--i:${Math.min(3 + i, 12)}" data-act="abAdmOpen" data-id="${esc(r.id)}">${abMono(r)}
     <span class="ab-clb"><span class="ab-clh"><b>${esc(r.name || "Sans nom")}</b>${abPlanPill(p)}</span>
       <span class="ab-clm">${esc(r.ownerEmail || r.ownerName || r.owner || "—")}${r.ownerName && r.ownerEmail ? ` · ${esc(firstName(r.ownerName))}` : ""}</span>
-      <span class="ab-clm dim">${r.createdAt ? `Créé le ${abDate(r.createdAt)}` : "Date inconnue"} · ${r.nMembers == null ? "équipe ?" : `${r.nMembers} membre${r.nMembers > 1 ? "s" : ""}`} ${p.plan === "essai" || p.plan === "expire" ? `· pack ${AB_PACKS[r.pack === "essentiel" ? "essentiel" : "complet"].t} ` : ""}${r.id === S.rid ? "· ouvert ici" : ""}</span></span>${ico("chev")}</button>`; }).join("");
+      <span class="ab-clm dim">${r.createdAt ? `Créé le ${abDate(r.createdAt)}` : "Date inconnue"} · ${r.nMembers == null ? "équipe ?" : `${r.nMembers} membre${r.nMembers > 1 ? "s" : ""}`} ${p.plan === "essai" || p.plan === "expire" ? `· pack ${AB_PACKS[abPk(r.pack)].t} ` : ""}${r.id === S.rid ? "· ouvert ici" : ""}</span></span>${ico("chev")}</button>`; }).join("");
 }
 function abAdminUsers() {
   const A = AB.admin || {}; const q = AB.q.trim().toLowerCase();
@@ -251,7 +259,7 @@ VIEWS.admin = {
       <div class="ab-denied-b">${signed ? `<button class="btn soft" data-act="abAdmSwitch">${ico("swap")}Changer de compte</button>` : `<button class="btn acc" data-act="abAdmLogin">${ico("users")}Se connecter</button>`}${S.resto ? `<button class="btn ghost" data-go="home">Retour à l'app</button>` : ""}</div></div></div>`;
     abAdminFetch();
     const A = AB.admin || {}; const R = A.restos || [];
-    const n = { all: R.length, essai: 0, paye: 0, fin: 0 }; R.forEach((r) => { const p = abPlan(r); if (p.plan === "essai") n.essai++; else if (p.plan === "essentiel" || p.plan === "complet") n.paye++; else n.fin++; });
+    const n = { all: R.length, essai: 0, paye: 0, fin: 0 }; R.forEach((r) => { const p = abPlan(r); if (p.plan === "essai") n.essai++; else if (AB_LVL[p.plan]) n.paye++; else n.fin++; });
     const kpi = `<div class="ab-kpis st" style="--i:1"><div class="glass ab-kpi"><span class="lbl">Restaurants</span><b class="mono">${n.all}</b></div><div class="glass ab-kpi"><span class="lbl">En essai</span><b class="mono acc">${n.essai}</b></div><div class="glass ab-kpi"><span class="lbl">Abonnés</span><b class="mono ok">${n.paye}</b></div><div class="glass ab-kpi"><span class="lbl">Terminés</span><b class="mono ${n.fin ? "bad" : ""}">${n.fin}</b></div></div>`;
     const tabs = `<div class="seg ab-seg st" style="--i:2"><span class="knob" style="width:calc(50% - 4px);transform:translateX(${AB.tab === "comptes" ? "100%" : "0"})"></span><button class="${AB.tab === "restos" ? "on" : ""}" data-act="abAdmTab" data-v="restos">Restaurants</button><button class="${AB.tab === "comptes" ? "on" : ""}" data-act="abAdmTab" data-v="comptes">Comptes${A.users ? ` · ${A.users.length}` : ""}</button></div>
       <label class="ab-search st" style="--i:2">${ico("abSearch")}<input class="input" id="abQ" type="search" placeholder="${AB.tab === "comptes" ? "Nom, e-mail…" : "Restaurant, e-mail du gérant…"}" value="${esc(AB.q)}" autocomplete="off"></label>`;
@@ -269,7 +277,7 @@ function abAdmSheet(id) {
     <p class="note ab-line">${line} · ${r.nMembers == null ? "équipe inconnue" : `${r.nMembers} membre${r.nMembers > 1 ? "s" : ""}`} · <span class="mono">${esc(r.id)}</span></p>
     ${p.plan === "suspendu" ? `<button class="btn acc block" data-act="abAdmRestore">${ico("abPlay")}Rétablir l'accès</button>` : `
     <div class="lbl">Offrir l'accès</div>
-    <div class="seg ab-seg"><span class="knob" style="width:calc(50% - 4px);transform:translateX(${st.pack === "complet" ? "100%" : "0"})"></span><button class="${st.pack === "essentiel" ? "on" : ""}" data-act="abAdmPack" data-v="essentiel">Essentiel</button><button class="${st.pack === "complet" ? "on" : ""}" data-act="abAdmPack" data-v="complet">Complet</button></div>
+    <div class="seg ab-seg ab-seg3"><span class="knob" style="width:calc(33.333% - 2.67px);transform:translateX(${AB_ORDER.indexOf(st.pack) * 100}%)"></span>${AB_ORDER.map((k) => `<button class="${st.pack === k ? "on" : ""}" data-act="abAdmPack" data-v="${k}">${AB_PACKS[k].t}</button>`).join("")}</div>
     <div class="chips ab-dur">${dur.map(([m, t]) => `<button class="chip ${st.dur === m ? "on" : ""}" data-act="abAdmDur" data-v="${m}">${t}</button>`).join("")}</div>
     <button class="btn acc block" data-act="abAdmGrant">${ico("abGift")}Offrir ${AB_PACKS[st.pack].t} · ${dur.find(([m]) => m === st.dur)[1].toLowerCase()}</button>
     <div class="lbl">Essai</div>

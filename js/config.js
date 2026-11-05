@@ -9,9 +9,9 @@ window.GG_ADMINS = ["marceau.ruis@gmail.com"];
 /* ── Commercial layer (js/abo.js) ──
    Stripe Payment Links, one per pack (Stripe dashboard → Payment Links → « Créer »). null = no online payment yet: the app
    shows « Pour activer votre abonnement, contactez-nous » with the address below and the activation-code field. */
-window.GG_STRIPE = { essentiel: null, complet: null };
+window.GG_STRIPE = { essentiel: null, pro: null, complet: null };
 /* Activation codes typed by a gérant in Abonnement → « J'ai un code d'activation ». CHANGE THESE before giving any out. */
-window.GG_ACTIVATION = { "GG-ESSENTIEL-2026": "essentiel", "GG-COMPLET-2026": "complet" };
+window.GG_ACTIVATION = { "GG-ESSENTIEL-2026": "essentiel", "GG-PRO-2026": "pro", "GG-COMPLET-2026": "complet" };
 /* where « contactez-nous » writes */
 window.GG_CONTACT = "contact@growthgusto.fr";
 

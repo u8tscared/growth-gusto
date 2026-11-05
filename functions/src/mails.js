@@ -86,7 +86,7 @@ const step = (n, bg, fg, t, s) => `<tr><td style="padding:0 26px 10px"><table ro
 
 /* kind: "code" | "welcome" | "invite" | "trial3" | "last" | "ended" · d: { name, code, resto, ends, pack, from, roleT, link } */
 function mailHTML(kind, d = {}) {
-  const me = firstName(d.name), resto = esc(d.resto || "votre restaurant"), packT = d.pack === "essentiel" ? "Essentiel" : "Complet";
+  const me = firstName(d.name), resto = esc(d.resto || "votre restaurant"), packT = d.pack === "essentiel" ? "Essentiel" : d.pack === "pro" ? "Pro" : "Complet";
   if (kind === "code") {
     const c = String(d.code || "000000").replace(/\D/g, "").padEnd(6, "0").slice(0, 6);
     const box = (x) => `<td width="15%" align="center" style="padding:0 3px"><div style="background:#FFFFFF;border:1.5px solid #DCCFB8;border-bottom:4px solid #E2D6C2;border-radius:14px;font-family:${FM};font-size:30px;font-weight:700;line-height:58px;height:58px;color:#1B1530;text-align:center">${x}</div></td>`;
@@ -120,13 +120,14 @@ function mailHTML(kind, d = {}) {
     const ends = d.ends ? longDate(d.ends) : "dans 3 jours";
     return {
       subject: `Plus que 3 jours d'essai · ${d.resto || "Growth Gusto"}`, kind,
-      text: `Votre essai de Growth Gusto (${d.resto || "votre restaurant"}) se termine ${ends}.\nChoisissez votre formule pour continuer sans interruption : Essentiel 49 € HT / mois ou Complet 99 € HT / mois.\n${APP}?go=abonnement\n\nRien n'est effacé à la fin de l'essai.`,
+      text: `Votre essai de Growth Gusto (${d.resto || "votre restaurant"}) se termine ${ends}.\nChoisissez votre formule pour continuer sans interruption : Essentiel 59 €, Pro 109 € ou Complet 169 € HT / mois.\n${APP}?go=abonnement\n\nRien n'est effacé à la fin de l'essai.`,
       html: shell({ title: "Plus que 3 jours", pre: `Votre essai se termine ${ends}. Vos données restent à vous.`,
         hero: band("#FFF3D6", "#F1D9A0", resto, "#7A5A1A", `Plus que <span style="color:#C88A12">3&nbsp;jours</span> d'essai.`, "#1B1530", `Il se termine ${esc(ends)}.`, "#7A5A1A"),
         body: P(`${me ? esc(me) + ", c" : "C"}hoisissez votre formule pour que vos relevés, étiquettes et votre registre continuent sans interruption.`, "22px 26px 16px")
           + `<tr><td style="padding:0 22px 16px"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"><tr>
-<td width="50%" style="padding:0 4px"><div style="background:#FFFFFF;border:1.5px solid ${d.pack === "essentiel" ? "#5B2BFF" : "#E9DFCD"};border-radius:16px;padding:14px"><div style="font-family:${F};font-size:13px;font-weight:700;color:#615B74">Essentiel</div><div style="font-family:${FD};font-size:24px;font-weight:800;letter-spacing:-.5px;color:#1B1530;padding-top:2px">49&nbsp;€&nbsp;<span style="font-family:${F};font-size:12.5px;font-weight:600;color:#6E6880">HT/mois</span></div></div></td>
-<td width="50%" style="padding:0 4px"><div style="background:#FFFFFF;border:1.5px solid ${d.pack === "essentiel" ? "#E9DFCD" : "#5B2BFF"};border-radius:16px;padding:14px"><div style="font-family:${F};font-size:13px;font-weight:700;color:#615B74">Complet</div><div style="font-family:${FD};font-size:24px;font-weight:800;letter-spacing:-.5px;color:#1B1530;padding-top:2px">99&nbsp;€&nbsp;<span style="font-family:${F};font-size:12.5px;font-weight:600;color:#6E6880">HT/mois</span></div></div></td>
+<td width="33%" style="padding:0 4px"><div style="background:#FFFFFF;border:1.5px solid ${(d.pack === "essentiel") ? "#5B2BFF" : "#E9DFCD"};border-radius:16px;padding:14px"><div style="font-family:${F};font-size:13px;font-weight:700;color:#615B74">Essentiel</div><div style="font-family:${FD};font-size:20px;font-weight:800;letter-spacing:-.5px;color:#1B1530;padding-top:2px">59&nbsp;€&nbsp;<span style="font-family:${F};font-size:12.5px;font-weight:600;color:#6E6880">HT/mois</span></div></div></td>
+<td width="33%" style="padding:0 4px"><div style="background:#FFFFFF;border:1.5px solid ${(d.pack === "pro") ? "#5B2BFF" : "#E9DFCD"};border-radius:16px;padding:14px"><div style="font-family:${F};font-size:13px;font-weight:700;color:#615B74">Pro</div><div style="font-family:${FD};font-size:20px;font-weight:800;letter-spacing:-.5px;color:#1B1530;padding-top:2px">109&nbsp;€&nbsp;<span style="font-family:${F};font-size:12.5px;font-weight:600;color:#6E6880">HT/mois</span></div></div></td>
+<td width="33%" style="padding:0 4px"><div style="background:#FFFFFF;border:1.5px solid ${(d.pack !== "essentiel" && d.pack !== "pro") ? "#5B2BFF" : "#E9DFCD"};border-radius:16px;padding:14px"><div style="font-family:${F};font-size:13px;font-weight:700;color:#615B74">Complet</div><div style="font-family:${FD};font-size:20px;font-weight:800;letter-spacing:-.5px;color:#1B1530;padding-top:2px">169&nbsp;€&nbsp;<span style="font-family:${F};font-size:12.5px;font-weight:600;color:#6E6880">HT/mois</span></div></div></td>
 </tr></table></td></tr>`,
         cta: "Choisir ma formule", href: APP + "?go=abonnement",
         foot: `Vous essayez le pack ${packT}. Rien n'est effacé à la fin de l'essai : vos données restent à vous.` }),
@@ -157,7 +158,7 @@ function mailHTML(kind, d = {}) {
       hero: band("#FFE9DE", "#F6C9B8", resto, "#C8432A", over ? "Votre essai est terminé." : "Dernier jour d'essai.", "#1B1530", over ? "Tout est gardé, rien n'est effacé." : `L'essai s'arrête ${when}.`, "#C8432A"),
       body: P(over ? `${me ? esc(me) + ", v" : "V"}os relevés et étiquettes restent consultables. Pour en enregistrer de nouveaux, activez votre abonnement : une minute suffit.` : "Ensuite, l'app reste consultable mais n'enregistre plus rien. Activez votre abonnement pour continuer sans coupure.", "22px 26px 18px"),
       cta: "Activer mon abonnement", href: APP + "?go=abonnement",
-      foot: `Pack ${packT} : ${d.pack === "essentiel" ? "49" : "99"} € HT par mois, sans engagement. Une question ? Répondez à cet e&#8209;mail.` }),
+      foot: `Pack ${packT} : ${d.pack === "essentiel" ? "59" : d.pack === "pro" ? "109" : "169"} € HT par mois, sans engagement. Une question ? Répondez à cet e&#8209;mail.` }),
   };
 }
 

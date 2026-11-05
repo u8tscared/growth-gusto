@@ -217,7 +217,7 @@ const DB = {
   },
   /* commercial fields on a new restaurant (js/abo.js reads them): a 14-day trial of the pack chosen on the site, Complet by default */
   restoDefaults(d) {
-    const now = Date.now(); let pack = "complet"; try { if (localStorage.getItem("gg-plan") === "essentiel") pack = "essentiel"; localStorage.removeItem("gg-plan"); } catch (e) {}
+    const now = Date.now(); let pack = "complet"; try { const g = localStorage.getItem("gg-plan"); if (g === "essentiel" || g === "pro") pack = g; localStorage.removeItem("gg-plan"); } catch (e) {}
     return { plan: "essai", pack, trialEnds: ((d && d.createdAt) || now) + 14 * 864e5, ...(d || {}) };
   },
   /* the subscription gate (js/abo.js): once the trial is over, the app stays readable but a write opens the « essai terminé » sheet */
@@ -849,7 +849,7 @@ function registerSW() {
    to the foreground. A new v means the code running here is old: with nothing in progress the app reloads silently (caches dropped,
    so the reload is guaranteed fresh); otherwise a toast offers « Mettre à jour ». sessionStorage guards against reload loops:
    one reload attempt per version per session, after which the version is simply adopted. */
-const APP_V = "2026-11-05.10";
+const APP_V = "2026-11-05.11";
 const UPD = {
   running: null, offered: null,
   get: (k, store) => { try { return store.getItem(k); } catch (e) { return null; } },
