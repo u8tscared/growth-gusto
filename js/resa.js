@@ -142,14 +142,26 @@ function rsBadge() {
   let c = el.querySelector(".rs-cnt"); if (!n) { if (c) c.remove(); return; }
   if (!c) { c = document.createElement("span"); c.className = "count rs-cnt"; el.appendChild(c); } if (c.textContent !== String(n)) c.textContent = n;
 }
-try { const sd = document.getElementById("side"); if (sd) new MutationObserver(() => { if (R.rows) rsBadge(); }).observe(sd, { childList: true }); } catch (e) {}
+try { const sd = document.getElementById("side"); if (sd) new MutationObserver(() => { if (R.rows) rsBadge(); rsBrandSync(); }).observe(sd, { childList: true }); } catch (e) {}
 
 /* ───────── public projection (restos/{rid}/public/resa), written by any member's app ───────── */
+/* the restaurant logo shown on the booking page: Réglages › Logo (data: or https URL), kept to a sane size for the public doc */
+const rsLogo = () => { const l = typeof restoLogo === "function" ? restoLogo(S.resto) : (S.resto && S.resto.logo) || ""; return typeof l === "string" && /^(data:image\/|https:\/\/)/.test(l) && l.length <= 200000 ? l : ""; };
+/* the logo or the name changed (Réglages, onboarding, another device) while the Réservations screen is not open:
+   patch just those two keys of the public doc, so the booking page follows without waiting for the next full sync */
+const rsBrandSync = debounce(() => {
+  if (DB.mode !== "db" || !DB.db || !S.rid || !S.resto || !S.resto.resaCfg) return;
+  const sig = S.rid + "|" + (S.resto.name || "") + "|" + rsLogo();
+  if (R.brandRid !== S.rid) { R.brandRid = S.rid; R.brandSig = sig; return; } /* first look at this restaurant: nothing changed yet */
+  if (sig === R.brandSig) return; R.brandSig = sig;
+  if (R.rid === S.rid && R.pubSeen && R.rows) { rsSync(); return; }
+  DB.db.doc(`restos/${S.rid}/public/resa`).update({ name: S.resto.name || "", logo: rsLogo(), updatedAt: Date.now() }).catch((e) => console.warn("resa public brand", e && e.code));
+}, 1500);
 function rsPubDoc() {
   const cfg = rsCfg(), today = dayKey(), end = addDays(today, cfg.horizon + 1), days = {};
   rsRows().forEach((b) => { if (!rsLive(b) || !b.date || b.date < today || b.date > end) return; const t = rsBucket(cfg, b.date, b.time); (days[b.date] ||= {})[t] = (days[b.date][t] || 0) + (+b.covers || 0); });
   return {
-    v: 1, name: (S.resto && S.resto.name) || "", address: cfg.address || "", phone: cfg.phone || "", photo: cfg.photo || "", msg: cfg.msg || "",
+    v: 1, name: (S.resto && S.resto.name) || "", logo: rsLogo(), address: cfg.address || "", phone: cfg.phone || "", photo: cfg.photo || "", msg: cfg.msg || "",
     mail: !!(S.resto && S.resto.server && S.resto.server.resa),
     cfg: { services: cfg.services.map((s) => ({ id: s.id, name: s.name, from: s.from, to: s.to, days: s.days })), slot: cfg.slot, maxPerSlot: cfg.maxPerSlot, maxService: cfg.maxService,
       closures: cfg.closures.filter((c) => c && (c.to || c.from) >= today), online: !!cfg.online, validate: !!cfg.validate, waitlist: cfg.waitlist !== false, lead: cfg.lead, maxOnline: cfg.maxOnline, horizon: cfg.horizon },
@@ -518,6 +530,8 @@ function rsMailDay(k) { const D = ["dimanche", "lundi", "mardi", "mercredi", "je
 function rsMailHtml(kind, b, r, L) {
   const e = (v) => String(v == null ? "" : v).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const K = RS_MAIL_KINDS[kind] || RS_MAIL_KINDS.confirme, nm = e(String(b.name || "").trim().split(/\s+/)[0] || ""), rn = e(r.name || "le restaurant");
+  /* the restaurant logo, only as an https URL: most mail clients block data: images */
+  const lg = typeof r.logo === "string" && /^https:\/\/[^\s"'<>]+$/.test(r.logo) && r.logo.length <= 2000 ? r.logo : "";
   const lead = {
     demande: `Bonjour ${nm}, votre demande est bien arrivée chez <b>${rn}</b>. Le restaurant la valide au plus vite et vous recevrez un e-mail de confirmation.`,
     confirme: `Bonjour ${nm}, c'est confirmé : <b>${rn}</b> vous attend.`,
@@ -537,6 +551,7 @@ function rsMailHtml(kind, b, r, L) {
 <body style="margin:0;padding:0;background:#FBF6EC;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;color:#1B1530">
 <div style="max-width:500px;margin:0 auto;padding:24px 14px 32px">
  <div style="background:#4C1FEA;border-radius:26px 26px 0 0;padding:26px 24px 30px;color:#ffffff">
+  ${lg ? `<img src="${e(lg)}" width="52" height="52" alt="${rn}" style="display:block;width:52px;height:52px;border-radius:15px;background:#ffffff;object-fit:contain;margin:0 0 14px;border:0">` : ""}
   <div style="font-size:14px;color:#D9D2FF;font-weight:600">${rn}</div>
   <div style="font-size:28px;line-height:1.1;font-weight:800;letter-spacing:-.5px;margin-top:6px">${e(K.t)}</div>
  </div>
@@ -807,7 +822,7 @@ Object.assign(ACT, {
   rsMailPrev: (a, id, v) => {
     rsCeKeep(); SFX.tap(); const c = R.ce || rsCfg(), d = addDays(dayKey(), 3);
     const b = { name: "Camille Martin", date: d, time: "20:00", covers: 4, notes: "Anniversaire", resaMsg: v === "refuse" ? "Complet ce soir-là, désolés ! Le lendemain nous avons encore de la place." : v === "annule" ? "Fermeture exceptionnelle, toutes nos excuses." : "" };
-    const html = rsMailHtml(v, b, { name: (S.resto && S.resto.name) || "Votre restaurant", address: c.address || "", phone: c.phone || "" }, { manage: "#", ics: "#", book: "#" });
+    const html = rsMailHtml(v, b, { name: (S.resto && S.resto.name) || "Votre restaurant", address: c.address || "", phone: c.phone || "", logo: rsLogo() }, { manage: "#", ics: "#", book: "#" });
     const K = RS_MAIL_KINDS[v] || RS_MAIL_KINDS.confirme;
     openSheet(`<div class="rs-mpv"><div class="rs-edh"><span class="h2">Aperçu</span><button class="iconbtn" data-act="rsMailBack" aria-label="Retour">${ico("x")}</button></div>
       <div class="rs-mpo"><span>Objet</span><b>${esc(K.s({ name: (S.resto && S.resto.name) || "Votre restaurant" }, b, rsMailDay(d)))}</b></div>

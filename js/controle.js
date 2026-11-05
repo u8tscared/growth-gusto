@@ -803,10 +803,11 @@ function ctRcIdle() {
     <div class="ct-how st" style="--i:3">${[["search", "Cherchez le lot", "ou le nom du produit"], ["ctBlock", "Bloquez", "tout ce qui est en stock"], ["printer", "Imprimez", "la fiche de retrait"]].map(([ic, a, b], i) => `<div>${ctWell(ic, ["vi", "to", "sk"][i])}<b>${a}</b><em>${b}</em></div>`).join("")}</div>${hist}`;
 }
 VIEWS.rappel = {
-  nav: "controle",
+  nav: "rappel",
   render() {
     ctWatch(); const q = S.ui.ctRcQ || "";
     return `<div class="inner narrow ct ct-rc">${topBar("Rappel de lot")}
+      ${q ? "" : `<div class="ct-rcwhy st" style="--i:0"><b>À quoi ça sert ?</b><p>Votre fournisseur vous écrit : « les crevettes, lots X, Y et Z, sont rappelées, rupture de la chaîne du froid ». Tapez le numéro de lot ou le produit : l'app retrouve quand vous l'avez reçu, ce qui reste en stock et les étiquettes concernées, vous bloquez tout en un geste et vous imprimez la fiche de retrait pour le contrôle.</p></div>`}
       <label class="ct-search st" style="--i:1">${ico("search")}<input id="ctRcIn" type="search" enterkeyhint="search" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="N° de lot ou produit" value="${esc(q)}" aria-label="Numéro de lot ou nom du produit">${q ? `<button class="ct-clr" data-act="ctRcClear" aria-label="Effacer">${ico("x")}</button>` : ""}</label>
       <div id="ctRcRes" class="ct-rcres">${ctRcResults()}</div></div>`;
   },

@@ -65,6 +65,8 @@ function longDay(k) { const D = ["dimanche", "lundi", "mardi", "mercredi", "jeud
 function mailHtml(kind, b, r, L) {
   const e = (v) => String(v == null ? "" : v).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const K = KINDS[kind] || KINDS.confirme, nm = e(String(b.name || "").trim().split(/\s+/)[0] || ""), rn = e(r.name || "le restaurant");
+  /* the restaurant logo, only as an https URL: most mail clients block data: images */
+  const lg = typeof r.logo === "string" && /^https:\/\/[^\s"'<>]+$/.test(r.logo) && r.logo.length <= 2000 ? r.logo : "";
   const lead = {
     demande: `Bonjour ${nm}, votre demande est bien arrivée chez <b>${rn}</b>. Le restaurant la valide au plus vite et vous recevrez un e-mail de confirmation.`,
     confirme: `Bonjour ${nm}, c'est confirmé : <b>${rn}</b> vous attend.`,
@@ -84,6 +86,7 @@ function mailHtml(kind, b, r, L) {
 <body style="margin:0;padding:0;background:#FBF6EC;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;color:#1B1530">
 <div style="max-width:500px;margin:0 auto;padding:24px 14px 32px">
  <div style="background:#4C1FEA;border-radius:26px 26px 0 0;padding:26px 24px 30px;color:#ffffff">
+  ${lg ? `<img src="${e(lg)}" width="52" height="52" alt="${rn}" style="display:block;width:52px;height:52px;border-radius:15px;background:#ffffff;object-fit:contain;margin:0 0 14px;border:0">` : ""}
   <div style="font-size:14px;color:#D9D2FF;font-weight:600">${rn}</div>
   <div style="font-size:28px;line-height:1.1;font-weight:800;letter-spacing:-.5px;margin-top:6px">${e(K.t)}</div>
  </div>
@@ -119,7 +122,7 @@ async function keyOf(rid, bid) {
 async function sendMail(kind, rid, bid, b, resto) {
   const email = String(b.email || "").trim(); if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return false;
   if (!(await quota(1))) { logger.warn("resa: Brevo daily cap reached"); return false; }
-  const c = resto.resaCfg || {}, r = { name: resto.name || "Restaurant", address: c.address || "", phone: c.phone || "" };
+  const c = resto.resaCfg || {}, r = { name: resto.name || "Restaurant", address: c.address || "", phone: c.phone || "", logo: typeof resto.logo === "string" ? resto.logo : "" };
   const k = await keyOf(rid, bid), q = `?r=${encodeURIComponent(rid)}&b=${encodeURIComponent(bid)}&k=${k}`;
   const L = { manage: BASE + q, ics: BASE + q + "&ics=1", book: BASE + "?r=" + encodeURIComponent(rid) };
   const K = KINDS[kind] || KINDS.confirme;

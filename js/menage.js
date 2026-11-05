@@ -1,7 +1,11 @@
 /* Growth Gusto — area: menage (planning de ménage / plan de nettoyage HACCP)
-   Chore doc: { name, zone, moment, freq, days?, wday?, mday?, who?, notes?, photo?, createdAt }
+   Chore doc: { name, zone, moment, freq, days?, wday?, mday?, every?, start?, dates?, required?, who?, notes?, photo?, steps?, createdAt }
      moment: "ouverture" | "midi" | "fermeture"
      freq:   "jour" | "service" (midi + soir) | "jours" (days: getDay() numbers) | "semaine" (wday) | "mois" (mday)
+             | "ndays" (every N days from start) | "nweeks" (every N weeks from start's week, on days) | "dates" (dates: day keys) | "once" (dates: [one day key])
+     required: false = « Facultatif »: shown and checkable, never late, never counted in compliance / alerts (past ones are state "skip").
+   Restaurant settings (restos/{rid}): choreZones: [zone names] (the zone list once the gérant edits it; default MEN_ZONES),
+     chorePhotoStaff: bool (default true) = anyone who is not a gérant takes a photo to check any task.
      Legacy docs { name, zone, freq: "jour"|"semaine"|"mois" } keep working: no moment = fermeture,
      no wday / mday = « dans la semaine » / « dans le mois » (due by the end of the period).
    Log doc:   { choreId, at, day, uid, by?, slot? ("midi"|"soir", only for « après chaque service »), photoUrl?, photoId?, evId? } */
@@ -23,14 +27,18 @@ const MEN_MOMENTS = {
   midi: { t: "Après le service du midi", s: "après le midi", hint: "Dès la fin du midi", ic: "menMeal", due: 17 },
   fermeture: { t: "Fermeture", s: "fermeture", hint: "Avant de partir", ic: "menMoon", due: 24 },
 };
-const MEN_FREQS = [["jour", "Chaque jour"], ["service", "Après chaque service"], ["jours", "Jours précis"], ["semaine", "Chaque semaine"], ["mois", "Chaque mois"]];
+const MEN_FREQS = [["jour", "Chaque jour"], ["service", "Après chaque service"], ["jours", "Jours de la semaine"], ["ndays", "Tous les N jours"], ["semaine", "Chaque semaine"], ["nweeks", "Toutes les N semaines"], ["mois", "Chaque mois"], ["dates", "Dates précises"], ["once", "Une seule fois"]];
+const MEN_FREQ_KEYS = MEN_FREQS.map((f) => f[0]);
+const MEN_MOS = ["janv", "févr", "mars", "avr", "mai", "juin", "juil", "août", "sept", "oct", "nov", "déc"];
+const menIsKey = (k) => typeof k === "string" && /^\d{4}-\d{2}-\d{2}$/.test(k);
+const menDiff = (a, b) => Math.round((parseDay(b) - parseDay(a)) / 864e5); // whole days from a to b
 const MEN_DOW = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"]; // display order, Monday first
 const menDowJs = (i) => (i + 1) % 7; // display index -> getDay()
 const menDow = (k) => parseDay(k).getDay();
 const menWeekStart = (k) => addDays(k, -((menDow(k) + 6) % 7));
 const menMonthEnd = (k) => { const d = parseDay(k); return dayKey(new Date(d.getFullYear(), d.getMonth() + 1, 0)); };
 const menDim = (k) => +menMonthEnd(k).slice(8);
-const M = { busy: {}, tab: "jour", wk: 0, sel: null, open: {}, just: null, justAt: 0, ring: 0, logs: null, logsRid: null, names: [] };
+const M = { busy: {}, tab: "jour", wk: 0, sel: null, mo: 0, msel: null, open: {}, just: null, justAt: 0, ring: 0, logs: null, logsRid: null, names: [] };
 // the old free-text signer override (gg-men-signer) signed logs with someone else's name: dropped, the signer is always S.me
 try { localStorage.removeItem("gg-men-signer"); M.names = JSON.parse(localStorage.getItem("gg-men-names") || "[]"); } catch (e) {}
 const menSaveNames = () => { try { localStorage.setItem("gg-men-names", JSON.stringify(M.names)); } catch (e) {} };
@@ -56,12 +64,19 @@ function menNames() {
 }
 const menBy = (l) => firstName(l.by || nameOf(l.uid)) || "Quelqu'un";
 function menNorm(c) { // compatibility with legacy chore docs
-  const freq = ["jour", "service", "jours", "semaine", "mois"].includes(c.freq) ? c.freq : "jour";
-  return { ...c, name: c.name || "", freq, moment: MEN_MOMENTS[c.moment] ? c.moment : "fermeture", days: Array.isArray(c.days) ? c.days.map(Number) : [], wday: c.wday ?? null, mday: c.mday ?? null };
+  const freq = MEN_FREQ_KEYS.includes(c.freq) ? c.freq : "jour";
+  const dates = Array.isArray(c.dates) ? [...new Set(c.dates.filter(menIsKey))].sort() : [];
+  return { ...c, name: c.name || "", freq, moment: MEN_MOMENTS[c.moment] ? c.moment : "fermeture", days: Array.isArray(c.days) ? c.days.map(Number) : [], wday: c.wday ?? null, mday: c.mday ?? null,
+    every: Math.max(1, Math.min(365, Math.round(+c.every) || 1)), start: menIsKey(c.start) ? c.start : null, dates: freq === "once" ? dates.slice(0, 1) : dates, required: c.required !== false };
 }
 const MEN_MO = Object.keys(MEN_MOMENTS);
-const menZi = (z) => { const i = MEN_ZONES.indexOf(z); return i < 0 ? 99 : i; };
-const menChores = () => S.chores.map(menNorm).sort((a, b) => MEN_MO.indexOf(a.moment) - MEN_MO.indexOf(b.moment) || menZi(a.zone) - menZi(b.zone) || (a.createdAt || 0) - (b.createdAt || 0) || a.name.localeCompare(b.name, "fr"));
+/* zones: the restaurant's own list (resto.choreZones, once edited) else the presets, plus any zone a task still uses */
+function menZoneList() {
+  const base = Array.isArray(S.resto && S.resto.choreZones) ? S.resto.choreZones : MEN_ZONES;
+  return [...new Set([...base, ...S.chores.map((c) => c.zone)].map((z) => String(z || "").trim()).filter(Boolean))];
+}
+const menZi = (z, L = menZoneList()) => { const i = L.indexOf(z); return i < 0 ? 99 : i; };
+const menChores = () => { const ZL = menZoneList(); return S.chores.map(menNorm).sort((a, b) => MEN_MO.indexOf(a.moment) - MEN_MO.indexOf(b.moment) || menZi(a.zone, ZL) - menZi(b.zone, ZL) || (a.createdAt || 0) - (b.createdAt || 0) || a.name.localeCompare(b.name, "fr")); };
 const menStart = (c) => (c.createdAt ? dayKey(new Date(c.createdAt)) : "2000-01-01");
 
 /* occurrences of a chore due on day k */
@@ -73,6 +88,9 @@ function menOccOn(c, k) {
     case "jours": return c.days.includes(menDow(k)) ? one() : [];
     case "semaine": return c.wday == null ? (menDow(k) === 0 ? one({ flex: true }) : []) : menDow(k) === +c.wday ? one() : [];
     case "mois": return c.mday == null ? (k === menMonthEnd(k) ? one({ flex: true }) : []) : +k.slice(8) === Math.min(+c.mday, menDim(k)) ? one() : [];
+    case "ndays": { const s = c.start || menStart(c); return k >= s && menDiff(s, k) % c.every === 0 ? one() : []; }
+    case "nweeks": { const s = c.start || menStart(c); if (k < s || !c.days.includes(menDow(k))) return []; return (menDiff(menWeekStart(s), menWeekStart(k)) / 7) % c.every === 0 ? one() : []; }
+    case "dates": case "once": return c.dates.includes(k) ? one() : [];
     default: return one();
   }
 }
@@ -94,8 +112,14 @@ function menLogFor(o) { // first completion of the occurrence's period
   return null;
 }
 const MEN_SLOTS = ["midi", "soir"];
-/* state: done | late | todo | overdue | missed | upcoming */
+/* state: done | late | todo | overdue | missed | upcoming | skip (an optional task not done, its period over) */
 function menState(o, today = dayKey(), hour = new Date().getHours()) {
+  const st = menState0(o, today, hour);
+  if (o.c.required !== false) return st;
+  return (o.st = st === "overdue" ? "todo" : st === "missed" ? "skip" : st); // « facultatif »: never late, never missed
+}
+const menReq = (o) => o.c.required !== false;
+function menState0(o, today, hour) {
   const l = menLogFor(o); o.log = l;
   if (l) return (o.st = l.day > o.day ? "late" : "done");
   if (o.day > today) return (o.st = "upcoming");
@@ -116,29 +140,30 @@ function menToday() {
     cand.forEach((o) => {
       if (seen.has(menKey(o))) return; menState(o);
       if (o.flex && o.st === "upcoming") o.st = "todo"; // « dans la semaine / le mois » : open until the end of the period
-      if (o.st === "missed" || (o.day < ws && o.st !== "overdue")) return;
+      if (o.st === "missed" || o.st === "skip" || (o.day < ws && o.st !== "overdue" && !(o.st === "todo" && !menReq(o)))) return;
       seen.add(menKey(o)); week.push(o);
     });
   });
-  const rank = { overdue: 0, todo: 1, upcoming: 2, missed: 3, late: 4, done: 4 };
+  const rank = { overdue: 0, todo: 1, upcoming: 2, missed: 3, skip: 3, late: 4, done: 4 };
   week.sort((a, b) => rank[a.st] - rank[b.st] || (a.day < b.day ? -1 : 1));
   return { groups, week };
 }
 /* Single source of truth for « today's cleaning »: exactly what the Today tab lists (today's moments + this week's / month's
    items that are open or already done this period; items only planned later in the week are not counted yet).
+   Optional tasks (« facultatif ») are left out of every count.
    Global used by home and the report: menDayStats() -> { done, total, late, pct } */
 function menDayStats() {
-  const { groups, week } = menToday(); const L = [...groups.ouverture, ...groups.midi, ...groups.fermeture, ...week].filter((o) => o.st !== "upcoming" && o.st !== "missed");
+  const { groups, week } = menToday(); const L = [...groups.ouverture, ...groups.midi, ...groups.fermeture, ...week].filter((o) => menReq(o) && o.st !== "upcoming" && o.st !== "missed");
   const done = L.filter(menIsDone).length; const late = L.filter((o) => o.st === "overdue").length;
   return { done, total: L.length, late, pct: L.length ? Math.round((done / L.length) * 100) : null };
 }
-function menDueToday() { const { groups, week } = menToday(); const set = new Set(); [...groups.ouverture, ...groups.midi, ...groups.fermeture, ...week].forEach((o) => { if (o.st === "todo" || o.st === "overdue") set.add(o.c.id); }); return S.chores.filter((c) => set.has(c.id)); }
-// Global used by home's « À traiter »: array of chore docs still due now (today's + this week's open ones).
+function menDueToday() { const { groups, week } = menToday(); const set = new Set(); [...groups.ouverture, ...groups.midi, ...groups.fermeture, ...week].forEach((o) => { if (menReq(o) && (o.st === "todo" || o.st === "overdue")) set.add(o.c.id); }); return S.chores.filter((c) => set.has(c.id)); }
+// Global used by home's « À traiter »: array of chore docs still due now (today's + this week's open ones; optional tasks never nag).
 function choresDue() { return menDueToday(); }
 
-/* compliance over [a, b] (b capped at today; today's still-open tasks are not counted yet) */
+/* compliance over [a, b] (b capped at today; today's still-open tasks are not counted yet; optional tasks never count) */
 function menCompliance(a, b, filter) {
-  const t = dayKey(); if (b > t) b = t; let done = 0, tot = 0, late = 0; const missed = []; const cs = menChores().filter((c) => !filter || filter(c));
+  const t = dayKey(); if (b > t) b = t; let done = 0, tot = 0, late = 0; const missed = []; const cs = menChores().filter((c) => c.required && (!filter || filter(c)));
   for (let k = a; k <= b; k = addDays(k, 1)) cs.forEach((c) => menOccOn(c, k).forEach((o) => {
     const st = menState(o); if (st === "done" || st === "late") { done++; tot++; if (st === "late") late++; } else if (st === "missed" || (st === "overdue" && k < t)) { tot++; missed.push(o); }
   }));
@@ -154,8 +179,15 @@ function menFreqTx(c) {
   if (c.freq === "jours") return c.days.length ? MEN_DOW.filter((_, i) => c.days.includes(menDowJs(i))).join(", ") : "Aucun jour choisi";
   if (c.freq === "semaine") return c.wday == null ? "Chaque semaine" : `Chaque ${DAYS[c.wday]}`;
   if (c.freq === "mois") return c.mday == null ? "Chaque mois" : c.mday == 1 ? "Le 1er du mois" : `Le ${c.mday} du mois`;
+  const from = c.start && c.start > dayKey() ? `, dès le ${menDateTx(c.start)}` : "";
+  if (c.freq === "ndays") return `${c.every > 1 ? `Tous les ${c.every} jours` : "Chaque jour"}${from}`;
+  if (c.freq === "nweeks") { const dd = MEN_DOW.filter((_, i) => c.days.includes(menDowJs(i))).map((d) => d.toLowerCase()); return `${c.every > 1 ? `Toutes les ${c.every} semaines` : "Chaque semaine"}${dd.length ? `, ${dd.length > 1 ? dd.slice(0, -1).join(", ") + " et " + dd[dd.length - 1] : dd[0]}` : ""}${from}`; }
+  if (c.freq === "once") return c.dates.length ? `Une fois, le ${menDateTx(c.dates[0])}` : "Date à choisir";
+  if (c.freq === "dates") { if (!c.dates.length) return "Aucune date choisie"; const t = dayKey(); const next = c.dates.filter((k) => k >= t); const L = (next.length ? next : c.dates.slice(-3)); return L.slice(0, 3).map(menDateTx).join(", ") + (L.length > 3 ? ` +${L.length - 3}` : ""); }
   return "Chaque jour";
 }
+/* « 12 nov », with the year when it is not this year's */
+const menDateTx = (k) => { const d = parseDay(k); return `${d.getDate() === 1 ? "1er" : d.getDate()} ${MEN_MOS[d.getMonth()]}${d.getFullYear() !== new Date().getFullYear() ? ` ${d.getFullYear()}` : ""}`; };
 const menMomentTx = (c) => (c.freq === "service" ? "midi et soir" : MEN_MOMENTS[c.moment].s);
 const menSlotTx = (s) => (s === "midi" ? "Midi" : s === "soir" ? "Soir" : "");
 const menCheckSvg = `<svg viewBox="0 0 24 24"><path d="M6 12.5l4 4 8-9"/></svg>`;
@@ -177,11 +209,11 @@ const menWhenTx = (o) => (o.flex ? (o.c.freq === "mois" ? "dans le mois" : "dans
 VIEWS.menage = {
   render() {
     menWatch();
-    const tabs = [["jour", "Aujourd'hui"], ["semaine", "Semaine"], ["plan", "Plan"]]; const ti = Math.max(0, tabs.findIndex((t) => t[0] === M.tab));
+    const tabs = [["jour", "Aujourd'hui"], ["semaine", "Semaine"], ["mois", "Mois"], ["plan", "Plan"]]; const ti = Math.max(0, tabs.findIndex((t) => t[0] === M.tab));
     const head = `${topBar("Planning ménage", { right: S.chores.length ? `<button class="btn soft sm" data-act="menEdit">${ico("plus")}Tâche</button>` : "" })}
-      ${S.chores.length ? `<div class="seg men-tabs st" style="--i:1" role="tablist"><span class="knob" style="width:calc(33.33% - 3px);transform:translateX(${ti * 100}%)"></span>${tabs.map(([k, t]) => `<button class="${M.tab === k ? "on" : ""}" role="tab" aria-selected="${M.tab === k}" data-act="menTab" data-v="${k}">${t}</button>`).join("")}</div>` : ""}`;
+      ${S.chores.length ? `<div class="seg men-tabs st" style="--i:1" role="tablist"><span class="knob" style="width:calc(25% - 2px);transform:translateX(${ti * 100}%)"></span>${tabs.map(([k, t]) => `<button class="${M.tab === k ? "on" : ""}" role="tab" aria-selected="${M.tab === k}" data-act="menTab" data-v="${k}">${t}</button>`).join("")}</div>` : ""}`;
     if (!S.chores.length) return `<div class="inner narrow men">${head}${menEmpty()}</div>`;
-    const body = M.tab === "semaine" ? menWeekView() : M.tab === "plan" ? menPlanView() : menTodayView();
+    const body = M.tab === "semaine" ? menWeekView() : M.tab === "mois" ? menMonthView() : M.tab === "plan" ? menPlanView() : menTodayView();
     return `<div class="inner wide men men-t-${M.tab}">${head}${body}</div>`;
   },
   after(v) {
@@ -225,9 +257,9 @@ function menTodayView() {
     </div></div>`;
   let i = 3;
   const sec = (g, title, hint, icn, L, showDay) => {
-    if (!L.length) return ""; const d = L.filter(menIsDone).length; const full = d === L.length; const open = M.open[g] ?? !full; const isCur = g === cur && !full;
+    if (!L.length) return ""; const R = L.some(menReq) ? L.filter(menReq) : L; const d = R.filter(menIsDone).length; const full = d === R.length; const open = M.open[g] ?? !full; const isCur = g === cur && !full;
     return `<section class="glass men-g ${full ? "full" : ""} ${isCur ? "cur" : ""} st" style="--i:${i++}">
-      <button class="men-gh" data-act="menGroup" data-v="${g}" aria-expanded="${open}"><span class="ic ${full ? "ok" : ""}">${ico(icn)}</span><span class="men-gt"><b>${title}</b><em>${full ? "Tout est fait" : (isCur ? "Maintenant · " : "") + hint}</em></span><span class="men-gc mono">${d}/${L.length}</span>${ico("down", "men-chev" + (open ? " on" : ""))}</button>
+      <button class="men-gh" data-act="menGroup" data-v="${g}" aria-expanded="${open}"><span class="ic ${full ? "ok" : ""}">${ico(icn)}</span><span class="men-gt"><b>${title}</b><em>${full ? "Tout est fait" : (isCur ? "Maintenant · " : "") + hint}</em></span><span class="men-gc mono">${d}/${R.length}</span>${ico("down", "men-chev" + (open ? " on" : ""))}</button>
       <div class="men-rows ${open ? "" : "shut"}"><div>${L.map((o) => menRow(o, showDay)).join("")}</div></div></section>`;
   };
   const wk = sec("week", "À faire cette semaine", "Tâches hebdomadaires et mensuelles", "menCal", week, true);
@@ -238,10 +270,10 @@ function menTodayView() {
 }
 function menRow(o, showDay) {
   const c = o.c, l = o.log, k = menKey(o), dn = menIsDone(o); const just = M.just === k && Date.now() - M.justAt < 1400;
-  const canDo = !dn && o.st !== "missed" && (o.st !== "upcoming" || showDay);
+  const canDo = !dn && o.st !== "missed" && o.st !== "skip" && (o.st !== "upcoming" || showDay);
   const sub = dn ? `<span class="men-who">${esc(menBy(l))} · ${when(l.at)}${o.st === "late" ? " · en retard" : ""}</span>` : [showDay ? menWhenTx(o) : "", c.zone, c.notes].filter(Boolean).map(esc).join(" · ");
   const per = !showDay && (c.freq === "semaine" || c.freq === "mois") ? `<span class="men-tag">${c.freq === "mois" ? "Mensuel" : "Hebdo"}</span>` : "";
-  const tags = `${per}${o.slot ? `<span class="men-tag">${menSlotTx(o.slot)}</span>` : ""}${c.who && !dn ? `<span class="men-tag who">${esc(firstName(c.who))}</span>` : ""}${(c.photo || menMustPhoto()) && !dn ? `<span class="men-tag ph" title="Photo obligatoire">${ico("camera")}</span>` : ""}${o.st === "overdue" ? `<span class="pill bad"><span class="dot"></span>En retard</span>` : ""}`;
+  const tags = `${per}${!menReq(o) ? `<span class="men-tag opt">Facultatif</span>` : ""}${o.slot ? `<span class="men-tag">${menSlotTx(o.slot)}</span>` : ""}${c.who && !dn ? `<span class="men-tag who">${esc(firstName(c.who))}</span>` : ""}${menNeedPhoto(c) && !dn ? `<span class="men-tag ph" title="Photo obligatoire">${ico("camera")}</span>` : ""}${o.st === "overdue" ? `<span class="pill bad"><span class="dot"></span>En retard</span>` : ""}`;
   const gd = !dn ? `<button class="men-ph gd" data-act="menGuide" data-id="${c.id}" aria-label="Comment faire : ${esc(c.name)}">${ico("book")}</button>` : "";
   const right = dn ? (menHasPic(l) ? `<button class="men-ph" data-act="menLog" data-id="${l.id}" aria-label="Voir la photo">${menImg(l)}</button>` : `<button class="men-ph add" data-act="menPhotoAdd" data-id="${l.id}" aria-label="Ajouter une photo de preuve">${ico("camera")}</button>`) : "";
   const act = canDo ? `data-act="menDo" data-v="${k}" aria-label="Marquer « ${esc(c.name)} » comme fait"` : dn ? `data-act="menLog" data-id="${l.id}" aria-label="Détails de « ${esc(c.name)} »"` : `data-act="menHist" data-id="${c.id}"`;

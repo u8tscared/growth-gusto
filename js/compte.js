@@ -420,13 +420,14 @@ VIEWS.reglages = {
     const me = ccMember(S.me.id) || { id: S.me.id, name: S.me.name, color: S.me.color }; const local = ccLocalMode(); const al = ccAutoLock(); const lb = +(ccLS.raw("gg-lastbackup") || 0);
     const gerant = myRole() === "gerant";
     return `<div class="inner cc-wide">${topBar("Réglages")}
-      <div class="cc-hero st" style="--i:1">${ccAva(me, 52)}<div style="flex:1;min-width:0"><b>${esc(S.me.name || "Vous")}</b><span>${ROLES[myRole()]} · ${esc(S.resto?.name || "")}</span></div>${local ? `<button class="btn sm cc-hero-btn" data-act="whoami">${ico("swap")}Changer</button>` : ""}</div>
+      <div class="cc-hero st" style="--i:1">${ccAva(me, 52)}<div style="flex:1;min-width:0"><b>${esc(S.me.name || "Vous")}</b><span class="cc-hero-r">${ROLES[myRole()]} · ${restoLogo() ? restoMark(16) : ""}${esc(S.resto?.name || "")}</span></div>${local ? `<button class="btn sm cc-hero-btn" data-act="whoami">${ico("swap")}Changer</button>` : ""}</div>
       <div class="cc-cols"><div class="cc-col">
       <div class="lbl st cc-sec" style="--i:2">Restaurant</div>
       <div class="glass pad st" style="--i:2">
         <div class="li tap" data-act="${local && ccMember(S.me.id) ? "ccMemberEdit" : "meRename"}" data-id="${S.me.id}"><span class="ic">${ico("users")}</span><div class="tx"><b>Mon profil</b><em>${esc(S.me.name || "À renseigner, il signe vos relevés")}</em></div>${ico("chev")}</div>
         ${local && ccMember(S.me.id) ? `<div class="li tap" data-act="ccPinChange"><span class="ic w-in">${ico("lock")}</span><div class="tx"><b>Mon code</b><em>${ccHasPin(ccMember(S.me.id)) ? "Actif · toucher pour le changer" : "À créer : il protège votre profil"}</em></div>${ccHasPin(ccMember(S.me.id)) ? ico("chev") : `<span class="pill warn">À créer</span>`}</div>` : ""}
         <div class="li tap" data-act="restoRename"><span class="ic">${ico("edit")}</span><div class="tx"><b>Nom du restaurant</b><em>${esc(S.resto?.name || "")}</em></div>${ico("chev")}</div>
+        ${gerant ? `<div class="li tap" data-act="restoLogo"><span class="ic cc-logo-ic">${restoLogo() ? restoMark(30) : ico("image")}</span><div class="tx"><b>Logo</b><em>${restoLogo() ? "Sur l'app, les documents et la page de réservation" : "À ajouter : il apparaît partout, réservation comprise"}</em></div>${ico("chev")}</div>` : ""}
         ${gerant && typeof OB !== "undefined" ? `<div class="li tap" data-act="obComplete"><span class="ic w-sa">${ico("obCard")}</span><div class="tx"><b>Compléter la fiche du restaurant</b><em>${[S.resto?.logo ? "" : "logo", S.resto?.address ? "" : "adresse", S.fridges.length ? "" : "frigos", S.resto?.printer ? "" : "imprimante"].filter(Boolean).join(", ") || "Logo, adresse, frigos, équipe, imprimante"}</em></div>${ico("chev")}</div>` : ""}
         <div class="li tap" data-act="restoSwitch"><span class="ic w-sk">${ico("store")}</span><div class="tx"><b>Établissements</b><em>${S.restos.length} · changer ou en ajouter un</em></div>${ico("chev")}</div>
         ${typeof abRow === "function" ? abRow() : ""}
@@ -515,7 +516,7 @@ VIEWS.more = {
     let k = 2;
     const me = ccMember(S.me.id) || { id: S.me.id, name: S.me.name, color: S.me.color };
     return `<div class="inner narrow cc-more">${topBar("Tout Growth Gusto", { noBack: true })}
-      <div class="cc-hero st" style="--i:1">${ccAva(me, 46)}<div style="flex:1;min-width:0"><b>${esc(S.me.name || "Vous")}</b><span>${ROLES[myRole()]} · ${esc(S.resto?.name || "")}</span></div>${ccLocalMode() ? `<button class="btn sm cc-hero-btn" data-act="whoami">${ico("swap")}Changer</button>` : ""}</div>
+      <div class="cc-hero st" style="--i:1">${ccAva(me, 46)}<div style="flex:1;min-width:0"><b>${esc(S.me.name || "Vous")}</b><span class="cc-hero-r">${ROLES[myRole()]} · ${restoLogo() ? restoMark(16) : ""}${esc(S.resto?.name || "")}</span></div>${ccLocalMode() ? `<button class="btn sm cc-hero-btn" data-act="whoami">${ico("swap")}Changer</button>` : ""}</div>
       ${grp.map(([g, items]) => { const its = items.filter(([r]) => VIEWS[r] && canSee(r)); if (!its.length) return ""; const n = its.length, c = n % 3 === 0 ? 3 : n === 4 || n === 7 || n === 8 ? 4 : n <= 2 ? 2 : 3; return `<div class="lbl st cc-sec" style="--i:${k++}">${g}</div><div class="cc-grid c${c} st" style="--i:${k++}">${its.map(([r, i, t, b, tone, w]) => `<button class="cc-gt ${w || CC_WELL[r] || "w-vi"}" data-go="${r}" ${r === "reception" ? 'data-fresh="1"' : ""}><span class="ic">${ico(IC[i] ? i : "grid")}${b ? `<span class="cc-gb mono ${tone || ""}">${b}</span>` : ""}</span><span class="t">${esc(t)}</span></button>`).join("")}</div>`; }).join("")}
       ${myRole() !== "gerant" && ccLocalMode() ? `<p class="note st cc-more-note" style="--i:${k}">${ico("lock")}Finances, salaires et tableau de bord sont réservés au gérant.</p>` : ""}
     </div>`;
@@ -672,7 +673,7 @@ Object.assign(ACT, {
 
   /* établissements */
   restoSwitch: () => {
-    openSheet(`<div class="h2" style="font-size:20px">Établissements</div>${S.restos.map((r) => `<div class="li tap" data-act="restoPick" data-id="${r.id}"><span class="cc-mono sm">${esc(initials(r.name))}</span><div class="tx"><b>${esc(r.name)}</b><em>${r.id === S.rid ? "Ouvert en ce moment" : "Toucher pour ouvrir"}</em></div>${r.id === S.rid ? `<span class="check cc-curck"><svg viewBox="0 0 24 24"><path d="M6 12.5l4 4 8-9"/></svg></span>` : ico("chev")}</div>`).join("")}
+    openSheet(`<div class="h2" style="font-size:20px">Établissements</div>${S.restos.map((r) => `<div class="li tap" data-act="restoPick" data-id="${r.id}">${restoMark(40, r, `<span class="cc-mono sm">${esc(initials(r.name))}</span>`)}<div class="tx"><b>${esc(r.name)}</b><em>${r.id === S.rid ? "Ouvert en ce moment" : "Toucher pour ouvrir"}</em></div>${r.id === S.rid ? `<span class="check cc-curck"><svg viewBox="0 0 24 24"><path d="M6 12.5l4 4 8-9"/></svg></span>` : ico("chev")}</div>`).join("")}
       ${myRole() === "gerant" ? `<div class="hstack"><input class="input" id="newResto" placeholder="Nouvel établissement" maxlength="60" enterkeyhint="done" style="flex:1;min-width:0"><button class="btn acc" data-act="restoAdd">${ico("plus")}Ajouter</button></div><span class="note">Chaque établissement a ses frigos, son équipe et son registre.</span>` : ""}`);
   },
   restoPick: (a, id) => {
@@ -686,6 +687,35 @@ Object.assign(ACT, {
   restoAdd: () => ccOnce("restoAdd", ACT.restoAdd0),
   restoAdd0: async () => { const n = ($("#newResto").value || "").trim(); if (!n) { ccShake($("#newResto")); return; } const rid = "r" + Date.now().toString(36); await safe(DB.set("restos", rid, { name: n, createdAt: Date.now(), by: S.me.id })); if (!S.restos.find((r) => r.id === rid)) S.restos.push({ id: rid, name: n }); const me = { ...S.me }; const g = ccLS.get("gg-who", {}); g[rid] = { id: me.id, name: me.name || "", color: me.color || "" }; ccLS.set("gg-who", g);
     ACT.restoPick(null, rid); await DB.set("members", me.id, { role: "gerant", joinedAt: Date.now(), ...(me.name ? { name: me.name } : {}), ...(me.color ? { color: me.color } : {}) }).catch(() => {}); S.isOwner = true; await logEvent("team", `a créé ${n}`); renderChrome(); SFX.done(); burst(); },
+  /* Réglages › Logo (gérant): pick → ≤ 256 px JPEG data URL on white (whole logo, never cropped), or remove.
+     restos/{rid}.logo feeds the side bar, Accueil, documents and labels; js/resa.js copies it to the booking page. */
+  restoLogo: () => {
+    if (myRole() !== "gerant") { SFX.err(); toast("Réservé au gérant", "err"); return; }
+    SFX.tap(); const has = !!restoLogo();
+    openSheet(`<div class="h2" style="font-size:20px">Logo du restaurant</div><p class="sub">Il apparaît dans l'application, sur vos documents (registre, dossier sanitaire, fiches) et sur votre page de réservation.</p>
+      <div class="cc-logo-pv">${restoMark(96)}<b>${esc(S.resto?.name || "")}</b></div>
+      <button class="btn acc block" data-act="restoLogoPick">${ico("image")}${has ? "Changer le logo" : "Importer une image"}</button>
+      ${has ? `<button class="btn ghost block" data-act="restoLogoDel">Retirer le logo</button>` : ""}<span class="note">Une image carrée sur fond clair rend le mieux. Elle est réduite à 256 px.</span>`);
+  },
+  restoLogoPick: async () => {
+    const [f] = await pickImage(); if (!f) return;
+    let u = "";
+    try {
+      const img = await new Promise((r, j) => { const i = new Image(); i.onload = () => r(i); i.onerror = j; i.src = URL.createObjectURL(f); });
+      const k = Math.min(1, 256 / Math.max(img.width, img.height)), w = Math.max(1, Math.round(img.width * k)), h = Math.max(1, Math.round(img.height * k));
+      const c = document.createElement("canvas"); c.width = w; c.height = h; const x = c.getContext("2d"); x.fillStyle = "#fff"; x.fillRect(0, 0, w, h); x.drawImage(img, 0, 0, w, h);
+      try { URL.revokeObjectURL(img.src); } catch (e) {}
+      for (const q of [0.88, 0.76, 0.62, 0.48, 0.36]) { u = c.toDataURL("image/jpeg", q); if (u.length <= 48 * 1024) break; }
+    } catch (e) { console.warn("logo", e); SFX.err(); toast("Image illisible. Essayez une autre image.", "err"); return; }
+    await ACT.restoLogoSet(u); toast("Logo enregistré");
+  },
+  restoLogoDel: async () => { await ACT.restoLogoSet(""); toast("Logo retiré"); },
+  restoLogoSet: async (u) => {
+    await safe(DB.update("restos", S.rid, { logo: u }));
+    [S.resto, S.restos.find((x) => x.id === S.rid)].forEach((r) => { if (r) r.logo = u; });
+    if (typeof logEvent === "function") logEvent("team", u ? "a changé le logo du restaurant" : "a retiré le logo du restaurant").catch(() => {});
+    closeSheet(true); SFX.ok(); buzz(8); renderChrome(); rerender();
+  },
   restoRename: () => { openSheet(`<div class="h2" style="font-size:20px">Nom du restaurant</div><input class="input" id="rn" value="${esc(S.resto.name)}"><button class="btn acc block" data-act="restoRenameOk">Enregistrer</button>`); },
   meRename: () => { openSheet(`<div class="h2" style="font-size:20px">Votre prénom</div><input class="input" id="mn" value="${esc(S.me.name)}" autocomplete="given-name"><button class="btn acc block" data-act="meRenameOk">Enregistrer</button>`); },
   meRenameOk: async () => { const n = ($("#mn").value || "").trim(); if (!n) return; S.me.name = n; S.profiles[S.me.id] = { ...(S.profiles[S.me.id] || {}), name: n }; if (S.me.id === "local") { try { localStorage.setItem("gg-name", n); } catch (e) {} } ccSaveWho(); await DB.update("members", S.me.id, { name: n }).catch(() => DB.set("members", S.me.id, { role: myRole(), joinedAt: Date.now(), name: n }).catch(() => {})); closeSheet(true); SFX.ok(); renderChrome(); rerender(); },

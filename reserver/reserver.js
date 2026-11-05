@@ -1,5 +1,5 @@
 /* Growth Gusto — public booking page (https://app.growthgusto.fr/reserver/?r=<rid>). No account, no tracking.
-   Reads restos/{rid}/public/resa (name, address, photo, cfg, booked covers per day and slot — never a client's data, see js/resa.js rsPubDoc)
+   Reads restos/{rid}/public/resa (name, logo, address, photo, cfg, booked covers per day and slot — never a client's data, see js/resa.js rsPubDoc)
    and creates one booking restos/{rid}/bookings/{id}, in a batch that also adds its covers to the slot counter of the public doc and
    writes the booking's private manage key resaKeys/{rid}/keys/{id} (firestore.rules check all three: tools/resa.rules.txt).
    Status: "en ligne" (confirmed at once), "avalider" (the restaurant validates each request: cfg.validate), "attente" (waiting list on a
@@ -140,10 +140,16 @@
   }
 
   /* ───────── views ───────── */
+  /* the restaurant logo (Réglages › Logo in the app, copied into the public doc by js/resa.js): hero tile and tab icon */
+  const logoOf = (p) => (p && typeof p.logo === "string" && /^(data:image\/|https:\/\/)/.test(p.logo) ? p.logo : "");
+  function brandIcon(p) {
+    const lg = logoOf(p); if (!lg || brandIcon.done === lg) return; brandIcon.done = lg;
+    try { document.querySelectorAll('link[rel~="icon"],link[rel="apple-touch-icon"]').forEach((l) => l.remove()); ["icon", "apple-touch-icon"].forEach((rel) => { const l = document.createElement("link"); l.rel = rel; l.href = lg; document.head.appendChild(l); }); } catch (e) {}
+  }
   function hero() {
-    const p = st.pub || {};
+    const p = st.pub || {}, lg = logoOf(p); brandIcon(p);
     return `<header class="rv-hero"><div class="rv-hero-in">
-      <div class="rv-ph">${p.photo ? `<img src="${esc(p.photo)}" alt="">` : `<span>${esc(initials(p.name))}</span>`}</div>
+      <div class="rv-ph${lg ? " logo" : ""}">${lg ? `<img src="${esc(lg)}" alt="${esc(p.name || "")}" referrerpolicy="no-referrer">` : p.photo ? `<img src="${esc(p.photo)}" alt="">` : `<span>${esc(initials(p.name))}</span>`}</div>
       <div class="rv-hn"><span class="rv-k">${MANAGE ? "Votre réservation" : "Réserver une table"}</span><h1>${esc(p.name || "Restaurant")}</h1>${p.address ? `<p>${svg.pin}${esc(p.address)}</p>` : ""}</div>
     </div></header>`;
   }

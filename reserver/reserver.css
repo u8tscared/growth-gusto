@@ -194,3 +194,6 @@ svg{width:18px;height:18px;flex:none;fill:none;stroke:currentColor;stroke-width:
 .rv-rmsg{background:var(--saffron-tint);color:var(--saffron-ink)!important;border-radius:14px;padding:11px 14px;font-weight:600}
 .rv-q{font-size:28px!important}
 .rv-mine .rv-hint a{color:var(--accent-ink);font-weight:700}
+/* the restaurant logo (public doc `logo`): whole logo on white, never cropped */
+.rv-ph.logo{background:#fff}
+.rv-ph.logo img{object-fit:contain;padding:6px;box-sizing:border-box}

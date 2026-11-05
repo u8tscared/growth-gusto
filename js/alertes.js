@@ -421,7 +421,7 @@ VIEWS.sites = {
     const card = (r, i) => {
       const st = alSiteStat(r), cur = r.id === S.rid, lv = !st || st.conf == null ? "neu" : st.conf >= 95 ? "ok" : st.conf >= 80 ? "warn" : "bad";
       return `<div class="glass al-site st${cur ? " cur" : ""}" style="--i:${i + 2}" ${cur ? `data-go="alertes"` : `data-act="alSitePick" data-id="${esc(r.id)}"`} role="button" tabindex="0" aria-label="${cur ? "Voir les alertes de" : "Ouvrir"} ${esc(r.name)}">
-        <div class="al-sh"><span class="al-mono">${esc(initials(r.name))}</span><div class="al-sn"><b>${esc(r.name)}</b><em>${cur ? "Ouvert en ce moment" : "Toucher pour ouvrir"}</em></div>${cur ? `<span class="pill acc">Ici</span>` : `<span class="al-open">${ico("chev")}</span>`}</div>
+        <div class="al-sh">${restoMark(46, r, `<span class="al-mono">${esc(initials(r.name))}</span>`)}<div class="al-sn"><b>${esc(r.name)}</b><em>${cur ? "Ouvert en ce moment" : "Toucher pour ouvrir"}</em></div>${cur ? `<span class="pill acc">Ici</span>` : `<span class="al-open">${ico("chev")}</span>`}</div>
         ${st ? `<div class="al-sg">
           <div class="al-sk al-conf">${alRing(st.conf, lv)}<span class="al-cv">${st.conf == null ? "–" : st.conf + "<small>%</small>"}</span><em>Conformité</em></div>
           <div class="al-sk"><span class="al-num">${st.done}<small>/${st.exp}</small></span><em>Relevés</em></div>
