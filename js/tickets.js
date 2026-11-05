@@ -182,7 +182,7 @@ async function tkSyncStock(t) {
     const doc = { productId: p.id, name: p.name, qty, unit: p.unit || "", kind: "vente", ref: t.id, refType: "ticket", day: t.date, at: t.at || Date.now(), uid: S.me.id, by: S.me.name || "", libelle: l.libelle, soldQty: q, soldUnit: ln.soldUnit || "" };
     try { if (typeof stockMove === "function") await stockMove(doc); else await DB.add("moves", doc); res.done.push(doc); } catch (e) { console.warn(e); }
   }
-  if (res.recipes) logEvent("stock", `ventes de la caisse du ${shortDate(t.date)} : ingrédients de ${tkPl(res.recipes, "plat")} déduits du stock`, { ref: t.id });
+  if (res.recipes) logEvent("stock", `a déduit du stock les ventes de la caisse du ${shortDate(t.date)} : ingrédients de ${tkPl(res.recipes, "plat")}`, { ref: t.id });
   if (res.done.length && typeof stockMove !== "function") logEvent("stock", `ventes du ${shortDate(t.date)} déduites du stock (${tkPl(res.done.length, "produit")})`, { ref: t.id });
   return res;
 }

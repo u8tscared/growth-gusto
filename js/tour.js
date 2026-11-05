@@ -24,6 +24,10 @@
   const tabs = () => { const tb = q("#tabbar"); return !desk() && tb && !tb.classList.contains("hide") ? tb : null; };
   const side = () => { const s = q("#side"); return desk() && s && !s.classList.contains("off") ? s : null; };
 
+  /* a sidebar line (computer only) · a module that exists in this build and is allowed for this person · an icon or its fallback */
+  const nav = (r) => { const s = side(); return s ? q(`.nav[data-go="${r}"]`, s) : null; };
+  const has = (r) => { try { return !!(typeof VIEWS === "object" && VIEWS[r]) && (typeof permOk !== "function" || permOk(r)); } catch (e) { return false; } };
+  const IC_OR = (a, b) => { try { return typeof IC === "object" && IC[a] ? a : b; } catch (e) { return b; } };
   /* the stops: el() finds the target right now (the home re-renders on every data change, so never keep a node) */
   const STOPS = [
     { k: "hero", ic: "therm", t: "Le relevé", s: "Midi et soir, relevez vos frigos ici. Dix secondes chacun.", el: () => q(".hm-hero", view()) },
@@ -32,9 +36,13 @@
     { k: "scan", ic: "scan", t: "Le scanner", s: "Étiquette ou QR : scannez, le produit s'ouvre aussitôt.", el: () => { const t = tabs(); if (t) return q('[data-tab="scan"] .fab', t) || q('[data-tab="scan"]', t); const s = side(); return s && q('.nav[data-go="scan"]', s); } },
     { k: "frigos", ic: "snow", t: "Vos frigos", s: "Chaque frigo, ses produits et leurs DLC, d'un coup d'œil.", el: () => { const t = tabs(); if (t) return q('[data-tab="frigos"]', t); const s = side(); return s && q('.nav[data-go="frigos"]', s); } },
     /* one module = one exact item: the Plus tab on a phone, the Finances line of the sidebar on a computer (never the whole list) */
-    { k: "plus", ic: "grid", t: "Tout le reste", s: "Registre, recettes, équipe, stock, réglages : tout est dans Plus.", el: () => { const t = tabs(); return t ? q('[data-tab="more"]', t) : null; } },
-    { k: "finance", ic: "euro", t: "Vos finances", s: "Achats, coûts et résultat du mois, au même endroit.", el: () => { const s = side(); return s ? q('.nav[data-go="finance"]', s) : null; } },
-    { k: "registre", ic: "shield", t: "Le registre", s: () => desk() ? "Tout est daté et signé. Prêt pour le contrôle sanitaire." : "Chaque geste est daté et signé : prêt pour le contrôle sanitaire.", el: () => { const s = side(); if (s) return q('.nav[data-go="registre"]', s); return q(".hm-feedc", view()); } },
+    { k: "plus", ic: "grid", t: "Tout le reste", s: () => `${has("hygiene") ? "Hygiène, " : ""}${has("alertes") ? "alertes, " : ""}${has("controle") ? "contrôle sanitaire, " : ""}recettes, équipe : tout est dans Plus.`.replace(/^./, (c) => c.toUpperCase()), el: () => { const t = tabs(); return t ? q('[data-tab="more"]', t) : null; } },
+    /* computer: the new modules, one sidebar line each */
+    { k: "hygiene", ic: IC_OR("hygPot", "spray"), t: "L'hygiène", s: "Refroidissement, friture, gaspillage et vos documents.", el: () => nav("hygiene") },
+    { k: "finance", ic: "euro", t: "Vos finances", s: "Achats, coûts et résultat du mois, au même endroit.", el: () => nav("finance") },
+    { k: "controle", ic: IC_OR("ctBadge", "shield"), t: "Le contrôle sanitaire", s: "Un inspecteur passe ? Tout son dossier est prêt ici.", el: () => nav("controle") },
+    { k: "alertes", ic: IC_OR("alBell", "alert"), t: "Les alertes", s: "Un frigo chauffe, une DLC tombe : vous êtes prévenu.", el: () => nav("alertes") },
+    { k: "registre", ic: "shield", t: "Le registre", s: () => desk() ? "Tout est daté et signé. Prêt pour le contrôle sanitaire." : "Chaque geste est daté et signé : prêt pour le contrôle sanitaire.", el: () => { const s = side(); if (s) return has("controle") ? null : q('.nav[data-go="registre"]', s); return q(".hm-feedc", view()); } },
     { k: "end", ic: "therm", t: "Vous êtes prêt", s: "Commencez par votre premier relevé. Le reste suivra.", end: true },
   ];
   const txt = (v) => (typeof v === "function" ? v() : v);

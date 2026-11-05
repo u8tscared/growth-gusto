@@ -1,12 +1,15 @@
 /* Growth Gusto — onboarding (area prefix « ob »): seven short screens that set the restaurant up from A to Z, after an account is created
    (js/auth.js hands off with OB.handoff), on the first run of the local mode (VIEWS.onboarding delegates here), and later from Réglages
    (« Compléter la fiche du restaurant »). One screen per step, springy transitions, a live « fiche » of the restaurant on the right (desktop).
-   Steps: resto · vous · frigos (starts empty, typed tiles) · etiquettes (labels.js picker) · imprimante (labels.js wizard) · equipe · pret.
+   Steps: resto · vous · frigos (starts empty, typed tiles) · etiquettes (labels.js picker) · imprimante (labels.js wizard) · equipe ·
+   outils (one-tap cards: import, sondes, caisse, résa, alertes, PMS, formation → resto.setupTodo) · pret (to-do + « ce que fait l'app »).
    Modes: "create" (no restaurant yet: the restaurant and the gérant are written when the person leaves step 2) · "complete" (the restaurant
    exists: every step writes live). After step 2 the flow is always "complete", so back, refresh or re-entry never create a second restaurant.
    The session marker « gg-ob » ("rid" or "rid|step") resumes the first run after a refresh; it is cleared when the flow closes.
    Data: resto doc { name, site, logo, type, address, phone, covers }, fridges { name, type, min, max, order, createdAt, svcMax? },
-   members { name, role, color, photo }. Hooks: OB.handoff(rid) (auth), OB.open(from) (Réglages), ACT.obCreate() (legacy test entry),
+   members { name, role, color, photo }, resto.setupTodo [tool ids] + resto.setupTodoHidden (home card « Masquer »).
+   Public: OB.todoCard() → HTML of the home card « À faire pour bien démarrer » (or ""), OB.featuresHTML() / ACT.obFeatures (sheet « Tout
+   ce que fait Growth Gusto »), OB.openTool(id). Hooks: OB.handoff(rid) (auth), OB.open(from) (Réglages), ACT.obCreate() (legacy test entry),
    window event « gg:onboarded » when the first run closes (guided tour). */
 "use strict";
 
@@ -17,6 +20,7 @@ const OB_STEPS = [
   { k: "etiquettes", t: "Vos étiquettes", s: "Étiquettes", opt: true },
   { k: "imprimante", t: "L'imprimante", s: "Imprimante", opt: true },
   { k: "equipe", t: "L'équipe", s: "Équipe", opt: true },
+  { k: "outils", t: "Vos outils", s: "Outils", opt: true },
   { k: "pret", t: "C'est prêt", s: "Prêt", opt: false },
 ];
 const OB_LAST = OB_STEPS.length - 1;
@@ -35,6 +39,7 @@ const OB_SVG = {
   plus: obSv('<path d="M12 5v14M5 12h14"/>', 18, 2.4),
   minus: obSv('<path d="M5 12h14"/>', 18, 2.4),
   x: obSv('<path d="M6 6l12 12M18 6 6 18"/>', 14, 2.4),
+  check: obSv('<path d="m5 12.5 4.5 4.5L19 7.5"/>', 15, 2.6),
   globe: obSv('<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3Z"/>'),
   pin: obSv('<path d="M12 21s-6-5.3-6-11a6 6 0 0 1 12 0c0 5.7-6 11-6 11Z"/><circle cx="12" cy="10" r="2.2"/>'),
   phone: obSv('<path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2Z"/>'),
@@ -82,6 +87,38 @@ const obKindOf = (f) => { if (f && OB_FR_FB[f.type]) return f.type; if (typeof r
 const obKindName = (k) => (OB_KINDS.find((x) => x[0] === k) || OB_KINDS[0])[1];
 /* drawn-fridge silhouette of the V2 home (css/v2.css .hm-dfr): cg = chest, cf = cold room, sv = under the worktop, st = upright */
 const obShape = (k) => (k === "congel" ? "cg" : k === "cfp" ? "cf" : k === "service" || k === "saladette" ? "sv" : "st");
+/* an icon of another area when it is loaded (they register in IC), else a core one */
+const obI = (n, fb) => ico(IC[n] ? n : fb);
+const obPerm = (r) => { try { return typeof permOk !== "function" || permOk(r); } catch (e) { return true; } };
+/* step « Vos outils »: what can be switched on after the onboarding. tone = icon well colour. done() = it is set up already. */
+const OB_TOOLS = [
+  { k: "import", n: "Import", ic: "imUp", fb: "upload", tone: "v", t: "Vous venez d'un autre logiciel ?", s: "Produits, recettes, relevés : on récupère tout.", todo: "Importer vos données", ts: "Excel ou CSV, en 2 minutes", r: "import", wide: true,
+    ok: () => (typeof window.IMPORT !== "undefined" && window.IMPORT && typeof window.IMPORT.open === "function") || !!VIEWS.import,
+    done: () => { try { if (typeof imWatch === "function") imWatch(); return typeof IM !== "undefined" && IM.wRid === S.rid && (IM.hist || []).some((h) => !h.undone); } catch (e) { return false; } } },
+  { k: "sondes", n: "Sondes", ic: "sdProbe", fb: "therm", tone: "sky", t: "Sondes connectées", s: "Les frigos se relèvent seuls.", todo: "Brancher vos sondes", ts: "Shelly, SensorPush, Govee…", r: "sondes",
+    done: () => { try { if (typeof sdWatch === "function") sdWatch(); return !!(window.SONDES && window.SONDES.list().length); } catch (e) { return false; } } },
+  { k: "caisse", n: "Caisse", ic: "cxPlug", fb: "receipt", tone: "sf", t: "Caisse connectée", s: "SumUp, Zelty, Square, Lightspeed.", todo: "Connecter la caisse", ts: "Ou importer un fichier de ventes", r: "caisse",
+    done: () => (S.cxStat || []).some((c) => c.status === "connected" || c.lastImport) || (S.cxSales || []).length > 0 },
+  { k: "resa", n: "Réservations", ic: "resa", fb: "cal", tone: "tm", t: "Réservations en ligne", s: "Un lien pour réserver une table.", todo: "Ouvrir les réservations", ts: "Services, couverts, lien public", r: "resa",
+    done: () => !!(S.resto && S.resto.resaCfg) },
+  { k: "alertes", n: "Alertes", ic: "alBell", fb: "alert", tone: "tm", t: "Alertes par e-mail", s: "Prévenu si un frigo chauffe.", todo: "Régler vos alertes", ts: "Qui prévenir, et quand", r: "alertes",
+    done: () => !!(S.resto && S.resto.alertCfg) },
+  { k: "pms", n: "PMS", ic: "ctBadge", fb: "shield", tone: "v", t: "Plan de maîtrise sanitaire", s: "Votre PMS, rédigé pour vous.", todo: "Générer votre PMS", ts: "15 questions, un document prêt", r: "pms",
+    done: () => { try { if (typeof ctWatch === "function") ctWatch(); } catch (e) {} return !!(S.ctDocs && S.ctDocs.pms); } },
+  { k: "formation", n: "Formation", ic: "fmHand", fb: "book", tone: "sf", t: "Formation de l'équipe", s: "L'HACCP en 10 minutes, avec quiz.", todo: "Former l'équipe", ts: "Quiz et attestations", r: "formation",
+    done: () => { try { if (typeof fmWatch === "function") fmWatch(); return (typeof FM !== "undefined" && FM.rid === S.rid && (FM.rows || []).length > 0) || (S.trainings || []).length > 0; } catch (e) { return false; } } },
+];
+const obTool = (k) => OB_TOOLS.find((x) => x.k === k);
+const obToolOk = (x) => !!x && (x.ok ? x.ok() : !!VIEWS[x.r]) && obPerm(x.r);
+/* « Ce que Growth Gusto fait pour vous »: every screen, by family (only the ones loaded and allowed are shown) */
+const OB_FEATS = [
+  { t: "Hygiène & HACCP", ic: "shield", tone: "v", items: [["releve", "therm", "Relevés de températures"], ["hygiene", "hygPot", "Refroidissement, friture"], ["menage", "spray", "Plan de nettoyage"], ["registre", "shield", "Registre HACCP"], ["controle", "ctBadge", "Contrôle sanitaire"], ["pms", "ctDoc", "Plan de maîtrise sanitaire"], ["rappel", "ctRecall", "Rappel de lot"], ["obligations", "calcheck", "Obligations"]] },
+  { t: "Cuisine & stock", ic: "book", tone: "sf", items: [["frigos", "snow", "Frigos et DLC"], ["sondes", "sdProbe", "Sondes connectées"], ["scan", "scan", "Étiquettes et scanner"], ["reception", "truck", "Réceptions"], ["notes", "book", "Recettes et allergènes"], ["stock", "box", "Stock et inventaire"], ["gaspillage", "hygBin", "Gaspillage"]] },
+  { t: "Équipe", ic: "users", tone: "sky", items: [["pointeuse", "clock", "Pointeuse"], ["planning", "cal", "Planning et paie"], ["formation", "fmHand", "Formation HACCP"], ["equipe", "users", "Équipe et accès"]] },
+  { t: "Gestion & ventes", ic: "euro", tone: "ok", items: [["dashboard", "dash", "Tableau de bord"], ["finance", "euro", "Finances"], ["caisse", "cxPlug", "Caisse connectée"], ["tickets", "receipt", "Tickets de caisse"], ["alertes", "alBell", "Alertes"], ["sites", "store", "Plusieurs établissements"], ["import", "imUp", "Import d'un autre logiciel"]] },
+  { t: "Clients", ic: "resa", tone: "tm", items: [["resa", "resa", "Réservations en ligne"]] },
+];
+const OB_FB = { hygPot: "spray", ctBadge: "shield", ctDoc: "list", ctRecall: "alert", sdProbe: "therm", hygBin: "trash", fmHand: "book", cxPlug: "receipt", alBell: "alert", imUp: "upload", resa: "cal" };
 
 const OB = {
   st: null,
@@ -97,7 +134,7 @@ const OB = {
   start(opts = {}) {
     const r = S.resto || {}, meDoc = (S.members || []).find((m) => m.id === S.me.id) || {};
     const mode = opts.mode || (S.rid && S.resto ? "complete" : "create");
-    const d = { name: r.name || "", site: r.site || "", logo: r.logo || "", type: r.type || "", address: r.address || "", phone: r.phone || "", covers: r.covers ? String(r.covers) : "", me: meDoc.name || S.me.name || "", photo: meDoc.photo || "", more: !!(r.address || r.phone || r.covers), nw: null, added: [], gone: [], team: [], inv: null, skipped: {}, done: {} };
+    const d = { name: r.name || "", site: r.site || "", logo: r.logo || "", type: r.type || "", address: r.address || "", phone: r.phone || "", covers: r.covers ? String(r.covers) : "", me: meDoc.name || S.me.name || "", photo: meDoc.photo || "", more: !!(r.address || r.phone || r.covers), nw: null, added: [], gone: [], team: [], inv: null, skipped: {}, done: {}, tools: Array.isArray(r.setupTodo) ? r.setupTodo.filter((k) => obTool(k)) : [] };
     this.st = { mode, step: Math.max(0, Math.min(OB_LAST, opts.step || 0)), dir: 1, from: opts.from || "", busy: false, d, ret: false, rush: false };
   },
   ensure() { if (!this.st || (this.st.mode === "create" && S.resto)) this.start({ from: this.st ? this.st.from : "boot" }); return this.st; },
@@ -119,7 +156,7 @@ const OB = {
   printerName() { try { if (typeof lbPrinterCfg === "function" && S.resto) { const c = lbPrinterCfg(); return c.model ? c.name || OB_PRINTER : ""; } } catch (e) {} const p = S.resto && S.resto.printer; return typeof p === "string" ? p : p && p.model ? OB_PRINTER : ""; },
   labelSet() { return !!(S.resto && S.resto.labelStyle); },
   /* what each step has in place (summary, CTA wording, fiche) */
-  has(k) { const d = this.st.d; return k === "resto" ? !!d.name : k === "vous" ? !!d.me : k === "frigos" ? this.frList().length > 0 : k === "etiquettes" ? this.labelSet() : k === "imprimante" ? !!this.printerName() : k === "equipe" ? this.mates().length > 0 || !!d.inv : true; },
+  has(k) { const d = this.st.d; return k === "resto" ? !!d.name : k === "vous" ? !!d.me : k === "frigos" ? this.frList().length > 0 : k === "etiquettes" ? this.labelSet() : k === "imprimante" ? !!this.printerName() : k === "equipe" ? this.mates().length > 0 || !!d.inv : k === "outils" ? d.tools.length > 0 : true; },
   mark() { if (this.st && this.st.from === "boot" && S.rid && S.resto) obSS.set("gg-ob", `${S.rid}|${this.st.step}`); },
 
   /* ───────────── markup ───────────── */
@@ -191,7 +228,8 @@ const OB = {
       const n = this.frList().length;
       return `<div id="obFrHead">${this.frHeadHTML()}</div>
         <div class="onb-kit st${n ? "" : " empty"}" style="--i:2" id="obKit">${this.kitHTML()}</div>
-        <div class="onb-frzone st" style="--i:3" id="obFrZone">${d.nw ? this.newHTML() : this.kindsHTML()}</div>`;
+        <div class="onb-frzone st" style="--i:3" id="obFrZone">${d.nw ? this.newHTML() : this.kindsHTML()}</div>
+        ${VIEWS.sondes ? `<p class="onb-sdnote st" style="--i:4"><span class="onb-tool-ic">${obI("sdProbe", "therm")}</span><span><b>Vous avez des sondes ?</b> Vous les brancherez après.</span></p>` : ""}`;
     }
     if (s.k === "etiquettes") {
       let ext = ""; try { if (typeof window.lbStylePickerHTML === "function") ext = window.lbStylePickerHTML() || ""; } catch (e) { console.warn("lbStylePickerHTML", e); ext = ""; }
@@ -212,12 +250,21 @@ const OB = {
             : `<div class="onb-addrow"><div class="onb-in"><input class="onb-input" id="obTeamIn" placeholder="Son prénom" autocomplete="off" maxlength="40" enterkeyhint="done" aria-label="Prénom d'un équipier"></div><button type="button" class="onb-chip onb-addbtn" data-act="obTeamAdd">${OB_SVG.plus}<span>Ajouter</span></button></div>`}</div>
         ${cloud ? `<div class="onb-inv st" style="--i:3" id="obInv">${this.invHTML()}</div>` : ""}`;
     }
+    if (s.k === "outils") {
+      const L = OB_TOOLS.filter(obToolOk), wide = L.filter((x) => x.wide), grid = L.filter((x) => !x.wide);
+      return `${this.head("Et en plus ?", "Touchez ce qui vous intéresse. On vous le prépare.")}
+        ${wide.map((x) => this.toolHTML(x, 2)).join("")}
+        <div class="onb-tools st" style="--i:3" role="group" aria-label="Vos outils">${grid.map((x, i) => this.toolHTML(x, i)).join("")}</div>
+        <p class="onb-fine onb-tools-n st" style="--i:4" id="obToolsN">${this.toolsCount()}</p>`;
+    }
     if (s.k === "pret") {
       const me = firstName(d.me || S.me.name);
       const sum = this.summary(), todo = sum.filter((r) => !r.ok).length;
       return `<div class="onb-seal st" style="--i:0">${OB_SVG.seal}</div>
         ${this.head(`C'est prêt${me ? ", " + esc(me) : ""}.`, todo ? `${esc(d.name || S.resto?.name || "Votre restaurant")} est en place. Touchez une ligne pour la finir.` : `${esc(d.name || S.resto?.name || "Votre restaurant")} est entièrement installé.`, 1)}
-        <div class="onb-sum st" style="--i:3">${sum.map((r) => { const tag = r.ok ? "div" : "button"; return `<${tag} class="onb-sumr ${r.ok ? "ok" : "later"}"${r.ok ? "" : ` type="button" data-act="obGoStep" data-v="${r.k}"`}><i>${r.ic}</i><b>${r.t}</b><span>${r.s}</span>${r.ok ? "" : `<em class="onb-sumgo">${d.skipped[r.k] ? "À faire" : "Ajouter"}${OB_SVG.chev}</em>`}</${tag}>`; }).join("")}</div>`;
+        <div class="onb-sum st" style="--i:3">${sum.map((r) => { const tag = r.ok ? "div" : "button"; return `<${tag} class="onb-sumr ${r.ok ? "ok" : "later"}"${r.ok ? "" : ` type="button" data-act="obGoStep" data-v="${r.k}"`}><i>${r.ic}</i><b>${r.t}</b><span>${r.s}</span>${r.ok ? "" : `<em class="onb-sumgo">${d.skipped[r.k] ? "À faire" : "Ajouter"}${OB_SVG.chev}</em>`}</${tag}>`; }).join("")}</div>
+        ${this.todoListHTML()}
+        <section class="onb-feats st" style="--i:5" aria-labelledby="obFeatsT"><h3 class="onb-h3" id="obFeatsT">Ce que Growth Gusto fait pour vous</h3>${this.featsHTML("obOpen")}<p class="onb-fine">Tout se retrouve dans le menu, à tout moment.</p></section>`;
     }
     return "";
   },
@@ -248,6 +295,25 @@ const OB = {
       </div>
       <p class="onb-fine" id="obTHint">${isCg ? `Alerte au-dessus de ${obDeg(nw.max)} °C.` : `Alerte hors de ${obDeg(nw.min)} à ${obDeg(nw.max)} °C.`}</p>
     </div>`;
+  },
+  /* step « Vos outils »: one card = one tap, « Plus tard » until chosen */
+  toolHTML(x, i) {
+    const on = this.st.d.tools.includes(x.k);
+    return `<button type="button" class="onb-tool t-${x.tone}${x.wide ? " wide st" : ""}${on ? " on" : ""}" ${x.wide ? `style="--i:${i}"` : `style="--j:${i}"`} data-act="obTool" data-v="${x.k}" aria-pressed="${on}">
+      <span class="onb-tool-ic">${obI(x.ic, x.fb)}</span><span class="onb-tool-tx"><b>${x.t}</b><span>${x.s}</span></span>
+      <em class="onb-tool-st"><span class="no">${x.wide ? "Importer" : "Plus tard"}</span><span class="yes">${OB_SVG.check}${x.wide ? "À importer" : "Choisi"}</span></em></button>`;
+  },
+  toolsCount() { const n = this.st.d.tools.length; return n ? `${n} à faire après l'installation. On vous guide.` : "Rien n'est obligatoire : tout reste dans le menu."; },
+  /* « À faire pour bien démarrer » on « C'est prêt »: the chosen tools not set up yet */
+  todoListHTML() {
+    const L = this.st.d.tools.map(obTool).filter((x) => obToolOk(x) && !x.done());
+    if (!L.length) return "";
+    return `<section class="onb-todo st" style="--i:4" aria-labelledby="obTodoT"><h3 class="onb-h3" id="obTodoT">À faire pour bien démarrer</h3>
+      <div class="onb-todo-l">${L.map((x) => `<button type="button" class="onb-todor t-${x.tone}" data-act="obOpen" data-v="${x.k}"><span class="onb-tool-ic">${obI(x.ic, x.fb)}</span><span class="onb-tool-tx"><b>${x.todo}</b><span>${x.ts}</span></span>${OB_SVG.chev}</button>`).join("")}</div></section>`;
+  },
+  featsHTML(act) {
+    return `<div class="onb-fgrid">${OB_FEATS.map((g) => { const it = g.items.filter(([r]) => (r === "import" ? obToolOk(obTool("import")) : !!VIEWS[r]) && obPerm(r)); if (!it.length) return "";
+      return `<div class="onb-fg t-${g.tone}"><div class="onb-fg-h"><span class="onb-tool-ic">${obI(g.ic, OB_FB[g.ic] || "grid")}</span><b>${g.t}</b></div><div class="onb-fg-l">${it.map(([r, ic, t]) => `<button type="button" class="onb-fi2" data-act="${act}" data-v="r:${r}">${obI(ic, OB_FB[ic] || "grid")}<span>${t}</span></button>`).join("")}</div></div>`; }).join("")}</div>`;
   },
   logoHTML() {
     const d = this.st.d, n = d.name || "";
@@ -303,6 +369,7 @@ const OB = {
         ${row("etiquettes", OB_SVG.tag, "Étiquettes", this.labelSet() ? "Design choisi" : "", "Par défaut")}
         ${row("imprimante", OB_SVG.printer, "Imprimante", this.printerName(), "Plus tard")}
         <div class="onb-frow${s.k === "equipe" ? " cur" : ""} set" data-k="equipe"><span class="onb-fi">${OB_SVG.users}</span><span class="onb-ft">Équipe</span><span class="onb-fv onb-fteam">${team.slice(0, 5).map((n, i) => `<b style="--c:${esc(PALETTE[i % PALETTE.length])}" title="${esc(n)}">${esc(initials(n))}</b>`).join("")}${team.length > 5 ? `<span>+${team.length - 5}</span>` : ""}${d.inv ? `<span class="onb-fpill">invitation</span>` : ""}</span></div>
+        ${row("outils", OB_SVG.plus, "Outils", d.tools.map((k) => (obTool(k) || {}).n).filter(Boolean).join(", "), "Plus tard")}
       </div>
     </div>`;
   },
@@ -500,6 +567,7 @@ const OB = {
       if (s.opt && !this.has(s.k)) d.skipped[s.k] = true; else delete d.skipped[s.k];
     } else d.skipped[s.k] = true;
     if (s.k === "pret") return this.leave();
+    if (s.k === "outils") this.saveTools(true);
     this.setBusy(true); let made = false;
     try {
       if (s.k === "resto" || s.k === "vous") await this.commit(s.k);
@@ -538,10 +606,11 @@ const OB = {
     st.dir = n >= st.step ? 1 : -1; st.step = n; st.d.pop = null; this.paint(false);
   },
   prev() { if (this.st.step === 0) return; this.collect(); SFX.tap(); buzz(4); this.st.ret = false; this.goTo(this.st.step - 1); },
-  leave() {
-    const st = this.st; SFX.tap(); buzz([8, 30, 8]);
+  leave(to) {
+    const st = this.st; SFX.tap(); buzz([8, 30, 8]); this.saveTools(true);
     const back = st.from === "reglages" ? "reglages" : "home", first = back === "home";
     obSS.del("gg-ob"); st.from = ""; this.st = null; S.history = []; go(back, {}, { replace: true });
+    if (to) setTimeout(() => this.openTool(to), obReduce() ? 60 : 420);
     if (first) {
       setTimeout(() => toast(`${S.resto?.name || "Votre restaurant"} est prêt`), 500);
       /* the guided tour (another area) starts on this */
@@ -549,6 +618,46 @@ const OB = {
     }
   },
 };
+
+/* ───────────── « Vos outils » → resto.setupTodo, the home card, the features sheet ───────────── */
+Object.assign(OB, {
+  _toolsT: 0,
+  saveTools(now) {
+    clearTimeout(this._toolsT); if (!this.st || !S.rid || !S.resto) return;
+    const v = [...this.st.d.tools], cur = Array.isArray(S.resto.setupTodo) ? S.resto.setupTodo : null;
+    const run = () => {
+      if (cur && cur.join() === v.join()) return; if (!cur && !v.length) return;
+      S.resto.setupTodo = v; const patch = { setupTodo: v }; if (v.length && S.resto.setupTodoHidden) { patch.setupTodoHidden = false; S.resto.setupTodoHidden = false; }
+      DB.update("restos", S.rid, patch).catch((e) => console.warn("setupTodo", e));
+    };
+    if (now) run(); else this._toolsT = setTimeout(run, 500);
+  },
+  /* a tool id (« sondes ») or a route (« r:hygiene »): open its screen */
+  openTool(v) {
+    try {
+      v = String(v || ""); const r = v.startsWith("r:") ? v.slice(2) : "", x = r ? (r === "import" ? obTool("import") : null) : obTool(v);
+      if (x && x.k === "import" && window.IMPORT && typeof window.IMPORT.open === "function") { window.IMPORT.open(); return; }
+      const route = x ? x.r : r;
+      if (route && VIEWS[route]) { go(route); return; }
+      toast("Bientôt disponible");
+    } catch (e) { console.warn("ob open", e); }
+  },
+  /* home: « À faire pour bien démarrer », the tools chosen in the onboarding that are not set up yet ("" when none) */
+  todoCard() {
+    try {
+      const r = S.resto; if (!r || r.setupTodoHidden || !Array.isArray(r.setupTodo) || !r.setupTodo.length) return "";
+      const all = r.setupTodo.map(obTool).filter(obToolOk); const left = all.filter((x) => !x.done());
+      if (!left.length) return "";
+      const done = all.length - left.length, pct = Math.round((done / all.length) * 100);
+      return `<section class="glass obt st" style="--i:3" aria-labelledby="obtT">
+        <div class="obt-h"><div class="obt-ht"><b id="obtT">À faire pour bien démarrer</b><span>${done ? `${done} sur ${all.length} fait${done > 1 ? "s" : ""}` : obPl(left.length, "étape")}</span></div><button type="button" class="obt-x" data-act="obTodoHide">Masquer</button></div>
+        <div class="obt-bar" aria-hidden="true"><i style="width:${Math.max(pct, 4)}%"></i></div>
+        <div class="obt-l">${left.map((x) => `<button type="button" class="onb-todor t-${x.tone}" data-act="obOpen" data-v="${x.k}"><span class="onb-tool-ic">${obI(x.ic, x.fb)}</span><span class="onb-tool-tx"><b>${x.todo}</b><span>${x.ts}</span></span>${OB_SVG.chev}</button>`).join("")}</div>
+      </section>`;
+    } catch (e) { console.warn("ob todoCard", e); return ""; }
+  },
+  featuresHTML() { return `<div class="onb-fsheet"><h2 class="h2">Tout ce que fait Growth Gusto</h2><p class="onb-fsheet-s">Touchez un outil pour l'ouvrir.</p>${OB.featsHTML("obOpen")}</div>`; },
+});
 
 /* ───────────── route ───────────── */
 VIEWS.onboard = {
@@ -605,6 +714,27 @@ document.addEventListener("keydown", (e) => {
 
 /* ───────────── actions ───────────── */
 Object.assign(ACT, {
+  /* « Vos outils »: a card toggles between « Plus tard » and chosen */
+  obTool: (a, id, v) => {
+    const st = OB.st; if (!st || !obTool(v)) return; const d = st.d, i = d.tools.indexOf(v);
+    if (i >= 0) d.tools.splice(i, 1); else d.tools.push(v);
+    const on = i < 0; a.classList.toggle("on", on); a.setAttribute("aria-pressed", on);
+    if (on && !obReduce()) { a.classList.remove("pop"); void a.offsetWidth; a.classList.add("pop"); }
+    const n = $("#obToolsN"); if (n) n.textContent = OB.toolsCount();
+    on ? SFX.tick() : SFX.tap(); buzz(on ? 6 : 3);
+    if (on) delete d.skipped.outils; OB.soft(); OB.saveTools();
+  },
+  /* open a tool / a screen: from « C'est prêt » the onboarding closes first; from the home card or the sheet, straight there */
+  obOpen: (a, id, v) => {
+    if (OB.st && (S.route === "onboard" || S.route === "onboarding")) { if (OB.cur().k === "pret") OB.leave(v); return; }
+    SFX.tap(); buzz(4); try { if ($("#sheet.open")) closeSheet(true); } catch (e) {} OB.openTool(v);
+  },
+  obTodoHide: () => {
+    if (!S.resto || !S.rid) return; S.resto.setupTodoHidden = true; SFX.close(); buzz(4);
+    DB.update("restos", S.rid, { setupTodoHidden: true }).catch((e) => console.warn(e));
+    try { refresh(); } catch (e) {} toast("Masqué. Tout reste dans le menu.");
+  },
+  obFeatures: () => { SFX.tap(); openSheet(OB.featuresHTML()); },
   obNext: () => OB.next(false),
   obSkip: () => { SFX.tap(); buzz(4); OB.next(true); },
   obSkipAll: () => OB.skipAll(),

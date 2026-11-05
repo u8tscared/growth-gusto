@@ -377,3 +377,102 @@ html.kb .onb-cta{position:static}
   .onb,.onb *,.onb *::before,.onb *::after{animation-duration:1ms!important;animation-iteration-count:1!important;animation-delay:0ms!important;transition-duration:1ms!important;transition-delay:0ms!important}
 }
 #obFrHead{display:flex;flex-direction:column;gap:14px}
+
+/* ───────── step « Vos outils », « À faire pour bien démarrer », « Ce que Growth Gusto fait pour vous » ─────────
+   These classes also live outside .onb (home card .obt, the features sheet), so they use the global V2 tokens of css/v2.css. */
+.onb-tool-ic{flex:none;width:42px;height:42px;border-radius:50%;display:grid;place-items:center;background:#EFE9FF;color:#5B2BFF}
+.onb-tool-ic svg{width:21px;height:21px}
+.t-sky .onb-tool-ic{background:#E6F0FF;color:#2F5FBF}
+.t-sf .onb-tool-ic{background:#FFF3D6;color:#9A6200}
+.t-tm .onb-tool-ic{background:#FFE9DE;color:#C8432A}
+.t-ok .onb-tool-ic{background:#E3F5EA;color:#1E7F55}
+.onb-tool-tx{min-width:0;display:flex;flex-direction:column;gap:2px}
+.onb-tool-tx b{font:720 15.5px/1.2 var(--d);letter-spacing:-.015em;color:var(--ink);text-wrap:balance}
+.onb-tool-tx>span{font:500 13px/1.35 var(--f);color:var(--muted);text-wrap:pretty}
+
+.onb-tools{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.onb-tool{all:unset;box-sizing:border-box;--dp:4px;position:relative;display:flex;flex-direction:column;align-items:flex-start;gap:10px;min-width:0;padding:14px 14px 12px;margin-bottom:4px;border-radius:22px;cursor:pointer;
+  background:var(--paper);box-shadow:0 0 0 1.5px var(--rim-2) inset,0 var(--dp) 0 var(--edge-b);
+  transition:transform .14s var(--ease),box-shadow .14s var(--ease),background-color .2s}
+.onb-tools .onb-tool{animation:obIn .5s var(--spring) both;animation-delay:calc(var(--j,0) * 45ms + 160ms)}
+.onb-tool:active{transform:translateY(4px);--dp:0px;transition-duration:70ms}
+.onb-tool:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+@media (hover:hover) and (pointer:fine){.onb-tool:not(.on):hover{background:#fff}.onb-tool:hover .onb-tool-ic{transform:rotate(-8deg) scale(1.06)}}
+.onb-tool .onb-tool-ic{transition:transform .35s var(--spring)}
+.onb-tool .onb-tool-tx{flex:1}
+.onb-tool-st{font-style:normal;display:inline-grid;margin-top:auto}
+.onb-tool-st>span{grid-area:1/1;display:inline-flex;align-items:center;justify-content:center;gap:5px;height:30px;padding:0 12px;border-radius:999px;font:700 12.5px/1 var(--f);white-space:nowrap;transition:opacity .2s,transform .3s var(--spring)}
+.onb-tool-st .no{background:var(--well);color:var(--ink-2)}
+.onb-tool-st .yes{background:var(--accent);color:#fff;box-shadow:0 2px 0 var(--accent-edge);opacity:0;transform:scale(.6)}
+.onb-tool-st .yes svg{margin-left:-3px}
+.onb-tool.on{background:#F7F3FF;box-shadow:0 0 0 2px var(--accent) inset,0 var(--dp) 0 var(--accent-edge)}
+.onb-tool.on .onb-tool-st .no{opacity:0;transform:scale(.6)}
+.onb-tool.on .onb-tool-st .yes{opacity:1;transform:none}
+.onb-tool.on .onb-tool-ic{background:var(--accent);color:#fff}
+.onb-tool.pop .onb-tool-ic{animation:obPop .45s var(--spring)}
+/* the wide « Vous venez d'un autre logiciel ? » card */
+.onb-tool.wide{flex-direction:row;align-items:center;gap:13px;padding:14px 14px 14px 14px}
+.onb-tool.wide .onb-tool-ic{width:48px;height:48px}
+.onb-tool.wide .onb-tool-ic svg{width:23px;height:23px}
+.onb-tool.wide .onb-tool-tx b{font-size:16.5px}
+.onb-tool.wide .onb-tool-st{margin:0}
+.onb-tool.wide:not(.on) .onb-tool-st .no{background:var(--ink);color:#fff;box-shadow:0 2px 0 #000}
+.onb-tools-n{text-align:center}
+@media (max-width:374px){.onb-tools{grid-template-columns:1fr}.onb-tools .onb-tool{flex-direction:row;align-items:center}.onb-tools .onb-tool-st{margin:0}}
+
+/* step 3: « Vous avez des sondes ? » */
+.onb-sdnote{margin:0;display:flex;align-items:center;gap:12px;padding:10px 14px 10px 10px;border-radius:18px;background:var(--sky-tint);color:#24427F;font:500 14px/1.4 var(--f)}
+.onb-sdnote .onb-tool-ic{width:36px;height:36px;background:#fff;color:#2F5FBF}
+.onb-sdnote .onb-tool-ic svg{width:18px;height:18px}
+.onb-sdnote b{font-weight:700;color:#1B2F5E}
+
+/* « C'est prêt »: to-do, then everything the app does */
+.onb-h3{margin:6px 0 0;font:740 19px/1.2 var(--d);letter-spacing:-.022em;color:var(--ink)}
+.onb-todo,.onb-feats{display:flex;flex-direction:column;gap:10px}
+.onb-todo-l,.obt-l{display:flex;flex-direction:column;border-radius:22px;background:var(--paper);border:1.5px solid var(--rim);box-shadow:0 2px 0 #EFE6D6;overflow:hidden}
+.onb-todor{all:unset;box-sizing:border-box;display:flex;align-items:center;gap:12px;width:100%;min-width:0;padding:11px 12px 11px 14px;cursor:pointer;transition:background-color .16s}
+.onb-todor+.onb-todor{border-top:1.5px solid #F1E9DA}
+.onb-todor .onb-tool-tx{flex:1}
+.onb-todor .onb-tool-tx b{font-size:15px}
+.onb-todor>svg{flex:none;width:30px;height:30px;padding:7px;border-radius:50%;background:var(--ink);color:#fff;box-shadow:0 3px 0 #000;transition:transform .12s}
+.onb-todor:active>svg{transform:translateY(3px);box-shadow:none}
+.onb-todor:focus-visible{outline:3px solid var(--accent);outline-offset:-3px}
+@media (hover:hover){.onb-todor:hover{background:#F7F0E3}.onb-todor:hover>svg{background:var(--accent);box-shadow:0 3px 0 var(--accent-edge)}}
+.onb-fgrid{display:grid;grid-template-columns:1fr;gap:10px}
+.onb-fg{padding:12px 12px 12px;border-radius:22px;background:var(--paper);border:1.5px solid var(--rim);box-shadow:0 2px 0 #EFE6D6}
+.onb-fg-h{display:flex;align-items:center;gap:10px;margin:0 0 10px 2px}
+.onb-fg-h .onb-tool-ic{width:34px;height:34px}
+.onb-fg-h .onb-tool-ic svg{width:17px;height:17px}
+.onb-fg-h b{font:740 15.5px/1.2 var(--d);letter-spacing:-.015em}
+.onb-fg-l{display:flex;flex-wrap:wrap;gap:7px}
+.onb-fi2{all:unset;box-sizing:border-box;display:inline-flex;align-items:center;gap:7px;min-height:38px;padding:0 13px 0 10px;border-radius:999px;cursor:pointer;background:var(--bg);box-shadow:0 0 0 1.5px var(--rim) inset,0 2px 0 #EFE6D6;font:600 13.5px/1.2 var(--f);color:var(--ink);transition:transform .12s var(--ease),background-color .16s}
+.onb-fi2 svg{flex:none;width:17px;height:17px;color:var(--accent)}
+.t-sky .onb-fi2 svg{color:#2F5FBF}.t-sf .onb-fi2 svg{color:#9A6200}.t-tm .onb-fi2 svg{color:#C8432A}.t-ok .onb-fi2 svg{color:#1E7F55}
+.onb-fi2:active{transform:translateY(2px);box-shadow:0 0 0 1.5px var(--rim) inset}
+.onb-fi2:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+@media (hover:hover){.onb-fi2:hover{background:#fff}}
+.onb-feats>.onb-fine{text-align:center;margin-top:2px}
+@media (min-width:640px){.onb-fgrid{grid-template-columns:repeat(2,minmax(0,1fr))}.onb-fg:last-child:nth-child(odd){grid-column:1/-1}}
+.onb-fg{animation:obIn .5s var(--spring) both;animation-delay:calc(var(--k,0) * 50ms + 260ms)}
+.onb-fg:nth-child(2){--k:1}.onb-fg:nth-child(3){--k:2}.onb-fg:nth-child(4){--k:3}.onb-fg:nth-child(5){--k:4}
+
+/* the sheet « Tout ce que fait Growth Gusto » (ACT.obFeatures) */
+.onb-fsheet{display:flex;flex-direction:column;gap:6px}
+.onb-fsheet .h2{margin:0}
+.onb-fsheet-s{margin:0 0 8px;color:var(--muted);font-size:14.5px}
+
+/* home: « À faire pour bien démarrer » (OB.todoCard) */
+.obt{padding:16px;display:flex;flex-direction:column;gap:12px}
+.obt-h{display:flex;align-items:flex-start;gap:10px}
+.obt-ht{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.obt-ht b{font:750 18px/1.2 var(--d);letter-spacing:-.022em;color:var(--ink)}
+.obt-ht span{font:600 13px/1.3 var(--f);color:var(--muted)}
+.obt-x{all:unset;box-sizing:border-box;flex:none;height:34px;padding:0 13px;border-radius:999px;cursor:pointer;font:650 13px/34px var(--f);color:var(--ink-2);background:var(--well);transition:background-color .16s,transform .12s}
+.obt-x:active{transform:translateY(2px)}
+.obt-x:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+@media (hover:hover){.obt-x:hover{background:#EDE3D2;color:var(--ink)}}
+.obt-bar{height:8px;border-radius:4px;background:var(--well);overflow:hidden}
+.obt-bar i{display:block;height:100%;border-radius:inherit;background:var(--accent);transform-origin:left;animation:obProg .9s .2s var(--spring) both}
+.obt .obt-l{box-shadow:none;background:var(--bg)}
+@media (prefers-reduced-motion:reduce){.onb-tool,.onb-fg,.obt-bar i,.onb-tool-st>span{animation:none!important;transition:none!important}}
+.onb-cta::after{content:"";position:absolute;left:0;right:0;top:100%;height:240px;background:var(--c-canvas);pointer-events:none}

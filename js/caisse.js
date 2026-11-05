@@ -173,7 +173,7 @@ async function cxRollNow() {
       if (ex && ex.posHash === sig) continue;
       const doc = { ...t, posHash: sig, uid: (ex && ex.uid) || S.me.id, updatedAt: Date.now(), ...(ex && ex.stockOff ? { stockOff: true } : {}) };
       try { await DB.set("tickets", id, doc); } catch (e) { console.warn(e); continue; }
-      if (!ex) logEvent("ticket", `ventes de la caisse du ${shortDate(day)} reçues${doc.total ? ` · ${cxEur(doc.total)}` : ""}`, { ref: id });
+      if (!ex) logEvent("ticket", `a reçu les ventes de la caisse du ${shortDate(day)}${doc.total ? ` · ${cxEur(doc.total)}` : ""}`, { ref: id });
       await tkSyncStock({ ...doc, id });
     }
   } finally { cxRolling = false; if (cxRollAgain) { cxRollAgain = false; cxRoll(); } }

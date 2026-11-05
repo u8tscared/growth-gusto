@@ -239,7 +239,7 @@ VIEWS.home = {
       ${todo.length ? `<div class="hm-list">${todo.slice(0, cap).map(homeTodoRow).join("")}</div>${todo.length > TODO_MAX ? `<button class="hm-more" data-act="homeMore">${S.ui.hmAll ? `Réduire la liste${ico("up")}` : `Voir ${todo.length - cap === 1 ? "la tâche restante" : `les ${todo.length - cap} autres tâches`}${ico("down")}`}</button>` : ""}` : `<div class="hm-zen"><span class="check draw"><svg viewBox="0 0 24 24"><path d="M6 12.5l4 4 8-9"/></svg></span><b>${pend.length ? "Rien d'autre pour l'instant" : "Tout est à jour"}</b><span>${pend.length ? "À part le relevé, rien ne presse." : "Relevés, DLC et ménage : rien ne presse."}</span></div>`}
     </section>`;
 
-    const stepsCard = homeStepsCard(fresh ? 3 : 5);
+    const stepsCard = (typeof OB !== "undefined" && OB.todoCard ? OB.todoCard() || "" : "") + homeStepsCard(fresh ? 3 : 5); /* js/onboard.js: « À faire pour bien démarrer » (tools chosen in the onboarding) */
     const inst = typeof installHint === "function" ? installHint() : ""; let bn; { const r = S.route; S.route = "home-noinst"; try { bn = banner(); } finally { S.route = r; } } /* banner() without its install card: it goes under the hero */
     const instCard = inst ? `<div class="hm-inst">${inst}</div>` : "";
     /* js/perso.js: « Modifier l'accueil » (edit mode) and the person's block order / hidden blocks */
