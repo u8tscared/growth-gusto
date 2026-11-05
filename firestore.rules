@@ -147,8 +147,15 @@ service cloud.firestore {
 
       // ── everything else (fridges, readings, lots, stock, tickets, staff, finances…): members only ──
       match /{col}/{doc} {
-        allow read: if !(col in ['members', 'sensorKeys']) && isMember(rid);
-        allow create, update, delete: if !(col in ['members', 'sensorKeys']) && isMemberAfter(rid);
+        allow read: if !(col in ['members', 'sensorKeys', 'bankTx', 'bank']) && isMember(rid);
+        allow create, update, delete: if !(col in ['members', 'sensorKeys', 'bankTx', 'bank']) && isMemberAfter(rid);
+      }
+      // bank operations and bank links (js/banque.js, functions/src/banque.js): money, so gérants only; the server writes with admin rights
+      match /bankTx/{doc} {
+        allow read, write: if isGerant(rid);
+      }
+      match /bank/{doc} {
+        allow read, write: if isGerant(rid);
       }
       // sensor cloud accounts (keys, passwords) and the gateway token: gérants only; the server reads them with admin rights
       match /sensorKeys/{doc} {

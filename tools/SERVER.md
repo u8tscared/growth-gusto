@@ -35,3 +35,7 @@ Avec `caisse` : `firebase functions:secrets:set SUMUP_CLIENT_ID`, `SUMUP_CLIENT_
 - **mailInvite** (`functions/src/mails.js`, appelable, gérant seulement) : envoie une invitation d'équipe par e-mail (code + lien, 40 par restaurant et par jour).
 - **admin** (`functions/src/admin.js`) : `adminDeleteUser` (appelable, admins Growth Gusto seulement) supprime un compte, ses restaurants, ses adhésions et sa connexion. Bouton corbeille dans Admin → Comptes.
 - **resa** (`functions/src/resa.js`) : `onResaBooking` (déclencheur sur les réservations : mails au client via Brevo) et `resaTick` (rappels de la veille).
+- **banque** (`functions/src/banque.js`, app : `js/banque.js`) : `banqueApi` (HTTPS, jeton Firebase, gérant) liste les banques françaises, ouvre la connexion Enable Banking (retour sur `https://app.growthgusto.fr/?code=…&state=bq_…`), synchronise et délie ; `banqueTick` lit chaque compte toutes les 6 h et écrit `restos/{rid}/bankTx`. Consentements dans `bankLinks` (serveur seulement), 180 jours.
+  - Enable Banking gratuit = mode « restreint » : seuls les comptes reliés par le propriétaire de l'application dans le Control Panel sont lisibles. Pour les comptes des clients : contrat Enable Banking (aucun changement de code).
+  - Secrets : `firebase functions:secrets:set EB_APP_ID` (Application ID) et `firebase functions:secrets:set EB_PRIVATE_KEY --data-file <fichier .pem>`, puis ajouter `banque` à `GG_MODULES` dans `functions/.env`.
+  - Sans serveur, l'import de relevé (OFX, CSV, Excel) dans Finances → Banque marche pour tous les restaurants.
