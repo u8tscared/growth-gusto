@@ -237,16 +237,18 @@ function pmPane(F) {
       ${inv ? `<button class="pm-opt ${F.connect === "invite" ? "on" : ""}" data-act="pmConn" data-v="invite"><span class="pm-oi w-vi">${ico("pmPhone")}</span><span class="tx"><b>Sur son téléphone</b><em>Il reçoit une invitation : code, lien ou QR</em></span></button>` : ""}
       <button class="pm-opt ${F.connect === "local" ? "on" : ""}" data-act="pmConn" data-v="local"><span class="pm-oi w-sa">${ico("pmTablet")}</span><span class="tx"><b>Sur cet appareil</b><em>Il touche son visage, puis tape son code</em></span></button>
     </div>
+    ${F.connect === "invite" ? `<label class="pm-pin pm-mail"><span class="lbl pm-lbl">Son e-mail <em class="pm-opt-t">facultatif</em></span><input class="input pm-mailin" id="pmEmail" type="email" inputmode="email" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="120" value="${esc(F.email || "")}" placeholder="On lui envoie l'invitation par e-mail"><em class="pm-mail-s">Sinon, vous lui donnez le code ou le QR à l'écran suivant.</em></label>` : ""}
     ${F.connect === "local" ? `<label class="pm-pin"><span class="lbl pm-lbl">Son code à 4 chiffres <em class="pm-opt-t">facultatif</em></span><input class="input mono pm-pinin" id="pmPin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off" value="${esc(F.pin)}" placeholder="Sinon, il le crée à sa première connexion"></label>` : ""}`; }
   if (F.step === "recap") { const can = F.admin ? ["tout voir et tout gérer, y compris l'équipe et l'abonnement"] : PM_MODS.filter((x) => F.modules[x[0]] && (VIEWS[x[0]] || x[0] === "staff")).map((x) => x[4]).concat(PM_CAPS.filter((c) => F.caps[c[0]] && c[0] !== "seeMoney").map((c) => c[4]));
     const must = F.admin ? [] : PM_REQ.filter((r) => F.require[r[0]]).map((r) => r[4]);
-    const how = F.mode === "edit" ? "" : F.connect === "invite" ? "se connecter sur son téléphone avec une invitation" : "se connecter sur cet appareil";
+    const how = F.mode === "edit" ? "" : F.connect === "invite" ? (F.email ? `recevoir son invitation par e-mail (${F.email})` : "se connecter sur son téléphone avec une invitation") : "se connecter sur cet appareil";
     return `<div class="pm-q pm-rq"><span class="pm-rava">${pmAvaHTML(F, 72)}</span><h2 class="pm-h">${esc(F.name || "Nouvel équipier")}</h2><p class="pm-s">${F.admin ? "Gère le restaurant" : F.poste ? PM_POSTES[F.poste][0] : "Équipier"}</p></div>
     <div class="pm-rec"><div class="pm-rc"><b class="pm-rt">${nm} pourra</b><ul>${can.length ? can.map((t) => `<li><span class="pm-b ok"></span>${esc(t)}</li>`).join("") : `<li><span class="pm-b"></span>pointer et signer, sans autre module</li>`}${how ? `<li><span class="pm-b ok"></span>${how}</li>` : ""}</ul></div>
     ${must.length ? `<div class="pm-rc must"><b class="pm-rt">${nm} devra</b><ul>${must.map((t) => `<li><span class="pm-b sa"></span>${esc(t)}</li>`).join("")}</ul></div>` : ""}</div>`; }
   if (F.step === "done") { const c = F.done; const link = typeof AUTH !== "undefined" && AUTH.invLink ? AUTH.invLink(c.code) : c.code;
     return `<div class="pm-q"><span class="pm-kick">Invitation prête</span><h2 class="pm-h">Envoyez-la à ${nm}</h2></div>
-    <div class="pm-inv"><div class="pm-qr">${typeof AUTH !== "undefined" && AUTH.qr ? AUTH.qr(link) : ""}</div><b class="pm-code">${esc(typeof auFmtCode === "function" ? auFmtCode(c.code) : c.code)}</b><em>Pour ${nm} seul · valable 7 jours</em></div>
+    ${pmMailHTML(F)}
+    <div class="pm-inv"><div class="pm-qr">${typeof AUTH !== "undefined" && AUTH.qr ? AUTH.qr(link) : ""}</div><b class="pm-code">${esc(typeof auFmtCode === "function" ? auFmtCode(c.code) : c.code)}</b><em>Code ou QR à scanner · pour ${nm} seul · valable 7 jours</em></div>
     ${DB.mode === "demo" ? `<div class="banner">${ico("alert")}<span>Démo : ce code est un exemple.</span></div>` : ""}`; }
   return "";
 }
@@ -277,6 +279,7 @@ function pmNext() {
     if ((S.members || []).some((m) => m.id !== F.id && (m.name || "").trim().toLowerCase() === F.name.toLowerCase())) { if (typeof ccShake === "function") ccShake(n); toast(`Il y a déjà un ${F.name} : ajoutez une initiale.`, "err"); return; } }
   if (F.step === "admin" && F.admin == null) return;
   if (F.step === "connect") { if (!F.connect) { SFX.err(); toast("Choisissez comment il se connecte.", "err"); return; }
+    if (F.connect === "invite") { const em = ($("#pmEmail")?.value || "").trim(); if (em && !pmMailOk(em)) { if (typeof ccShake === "function") ccShake($("#pmEmail")); toast("Cette adresse e-mail n'a pas l'air complète.", "err"); return; } F.email = em; }
     if (F.connect === "local") { const pin = ($("#pmPin")?.value || "").trim(); if (pin && (!/^\d{4}$/.test(pin) || (typeof ccWeakPin === "function" && ccWeakPin(pin)))) { if (typeof ccShake === "function") ccShake($("#pmPin")); toast(/^\d{4}$/.test(pin) ? "Code trop facile à deviner." : "Le code doit faire 4 chiffres.", "err"); return; } F.pin = pin; } }
   if (i < steps.length - 1) pmGo(steps[i + 1], "fwd");
 }
@@ -305,7 +308,10 @@ async function pmSave() {
       if (DB.uid && typeof AUTH !== "undefined" && AUTH.fs) await AUTH.timeout(AUTH.fs.collection("invites").doc(code).set(doc), 12000);
       if (S.ui.auInv && S.ui.auInv.list) S.ui.auInv.list.unshift({ code, ...doc });
       await logEvent("team", `a invité ${fn}`).catch(() => {});
-      F.done = { code, ...doc }; F.busy = false; SFX.done(); buzz([10, 30, 10]); pmGo("done", "fwd"); return;
+      F.done = { code, ...doc }; F.busy = false;
+      try { window.dispatchEvent(new CustomEvent("gg:invite", { detail: { code, ...doc } })); } catch (e) {}
+      if (F.email) await pmMailSend(F, F.email, true);
+      SFX.done(); buzz([10, 30, 10]); pmGo("done", "fwd"); return;
     }
     const id = "m" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
     const pinP = F.pin && typeof ccPinPatch === "function" ? ccPinPatch(id, F.pin) : {};
@@ -317,7 +323,25 @@ async function pmSave() {
     try { window.dispatchEvent(new CustomEvent("gg:member", { detail: { id, from } })); } catch (e) {}
   } catch (e) { console.warn("perms", e); F.busy = false; btn && btn.removeAttribute("disabled"); SFX.err(); toast(e && e.code === "permission-denied" ? "Seul un gérant peut faire ça." : "Enregistrement impossible, réessayez.", "err"); }
 }
+/* ───────────── invitation by e-mail (functions/src/mails.js mailInvite, Brevo) ───────────── */
+const pmMailOk = (v) => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(String(v || "").trim());
+async function pmMailSend(F, email, quiet) {
+  F.mail = { busy: true, to: email, ok: false, err: "" };
+  if (DB.mode === "demo" || !DB.uid) { F.mail = { to: email, ok: true, demo: true }; return true; }
+  try { await AUTH.call("mailInvite", { code: F.done.code, email }); F.mail = { to: email, ok: true }; logEvent("team", `a envoyé l'invitation de ${firstName(F.name)} par e-mail`).catch(() => {}); if (!quiet) { SFX.ok(); toast(`Invitation envoyée à ${email}`); } return true; }
+  catch (e) { const c = typeof AUTH !== "undefined" && AUTH.vCode ? AUTH.vCode(e) : ""; console.warn("mailInvite", c || e);
+    F.mail = { to: email, ok: false, err: c === "resource-exhausted" ? "Limite d'e-mails atteinte aujourd'hui : partagez le code." : c === "permission-denied" ? "Seul un gérant peut inviter." : "L'e-mail n'est pas parti. Partagez le code ou le lien ci-dessous." };
+    if (!quiet) SFX.err(); return false; }
+}
+function pmMailHTML(F) {
+  const m = F.mail;
+  if (m && m.ok) return `<div class="pm-sent"><span class="pm-sent-ic">${ico("check")}</span><span><b>Invitation envoyée par e-mail</b><em>${esc(m.to)}${m.demo ? " · démo, rien n'est parti" : ""}</em></span></div>`;
+  return `<div class="pm-mailbox">${m && m.err ? `<p class="pm-mail-err">${esc(m.err)}</p>` : ""}<div class="pm-mailrow"><input class="input pm-mailin" id="pmEmail2" type="email" inputmode="email" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="120" value="${esc((m && m.to) || F.email || "")}" placeholder="Son e-mail" aria-label="Son e-mail"><button class="btn acc pm-mailgo" data-act="pmMail"${m && m.busy ? " disabled" : ""}>${ico(IC.auMail ? "auMail" : "share")}Envoyer</button></div></div>`;
+}
 Object.assign(ACT, {
+  pmMail: async () => { const F = PM.F; if (!F || !F.done) return; const el = $("#pmEmail2"); const em = (el ? el.value : "").trim();
+    if (!pmMailOk(em)) { if (typeof ccShake === "function") ccShake(el); else SFX.err(); toast("Entrez une adresse e-mail complète.", "err"); return; }
+    const b = $(".pm-mailgo"); b && b.setAttribute("disabled", ""); await pmMailSend(F, em, false); F.dir = "none"; pmPaint(); },
   pmNext: () => pmNext(),
   pmBack: () => { const F = PM.F; if (!F) return; const steps = pmSteps(F); const i = steps.indexOf(F.step); if (F.step === "who") { const n = $("#pmName"); if (n) F.name = n.value; } if (i > 0) pmGo(steps[i - 1], "bwd"); else pmClose(); },
   pmClose: () => { SFX.close && SFX.close(); pmClose(); },
@@ -327,7 +351,7 @@ Object.assign(ACT, {
   pmMod: (a, id, v) => { const F = PM.F; F.touched = true; F.modules[v] = !F.modules[v]; if (F.modules[v] && PM_MONEY.has(v)) F.caps.seeMoney = true; pmToggleEl(a, F.modules[v]); },
   pmReq: (a, id, v) => { const F = PM.F; F.touched = true; F.require[v] = !F.require[v]; pmToggleEl(a, F.require[v]); },
   pmCap: (a, id, v) => { const F = PM.F; F.touched = true; F.caps[v] = !F.caps[v]; if (v === "seeMoney" && !F.caps[v]) PM_MONEY.forEach((k) => { F.modules[k] = false; }); pmToggleEl(a, F.caps[v]); },
-  pmConn: (a, id, v) => { const F = PM.F; const p = $("#pmPin"); if (p) F.pin = p.value; F.connect = v; SFX.tick(); buzz(5); F.dir = "none"; pmPaint(); if (v === "local") setTimeout(() => $("#pmPin")?.focus({ preventScroll: true }), 200); },
+  pmConn: (a, id, v) => { const F = PM.F; const p = $("#pmPin"); if (p) F.pin = p.value; const em = $("#pmEmail"); if (em) F.email = em.value.trim(); F.connect = v; SFX.tick(); buzz(5); F.dir = "none"; pmPaint(); if (v === "local") setTimeout(() => $("#pmPin")?.focus({ preventScroll: true }), 200); if (v === "invite" && window.matchMedia("(min-width:700px)").matches) setTimeout(() => $("#pmEmail")?.focus({ preventScroll: true }), 200); },
   pmPhoto: async () => { const F = PM.F; const n = $("#pmName"); if (n) F.name = n.value; const [f] = await pickImage(); if (!f || !PM.F) return;
     try { const sh = await shrink(f, 200, 0.8); const c = sh.canvas; const s = Math.min(c.width, c.height); const t = document.createElement("canvas"); t.width = t.height = Math.min(160, s); t.getContext("2d").drawImage(c, (c.width - s) / 2, (c.height - s) / 2, s, s, 0, 0, t.width, t.height); F.photo = t.toDataURL("image/jpeg", 0.72); SFX.ok(); F.dir = "none"; pmPaint(); } catch (e) { toast("Photo illisible, réessayez.", "err"); } },
   pmSave: () => pmSave(),
@@ -345,5 +369,6 @@ document.addEventListener("input", (e) => { if (e.target.id === "pmName" && PM.F
 document.addEventListener("keydown", (e) => {
   if (!PM.F || !$("#pmFlow.on")) return;
   if (e.key === "Escape") { e.stopPropagation(); pmClose(); return; }
-  if (e.key === "Enter" && (e.target.id === "pmName" || e.target.id === "pmPin")) { e.preventDefault(); pmNext(); }
+  if (e.key === "Enter" && (e.target.id === "pmName" || e.target.id === "pmPin" || e.target.id === "pmEmail")) { e.preventDefault(); pmNext(); }
+  if (e.key === "Enter" && e.target.id === "pmEmail2") { e.preventDefault(); ACT.pmMail(); }
 }, true);

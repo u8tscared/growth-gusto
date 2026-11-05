@@ -1350,6 +1350,20 @@ function mailHTML(kind, d = {}) {
         foot: `Vous essayez le pack ${packT}. Rien n'est effacé à la fin de l'essai : vos données restent à vous.` }),
     };
   }
+  if (kind === "invite") {
+    const from = firstName(d.from), raw = String(d.code || "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8), code = raw.slice(0, 4) + "-" + raw.slice(4);
+    const link = d.link || APP + "?invite=" + raw, roleT = esc(d.roleT || "Équipe");
+    return {
+      subject: `${from ? from + " vous invite" : "Vous êtes invité"} à rejoindre ${d.resto || "l'équipe"} sur Growth Gusto`, kind,
+      text: `Bonjour${me ? " " + me : ""},\n\n${from || "Votre gérant"} vous invite à rejoindre ${d.resto || "l'équipe"} sur Growth Gusto (${d.roleT || "Équipe"}).\n\nOuvrez ce lien sur votre téléphone : ${link}\nOu tapez le code ${code} dans l'app (${APP}).\n\nL'invitation est valable 7 jours.`,
+      html: shell({ title: "Invitation", pre: `Code ${code} · valable 7 jours`,
+        hero: band("#5B2BFF", "#2A0BA6", resto, "#D9D0FF", me ? `${esc(me)}, on vous attend.` : "On vous attend en cuisine.", "#FFFFFF", `${from ? esc(from) + " vous invite" : "Vous êtes invité"} à rejoindre l'équipe sur Growth Gusto.`, "#EFE9FF"),
+        body: `<tr><td style="padding:22px 26px 6px"><span style="display:inline-block;background:#EFE9FF;color:#3A10D8;border-radius:999px;padding:7px 13px;font-family:${F};font-size:13px;font-weight:700">${roleT}</span></td></tr>`
+          + P("Touchez le bouton sur votre téléphone : vous créez votre compte (Google ou e-mail) et vous arrivez directement dans l'équipe.", "12px 26px 6px"),
+        cta: "Rejoindre l'équipe", href: link,
+        foot: `Ou tapez le code <b style="font-family:${FM};color:#1B1530">${code}</b> dans Growth Gusto. L'invitation est valable 7 jours. Vous ne connaissez pas ${d.resto ? esc(d.resto) : "ce restaurant"} ? Ignorez cet e-mail.` }),
+    };
+  }
   /* last day (still a few hours) or already over (the tick missed the last day) */
   const over = kind === "ended", at = d.ends ? new Date(d.ends) : null;
   const hm = at ? new Intl.DateTimeFormat("fr-FR", { timeZone: TZ, hour: "numeric", minute: "2-digit" }).format(at).replace(":", " h ").replace(/ h 00$/, " h") : "";

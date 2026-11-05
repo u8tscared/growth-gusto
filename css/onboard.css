@@ -585,3 +585,10 @@ html.kb .onb-cta{position:static}
 .onb-more-link{all:unset;box-sizing:border-box;align-self:flex-start;display:inline-flex;align-items:center;gap:4px;min-height:44px;padding:0 6px;border-radius:12px;cursor:pointer;font:650 14.5px/1.3 var(--f-t);color:var(--c-vtx)}
 .onb-more-link:focus-visible{outline:3px solid var(--c-focus)}
 @media (hover:hover){.onb-more-link:hover{background:var(--c-vtint)}}
+/* « Ajouter une personne » with its subtitle, invited chips, team code heading */
+.onb-addp-tx{flex:1;display:flex;flex-direction:column;gap:2px;min-width:0}
+.onb-addp-tx b{flex:none}
+.onb-addp-tx em{font-style:normal;font:560 13px/1.25 var(--f);opacity:.82}
+.onb-mate-inv{opacity:.9}
+.onb-mate-inv i,.onb-mate-inv img{outline:2px dashed color-mix(in srgb,var(--c) 70%,transparent);outline-offset:2px}
+.onb-inv-h{margin:16px 2px 8px;font:700 13px/1.2 var(--f);color:var(--faint,#6E6880)}

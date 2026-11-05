@@ -84,7 +84,7 @@ const step = (n, bg, fg, t, s) => `<tr><td style="padding:0 26px 10px"><table ro
 <td width="58" valign="top" style="padding:14px 0 14px 14px"><div style="width:36px;height:36px;border-radius:18px;background:${bg};color:${fg};font-family:${FD};font-size:17px;font-weight:800;line-height:36px;text-align:center">${n}</div></td>
 <td style="padding:13px 14px 13px 4px;font-family:${F}"><div style="font-size:15.5px;font-weight:700;color:#1B1530">${t}</div><div style="font-size:13.5px;line-height:19px;color:#615B74;padding-top:2px">${s}</div></td></tr></table></td></tr>`;
 
-/* kind: "code" | "welcome" | "trial3" | "last" | "ended" · d: { name, code, resto, ends, pack } */
+/* kind: "code" | "welcome" | "invite" | "trial3" | "last" | "ended" · d: { name, code, resto, ends, pack, from, roleT, link } */
 function mailHTML(kind, d = {}) {
   const me = firstName(d.name), resto = esc(d.resto || "votre restaurant"), packT = d.pack === "essentiel" ? "Essentiel" : "Complet";
   if (kind === "code") {
@@ -130,6 +130,20 @@ function mailHTML(kind, d = {}) {
 </tr></table></td></tr>`,
         cta: "Choisir ma formule", href: APP + "?go=abonnement",
         foot: `Vous essayez le pack ${packT}. Rien n'est effacé à la fin de l'essai : vos données restent à vous.` }),
+    };
+  }
+  if (kind === "invite") {
+    const from = firstName(d.from), raw = String(d.code || "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8), code = raw.slice(0, 4) + "-" + raw.slice(4);
+    const link = d.link || APP + "?invite=" + raw, roleT = esc(d.roleT || "Équipe");
+    return {
+      subject: `${from ? from + " vous invite" : "Vous êtes invité"} à rejoindre ${d.resto || "l'équipe"} sur Growth Gusto`, kind,
+      text: `Bonjour${me ? " " + me : ""},\n\n${from || "Votre gérant"} vous invite à rejoindre ${d.resto || "l'équipe"} sur Growth Gusto (${d.roleT || "Équipe"}).\n\nOuvrez ce lien sur votre téléphone : ${link}\nOu tapez le code ${code} dans l'app (${APP}).\n\nL'invitation est valable 7 jours.`,
+      html: shell({ title: "Invitation", pre: `Code ${code} · valable 7 jours`,
+        hero: band("#5B2BFF", "#2A0BA6", resto, "#D9D0FF", me ? `${esc(me)}, on vous attend.` : "On vous attend en cuisine.", "#FFFFFF", `${from ? esc(from) + " vous invite" : "Vous êtes invité"} à rejoindre l'équipe sur Growth Gusto.`, "#EFE9FF"),
+        body: `<tr><td style="padding:22px 26px 6px"><span style="display:inline-block;background:#EFE9FF;color:#3A10D8;border-radius:999px;padding:7px 13px;font-family:${F};font-size:13px;font-weight:700">${roleT}</span></td></tr>`
+          + P("Touchez le bouton sur votre téléphone : vous créez votre compte (Google ou e-mail) et vous arrivez directement dans l'équipe.", "12px 26px 6px"),
+        cta: "Rejoindre l'équipe", href: link,
+        foot: `Ou tapez le code <b style="font-family:${FM};color:#1B1530">${code}</b> dans Growth Gusto. L'invitation est valable 7 jours. Vous ne connaissez pas ${d.resto ? esc(d.resto) : "ce restaurant"} ? Ignorez cet e-mail.` }),
     };
   }
   /* last day (still a few hours) or already over (the tick missed the last day) */
@@ -247,4 +261,33 @@ async function mailsTick() {
   }
 }
 
-module.exports = { mailSendCode, mailVerifyCode, mailOnUserCreated, mailsTick, BREVO_KEY, _mailHTML: mailHTML };
+
+/* team invitation by e-mail: a gérant of the invite's restaurant sends invites/{code} to one address. 40 per restaurant and per day.
+   Returns { ok, email }. Errors: permission-denied (not a gérant), not-found (invite gone/expired), invalid-argument (bad address),
+   resource-exhausted (daily limit), unavailable (Brevo cap or failure: the app keeps the code and the link to share by hand). */
+const ROLE_T = { gerant: "Gérant", chef: "Second", equipe: "Équipe" };
+const POSTE_T = { cuisine: "Cuisine", salle: "Salle", plonge: "Plonge", bar: "Bar", second: "Second" };
+const mailInvite = onCall({ region: REGION, secrets: [BREVO_KEY], cors: true }, async (req) => {
+  const uid = authed(req); const data = req.data || {};
+  const code = String(data.code || "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8);
+  const email = String(data.email || "").trim().toLowerCase().slice(0, 120);
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) throw new HttpsError("invalid-argument", "Adresse e-mail invalide.");
+  const iref = db().doc(`invites/${code}`); const is = await iref.get();
+  if (code.length !== 8 || !is.exists) throw new HttpsError("not-found", "Invitation introuvable.");
+  const inv = is.data(); const now = Date.now();
+  if (inv.expiresAt && inv.expiresAt < now) throw new HttpsError("not-found", "Invitation expirée.");
+  const [ms, rs] = await Promise.all([db().doc(`restos/${inv.rid}/members/${uid}`).get(), db().doc(`restos/${inv.rid}`).get()]);
+  const isG = (ms.exists && ms.data().role === "gerant") || (rs.exists && rs.data().owner === uid);
+  if (!isG) throw new HttpsError("permission-denied", "Seul un gérant peut inviter.");
+  const cref = db().doc(`_mails/r_${inv.rid}`), day = parisDay();
+  const okDay = await db().runTransaction(async (t) => { const c = await t.get(cref); const d = c.exists ? c.data() : {}; const n = d.invDay === day ? d.invN || 0 : 0; if (n >= 40) return false; t.set(cref, { invDay: day, invN: n + 1 }, { merge: true }); return true; });
+  if (!okDay) throw new HttpsError("resource-exhausted", "Limite d'invitations par e-mail atteinte aujourd'hui.");
+  const from = (ms.exists && ms.data().name) || inv.createdByName || "";
+  const roleT = inv.role === "gerant" ? "Gérant · accès à tout" : POSTE_T[inv.poste] || ROLE_T[inv.role] || "Équipe";
+  const ok = await send({ email, name: inv.name || "" }, mailHTML("invite", { name: inv.name || "", from, resto: inv.restoName || (rs.exists && rs.data().name) || "", code, roleT, link: APP + "?invite=" + code }));
+  if (!ok) throw new HttpsError("unavailable", "Envoi impossible pour l'instant.");
+  await iref.set({ email, mailedAt: now }, { merge: true });
+  return { ok: true, email };
+});
+
+module.exports = { mailSendCode, mailVerifyCode, mailInvite, mailOnUserCreated, mailsTick, BREVO_KEY, _mailHTML: mailHTML };

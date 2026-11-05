@@ -250,11 +250,11 @@ const OB = {
     }
     if (s.k === "equipe") {
       const cloud = this.cloud(), perms = this.perms();
-      return `${this.head("Qui travaille avec vous ?", cloud ? "Partagez le lien : chacun voit la cuisine en direct." : "Chacun signe ses relevés en touchant son prénom.")}
+      return `${this.head("Qui travaille avec vous ?", cloud ? "Ajoutez chaque personne, choisissez ce qu'elle voit, et invitez-la par e-mail ou par code." : "Chacun signe ses relevés en touchant son prénom.")}
         <div class="onb-team st" style="--i:2"><div class="onb-mates" id="obTeamList">${this.teamHTML()}</div>
-          ${perms ? `<button type="button" class="onb-addp" data-act="obPerson"><span class="onb-addp-ic">${OB_SVG.userAdd}</span><b>Ajouter une personne</b>${OB_SVG.chev}</button>`
+          ${perms ? `<button type="button" class="onb-addp" data-act="obPerson"><span class="onb-addp-ic">${OB_SVG.userAdd}</span><span class="onb-addp-tx"><b>Ajouter une personne</b><em>${cloud ? "Gérant ou équipier · invitation par e-mail ou code" : "Gérant ou équipier · ce qu'il voit"}</em></span>${OB_SVG.chev}</button>`
             : `<div class="onb-addrow"><div class="onb-in"><input class="onb-input" id="obTeamIn" placeholder="Son prénom" autocomplete="off" maxlength="40" enterkeyhint="done" aria-label="Prénom d'un équipier"></div><button type="button" class="onb-chip onb-addbtn" data-act="obTeamAdd">${OB_SVG.plus}<span>Ajouter</span></button></div>`}</div>
-        ${cloud ? `<div class="onb-inv st" style="--i:3" id="obInv">${this.invHTML()}</div>` : ""}`;
+        ${cloud ? `<div class="onb-inv-h st" style="--i:3">Ou un code pour toute l'équipe</div><div class="onb-inv st" style="--i:3" id="obInv">${this.invHTML()}</div>` : ""}`;
     }
     if (s.k === "outils" && this.tqList().length) return this.tqHTML();
     if (s.k === "outils") {
@@ -331,7 +331,9 @@ const OB = {
   teamHTML() {
     const d = this.st.d, mates = this.mates(), meName = d.me || S.me.name || "Vous";
     const chip = (m, i, me) => { const mine = d.team.some((t) => t.id === m.id); return `<span class="onb-mate${m.id === d.pop ? " pop" : ""}" style="--c:${esc(m.color || PALETTE[(i + 1) % PALETTE.length])}">${m.photo ? `<img src="${esc(m.photo)}" alt="">` : `<i>${esc(initials(m.name || "?"))}</i>`}<span class="onb-mate-n">${esc(firstName(m.name) || m.name || "?")}<em>${me ? "Gérant · vous" : esc((typeof ROLES !== "undefined" && ROLES[m.role]) || "Équipe")}</em></span>${mine ? `<button type="button" data-act="obTeamDel" data-id="${esc(m.id)}" aria-label="Retirer ${esc(m.name)}">${OB_SVG.x}</button>` : ""}</span>`; };
-    return chip({ id: S.me.id, name: meName, photo: d.photo, color: S.me.color || PALETTE[0] }, -1, true) + mates.map((m, i) => chip(m, i, false)).join("");
+    const POS = { cuisine: "Cuisine", salle: "Salle", plonge: "Plonge", bar: "Bar", second: "Second" };
+    const inv = (d.invs || []).map((v, i) => `<span class="onb-mate onb-mate-inv${v.code === d.pop ? " pop" : ""}" style="--c:${esc(PALETTE[(mates.length + i + 1) % PALETTE.length])}">${v.photo ? `<img src="${esc(v.photo)}" alt="">` : `<i>${esc(initials(v.name || "?"))}</i>`}<span class="onb-mate-n">${esc(firstName(v.name) || v.name || "?")}<em>${v.role === "gerant" ? "Gérant" : esc(POS[v.poste] || "Équipe")} · ${v.email ? "invité par e-mail" : "invité"}</em></span></span>`).join("");
+    return chip({ id: S.me.id, name: meName, photo: d.photo, color: S.me.color || PALETTE[0] }, -1, true) + mates.map((m, i) => chip(m, i, false)).join("") + inv;
   },
   invHTML() {
     const d = this.st.d, inv = d.inv;
@@ -352,7 +354,7 @@ const OB = {
       { k: "frigos", ic: OB_SVG.snow, t: "Équipements", s: frs.length ? `${obPl(frs.length, "équipement")} à relever` : "Aucun pour l'instant", ok: frs.length > 0 },
       { k: "etiquettes", ic: OB_SVG.tag, t: "Étiquettes", s: this.labelSet() ? "Design choisi" : "Design par défaut", ok: this.labelSet() },
       { k: "imprimante", ic: OB_SVG.printer, t: "Imprimante", s: pr || "Étiquettes à l'écran en attendant", ok: !!pr },
-      { k: "equipe", ic: OB_SVG.userAdd, t: "Équipe", s: [mates.length ? obPl(mates.length, "personne") : "", d.inv ? "invitation prête" : ""].filter(Boolean).join(" · ") || "Vous seul pour l'instant", ok: mates.length > 0 || !!d.inv },
+      { k: "equipe", ic: OB_SVG.userAdd, t: "Équipe", s: [mates.length ? obPl(mates.length, "personne") : "", (d.invs || []).length ? obPl(d.invs.length, "invitation") + " envoyée" + (d.invs.length > 1 ? "s" : "") : d.inv ? "code d'équipe prêt" : ""].filter(Boolean).join(" · ") || "Vous seul pour l'instant", ok: mates.length > 0 || !!d.inv || !!(d.invs || []).length },
     ];
   },
   /* the drawn kitchen under the fiche on desktop: the real equipment, or soft outlines before the first one */
@@ -1082,4 +1084,10 @@ Object.assign(ACT, {
     OB.setBusy(true); const ok = await OB.finish(); OB.setBusy(false); if (!ok) return;
     OB.skipRest(); OB.goTo(OB_LAST);
   },
+});
+
+/* a person invited from the « Nouvel équipier » flow during onboarding: shown at once as a pending chip */
+window.addEventListener("gg:invite", (e) => {
+  try { if (!OB.st || !OB.st.d || !e.detail) return; const d = OB.st.d, v = e.detail; d.invs = (d.invs || []).filter((x) => x.code !== v.code).concat([v]); d.pop = v.code;
+    const L = $("#obTeamList"); if (L) { L._h = OB.teamHTML(); L.innerHTML = L._h; } OB.soft && OB.soft(); } catch (x) { console.warn("gg:invite", x); }
 });

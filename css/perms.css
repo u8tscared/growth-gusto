@@ -129,3 +129,18 @@
 .pm-na-ic .ico{width:40px;height:40px}
 .pm-na-card .sub{margin:0 0 10px;font-size:15px}
 @media (prefers-reduced-motion:reduce){.pm-pane,.pm-poste,.pm-opt,.pm-rava,.pm-qr,.pm-na-ic{animation:none!important}.pm-card{transition:none}}
+/* invitation by e-mail */
+.pm-mail .pm-mailin,.pm-mailrow .pm-mailin{height:52px;font-size:16px;width:100%;box-sizing:border-box}
+.pm-mail-s{display:block;margin-top:8px;font-style:normal;font-size:13px;color:var(--faint);font-weight:500}
+.pm-mailbox{margin:0 0 14px}
+.pm-mailrow{display:flex;gap:8px;align-items:stretch}
+.pm-mailrow .pm-mailin{flex:1;min-width:0}
+.pm-mailrow .btn{flex:none;height:52px;white-space:nowrap}
+.pm-mail-err{margin:0 0 8px;font-size:13.5px;font-weight:600;color:#C8432A}
+.pm-sent{display:flex;align-items:center;gap:12px;margin:0 0 14px;padding:12px 14px;border-radius:16px;background:#EFE9FF;color:#1B1530;animation:pmSentIn .42s cubic-bezier(.2,.9,.3,1.2) both}
+.pm-sent b{display:block;font-size:15px}
+.pm-sent em{display:block;font-style:normal;font-size:13px;color:#4A4560;word-break:break-all}
+.pm-sent-ic{flex:none;width:38px;height:38px;border-radius:50%;display:grid;place-items:center;background:#5B2BFF;color:#fff}
+.pm-sent-ic .ico{width:20px;height:20px}
+@keyframes pmSentIn{from{opacity:0;transform:translateY(8px) scale(.97)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.pm-sent{animation:none}}
