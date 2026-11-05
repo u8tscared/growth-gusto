@@ -428,7 +428,7 @@ const NAV = [
   ["sep", "", "Restaurant"], ["alertes", "alBell", "Alertes"], ["sites", "store", "Mes établissements"], ["import", "upload", "Importer"], ["imprimante", "printer", "Imprimante"], ["reglages", "sliders", "Réglages"],
 ];
 const TABS = [["home", "home", "Accueil"], ["frigos", "snow", "Frigos"], ["scan", "scan", ""], ["stock", "box", "Stock"], ["more", "grid", "Plus"]];
-const TAB_OF = { home: "home", frigos: "frigos", frigo: "frigos", releve: "home", scan: "scan", stock: "stock", reception: "more", tickets: "more", registre: "more", notes: "more", note: "more", menage: "more", equipe: "more", imprimante: "more", reglages: "more", more: "more", dashboard: "more", finance: "more", obligations: "more", pointeuse: "more", planning: "more", avis: "more" };
+const TAB_OF = { home: "home", frigos: "frigos", frigo: "frigos", releve: "home", scan: "scan", stock: "stock", reception: "more", tickets: "more", registre: "more", notes: "more", note: "more", menage: "more", equipe: "more", imprimante: "more", reglages: "more", more: "more", dashboard: "more", finance: "more", obligations: "more", pointeuse: "more", planning: "more", avis: "more", import: "more" };
 /* employee access (js/perms.js): a route the gérant switched off for this person is hidden everywhere and guarded in go() */
 const permOk = (r) => { try { return typeof PERMS === "undefined" || !PERMS.routeAllowed ? true : PERMS.routeAllowed(r) !== false; } catch (e) { return true; } };
 const navAllowed = () => { const out = []; NAV.forEach((n) => { if (n[0] !== "sep" && !permOk(n[0])) return; if (n[0] === "sep" && out.length && out[out.length - 1][0] === "sep") out.pop(); out.push(n); }); while (out.length && out[out.length - 1][0] === "sep") out.pop(); return out; };

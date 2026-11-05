@@ -335,6 +335,7 @@ function alGoCause(a) {
   if (g === "missed") { S.slot = a.slot || slotNow(); return go("releve"); }
   if (g === "dlc" && a.lotId && typeof openLot === "function") return openLot(a.lotId);
   if (g === "oblig" && a.oblId && VIEWS.obl) return go("obl", { id: a.oblId });
+  if (g === "resa" && VIEWS.resa) return go("resa", a.day ? { day: a.day } : {});
   if (g === "sensor" && VIEWS.sondes) return go("sondes", a.sensorId ? { id: a.sensorId } : {});
   if (a.fridgeId && S.fridges.some((f) => f.id === a.fridgeId)) return go("frigo", { id: a.fridgeId });
   if (g === "temp") return go("releve");
