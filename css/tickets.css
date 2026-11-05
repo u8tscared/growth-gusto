@@ -273,3 +273,123 @@
 .tk-sfoot .btn{white-space:nowrap}
 .tk-lastq{color:var(--muted)}
 @media (min-width:960px){.tk-chips{flex-wrap:wrap;overflow:visible}}
+
+/* ═════════════════ Version 2 ═════════════════ */
+.view[data-route=tickets] .lbl,.view[data-route=tzEdit] .lbl{font-family:var(--f);font-size:13px;font-weight:650;letter-spacing:0;text-transform:none;color:var(--ink-2)}
+#sheetBody:has([data-act=tzOpen]) .tbl th{font-family:var(--f);font-size:12.5px;font-weight:650;letter-spacing:0;text-transform:none;color:var(--ink-2)}
+#sheetBody:has([data-act=tzOpen]) .tbl td.n{font-family:var(--mono);font-weight:650}
+
+/* big numbers in Bricolage */
+.tk-kpi b{font-family:var(--mono);font-size:40px;font-weight:780;letter-spacing:-.04em}
+.tk-kpi b small{font-family:var(--d);font-size:22px;color:var(--faint)}
+.tk-kpis b,.tk-avg b,.tk-vsum b,.tk-vline b{font-family:var(--mono)}
+.tk-read{background:var(--tint);border-radius:14px;padding:9px 14px}
+.tk-read span{color:var(--accent-ink)}
+
+/* 14-day chart: flat violet, rounded, saffron for the best day, light grid */
+.tk-chart{height:160px}
+.tk-grid{stroke:#EFE6D6;stroke-dasharray:none;stroke-width:1.5}
+.tk-base{stroke:#E9DFCD;stroke-width:1.5}
+.tk-y{font:650 11px var(--mono);fill:var(--muted)}
+.tk-x{font:650 11.5px var(--f);fill:var(--muted)}
+.tk-x.td{fill:var(--ink);font-weight:750}
+.tk-x.on{fill:var(--accent-ink);font-weight:750}
+.tk-b{fill:#D4C9FF}
+.tk-b.top{fill:var(--saffron)}
+.tk-b.on{fill:var(--accent)}
+.tk-b0{fill:#E9DFCD}
+.tk-b0.has{fill:#D4C9FF}
+.tk-hit:focus-visible{fill:rgba(91,43,255,.07)}
+
+/* rows, bars, chips */
+.tk-bar{height:8px;background:#F1E9DA;border-radius:8px}
+.tk-bar i{background:var(--accent);border-radius:8px}
+.tk-top .rank{font-family:var(--mono);font-weight:720}
+.tk-q,.tk-mq{font-family:var(--mono);font-weight:720}
+.tk-cost{background:var(--tint-ok);border-radius:16px}
+.tk-cost.part{background:#F4EDE0}
+.tk-cost b{font-family:var(--mono)}
+.tk-hint .ico,.tk-tip .ico{color:var(--accent)}
+.tk-tip{color:var(--ink-2);font-weight:600}
+.tk-cam{border-radius:50%;background:var(--tint-ok)}
+.tk-quick .chip{color:var(--ink)}
+.tk-quick .chip .ico{color:var(--accent)}
+.tk-seg button.on{background:#fff;box-shadow:0 2px 0 var(--edge-b),0 0 0 1px var(--rim) inset;border-radius:12px;color:var(--ink)}
+.tk-seg{padding:4px}
+.tk-undo{color:var(--saffron)}
+
+/* saisie */
+.tk-search .input,.tk-dates .input{background:#fff}
+.tk-ac{background:#fff;border:1.5px solid var(--rim);box-shadow:var(--sh);border-radius:18px}
+.tk-opt+.tk-opt{border-top:1.5px solid #F1E9DA}
+.tk-opt:hover,.tk-opt:focus-visible{background:#F7F0E3}
+.tk-opt.new{color:var(--accent-ink)}
+.tk-line+.tk-line,.tk-mv+.tk-mv,.tk-unl+.tk-unl,.tk-lk+.tk-lk,.tk-prod+.tk-prod{border-top:1.5px solid #F1E9DA}
+.tk-line .tx b{font-weight:650}
+.tk-step{gap:6px}
+.tk-step .step{width:46px;height:46px;border-radius:15px;color:var(--ink)}
+.tk-step .step .ico{width:20px;height:20px;stroke-width:2.4}
+.tk-step .step:active{transform:translateY(4px)!important}
+.tk-step input{font-family:var(--mono);font-size:22px;font-weight:760;width:56px;height:46px;border-radius:14px;background:var(--tint);color:var(--ink)}
+.tk-step input:focus{background:#fff;box-shadow:0 0 0 2px var(--accent)}
+.tk-step input[readonly]{background:var(--tint)}
+.tk-step input.l3{font-size:19px}.tk-step input.l4{font-size:16px}
+@keyframes tkBump{40%{transform:scale(1.22);color:var(--accent-ink)}}
+.tk-ca .input{font-family:var(--mono);font-size:34px;font-weight:780;height:68px;background:#fff}
+.tk-ca b{font-family:var(--d);color:var(--faint)}
+.tk-px{background:var(--ink)}
+.tk-sheetca{background:var(--tint);border-radius:18px;padding:14px 16px}
+.tk-sheetca b{font-family:var(--mono);font-size:28px;font-weight:780;letter-spacing:-.035em}
+.tk-sfin span{background:#F7F0E3;border-radius:16px}
+.tk-sfin em{font-family:var(--f);font-size:12.5px;font-weight:650;color:var(--ink-2)}
+.tk-sfin b{font-family:var(--mono);font-size:19px;font-weight:740}
+.tk-shots img{border-radius:18px;border:1.5px solid var(--rim)}
+
+/* parts of a long ticket */
+.tk-part{background:var(--paper);border:1.5px solid var(--rim);border-radius:18px;box-shadow:0 2px 0 #EFE6D6}
+.tk-part b{font-family:var(--d);font-weight:720}
+.tk-part.on{background:var(--ink);color:#fff;border-color:var(--ink);box-shadow:0 3px 0 #000}
+.tk-part.on em{color:#C9C3DA}
+.tk-part.all{border-style:dashed;border-color:var(--rim-2)}
+.tk-part.add{background:var(--tint);color:var(--accent);border-color:transparent;box-shadow:none}
+.tk-addpart{border:1.5px dashed #CFC2FF;border-radius:20px;color:var(--accent)}
+.tk-addpart:hover{background:var(--tint)}
+.tk-pb{background:var(--tint);color:var(--accent-ink);border-radius:999px;padding:1px 7px;font-weight:700}
+.tk-dupnote,.tk-dupf{background:var(--saffron-tint);color:var(--saffron-ink)}
+.tk-dupnote{border-radius:16px}
+.tk-dupf.kept{background:var(--tint);color:var(--accent-ink)}
+.tk-dupf button{background:#fff;box-shadow:0 0 0 1.5px var(--rim-2) inset,0 2px 0 var(--edge-b)}
+.tk-line.dup .tx b{text-decoration-color:var(--saffron-edge)}
+
+/* CA, couverts, TVA */
+.tk-covrow{border-top:1.5px solid #F1E9DA}
+.tk-vatt{background:#F7F0E3;border-radius:16px}
+.tk-vatt:hover{background:#F4EDE0}
+.tk-vr{color:var(--ink-2);font-weight:650}
+.tk-vr .input{font-family:var(--mono);background:#fff}
+.tk-vr.ht .input{background:var(--tint)}
+.tk-vline .warn{color:var(--warn)}
+
+/* keypad sheet */
+.tk-kpv{background:var(--tint);box-shadow:none;border-radius:22px;border:2px solid #CFC2FF}
+.tk-kpv .mono{font-size:48px;font-weight:780}
+.tk-kpv.empty .mono{color:#C9BFE9}
+.tk-kpc .chip{color:var(--accent-ink);border-color:#DCD2FF}
+.tk-keys button{height:58px}
+.tk-unit1{font-family:var(--d)}
+
+/* product link sheet */
+.tk-prods{background:#fff;border:1.5px solid var(--rim);box-shadow:none;border-radius:18px}
+.tk-prod.sug{background:var(--tint)}
+.tk-prod:hover,.tk-prod:focus-visible{background:#F7F0E3}
+.tk-prod em i{color:var(--accent-ink)}
+.tk-lex{background:var(--tint-ok);border-radius:16px}
+.tk-lk .tx:hover{background:#F7F0E3}
+
+/* the save bar: solid paper, no frosted glass */
+.tk-edit .ctabar{background:var(--paper);-webkit-backdrop-filter:none;backdrop-filter:none;border:1.5px solid var(--rim);box-shadow:0 4px 0 #EFE6D6,0 20px 36px -18px rgba(27,21,48,.35);border-radius:26px;padding:8px 8px 4px}
+@media (min-width:960px){.tk-ed-r > .ctabar{background:none;border:0;box-shadow:none;padding:0}}
+@media (prefers-reduced-motion:reduce){.tk-b,.tk-bar i{animation:none}}
+.tk-ok .ico{display:none}
+.view[data-route=tickets] .glass > .row:first-child > .lbl{font-family:var(--d);font-size:18px;font-weight:740;letter-spacing:-.025em;color:var(--ink);font-variation-settings:"opsz" 96,"wdth" 92}
+.view[data-route=tickets] .glass > .row:first-child > .sub{font-weight:600}

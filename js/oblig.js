@@ -36,11 +36,11 @@ Object.assign(IC, {
 
 /* ───────── catalogue ───────── */
 const OBL_CATS = {
-  feu: { t: "Sécurité incendie", c: "#D42A48" },
-  tech: { t: "Installations techniques", c: "#1F7AE0" },
-  hyg: { t: "Hygiène & HACCP", c: "#0B9B6A" },
-  admin: { t: "Administratif & légal", c: "#4A1FE6" },
-  aff: { t: "Affichages", c: "#E0752F" },
+  feu: { t: "Sécurité incendie", c: "#C8432A" },
+  tech: { t: "Installations techniques", c: "#2F5FBF" },
+  hyg: { t: "Hygiène & HACCP", c: "#1E7F55" },
+  admin: { t: "Administratif & légal", c: "#5B2BFF" },
+  aff: { t: "Affichages", c: "#9A6200" },
 };
 const OBL_CAT_ORDER = ["feu", "tech", "hyg", "admin", "aff"];
 /* kind: visit = an outside company comes; self = you do it; doc = a document to renew */
@@ -284,7 +284,7 @@ VIEWS.obligations = {
   render() {
     if (!oblActive().length) return oblIntroHtml();
     const right = `<button class="btn soft sm ob-catb" data-go="oblCat" aria-label="Catalogue">${ico("sliders")}<span>Catalogue</span></button>`;
-    const side = `${oblYearHtml()}${oblRecentHtml()}<button class="glass pad ob-rep st" style="--i:6" data-go="regReport"><span class="ic">${ico("printer")}</span><span class="tx"><b>Pour un contrôle</b><em>Ces contrôles figurent dans le rapport du registre HACCP, avec la date, le prestataire et le statut.</em></span>${ico("chev")}</button>`;
+    const side = `${oblYearHtml()}${oblRecentHtml()}<button class="glass pad ob-rep st" style="--i:6" data-go="regReport"><span class="ic">${ico("printer")}</span><span class="tx"><b>Pour un contrôle</b><em>Inclus dans le rapport HACCP, avec date et prestataire.</em></span>${ico("chev")}</button>`;
     return `<div class="inner ob">${topBar("Obligations & contrôles", { right })}
       ${oblHeroHtml()}
       <div class="cols ob-cols"><div>${oblListHtml()}<button class="ob-add st" style="--i:5" data-go="oblCat">${ico("plus")}<span><b>Ajouter ou retirer des obligations</b><em>${oblActive().length} suivies · ${OBL_CATALOG.length} proposées</em></span></button></div><div>${side}</div></div>
@@ -297,7 +297,7 @@ function oblIntroHtml() {
   const sel = (S.ui.oblSel ||= Object.fromEntries(OBL_CATALOG.map((c) => [c.key, c.on])));
   const n = OBL_CATALOG.filter((c) => sel[c.key]).length;
   return `<div class="inner narrow ob ob-intro">${topBar("Obligations & contrôles")}
-    <div class="ob-ihero st" style="--i:1"><span class="ob-iic">${ico("calcheck")}</span><div><b>Tout ce qui revient chaque année</b><p>Extincteurs, nuisibles, hotte, électricité… Choisissez ce qui concerne votre restaurant : l'application vous prévient avant chaque échéance et garde chaque rapport pour l'inspecteur.</p></div></div>
+    <div class="ob-ihero st" style="--i:1"><span class="ob-iic">${ico("calcheck")}</span><div><b>Tout ce qui revient chaque année</b><p>Extincteurs, nuisibles, hotte… Cochez ce qui vous concerne : on vous prévient avant chaque échéance et on garde les rapports.</p></div></div>
     <p class="sub st" style="--i:2;margin:0 2px">Ce qui est coché concerne tout restaurant. Touchez un nom pour savoir pourquoi.</p>
     ${oblCatalogHtml((c) => !!sel[c.key], "oblSel", 3)}
     <div class="ctabar"><button class="btn acc block" data-act="oblStart" ${n ? "" : "data-off"}>${ico("check")}Suivre ${oblPlural(n, "obligation")}</button></div>

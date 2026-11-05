@@ -13,8 +13,8 @@
     "minimal-ui"
   ],
   "orientation": "any",
-  "theme_color": "#ECEFFB",
-  "background_color": "#ECEFFB",
+  "theme_color": "#FBF6EC",
+  "background_color": "#FBF6EC",
   "categories": [
     "business",
     "food",

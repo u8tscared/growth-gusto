@@ -96,7 +96,7 @@ function relScale(f) {
   else { lo = Math.min(-2, Math.floor(f.min - 2)); hi = Math.max(8, Math.ceil(f.max + 4)); }
   const pos = (x) => Math.max(0, Math.min(100, ((x - lo) / (hi - lo)) * 100));
   const a = pos(f.min), b = pos(f.max);
-  const bg = `linear-gradient(90deg,#7DB9FF 0%,#2FB985 ${Math.max(0, a - 4)}%,#2FB985 ${b}%,#F0A43A ${Math.min(100, b + 10)}%,#E14560 100%)`;
+  const bg = `linear-gradient(90deg,#9EC5FF 0%,#6FD9A3 ${Math.max(0, a - 4)}%,#6FD9A3 ${b}%,#F6B93B ${Math.min(100, b + 10)}%,#EF5A3C 100%)`;
   return { lo, hi, pos, bg };
 }
 /* can this pending fridge be signed by « Tout est conforme » ? only with a value set this round (stepper or slider):
@@ -123,6 +123,17 @@ function relDial(key, f, t) {
   return `<div class="big"><button class="step" data-step="-1" data-id="${key}" aria-label="Moins 0,1 degré">${ico("minus")}</button><div class="rel-vw"><div class="v" id="tv-${key}" style="color:${peak ? "var(--warn)" : bad ? "var(--bad)" : "inherit"}">${fmt(t)}<small>°C</small></div><div id="ts-${key}">${relState(f, t, key)}</div></div><button class="step" data-step="1" data-id="${key}" aria-label="Plus 0,1 degré">${ico("plus")}</button></div>
     <div><div class="scale" data-scale="${key}" data-lo="${lo}" data-hi="${hi}" style="background:${bg}"><span class="safe" style="left:${pos(f.min)}%;right:${100 - pos(f.max)}%"></span><i id="tk-${key}" style="left:${pos(t)}%" data-lo="${lo}" data-hi="${hi}"></i></div><div class="scale-l rel-sl"><span style="left:0">${lo}°</span>${pos(f.min) > 9 ? `<span class="c" style="left:${pos(f.min)}%">${relDeg(f.min)}°</span>` : ""}${pos(f.max) < 91 ? `<span class="c" style="left:${pos(f.max)}%">${relDeg(f.max)}°</span>` : ""}<span style="right:0">${hi}°</span></div></div>`;
 }
+/* optional photo on a reading (display, thermometer…): never required, one tap, kept with the reading */
+const relPhOf = (key) => (S.ui.relPh || {})[key];
+const relPhSrc = (r) => (r && ((r.photoId && typeof photoUrl === "function" && photoUrl(r.photoId)) || (typeof photoUrl === "function" ? photoUrl(r.photoUrl) : r.photoUrl))) || "";
+function relPhHtml(key) {
+  const p = relPhOf(key);
+  if (p && p.busy) return `<div class="rel-ph" id="ph-${key}"><span class="rel-phb busy"><i class="rel-spin"></i>Photo…</span></div>`;
+  if (p && p.src) return `<div class="rel-ph has" id="ph-${key}"><img src="${esc(p.src)}" alt="Photo du relevé"><span class="rel-pht">Photo jointe</span><button class="iconbtn" data-act="relPhotoRm" data-id="${key}" aria-label="Retirer la photo">${ico("x")}</button></div>`;
+  return `<div class="rel-ph" id="ph-${key}"><button class="rel-phb" data-act="relPhoto" data-id="${key}">${ico("camera")}Ajouter une photo<small>facultatif</small></button></div>`;
+}
+function relPhSync(key) { const w = $(`#ph-${key}`); if (w) w.outerHTML = relPhHtml(key); }
+function relPhThumb(r) { const src = relPhSrc(r); return src ? `<img class="rel-phs" src="${esc(src)}"${r.photoId ? ` data-photo="${esc(r.photoId)}"` : ""} alt="Photo">` : ""; }
 function relFixedPill(r) { return r.editedAt ? `<span class="pill warn rel-fx" title="Corrigé">${ico("edit")}<span class="rel-fxt">corrigé</span></span>` : ""; }
 function relFixedLine(r) { return r.editedAt ? `corrigé par ${esc(firstName(nameOf(r.editedBy)))} · ${when(r.editedAt)}` : ""; }
 function relRing(done, exp, size = 58) {
@@ -144,12 +155,13 @@ VIEWS.releve = {
       const r = rs.find((x) => x.fridgeId === f.id);
       if (r) {
         const drew = just.has(f.id);
-        return `<div class="glass fr done st ${drew ? "rel-in" : ""}" style="--i:${i + 3}" data-fr="${f.id}" data-act="relEdit" data-id="${r.id}" role="button" tabindex="0" aria-label="Modifier le relevé ${esc(f.name)}"><div class="head"><span class="ic ${r.ok ? (r.peak ? "warn" : "ok") : "bad"}">${relIco(f)}</span><div style="flex:1;min-width:0"><div class="rel-nm"><b class="h3 rel-ell">${esc(f.name)}</b>${relFixedPill(r)}</div><div class="who">${avatar(r.uid, true)}<span class="rel-ell">${esc(firstName(nameOf(r.uid)))} · ${hm(r.at)}${r.ok ? (r.peak ? ` · <span style="color:var(--warn)">pic de service</span>` : r.ctx === "service" ? " · en service" : "") : ` · <span style="color:var(--bad)">${esc(r.action || "hors seuil")}</span>`}</span>${relFixedPill(r).replace('rel-fx"', 'rel-fx rel-fx-m"')}</div></div><span class="t" style="color:${r.ok ? (r.peak ? "var(--warn)" : "var(--ok)") : "var(--bad)"}">${fmt(r.value)}°</span>${r.ok ? `<span class="check ${drew ? "draw" : ""}"><svg viewBox="0 0 24 24"><path d="M6 12.5l4 4 8-9"/></svg></span>` : `<span class="check ${drew ? "draw" : ""}" style="background:var(--bad);box-shadow:0 6px 14px -6px rgba(212,42,72,.6)">${ico("alert").replace('class="ico ', 'style="width:15px;height:15px;color:#fff" class="ico ')}</span>`}</div></div>`;
+        return `<div class="glass fr done st ${drew ? "rel-in" : ""}" style="--i:${i + 3}" data-fr="${f.id}" data-act="relEdit" data-id="${r.id}" role="button" tabindex="0" aria-label="Modifier le relevé ${esc(f.name)}"><div class="head"><span class="ic ${r.ok ? (r.peak ? "warn" : "ok") : "bad"}">${relIco(f)}</span><div style="flex:1;min-width:0"><div class="rel-nm"><b class="h3 rel-ell">${esc(f.name)}</b>${relFixedPill(r)}</div><div class="who">${avatar(r.uid, true)}<span class="rel-ell">${esc(firstName(nameOf(r.uid)))} · ${hm(r.at)}${r.ok ? (r.peak ? ` · <span style="color:var(--warn)">pic de service</span>` : r.ctx === "service" ? " · en service" : "") : ` · <span style="color:var(--bad)">${esc(r.action || "hors seuil")}</span>`}</span>${relFixedPill(r).replace('rel-fx"', 'rel-fx rel-fx-m"')}</div></div>${relPhThumb(r)}<span class="t" style="color:${r.ok ? (r.peak ? "var(--warn)" : "var(--ok)") : "var(--bad)"}">${fmt(r.value)}°</span>${r.ok ? `<span class="check ${drew ? "draw" : ""}"><svg viewBox="0 0 24 24"><path d="M6 12.5l4 4 8-9"/></svg></span>` : `<span class="check ${drew ? "draw" : ""}" style="background:var(--bad);box-shadow:0 6px 14px -6px rgba(212,42,72,.6)">${ico("alert").replace('class="ico ', 'style="width:15px;height:15px;color:#fff" class="ico ')}</span>`}</div></div>`;
       }
       const last = S.readings.find((x) => x.fridgeId === f.id);
       const t = relSuggest(f); S.temp[f.id] = t; const isOpen = S.open === f.id;
       return `<div class="glass fr ${isOpen ? "open" : ""} st" style="--i:${i + 3}" data-fr="${f.id}"><div class="head" data-act="frOpen" data-id="${f.id}" role="button" tabindex="0" aria-expanded="${isOpen}"><span class="ic">${relIco(f)}</span><div style="flex:1;min-width:0"><b class="h3 rel-ell" style="display:block">${esc(f.name)}</b><div class="who"><span class="rel-ell">Seuil ${relRange(f)}${last ? ` · dernier ${fmt(last.value)}°` : " · premier relevé"}</span></div></div><span class="pend"></span></div>
         <div class="dial"><div><div class="dz">${relDial(f.id, f, t)}${relIsService(f) ? relCtxHtml(f.id, f) : ""}
+          ${relPhHtml(f.id)}
           <button class="btn acc block" data-act="saveReading" data-id="${f.id}">${ico("check")}<span data-tlv="${f.id}" data-pre="Valider">Valider ${fmt(t)} °C</span></button>
         </div></div></div></div>`;
     }).join("");
@@ -183,7 +195,7 @@ VIEWS.frigos = {
       const sv = relIsService(f) ? fl.filter((l) => l.svcAt) : []; const svOld = sv.length ? Math.max(...sv.map(svcMin)) : null;
       const st = ok == null ? "none" : !ok ? "bad" : late ? "late" : "ok";
       const stTx = { none: "Jamais relevé", bad: "Hors seuil", late: "En retard", ok: "Conforme" }[st];
-      return `<div class="glass pad st rel-fcard" style="--i:${Math.min(i + 1, 12)}" data-go="frigo" data-id="${f.id}" role="button" tabindex="0" aria-label="${esc(f.name)} · ${stTx}"><div class="row"><div class="hstack" style="min-width:0"><span class="ic ${st === "bad" ? "bad" : ""}">${relIco(f)}</span><div style="min-width:0"><b class="h3 rel-ell" style="display:block">${esc(f.name)}</b><div class="rel-meta"><span class="rel-dot ${st}"></span><span>${stTx}</span><span class="rel-sep">·</span><span class="rel-ell">${fl.length ? `${fl.length} produit${fl.length > 1 ? "s" : ""}` : relRange(f)}</span></div></div></div>${last ? `<div style="text-align:right;flex:none"><div class="mono rel-ft" style="color:${ok === false ? "var(--bad)" : last.peak ? "var(--warn)" : "inherit"}">${fmt(last.value)}°</div><div class="sub" style="font-size:11.5px">${relAgo(last.at)}</div></div>` : ""}</div>${sv.length ? `<div class="rel-next svc"><span class="rel-ell">Mise en place · <b>${sv.length} produit${sv.length > 1 ? "s" : ""}</b></span><span class="pill ${svcTone(svOld)}">${ico("clock")}${svcDur(svOld)}</span></div>` : ""}${fl.length ? `<div class="rel-top">${fl.slice(0, 4).map((l) => `<span class="rel-tc ${relUrg(l)}"><i></i>${esc(relShort(l.name, 18))}${l.qty ? `<em class="mono">${esc(lbQty(l))}</em>` : ""}</span>`).join("")}${fl.length > 4 ? `<span class="rel-tc more">+${fl.length - 4}</span>` : ""}</div>${lateN ? `<div class="rel-falert"><span class="pill bad"><span class="dot"></span>${lateN} DLC dépassée${lateN > 1 ? "s" : ""}</span></div>` : ""}` : `<div class="rel-next none"><span class="rel-ell">Vide · touchez pour voir l'historique</span></div>`}</div>`;
+      return `<div class="glass pad st rel-fcard" style="--i:${Math.min(i + 1, 12)}" data-go="frigo" data-id="${f.id}" role="button" tabindex="0" aria-label="${esc(f.name)} · ${stTx}"><div class="rel-fhd"><span class="rel-lcd ${st}"><b>${last ? `${fmt(last.value)}°` : "--,-"}</b><small>${last ? relAgo(last.at) : "jamais"}</small></span><div style="min-width:0;flex:1"><b class="h3 rel-ell" style="display:block">${esc(f.name)}</b><div class="rel-meta"><span class="rel-dot ${st}"></span><span>${stTx}</span><span class="rel-sep">·</span><span class="rel-ell">${fl.length ? `${fl.length} produit${fl.length > 1 ? "s" : ""}` : relRange(f)}</span></div></div><i class="rel-hdl"></i></div>${sv.length ? `<div class="rel-next svc"><span class="rel-ell">Mise en place · <b>${sv.length} produit${sv.length > 1 ? "s" : ""}</b></span><span class="pill ${svcTone(svOld)}">${ico("clock")}${svcDur(svOld)}</span></div>` : ""}${fl.length ? `<div class="rel-top">${fl.slice(0, 4).map((l) => `<span class="rel-tc ${relUrg(l)}"><i></i>${esc(relShort(l.name, 18))}${l.qty ? `<em class="mono">${esc(lbQty(l))}</em>` : ""}</span>`).join("")}${fl.length > 4 ? `<span class="rel-tc more">+${fl.length - 4}</span>` : ""}</div>${lateN ? `<div class="rel-falert"><span class="pill bad"><span class="dot"></span>${lateN} DLC dépassée${lateN > 1 ? "s" : ""}</span></div>` : ""}` : `<div class="rel-next none"><span class="rel-ell">Vide · touchez pour voir l'historique</span></div>`}</div>`;
     };
     const groups = []; S.fridges.forEach((f) => { const ty = relTypeOf(f); let g = groups.find((x) => x.ty.k === ty.k); if (!g) groups.push((g = { ty, fs: [] })); g.fs.push(f); });
     let n = 0;
@@ -265,7 +277,7 @@ function relEvents(f) {
   S.readings.filter((r) => r.fridgeId === id).forEach((r) => {
     const vers = [...(r.prev || []), { value: r.value, at: r.editedAt || r.at, uid: r.editedBy || r.uid, why: r.editReason || "" }];
     const first = vers[0]; const ok = relROk(f, r);
-    E.push({ at: r.at, k: "temp", ic: "therm", tone: ok ? (r.peak ? "warn" : "ok") : "bad", t: `${fmt(r.value)} °C · ${r.mid ? "pendant le service" : relSlotName(r.slot)}`, s: `${firstName(nameOf(r.uid))}${ok ? (r.peak ? " · pic de service" : "") : ` · ${r.action || "hors seuil"}`}${r.editedAt ? ` · corrigé (avant ${fmt(first.value)} °C)` : ""}`, act: `data-act="relEdit" data-id="${r.id}"` });
+    E.push({ at: r.at, k: "temp", ic: "therm", tone: ok ? (r.peak ? "warn" : "ok") : "bad", t: `${fmt(r.value)} °C · ${r.mid ? "pendant le service" : relSlotName(r.slot)}`, s: `${firstName(nameOf(r.uid))}${ok ? (r.peak ? " · pic de service" : "") : ` · ${r.action || "hors seuil"}`}${r.editedAt ? ` · corrigé (avant ${fmt(first.value)} °C)` : ""}`, act: `data-act="relEdit" data-id="${r.id}"`, ph: relPhThumb(r) });
     for (let j = 1; j < vers.length; j++) E.push({ at: vers[j].at, k: "fix", ic: "edit", tone: "warn", t: `Correction · ${fmt(vers[j - 1].value)} → ${fmt(vers[j].value)} °C`, s: `${firstName(nameOf(vers[j].uid))} · relevé du ${relSlotName(r.slot)} ${shortDate(r.day)}${vers[j].why ? ` · ${vers[j].why}` : ""}`, act: `data-act="relEdit" data-id="${r.id}"` });
   });
   const mv = (S.moves || []).filter((m) => m.kind === "transfert" && !m.cancelled);
@@ -290,7 +302,7 @@ function relTimeline(f) {
   const days = [...new Set(E.map((e) => dayKey(new Date(e.at))))].sort().reverse(); const n = S.ui.relDays || 7; const shown = days.slice(0, n);
   const curve = flt === "all" || flt === "temp" ? `<div class="glass pad st" style="--i:4"><div class="row"><span class="lbl">7 derniers jours</span><span class="sub" style="font-size:12px">Seuil ${relRange(f)}</span></div><div class="rel-chart" id="relChart" data-id="${f.id}"></div><div class="rel-legend"><span><i class="m"></i>Midi</span><span><i class="s"></i>Soir</span>${relIsService(f) ? `<span><i class="p"></i>Pic de service</span>` : ""}<span><i class="x"></i>Hors seuil</span></div></div>` : "";
   return `<div class="chips rel-hf st" style="--i:4">${chips.map(([k, t, c]) => `<button class="chip ${flt === k ? "on" : ""}" data-act="relHf" data-v="${k}">${t}<em>${c}</em></button>`).join("")}</div>${curve}
-    <div class="glass pad st" style="--i:5">${E.length ? shown.map((k) => `<div class="rel-day"><div class="rel-dayh"><span>${relDayLabel(k)}</span><span>${shortDate(k)}</span></div>${E.filter((e) => dayKey(new Date(e.at)) === k).map((e) => `<div class="li tap rel-hev" role="button" tabindex="0" ${e.act}><span class="rel-evi ${e.tone}">${ico(e.ic)}</span><div class="tx"><b>${esc(e.t)}</b><em>${esc(e.s)}</em></div><span class="rel-evt mono">${hm(e.at)}</span></div>`).join("")}</div>`).join("") + (days.length > n ? `<button class="btn ghost block" data-act="relMore">Voir les jours précédents</button>` : "")
+    <div class="glass pad st" style="--i:5">${E.length ? shown.map((k) => `<div class="rel-day"><div class="rel-dayh"><span>${relDayLabel(k)}</span><span>${shortDate(k)}</span></div>${E.filter((e) => dayKey(new Date(e.at)) === k).map((e) => `<div class="li tap rel-hev" role="button" tabindex="0" ${e.act}><span class="rel-evi ${e.tone}">${ico(e.ic)}</span><div class="tx"><b>${esc(e.t)}</b><em>${esc(e.s)}</em></div>${e.ph || ""}<span class="rel-evt mono">${hm(e.at)}</span></div>`).join("")}</div>`).join("") + (days.length > n ? `<button class="btn ghost block" data-act="relMore">Voir les jours précédents</button>` : "")
       : `<div class="empty" style="padding:16px 0 4px">${flt === "all" ? "Rien pour l'instant. Les relevés, entrées, sorties et corrections de ce frigo s'afficheront ici." : "Rien de ce type pour ce frigo."}</div>`}</div>`;
 }
 VIEWS.frigo = {
@@ -447,10 +459,11 @@ const relDoneNow = (id) => readingsFor(dayKey(), S.slot).some((r) => r.fridgeId 
 async function commitReading(id, t, ok, action, extra = {}) {
   const f = relFr(id); const day = dayKey(), slot = S.slot;
   if (S.route === "releve") VIEWS.releve.live = false; /* keep the card on screen for its seal animation */
-  let rid;
+  let rid; const ph = relPhOf(id); if (ph && !ph.busy && (ph.photoId || ph.photoUrl)) { extra = { ...extra, ...(ph.photoId ? { photoId: ph.photoId } : {}), ...(ph.photoUrl ? { photoUrl: ph.photoUrl } : {}) }; }
   try { rid = await safe(DB.add("readings", { fridgeId: id, fname: f.name, value: t, slot, day, at: Date.now(), uid: S.me.id, ok, action, ...extra })); }
   catch (e) { VIEWS.releve.live = true; refresh(); return; }
-  await logEvent("reading", `a relevé ${f.name} · ${fmt(t)} °C${ok ? (extra.peak ? ` · pic pendant le service (toléré jusqu'à ${relDeg(relSvcMax(f))} °C)` : extra.ctx === "service" ? " · pendant le service" : "") : ` · hors seuil${extra.ctx === "service" ? " pendant le service" : ""}, ${action.toLowerCase()}`}`, { ref: id });
+  await logEvent("reading", `a relevé ${f.name} · ${fmt(t)} °C${ok ? (extra.peak ? ` · pic pendant le service (toléré jusqu'à ${relDeg(relSvcMax(f))} °C)` : extra.ctx === "service" ? " · pendant le service" : "") : ` · hors seuil${extra.ctx === "service" ? " pendant le service" : ""}, ${action.toLowerCase()}`}${extra.photoId || extra.photoUrl ? " · photo jointe" : ""}`, { ref: id, ...(extra.photoId ? { photoId: extra.photoId } : {}), ...(extra.photoUrl ? { photoUrl: extra.photoUrl } : {}) });
+  if (S.ui.relPh) delete S.ui.relPh[id];
   delete S.temp[id]; relTouched().delete(id);
   const complete = relSlotComplete(day, slot);
   relAdvance(id);
@@ -498,6 +511,18 @@ function relScrollToCard(view, nx, cur, shrinkBy) {
 }
 
 Object.assign(ACT, {
+  relPhoto: async (a, key) => {
+    SFX.tap(); const [file] = await pickImage(); if (!file) return;
+    const P = (S.ui.relPh ||= {}); P[key] = { busy: true }; relPhSync(key);
+    try {
+      const { blob, canvas } = await shrink(file, 1280, 0.8); const up = await upload(blob || file);
+      let photoUrl = /^https?:/.test((up && up.url) || "") ? up.url : "";
+      if (!up || !up.id) { if (DB.mode === "demo") photoUrl = up && up.url; else photoUrl = photoUrl || (() => { const k = Math.min(1, 560 / Math.max(canvas.width, canvas.height)); const c = document.createElement("canvas"); c.width = Math.round(canvas.width * k); c.height = Math.round(canvas.height * k); c.getContext("2d").drawImage(canvas, 0, 0, c.width, c.height); return c.toDataURL("image/jpeg", 0.55); })(); }
+      P[key] = { photoId: (up && up.id) || "", photoUrl, src: (up && up.url) || photoUrl }; SFX.ok(); buzz(8);
+    } catch (e) { console.warn(e); delete P[key]; SFX.err(); toast("Photo illisible, réessayez.", "err"); }
+    relPhSync(key);
+  },
+  relPhotoRm: (a, key) => { if (S.ui.relPh) delete S.ui.relPh[key]; SFX.tick(); relPhSync(key); },
   slot: (a, id, v) => { S.slot = v; S.open = null; S.ui.relRingPrev = null; SFX.tick(); rerender(); const vw = $("#viewport .view:not(.leave)"); vw && vw.scrollTo({ top: 0, behavior: "smooth" }); },
   frOpen: (a, id) => { S.open = S.open === id ? "__none" : id; SFX.tap(); $$(".fr[data-fr]").forEach((el) => el.classList.toggle("open", el.dataset.fr === S.open)); },
   saveReading: async (a, id) => {

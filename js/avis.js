@@ -122,7 +122,7 @@ function avCtxRows(f) {
 }
 function avShotHTML() {
   const s = avF().shot;
-  if (!s) return `<button class="btn soft block av-addshot" data-act="avShotAdd">${ico("camera")}Joindre une capture ou une photo</button>`;
+  if (!s) return `<button class="btn soft block av-addshot" data-act="avShotAdd">${ico("camera")}Joindre une photo</button>`;
   return `<div class="av-thumb"><img src="${esc(s.url)}" alt="Capture jointe"><button class="av-thx" data-act="avShotDel" aria-label="Retirer la capture">${ico("x")}</button></div><span class="note">Capture jointe : elle aide beaucoup à comprendre.</span>`;
 }
 function avThanksHTML(d) {
@@ -140,7 +140,7 @@ function avMineHTML() {
   if (!L.length) return `${head}<div class="glass empty st" style="--i:5"><div class="ic">${ico("avSend")}</div><b>Rien envoyé pour l'instant</b>Vos messages et les réponses de l'équipe Growth Gusto apparaîtront ici, avec leur avancement.</div>`;
   return `${head}<div class="av-list">${L.slice(0, 60).map((f, i) => avMineItem(f, i, seen)).join("")}</div>`;
 }
-function avStatusPill(f) { const R = (f.replies || []).length; const st = AV_ST[f.status] || AV_ST.recu; return R && f.status !== "fait" ? `<span class="pill acc">${ico("avMsg")}Réponse</span>` : `<span class="pill ${st[1]}">${f.status === "fait" ? ico("check") : ""}${st[0]}</span>`; }
+function avStatusPill(f) { const R = (f.replies || []).length; const st = AV_ST[f.status] || AV_ST.recu; return R && f.status !== "fait" ? `<span class="pill acc">${ico("avMsg")}Réponse</span>` : `<span class="pill ${st[1]}">${st[0]}</span>`; }
 const avRepHTML = (r) => `<div class="av-rep"><span class="av-repa">${appIcon(26)}</span><div><b>${esc(r.by || "Équipe Growth Gusto")}<em>${when(r.at)}</em></b><p>${esc(r.text)}</p></div></div>`;
 function avMineItem(f, i, seen) {
   const T = avType(f.type); const fresh = avLastReply(f) > seen;

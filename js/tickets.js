@@ -174,7 +174,7 @@ async function tkSyncStock(t) {
   return res;
 }
 const tkSoldTx = (d) => `${d.soldUnit ? tkQU(d.soldQty, d.soldUnit) : "×" + tkN(d.soldQty)} · ${esc(d.libelle)}`;
-function tkDoneRow(d) { return `<div class="tk-mv"><div class="tx"><b>${tkSoldTx(d)}</b><em>${esc(d.name)}</em></div><span class="mono tk-mq">−${tkQU(Math.abs(d.qty), d.unit)}</span></div>`; }
+function tkDoneRow(d) { return `<div class="tk-mv"><div class="tx"><b>${d.libelle ? tkSoldTx(d) : esc(d.name)}</b><em>${d.libelle ? esc(d.name) : "Vente du ticket"}</em></div><span class="mono tk-mq">−${tkQU(Math.abs(d.qty), d.unit)}</span></div>`; }
 function tkUnlinkedRows(list, tid) { return list.map((u) => `<div class="tk-unl"><div class="tx"><b>${esc(u.libelle)}</b><em>×${tkN(u.q)} · pas encore lié</em></div><button class="btn soft sm" data-act="tkLink" data-v="${esc(u.libelle)}" data-t="${tid || ""}">${ico("tklink")}Lier à un produit</button></div>`).join(""); }
 function tkUnlinkedFor(tickets) {
   const m = new Map();
@@ -269,9 +269,9 @@ function tkDrawChart(v) {
   const days = el.dataset.days.split(","); const by = tkByDay(); const W = Math.max(240, el.clientWidth || 320), H = 150, top = 16, bot = 26, ch = H - top - bot;
   const vals = days.map((d) => by[d]?.total || 0); const any = vals.some((x) => x > 0); const max = Math.max(...vals, 1); const band = W / days.length; const bw = Math.min(28, band - 6); const sel = S.ui.tkDay; const today = dayKey();
   const bars = days.map((d, i) => {
-    const x = i * band + (band - bw) / 2, val = vals[i], h = val > 0 ? Math.max(4, (val / max) * ch) : 0, y = top + ch - h, r = Math.min(4, bw / 2, h);
+    const x = i * band + (band - bw) / 2, val = vals[i], h = val > 0 ? Math.max(4, (val / max) * ch) : 0, y = top + ch - h, r = Math.min(8, bw / 2, h);
     const lab = "DLMMJVS"[parseDay(d).getDay()];
-    const mark = h ? `<path class="tk-b ${d === sel ? "on" : ""}" d="M${x},${top + ch} V${y + r} Q${x},${y} ${x + r},${y} H${x + bw - r} Q${x + bw},${y} ${x + bw},${y + r} V${top + ch} Z"/>` : by[d] ? `<rect class="tk-b0 has" x="${x}" y="${top + ch - 3}" width="${bw}" height="3" rx="1.5"/>` : `<rect class="tk-b0" x="${x + bw / 2 - 2}" y="${top + ch - 4}" width="4" height="4" rx="2"/>`;
+    const mark = h ? `<path class="tk-b ${d === sel ? "on" : val === max && any ? "top" : ""}" d="M${x},${top + ch} V${y + r} Q${x},${y} ${x + r},${y} H${x + bw - r} Q${x + bw},${y} ${x + bw},${y + r} V${top + ch} Z"/>` : by[d] ? `<rect class="tk-b0 has" x="${x}" y="${top + ch - 3}" width="${bw}" height="3" rx="1.5"/>` : `<rect class="tk-b0" x="${x + bw / 2 - 2}" y="${top + ch - 4}" width="4" height="4" rx="2"/>`;
     return `${mark}<text class="tk-x ${d === sel ? "on" : ""} ${d === today ? "td" : ""}" x="${x + bw / 2}" y="${H - 8}" text-anchor="middle">${lab}</text><rect class="tk-hit" data-act="tkDay" data-v="${d}" tabindex="0" role="button" aria-label="${tkCap(tkDayLabel(d, true))}" x="${i * band}" y="0" width="${band}" height="${H}"><title>${tkCap(tkDayLabel(d, true))} : ${by[d]?.has ? tkEur(by[d].total) : "–"}</title></rect>`;
   }).join("");
   el.innerHTML = `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="Chiffre d'affaires des 14 derniers jours">${any ? `<line class="tk-grid" x1="0" x2="${W}" y1="${top}" y2="${top}"/>` : ""}${any ? `<text class="tk-y" x="${W}" y="${top - 5}" text-anchor="end">${tkEur(max, 0)}</text>` : ""}<line class="tk-base" x1="0" x2="${W}" y1="${top + ch}" y2="${top + ch}"/>${bars}</svg>`;

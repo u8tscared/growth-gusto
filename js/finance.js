@@ -31,7 +31,7 @@ const finCat = (k) => FIN_CATS.find((c) => c.k === k) || FIN_CATS[FIN_CATS.lengt
 const FIN_BENCH = { food: { lo: 25, hi: 35, max: 60, t: "Food cost" }, labour: { lo: 30, hi: 40, max: 70, t: "Masse salariale" }, prime: { lo: 0, hi: 65, max: 100, t: "Prime cost" } };
 const FIN_VAT = 0.1; /* average VAT used only when the Z ticket gives no HT */
 /* chart series (validated with the dataviz checker: adjacent CVD ΔE ≥ 9, normal ΔE ≥ 19; always labelled) */
-const FIN_COL = { mat: "#eb6834", staff: "#2a78d6", fixed: "#eda100", result: "#1baf7a" };
+const FIN_COL = { mat: "#EF5A3C", staff: "#5B2BFF", fixed: "#F6B93B", result: "#1E7F55" };
 
 /* ───────── small utils ───────── */
 const finR2 = (v) => Math.round((+v || 0) * 100) / 100;
@@ -445,7 +445,7 @@ VIEWS.dashboard = {
     const sW1 = finSales(addDays(dayK, -7), addDays(dayK, -7)), sN1 = finSales(addDays(dayK, -364), addDays(dayK, -364));
     const W = finPeriod("semaine", 0); const wTo = finEffTo(W); const el = finDays(W.from, wTo); const sWk = finSales(W.from, wTo);
     const sWkP = finSales(addDays(W.from, -7), addDays(W.from, -7 + el)); const sWkN = finSales(addDays(W.from, -364), addDays(W.from, -364 + el));
-    const spark = []; for (let i = 13; i >= 0; i--) { const k = addDays(t, -i); spark.push({ k, v: finSales(k, k).ttc }); }
+    const spark = []; for (let i = 6; i >= 0; i--) { const k = addDays(t, -i); spark.push({ k, v: finSales(k, k).ttc }); }
     const smax = Math.max(1, ...spark.map((x) => x.v));
     const M = finPeriod("mois", 0); const MC = finCompute(M.from, finEffTo(M)); const MQ = finCmpPeriod(M, "prev"); const MD = finCompute(MQ.from, MQ.to);
     const H = finHaccp(); const lots = finLotsAlert(); const stock = finStockNow(); const obl = finObl(); const duty = finOnDuty(); const fb = finFeedback();
@@ -453,11 +453,11 @@ VIEWS.dashboard = {
     const tile = (cls, go, i, inner, aria) => `<div class="glass fdb-t ${cls} st" style="--i:${i}" role="button" tabindex="0" data-go="${go}" aria-label="${esc(aria)}">${inner}<span class="fdb-go" aria-hidden="true">${ico("chev")}</span></div>`;
     const mName = MONTHS[d.getMonth()];
 
-    const hero = `<div class="hero fdb-hero st" style="--i:1" role="button" tabindex="0" data-go="finance" aria-label="Voir les finances"><div class="fdb-hin">
+    const hero = `<div class="hero wall fdb-hero st" style="--i:1" role="button" tabindex="0" data-go="finance" aria-label="Voir les finances"><div class="fdb-hin">
       <div class="fdb-hl"><span class="fdb-hlbl">${useT ? "CA du jour" : "CA d'hier"} · TTC</span><b class="fdb-hbig mono">${sD.ttc ? finEur(sD.ttc, 0) : "–"}</b>
         <div class="fdb-hcmp">${pillCmp(sD.ttc, sW1.ttc, "vs S-1", `vs ${DAYS[parseDay(dayK).getDay()]} dernier`)}${pillCmp(sD.ttc, sN1.ttc, "vs N-1", "vs même jour l'an dernier")}${!sD.ttc ? `<span class="fdb-cmp"><span>Ticket Z pas encore saisi</span></span>` : ""}</div>
         <div class="fdb-wk"><span>Semaine à date</span><b class="mono">${finEur(sWk.ttc, 0)}</b>${pillCmp(sWk.ttc, sWkP.ttc, "vs S-1")}${pillCmp(sWk.ttc, sWkN.ttc, "vs N-1")}</div></div>
-      <div class="fdb-spark" aria-hidden="true"><div class="b">${spark.map((x, i) => `<i class="${x.k === dayK ? "on" : ""}" style="height:${x.v ? Math.max(4, (x.v / smax) * 100) : 3}%;--i:${i}"></i>`).join("")}</div><span>14 derniers jours</span></div></div>
+      <div class="fdb-spark" aria-hidden="true"><div class="b">${spark.map((x, i) => `<span class="c ${x.k === dayK ? "on" : ""} ${x.v ? "" : "z"}" style="--i:${i}"><span class="bw"><i style="height:${x.v ? Math.max(6, (x.v / smax) * 100) : 4}%"></i></span><em>${x.k === t ? "Auj." : finCap(DAYS[parseDay(x.k).getDay()].slice(0, 3))}</em></span>`).join("")}</div><span>7 derniers jours</span></div></div>
       ${!useT ? `<button class="btn fdb-z" data-go="tickets">${ico("receipt")}Saisir le ticket Z du jour</button>` : ""}</div>`;
 
     const ratioTile = (key, lbl, v, pv, sub, i) => { const st = finStatus(key, v); return tile("fdb-ratio", "finance", i, `<div class="row"><span class="lbl">${lbl} · ${mName}</span><span class="pill ${st.c}">${st.t}</span></div><div class="fdb-rv"><b class="mono">${finPct(v)}</b>${finDelta(v, pv, false, true)}</div>${finBullet(key, v, pv)}<span class="sub fdb-sub">${sub}</span>`, `${lbl} ${finPct(v)}`); };

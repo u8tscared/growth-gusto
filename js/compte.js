@@ -355,9 +355,10 @@ VIEWS.equipe = {
     const canManage = myRole() === "gerant"; const ms = ccMembers(); const local = ccLocalMode();
     const ev = S.events.slice(0, 8);
     const cloud = ccCloud();
-    const mark = (x) => (cloud && ccIsAccount(x) ? (ccIsOwner(x.id) ? ` <span class="cc-lk" title="Propriétaire">${ico("shield")}</span>` : "") : ccHasPin(x) ? ` <span class="cc-lk" title="Protégé par un code">${ico("lock")}</span>` : ` <span class="cc-nopin">code à créer</span>`);
+    const mark = (x) => (cloud && ccIsAccount(x) ? (ccIsOwner(x.id) ? ` <span class="cc-lk" title="Propriétaire">${ico("shield")}</span>` : "") : ccHasPin(x) ? ` <span class="cc-lk" title="Protégé par un code">${ico("lock")}</span>` : "");
+    const nopin = (x) => !(cloud && ccIsAccount(x)) && !ccHasPin(x) ? `<span class="cc-nopin">Code à créer</span>` : "";
     const sub = (x, mine, last) => (cloud && ccIsAccount(x) ? esc(x.email || "Compte") : cloud ? "Profil cuisine · sans compte" : "") + (mine.length ? `${cloud ? " · " : ""}${mine.length} action${mine.length > 1 ? "s" : ""} · ${ccAgo(last.at)}` : cloud ? "" : "Aucune action");
-    const row = (x) => { const mine = S.events.filter((e) => e.uid === x.id); const last = mine[0]; return `<div class="li tap cc-mrow" data-act="ccMember" data-id="${x.id}">${ccAva(x, 44)}<div class="tx"><b><span class="cc-nm">${esc(x.name || nameOf(x.id))}</span>${x.id === S.me.id ? `<span class="cc-you">vous</span>` : ""}${mark(x)}</b><em>${sub(x, mine, last)}</em></div><span class="pill ${x.role === "gerant" ? "acc" : x.role === "chef" ? "warn" : "neu"}">${ROLES[x.role] || "Équipe"}</span>${ico("chev")}</div>`; };
+    const row = (x) => { const mine = S.events.filter((e) => e.uid === x.id); const last = mine[0]; return `<div class="li tap cc-mrow" data-act="ccMember" data-id="${x.id}">${ccAva(x, 44)}<div class="tx"><b><span class="cc-nm">${esc(x.name || nameOf(x.id))}</span>${x.id === S.me.id ? `<span class="cc-you">vous</span>` : ""}${mark(x)}</b><em>${nopin(x)}${sub(x, mine, last)}</em></div><span class="pill ${x.role === "gerant" ? "acc" : x.role === "chef" ? "warn" : "neu"}">${ROLES[x.role] || "Équipe"}</span>${ico("chev")}</div>`; };
     return `<div class="inner cc-wide">${topBar("Équipe", { right: canManage ? `<button class="btn acc sm" data-act="ccMemberNew">${ico("plus")}Ajouter</button>` : "" })}
       ${local ? `<div class="cc-hero st" style="--i:1"><span class="cc-hero-ic">${ico("users")}</span><div style="flex:1;min-width:0"><b>Qui signe ?</b><span>Chacun signe à son nom.</span></div><button class="btn sm cc-hero-btn" data-act="whoami">${ico("swap")}Changer</button></div>` : cloud && canManage ? `<div class="cc-hero st" style="--i:1"><span class="cc-hero-ic">${ico("auLink")}</span><div style="flex:1;min-width:0"><b>Invitez votre équipe</b><span>Lien, code ou QR · chacun son compte</span></div><button class="btn sm cc-hero-btn" data-act="auInvite">${ico("auLink")}Inviter</button></div>` : ""}
       <div class="cc-cols"><div class="cc-col"><div class="glass pad st" style="--i:2"><div class="row" style="margin-bottom:2px"><span class="lbl">${ms.length} personne${ms.length > 1 ? "s" : ""}</span>${!canManage ? `<span class="note">Seul un gérant peut modifier l'équipe</span>` : ""}</div>
@@ -365,7 +366,7 @@ VIEWS.equipe = {
         ${canManage ? `<button class="li tap cc-addrow" data-act="ccMemberNew"><span class="cc-ava plus" style="--s:44px">${ico("plus")}</span><div class="tx"><b>${cloud ? "Ajouter un profil cuisine" : "Ajouter un équipier"}</b><em>${cloud ? "Sans compte : prénom, rôle, couleur et code facultatif" : "Prénom, rôle, couleur et code facultatif"}</em></div></button>` : ""}</div>
       <p class="note st" style="--i:4">Gérant : gère l'équipe et les réglages. Chef et Équipe : relevés, réceptions, étiquettes, stock et ménage, sans les chiffres (finances, salaires, tableau de bord). ${cloud ? "Un profil cuisine sert à pointer et signer sans compte." : "Chacun entre avec son code à 4 chiffres."}</p></div>
       <div class="cc-col"><div class="glass pad st" style="--i:3"><div class="row"><span class="lbl">Qui a fait quoi</span><button class="btn ghost sm" data-go="registre">Registre${ico("chev")}</button></div>
-        ${ev.length ? ev.map((e) => `<div class="li">${avatar(e.uid)}<div class="tx"><b style="white-space:normal">${esc(said(e.uid, e.text))}</b><em>${when(e.at)}</em></div></div>`).join("") : `<div class="empty" style="padding:16px 0 6px">Les actions de chacun apparaîtront ici.</div>`}</div></div></div></div>`;
+        ${ev.length ? ev.map((e) => `<div class="li cc-ev">${avatar(e.uid)}<div class="tx"><b style="white-space:normal">${esc(said(e.uid, e.text))}</b><em>${when(e.at)}</em></div></div>`).join("") : `<div class="empty" style="padding:16px 0 6px">Les actions de chacun apparaîtront ici.</div>`}</div></div></div></div>`;
   },
 };
 
@@ -401,6 +402,8 @@ function ccFormSheet() {
 
 /* ───────────── réglages ───────────── */
 function ccBytes() { const s = ccLS.raw("gg-local") || ""; const k = (s.length * 2) / 1024; return k > 1024 ? `${fmt(k / 1024, 1)} Mo` : `${Math.max(1, Math.round(k))} Ko`; }
+/* « Installer l'app »: auth.js may provide ACT.auInstall; otherwise the browser prompt, or the install card on Accueil */
+function ccCanInstall() { try { if (typeof isStandalone === "function" && isStandalone()) return false; return typeof ACT.auInstall === "function" || (typeof installEvt !== "undefined" && !!installEvt) || (typeof IS_IOS !== "undefined" && IS_IOS) || (typeof IS_ANDROID !== "undefined" && IS_ANDROID); } catch (e) { return false; } }
 const ccSw = (on) => `<span class="cc-sw ${on ? "on" : ""}" aria-hidden="true"><i></i></span>`;
 VIEWS.reglages = {
   render() {
@@ -412,23 +415,24 @@ VIEWS.reglages = {
       <div class="lbl st cc-sec" style="--i:2">Restaurant</div>
       <div class="glass pad st" style="--i:2">
         <div class="li tap" data-act="${local && ccMember(S.me.id) ? "ccMemberEdit" : "meRename"}" data-id="${S.me.id}"><span class="ic">${ico("users")}</span><div class="tx"><b>Mon profil</b><em>${esc(S.me.name || "À renseigner, il signe vos relevés")}</em></div>${ico("chev")}</div>
-        ${local && ccMember(S.me.id) ? `<div class="li tap" data-act="ccPinChange"><span class="ic">${ico("lock")}</span><div class="tx"><b>Mon code</b><em>${ccHasPin(ccMember(S.me.id)) ? "Actif · toucher pour le changer" : "À créer : il protège votre profil"}</em></div>${ccHasPin(ccMember(S.me.id)) ? ico("chev") : `<span class="pill warn">À créer</span>`}</div>` : ""}
+        ${local && ccMember(S.me.id) ? `<div class="li tap" data-act="ccPinChange"><span class="ic w-in">${ico("lock")}</span><div class="tx"><b>Mon code</b><em>${ccHasPin(ccMember(S.me.id)) ? "Actif · toucher pour le changer" : "À créer : il protège votre profil"}</em></div>${ccHasPin(ccMember(S.me.id)) ? ico("chev") : `<span class="pill warn">À créer</span>`}</div>` : ""}
         <div class="li tap" data-act="restoRename"><span class="ic">${ico("edit")}</span><div class="tx"><b>Nom du restaurant</b><em>${esc(S.resto?.name || "")}</em></div>${ico("chev")}</div>
-        ${gerant && typeof OB !== "undefined" ? `<div class="li tap" data-act="obComplete"><span class="ic">${ico("obCard")}</span><div class="tx"><b>Compléter la fiche du restaurant</b><em>${[S.resto?.logo ? "" : "logo", S.resto?.address ? "" : "adresse", S.fridges.length ? "" : "frigos", S.resto?.printer ? "" : "imprimante"].filter(Boolean).join(", ") || "Logo, adresse, frigos, équipe, imprimante"}</em></div>${ico("chev")}</div>` : ""}
-        <div class="li tap" data-act="restoSwitch"><span class="ic">${ico("store")}</span><div class="tx"><b>Établissements</b><em>${S.restos.length} · changer ou en ajouter un</em></div>${ico("chev")}</div>
+        ${gerant && typeof OB !== "undefined" ? `<div class="li tap" data-act="obComplete"><span class="ic w-sa">${ico("obCard")}</span><div class="tx"><b>Compléter la fiche du restaurant</b><em>${[S.resto?.logo ? "" : "logo", S.resto?.address ? "" : "adresse", S.fridges.length ? "" : "frigos", S.resto?.printer ? "" : "imprimante"].filter(Boolean).join(", ") || "Logo, adresse, frigos, équipe, imprimante"}</em></div>${ico("chev")}</div>` : ""}
+        <div class="li tap" data-act="restoSwitch"><span class="ic w-sk">${ico("store")}</span><div class="tx"><b>Établissements</b><em>${S.restos.length} · changer ou en ajouter un</em></div>${ico("chev")}</div>
         ${typeof abRow === "function" ? abRow() : ""}
-        <div class="li tap" data-go="equipe"><span class="ic">${ico("users")}</span><div class="tx"><b>Équipe</b><em>${S.members.length} personne${S.members.length > 1 ? "s" : ""}</em></div>${ico("chev")}</div>
-        <div class="li tap" data-go="imprimante"><span class="ic">${ico("printer")}</span><div class="tx"><b>Imprimante</b><em>${esc(typeof lbPrinterCfg === "function" ? (lbPrinterCfg().name || "À choisir") : "À choisir")}</em></div>${ico("chev")}</div>
+        <div class="li tap" data-go="equipe"><span class="ic w-mi">${ico("users")}</span><div class="tx"><b>Équipe</b><em>${S.members.length} personne${S.members.length > 1 ? "s" : ""}</em></div>${ico("chev")}</div>
+        <div class="li tap" data-go="imprimante"><span class="ic w-nd">${ico("printer")}</span><div class="tx"><b>Imprimante</b><em>${esc(typeof lbPrinterCfg === "function" ? (lbPrinterCfg().name || "À choisir") : "À choisir")}</em></div>${ico("chev")}</div>
       </div></div><div class="cc-col">
       <div class="lbl st cc-sec" style="--i:3">Cet appareil</div>
       <div class="glass pad st" style="--i:3">
         <div class="li tap" data-act="sound" role="switch" aria-checked="${SFX.on}"><span class="ic">${ico("sound")}</span><div class="tx"><b>Sons</b><em>${SFX.on ? "Activés" : "Coupés"}</em></div>${ccSw(SFX.on)}</div>
         <div class="li tap" data-act="ccHaptics" role="switch" aria-checked="${ccHaptics()}"><span class="ic">${ico("vibe")}</span><div class="tx"><b>Vibrations</b><em>${ccVib0 ? (ccHaptics() ? "Activées" : "Coupées") : "Non prises en charge sur cet appareil"}</em></div>${ccSw(ccHaptics())}</div>
-        ${local ? `<div class="li tap" data-act="ccAutoLockSheet"><span class="ic">${ico("lock")}</span><div class="tx"><b>Code à l'ouverture</b><em>${al ? `Redemandé après ${al >= 60 ? al / 60 + " h" : al + " min"} sans utiliser l'app` : "Demandé seulement à l'ouverture"}</em></div><span class="pill acc">${al ? (al >= 60 ? al / 60 + " h" : al + " min") : "Ouverture"}</span></div>` : ""}
+        ${ccCanInstall() ? `<div class="li tap" data-act="ccInstall"><span class="ic w-sa">${ico("download")}</span><div class="tx"><b>Installer sur l'écran d'accueil</b><em>Plein écran, même sans réseau</em></div>${ico("chev")}</div>` : ""}
+        ${local ? `<div class="li tap" data-act="ccAutoLockSheet"><span class="ic w-nd">${ico("lock")}</span><div class="tx"><b>Code à l'ouverture</b><em>${al ? `Redemandé après ${al >= 60 ? al / 60 + " h" : al + " min"} sans utiliser l'app` : "Demandé seulement à l'ouverture"}</em></div><span class="pill acc">${al ? (al >= 60 ? al / 60 + " h" : al + " min") : "Ouverture"}</span></div>` : ""}
       </div>
       ${local ? `<div class="lbl st cc-sec" style="--i:4">Données</div>
       <div class="glass pad st cc-data" style="--i:4">
-        <div class="cc-datahead"><span class="ic">${ico("db")}</span><div style="flex:1;min-width:0"><b>Vos données sont sur cet appareil</b><span>${ccBytes()} · dernière sauvegarde : ${lb ? when(lb) : "jamais"}</span></div></div>
+        <div class="cc-datahead"><span class="ic w-sk">${ico("db")}</span><div style="flex:1;min-width:0"><b>Vos données sont sur cet appareil</b><span>${ccBytes()} · dernière sauvegarde : ${lb ? when(lb) : "jamais"}</span></div></div>
         ${!lb || Date.now() - lb > 7 * 864e5 ? `<div class="banner" style="margin-top:12px">${ico("alert")}<span>Sauvegardez chaque semaine : si le téléphone est perdu ou vidé, le fichier permet de tout récupérer.</span></div>` : ""}
         <div class="grid2 cc-g2" style="margin-top:12px">${gerant ? `<button class="btn acc" data-act="ccExport">${ico("download")}Sauvegarder</button><button class="btn soft" data-act="ccImport">${ico("upload")}Restaurer</button>` : `<button class="btn acc" data-act="ccExport" style="grid-column:1/-1">${ico("download")}Sauvegarder</button>`}</div>
         ${gerant ? "" : `<p class="note" style="margin:8px 2px 0">Seul un gérant peut restaurer une sauvegarde.</p>`}
@@ -481,6 +485,8 @@ setTimeout(() => { let f = null; try { f = sessionStorage.getItem("gg-flash"); s
 const ccTry = (fn, d) => { try { const v = fn(); return v == null ? d : v; } catch (e) { return d; } };
 function ccOblDueN() { return typeof oblDue === "function" ? ccTry(() => (oblDue(30) || []).length, 0) : 0; }
 function ccOnShiftN() { return typeof homeOnShift === "function" ? ccTry(() => homeOnShift().filter((x) => x.st === "in").length, 0) : 0; }
+/* V2: one pastel well per module, same colours as the Accueil shortcuts */
+const CC_WELL = { releve: "w-vi", frigos: "w-sk", scan: "w-in", reception: "w-sa", notes: "w-to", menage: "w-sk", dashboard: "w-vi", finance: "w-mi", stock: "w-to", tickets: "w-sa", registre: "w-sk", obligations: "w-nd", pointeuse: "w-sk", planning: "w-vi", staff: "w-mi", equipe: "w-mi", avis: "w-sa", imprimante: "w-nd", reglages: "w-nd", abonnement: "w-vi", avisAdmin: "w-sa", admin: "w-in" };
 VIEWS.more = {
   render() {
     const ts = todayStats(S.slot || slotNow()); const pend = ts.exp - ts.done; const urg = urgentCount();
@@ -497,7 +503,7 @@ VIEWS.more = {
     const me = ccMember(S.me.id) || { id: S.me.id, name: S.me.name, color: S.me.color };
     return `<div class="inner narrow cc-more">${topBar("Tout Growth Gusto", { noBack: true })}
       <div class="cc-hero st" style="--i:1">${ccAva(me, 46)}<div style="flex:1;min-width:0"><b>${esc(S.me.name || "Vous")}</b><span>${ROLES[myRole()]} · ${esc(S.resto?.name || "")}</span></div>${ccLocalMode() ? `<button class="btn sm cc-hero-btn" data-act="whoami">${ico("swap")}Changer</button>` : ""}</div>
-      ${groups.map(([g, items]) => { const its = items.filter(([r]) => VIEWS[r] && canSee(r)); if (!its.length) return ""; const n = its.length, c = n % 3 === 0 ? 3 : n === 4 || n === 7 || n === 8 ? 4 : n <= 2 ? 2 : 3; return `<div class="lbl st cc-sec" style="--i:${k++}">${g}</div><div class="cc-grid c${c} st" style="--i:${k++}">${its.map(([r, i, t, b, tone]) => `<button class="cc-gt" data-go="${r}" ${r === "reception" ? 'data-fresh="1"' : ""}><span class="ic">${ico(IC[i] ? i : "grid")}</span><span class="t">${t}</span>${b ? `<span class="cc-gb mono ${tone || ""}">${b}</span>` : ""}</button>`).join("")}</div>`; }).join("")}
+      ${groups.map(([g, items]) => { const its = items.filter(([r]) => VIEWS[r] && canSee(r)); if (!its.length) return ""; const n = its.length, c = n % 3 === 0 ? 3 : n === 4 || n === 7 || n === 8 ? 4 : n <= 2 ? 2 : 3; return `<div class="lbl st cc-sec" style="--i:${k++}">${g}</div><div class="cc-grid c${c} st" style="--i:${k++}">${its.map(([r, i, t, b, tone]) => `<button class="cc-gt ${CC_WELL[r] || "w-vi"}" data-go="${r}" ${r === "reception" ? 'data-fresh="1"' : ""}><span class="ic">${ico(IC[i] ? i : "grid")}${b ? `<span class="cc-gb mono ${tone || ""}">${b}</span>` : ""}</span><span class="t">${t}</span></button>`).join("")}</div>`; }).join("")}
       ${myRole() !== "gerant" && ccLocalMode() ? `<p class="note st cc-more-note" style="--i:${k}">${ico("lock")}Finances, salaires et tableau de bord sont réservés au gérant.</p>` : ""}
     </div>`;
   },
@@ -607,6 +613,11 @@ Object.assign(ACT, {
   role: (a, id) => ACT.ccMemberEdit(a, id),
 
   /* réglages */
+  ccInstall: (a, id, v, e) => {
+    if (typeof ACT.auInstall === "function") return ACT.auInstall(a, id, v, e);
+    if (typeof installEvt !== "undefined" && installEvt && ACT.installApp) return ACT.installApp(a);
+    try { localStorage.removeItem("gg-install-off"); } catch (x) {} S.ui.instOpen = true; SFX.tap(); go("home");
+  },
   ccHaptics: () => { const on = !ccHaptics(); try { localStorage.setItem("gg-haptics", on ? "on" : "off"); } catch (e) {} ccApplyHaptics(); SFX.tick(); buzz(14); rerender(); },
   ccAutoLockSheet: () => { const al = ccAutoLock(); openSheet(`<div><div class="h2" style="font-size:21px">Redemander le code</div><p class="sub" style="margin:6px 0 0">Le code est toujours demandé à l'ouverture de l'app. Choisissez aussi au bout de combien de temps sans l'utiliser (téléphone en poche, écran éteint) il est redemandé.</p></div>
     <div style="display:flex;flex-direction:column;gap:8px">${[[5, "Après 5 minutes"], [15, "Après 15 minutes"], [30, "Après 30 minutes (conseillé)"], [60, "Après 1 heure"], [240, "Après 4 heures"], [0, "Seulement à l'ouverture"]].map(([v, t]) => `<button class="chip cc-opt-row ${al === v ? "on" : ""}" data-act="ccAutoLockSet" data-v="${v}">${t}${al === v ? ico("check") : ""}</button>`).join("")}</div>
@@ -648,7 +659,7 @@ Object.assign(ACT, {
 
   /* établissements */
   restoSwitch: () => {
-    openSheet(`<div class="h2" style="font-size:20px">Établissements</div>${S.restos.map((r) => `<div class="li tap" data-act="restoPick" data-id="${r.id}"><span class="cc-mono sm">${esc(initials(r.name))}</span><div class="tx"><b>${esc(r.name)}</b><em>${r.id === S.rid ? "Ouvert en ce moment" : "Toucher pour ouvrir"}</em></div>${r.id === S.rid ? `<span class="check"><svg viewBox="0 0 24 24"><path d="M6 12.5l4 4 8-9"/></svg></span>` : ico("chev")}</div>`).join("")}
+    openSheet(`<div class="h2" style="font-size:20px">Établissements</div>${S.restos.map((r) => `<div class="li tap" data-act="restoPick" data-id="${r.id}"><span class="cc-mono sm">${esc(initials(r.name))}</span><div class="tx"><b>${esc(r.name)}</b><em>${r.id === S.rid ? "Ouvert en ce moment" : "Toucher pour ouvrir"}</em></div>${r.id === S.rid ? `<span class="check cc-curck"><svg viewBox="0 0 24 24"><path d="M6 12.5l4 4 8-9"/></svg></span>` : ico("chev")}</div>`).join("")}
       ${myRole() === "gerant" ? `<div class="hstack"><input class="input" id="newResto" placeholder="Nouvel établissement" maxlength="60" enterkeyhint="done" style="flex:1;min-width:0"><button class="btn acc" data-act="restoAdd">${ico("plus")}Ajouter</button></div><span class="note">Chaque établissement a ses frigos, son équipe et son registre.</span>` : ""}`);
   },
   restoPick: (a, id) => {

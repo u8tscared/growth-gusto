@@ -3,14 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#ECEFFB" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#07081A" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#FBF6EC">
 <meta name="description" content="Relevés HACCP, étiquettes, stock, allergènes, équipe et finances : toute la cuisine de votre restaurant dans une app.">
 <meta name="format-detection" content="telephone=no">
 <meta name="application-name" content="Gusto">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Gusto">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
@@ -46,7 +45,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&family=Bricolage+Grotesque:opsz,wdth,wght@12..96,75..100,400..800&family=Instrument+Sans:wght@400..700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;600;700&family=Bricolage+Grotesque:opsz,wdth,wght@12..96,75..100,400..800&family=Instrument+Sans:wght@400..700&display=swap">
 <link rel="stylesheet" href="css/base.css">
 <link rel="stylesheet" href="css/compte.css">
 <link rel="stylesheet" href="css/abo.css">
@@ -65,7 +64,8 @@
 <link rel="stylesheet" href="css/rh.css">
 <link rel="stylesheet" href="css/avis.css">
 <link rel="stylesheet" href="css/auth.css">
-<style>html,body{margin:0;background:#ECEFFB}body{font:14px Manrope,system-ui}[hidden]{display:none!important}</style>
+<link rel="stylesheet" href="css/v2.css">
+<style>html,body{margin:0;background:#FBF6EC}body{font:14px "Instrument Sans",system-ui}[hidden]{display:none!important}</style>
 <script>try{if(matchMedia("(display-mode: standalone)").matches||navigator.standalone)document.documentElement.classList.add("standalone")}catch(e){}</script>
 </head>
 <body>
@@ -73,7 +73,7 @@
 <div class="aurora" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
 <div class="grain" aria-hidden="true"></div>
 <div class="statusveil" aria-hidden="true"></div>
-<div class="boot" id="boot" aria-hidden="true"><div class="boot-ic" id="bootMark"><svg viewBox="0 0 100 100"><path d="M86 16H50A34 34 0 0 0 25.96 74.04" fill="none" stroke="#fff" stroke-width="14"/><path d="M40.5 83.5 80 44M52 42h30v30" fill="none" stroke="#fff" stroke-width="12.5" stroke-linejoin="miter" stroke-miterlimit="4"/></svg></div></div>
+<div class="boot" id="boot" aria-hidden="true"><div class="boot-ic" id="bootMark"><svg viewBox="0 0 100 100"><path d="M86 16H50A34 34 0 0 0 25.96 74.04" fill="none" stroke="#5B2BFF" stroke-width="14"/><path d="M40.5 83.5 80 44M52 42h30v30" fill="none" stroke="#5B2BFF" stroke-width="12.5" stroke-linejoin="miter" stroke-miterlimit="4"/></svg></div></div>
 <button class="skip" id="skip" data-act="skipMain">Aller au contenu</button>
 <div id="app">
   <nav class="side" id="side" aria-label="Navigation"></nav>
@@ -87,7 +87,7 @@
 <input type="file" id="filePickMulti" accept="image/*" multiple hidden>
 <script>/* very old browsers (some Android phones ship an outdated built-in browser): explain instead of a blank screen */
 (function(){var ok=true;try{new Function("var a={};a.b??=1;a.c||=2;return a?.b+`x`;")();ok=!!(window.Promise&&window.fetch&&window.localStorage&&Array.prototype.flat&&Object.fromEntries);}catch(e){ok=false}
-if(!ok){window.GG_OLD=1;document.addEventListener("DOMContentLoaded",function(){var d=document.createElement("div");d.setAttribute("style","position:fixed;inset:0;z-index:9999;background:#ECEFFB;display:flex;align-items:center;justify-content:center;padding:24px;font:16px system-ui,sans-serif;color:#0E1330;text-align:center");d.innerHTML='<div style="max-width:360px"><div style="font-size:22px;font-weight:800;margin-bottom:10px">Navigateur trop ancien</div><p style="color:#5A6386;line-height:1.5">Growth Gusto a besoin d\'un navigateur à jour. Ouvrez ce lien dans <b>Google Chrome</b> (mis à jour depuis le Play Store) :</p><p style="font-weight:700;word-break:break-all;margin-top:14px">'+location.href.split("#")[0]+'</p></div>';document.body.appendChild(d);var b=document.getElementById("boot");if(b)b.style.display="none";});}})();</script>
+if(!ok){window.GG_OLD=1;document.addEventListener("DOMContentLoaded",function(){var d=document.createElement("div");d.setAttribute("style","position:fixed;inset:0;z-index:9999;background:#FBF6EC;display:flex;align-items:center;justify-content:center;padding:24px;font:16px system-ui,sans-serif;color:#1B1530;text-align:center");d.innerHTML='<div style="max-width:360px"><div style="font-size:22px;font-weight:800;margin-bottom:10px">Navigateur trop ancien</div><p style="color:#5A6386;line-height:1.5">Growth Gusto a besoin d\'un navigateur à jour. Ouvrez ce lien dans <b>Google Chrome</b> (mis à jour depuis le Play Store) :</p><p style="font-weight:700;word-break:break-all;margin-top:14px">'+location.href.split("#")[0]+'</p></div>';document.body.appendChild(d);var b=document.getElementById("boot");if(b)b.style.display="none";});}})();</script>
 <script src="vendor/qrcode.js"></script>
 <script src="vendor/jsQR.js"></script>
 

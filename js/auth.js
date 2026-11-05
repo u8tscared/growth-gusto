@@ -48,7 +48,7 @@ const AU_SVG = {
   eye: auSv('<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/>'),
   eyeOff: auSv('<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/><path d="M4 4l16 16"/>'),
   ok: `<svg viewBox="0 0 12 12" width="12" height="12" aria-hidden="true" focusable="false"><path d="M2.5 6.2 5 8.6l4.6-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
-  cloche: `<svg viewBox="0 0 32 32" width="26" height="26" fill="none" stroke="#1B1530" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M6 20h20a10 10 0 0 0-20 0Z" fill="#fff"/><path d="M4 23h24"/><path d="M16 8v2"/><circle cx="16" cy="7" r="1.6" fill="#1B1530"/></svg>`,
+  cloche: `<svg viewBox="0 0 32 32" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M6 20h20a10 10 0 0 0-20 0Z" fill="#F6B93B"/><path d="M4 23.5h24"/><path d="M16 8v2"/><circle cx="16" cy="7" r="1.6" fill="currentColor"/></svg>`,
 };
 const AU_DOTS = `<span class="au-dots" aria-hidden="true"><i></i><i></i><i></i></span>`;
 const AU_DOTS_IN = `<span class="au-dots in" aria-hidden="true"><i></i><i></i><i></i></span>`;
@@ -59,8 +59,9 @@ const auReduce = () => { try { return window.matchMedia("(prefers-reduced-motion
 const auFrHTML = (n, lo, hi, on) => `<i class="au-frk" aria-hidden="true">${on ? AU_SVG.ok : ""}</i>${esc(n)}<em>${lo}/${hi} °C</em>`;
 /* camera framing of the kitchen (x, y, w, h in the 800×840 drawing) for each kind of step */
 const AUK_FOCUS = {
-  desk: { welcome: [0, 0, 800, 840], soon: [0, 0, 800, 840], form: [0, 0, 800, 840], busy: [0, 0, 800, 840], done: [30, 260, 540, 560] },
-  phone: { welcome: [30, 70, 600, 430], soon: [30, 70, 600, 430], form: [170, 250, 460, 200], busy: [420, 320, 300, 180], done: [80, 250, 380, 380] },
+  desk: { welcome: [0, 0, 800, 840], soon: [0, 0, 800, 840], form: [0, 0, 800, 840], busy: [0, 0, 800, 840], done: [30, 220, 540, 560] },
+  tab: { welcome: [0, 90, 800, 480], soon: [0, 90, 800, 480], form: [0, 180, 800, 300], busy: [0, 90, 800, 480], done: [0, 180, 800, 520] },
+  phone: { welcome: [40, 92, 640, 470], soon: [40, 92, 640, 470], form: [250, 200, 480, 200], busy: [40, 92, 640, 470], done: [30, 200, 420, 420] },
 };
 Object.assign(IC, {
   auMail: ["r:2,4,20,16,3", "m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"],
@@ -208,7 +209,7 @@ const AUTH = {
     if ($("#auDemo")) return;
     document.documentElement.classList.add("au-demomode");
     const b = document.createElement("div"); b.id = "auDemo"; b.className = "au-dbar"; b.setAttribute("role", "status");
-    b.innerHTML = `<span class="au-demo-dot" aria-hidden="true"></span><span class="au-demo-tx"><b>Mode démo</b><span><i class="au-sep"> · </i>rien n'est enregistré</span></span><button class="au-demo-cta" data-act="auDemoSignup">Créer mon compte</button><button class="au-demo-x" data-act="auDemoLeave" aria-label="Quitter la démo">${ico("x")}</button>`;
+    b.innerHTML = `<span class="au-demo-dot" aria-hidden="true">${AU_SVG.cloche}</span><span class="au-demo-tx"><b>Mode démo</b><span><i class="au-sep"> · </i>rien n'est enregistré</span></span><button class="au-demo-cta" data-act="auDemoSignup">Créer mon compte</button><button class="au-demo-x" data-act="auDemoLeave" aria-label="Quitter la démo">${ico("x")}</button>`;
     document.body.appendChild(b); requestAnimationFrame(() => b.classList.add("on"));
   },
 
@@ -218,12 +219,12 @@ const AUTH = {
     el = document.createElement("div"); el.id = "au"; el.className = "au"; el.setAttribute("role", "dialog"); el.setAttribute("aria-modal", "true"); el.setAttribute("aria-label", "Bienvenue sur Growth Gusto");
     el.innerHTML = `<div class="au-scroll" id="auScroll"><div class="au-app">
         <main class="au-auth" id="auAuth">
-          <div class="au-brand">${auMark("a")}<span class="au-wm">Growth Gusto</span></div>
+          <div class="au-brand">${appIcon(36)}<span class="au-wm">Growth <b>Gusto</b></span></div>
           <div class="au-deck" id="auDeck"><div class="au-pane" id="auPane" aria-live="polite"></div></div>
           <p class="au-fine au-fine-d">Données hébergées en France et chiffrées.</p>
         </main>
         <aside class="au-stage" id="auStage" aria-hidden="true">
-          <div class="au-sbrand">${auMark("b")}<span class="au-wm">Growth Gusto</span></div>
+          <div class="au-sbrand">${appIcon(30)}<span class="au-wm">Growth <b>Gusto</b></span></div>
           <div class="auk" id="auk">${this.stageHTML()}</div>
           <div class="auk-night"></div>
         </aside>
@@ -237,61 +238,60 @@ const AUTH = {
   },
   /* the kitchen of Chemin des Sarments: fridge with its thermometer, label printer, sauce pot, oysters, and the ticket rail */
   stageHTML() {
-    const k = 'class="auk-ink"';
+    /* V2 flat drawing: no outlines, cream appliances with a lilac inner edge, dark LCD screens with mint digits, on the violet grid wall */
+    const fr = (x, y, w, h, r = 14) => `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${r}" fill="#E4DCF7"/><rect x="${x}" y="${y}" width="${w}" height="${h - 14}" rx="${r}" fill="#FFFDF8"/><rect x="${x + w - 20}" y="${y + 10}" width="10" height="${h - 34}" rx="5" fill="#EEE9FB"/>`;
+    const lcd = (x, y, w, h, t, fs = 20) => `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="8" fill="#1B1530"/><text x="${x + w / 2}" y="${y + h / 2 + fs * 0.36}" text-anchor="middle" font-family="JetBrains Mono, ui-monospace, monospace" font-weight="700" font-size="${fs}" fill="#9EF5C4">${t}</text>`;
     return `<svg viewBox="0 0 800 840" aria-hidden="true" focusable="false">
-      <defs><pattern id="aukTiles" width="48" height="32" patternUnits="userSpaceOnUse"><rect width="48" height="32" fill="#4C1FEA"/><path d="M0 .75H48M.75 0V32" stroke="#5A30F4" stroke-width="1.5"/></pattern></defs>
-      <rect x="-400" y="-200" width="1600" height="1100" fill="url(#aukTiles)"/>
-      <rect x="-400" y="480" width="1600" height="520" fill="#3A10D8"/>
-      <g><rect x="300" y="504" width="900" height="294" fill="#3A10D8" ${k}/>
-        <rect x="330" y="530" width="200" height="86" rx="10" fill="#4318E0" ${k} style="stroke-width:2.5"/><rect x="550" y="530" width="200" height="86" rx="10" fill="#4318E0" ${k} style="stroke-width:2.5"/>
-        <rect x="330" y="636" width="200" height="140" rx="10" fill="#4318E0" ${k} style="stroke-width:2.5"/><rect x="550" y="636" width="200" height="140" rx="10" fill="#4318E0" ${k} style="stroke-width:2.5"/>
-        <rect x="504" y="660" width="10" height="44" rx="5" fill="#E7E3F1" ${k} style="stroke-width:2.5"/><rect x="566" y="660" width="10" height="44" rx="5" fill="#E7E3F1" ${k} style="stroke-width:2.5"/>
-        <rect x="400" y="548" width="60" height="10" rx="5" fill="#E7E3F1" ${k} style="stroke-width:2.5"/><rect x="620" y="548" width="60" height="10" rx="5" fill="#E7E3F1" ${k} style="stroke-width:2.5"/>
-        <rect x="-400" y="796" width="1600" height="200" fill="#2C0CB0"/><path d="M-400 797H1200" ${k}/>
-        <rect x="290" y="480" width="920" height="26" rx="6" fill="#F3E6CF" ${k}/><path d="M296 499H1200" stroke="#E2D0B0" stroke-width="5"/></g>
-      <g fill="#3A10D8" opacity=".55"><ellipse cx="402" cy="481" rx="74" ry="6"/><ellipse cx="566" cy="481" rx="74" ry="6"/><ellipse cx="716" cy="481" rx="86" ry="6"/></g>
+      <rect x="-400" y="648" width="1600" height="600" fill="#1B1530" fill-opacity=".14"/>
+      <rect x="-400" y="638" width="1600" height="10" fill="#FFFDF8" fill-opacity=".88"/>
       <g id="aukFridge">
-        <rect x="70" y="140" width="230" height="660" rx="18" fill="#FFFDF8" ${k}/><rect x="280" y="150" width="14" height="640" rx="6" fill="#EDE4D3"/>
-        <rect x="80" y="150" width="210" height="116" rx="10" fill="#FFFDF8" ${k} style="stroke-width:2.5"/><rect x="250" y="176" width="10" height="66" rx="5" fill="#1B1530"/><path d="M100 176h40" ${k} style="stroke-width:2.5;stroke:#D7CCB8"/>
-        <g><rect x="80" y="276" width="210" height="514" rx="10" fill="#FFF4D9" ${k} style="stroke-width:2.5"/><rect id="aukLight" x="92" y="284" width="186" height="80" rx="8" fill="#FFFBEF"/>
-          <rect x="140" y="286" width="90" height="8" rx="4" fill="#F6B93B" ${k} style="stroke-width:2"/><path d="M84 404h202M84 530h202M84 656h202" ${k}/>
-          <rect x="98" y="350" width="104" height="54" rx="6" fill="#E7E3F1" ${k} style="stroke-width:2.5"/><rect x="94" y="342" width="112" height="12" rx="4" fill="#C9C3DA" ${k} style="stroke-width:2.5"/>
-          <rect x="120" y="366" width="40" height="22" rx="3" fill="#fff" ${k} style="stroke-width:2"/><path d="M126 373h22M126 381h14" stroke="#1B1530" stroke-width="2" stroke-linecap="round"/>
-          <path d="M232 404v-44l8-12v-14h12v14l8 12v44z" fill="#23935C" ${k} style="stroke-width:2.5"/>
-          <rect x="96" y="470" width="120" height="60" rx="5" fill="#E8B26A" ${k} style="stroke-width:2.5"/><path d="M96 490h120M96 510h120" stroke="#1B1530" stroke-width="2"/><rect x="118" y="478" width="76" height="14" rx="2" fill="#fff" stroke="#1B1530" stroke-width="2"/>
-          <path d="M232 530c0-26 10-40 20-46 10 6 20 20 20 46z" fill="#23935C" ${k} style="stroke-width:2.5"/><path d="M252 486v44" stroke="#1A7448" stroke-width="2.5"/>
-          <path d="M104 656v-34l70-18v52z" fill="#F6B93B" ${k} style="stroke-width:2.5"/><circle cx="140" cy="636" r="5" fill="#D99A1E"/><circle cx="158" cy="624" r="3.5" fill="#D99A1E"/>
-          <rect x="196" y="616" width="70" height="40" rx="6" fill="#EF5A3C" ${k} style="stroke-width:2.5"/><path d="M206 630h50" stroke="#fff" stroke-width="3" stroke-linecap="round"/></g>
+        ${fr(60, 150, 200, 498, 18)}
+        <rect x="74" y="262" width="166" height="5" rx="2.5" fill="#EEE9FB"/><rect x="214" y="180" width="8" height="54" rx="4" fill="#C9BFE9"/>
+        <text x="84" y="216" font-family="Instrument Sans, ui-sans-serif, sans-serif" font-weight="700" font-size="15" fill="#B5ABD3">Chambre froide</text>
+        <g><rect x="74" y="278" width="166" height="340" rx="10" fill="#FFF4D9"/><rect id="aukLight" x="82" y="284" width="150" height="70" rx="8" fill="#FFFBEF"/>
+          <rect x="128" y="286" width="60" height="6" rx="3" fill="#F6B93B"/><path d="M78 392h158M78 500h158" stroke="#EADBB8" stroke-width="5" stroke-linecap="round"/>
+          <rect x="90" y="340" width="70" height="50" rx="6" fill="#E4DCF7"/><rect x="104" y="356" width="40" height="18" rx="3" fill="#fff"/>
+          <path d="M196 390v-36l7-10v-12h10v12l7 10v36z" fill="#2FA36B"/>
+          <rect x="88" y="448" width="96" height="50" rx="6" fill="#E8B26A"/><rect x="104" y="458" width="62" height="12" rx="2" fill="#fff"/>
+          <circle cx="210" cy="480" r="18" fill="#EF5A3C"/><path d="M204 462c4 2 8 2 12 0" stroke="#2FA36B" stroke-width="4" stroke-linecap="round" fill="none"/>
+          <path d="M92 598v-30l60-14v44z" fill="#F6B93B"/><circle cx="122" cy="580" r="4" fill="#D99A1E"/><rect x="166" y="560" width="62" height="38" rx="6" fill="#9EC5FF"/></g>
         <g id="aukDoor">
-          <g id="aukDoorB"><rect x="80" y="276" width="210" height="514" rx="10" fill="#F2EADB" ${k} style="stroke-width:2.5"/><rect x="96" y="330" width="178" height="40" rx="6" fill="#FFFDF8" ${k} style="stroke-width:2.5"/><rect x="96" y="470" width="178" height="40" rx="6" fill="#FFFDF8" ${k} style="stroke-width:2.5"/><rect x="96" y="610" width="178" height="40" rx="6" fill="#FFFDF8" ${k} style="stroke-width:2.5"/></g>
-          <g id="aukDoorF"><rect x="80" y="276" width="210" height="514" rx="10" fill="#FFFDF8" ${k} style="stroke-width:2.5"/><rect x="250" y="300" width="10" height="140" rx="5" fill="#1B1530"/>
-            <rect x="104" y="306" width="128" height="78" rx="12" fill="#1B1530"/><rect id="aukLcd" x="110" y="312" width="116" height="66" rx="8" fill="#241C40"/>
-            <rect x="121" y="322" width="8" height="38" rx="4" fill="none" stroke="#9EF5C4" stroke-width="2"/><rect id="aukMerc" x="123" y="330" width="4" height="30" rx="2" fill="#9EF5C4"/><circle cx="125" cy="364" r="6" fill="#9EF5C4"/>
-            <text id="aukT" x="214" y="355" text-anchor="end" font-family="JetBrains Mono, ui-monospace, monospace" font-weight="700" font-size="30" fill="#9EF5C4">3,2</text>
-            <text id="aukTs" x="214" y="370" text-anchor="end" font-family="JetBrains Mono, ui-monospace, monospace" font-weight="500" font-size="9" letter-spacing="1" fill="#9EF5C4" opacity=".7">°C · OK</text>
-            <text x="104" y="404" font-family="JetBrains Mono, ui-monospace, monospace" font-weight="700" font-size="9" letter-spacing="1.6" fill="#8A8499">FRIGO 2 · POSITIF</text>
-            <g transform="translate(0 130) rotate(-4 150 520)"><rect x="104" y="470" width="96" height="112" rx="4" fill="#F6B93B" ${k} style="stroke-width:2.5"/>
-              <text x="116" y="496" font-family="Bricolage Grotesque, ui-sans-serif, sans-serif" font-weight="700" font-size="13" fill="#1B1530">Relevés</text>
-              <path d="M116 516l4 4 7-8M116 538l4 4 7-8M116 560l4 4 7-8" fill="none" stroke="#1B1530" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M134 516h50M134 538h40M134 560h46" stroke="#1B1530" stroke-width="2" stroke-linecap="round" opacity=".55"/>
-              <circle cx="152" cy="470" r="9" fill="#EF5A3C" ${k} style="stroke-width:2.5"/></g></g></g>
+          <g id="aukDoorB"><rect x="74" y="278" width="166" height="340" rx="10" fill="#F2EADB"/><rect x="88" y="320" width="138" height="34" rx="6" fill="#FFFDF8"/><rect x="88" y="430" width="138" height="34" rx="6" fill="#FFFDF8"/><rect x="88" y="540" width="138" height="34" rx="6" fill="#FFFDF8"/></g>
+          <g id="aukDoorF"><rect x="74" y="278" width="166" height="340" rx="10" fill="#FFFDF8"/><rect x="214" y="300" width="8" height="120" rx="4" fill="#C9BFE9"/>
+            <rect x="90" y="300" width="112" height="70" rx="12" fill="#1B1530"/><rect id="aukLcd" x="96" y="306" width="100" height="58" rx="8" fill="#241C40"/>
+            <rect x="105" y="314" width="8" height="34" rx="4" fill="none" stroke="#9EF5C4" stroke-width="2"/><rect id="aukMerc" x="107" y="320" width="4" height="28" rx="2" fill="#9EF5C4"/><circle cx="109" cy="352" r="5.5" fill="#9EF5C4"/>
+            <text id="aukT" x="188" y="343" text-anchor="end" font-family="JetBrains Mono, ui-monospace, monospace" font-weight="700" font-size="28" fill="#9EF5C4">3,2</text>
+            <text id="aukTs" x="188" y="357" text-anchor="end" font-family="JetBrains Mono, ui-monospace, monospace" font-weight="500" font-size="9" fill="#9EF5C4" opacity=".75">°C · OK</text>
+            <g transform="rotate(-4 140 500)"><rect x="96" y="446" width="92" height="104" rx="8" fill="#F6B93B"/><rect x="96" y="540" width="92" height="10" rx="5" fill="#D99A1E"/>
+              <text x="108" y="472" font-family="Bricolage Grotesque, ui-sans-serif, sans-serif" font-weight="700" font-size="13" fill="#1B1530">Relevés</text>
+              <path d="M108 490l4 4 7-8M108 510l4 4 7-8M108 530l4 4 7-8" fill="none" stroke="#1B1530" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M126 490h46M126 510h36M126 530h42" stroke="#7A5A1A" stroke-width="2" stroke-linecap="round" opacity=".6"/>
+              <circle cx="142" cy="446" r="8" fill="#EF5A3C"/></g></g></g>
       </g>
-      <g id="aukPrinter"><rect x="336" y="418" width="132" height="62" rx="14" fill="#FFFDF8" ${k}/><rect x="336" y="452" width="132" height="28" fill="#EDE4D3"/><rect x="336" y="418" width="132" height="62" rx="14" fill="none" ${k}/>
-        <rect x="352" y="414" width="100" height="9" rx="4.5" fill="#1B1530"/><circle cx="354" cy="440" r="4" fill="#23935C"/><rect x="366" y="436" width="40" height="8" rx="4" fill="#EDE4D3"/><circle class="auk-btnp" cx="446" cy="442" r="9" fill="#5B2BFF" stroke="#1B1530" stroke-width="2.5"/></g>
-      <g id="aukPot"><g class="auk-steam"><path d="M540 380c-8-10 8-18 0-30"/><path d="M566 376c-8-10 8-18 0-30"/><path d="M592 380c-8-10 8-18 0-30"/></g>
-        <rect x="488" y="420" width="18" height="12" rx="5" fill="#C8432A" ${k} style="stroke-width:2.5"/><rect x="626" y="420" width="18" height="12" rx="5" fill="#C8432A" ${k} style="stroke-width:2.5"/>
-        <path d="M500 410h132v54a16 16 0 0 1-16 16H516a16 16 0 0 1-16-16z" fill="#EF5A3C" ${k}/><path d="M510 446h112" stroke="#C8432A" stroke-width="5" stroke-linecap="round"/><path d="M610 424v40" stroke="#FF8A6F" stroke-width="5" stroke-linecap="round"/>
-        <g id="aukLid"><path d="M494 410c0-14 32-24 72-24s72 10 72 24z" fill="#E7E3F1" ${k}/><rect x="554" y="372" width="24" height="14" rx="6" fill="#F6B93B" ${k} style="stroke-width:2.5"/></g></g>
-      <g id="aukBoard"><rect x="640" y="464" width="156" height="16" rx="6" fill="#E8B26A" ${k}/><path d="M650 472h136" stroke="#D49A4E" stroke-width="2"/>
-        <g id="aukOyster"><path d="M650 464c-2-14 8-24 26-24 14 0 26 8 28 24z" fill="#C9C3DA" ${k} style="stroke-width:2.5"/><path d="M658 462c2-8 8-12 18-12s16 4 20 12" fill="#F8F4FF" stroke="#1B1530" stroke-width="2"/>
-          <path class="auk-top auk-ink" d="M650 462c4-16 18-26 34-24 10 1 18 8 20 20-6-4-14-6-20-4-10-6-22-2-34 8z" fill="#9D94BC" style="stroke-width:2.5"/><path d="M714 464l12-18a14 14 0 0 1 8 18z" fill="#F6B93B" ${k} style="stroke-width:2.5"/></g>
-        <g id="aukKnife"><path d="M700 464h40v-6c-20 0-30-8-40-2z" fill="#F4F2FA" ${k} style="stroke-width:2.5"/><path d="M706 461c10-3 20-1 30 0" stroke="#C9C3DA" stroke-width="2" fill="none"/><rect x="738" y="455" width="48" height="10" rx="5" fill="#1B1530"/><circle cx="752" cy="460" r="1.8" fill="#F3E6CF"/><circle cx="768" cy="460" r="1.8" fill="#F3E6CF"/></g></g>
+      <g>${fr(296, 488, 236, 160, 12)}${lcd(314, 506, 92, 34, "2,8°")}<rect x="314" y="560" width="188" height="7" rx="3.5" fill="#C9BFE9"/>
+        ${fr(550, 488, 236, 160, 12)}${lcd(568, 506, 92, 34, "−19°")}<rect x="568" y="560" width="188" height="7" rx="3.5" fill="#C9BFE9"/>
+        <rect x="286" y="460" width="520" height="16" rx="6" fill="#FFFDF8"/><rect x="292" y="474" width="508" height="5" rx="2.5" fill="#E4DCF7"/></g>
+      <g id="aukPrinter"><rect x="316" y="402" width="136" height="60" rx="14" fill="#E4DCF7"/><rect x="316" y="402" width="136" height="48" rx="14" fill="#FFFDF8"/>
+        <rect x="334" y="398" width="100" height="10" rx="5" fill="#1B1530"/><circle cx="338" cy="428" r="5" fill="#2FA36B"/><rect x="352" y="424" width="40" height="8" rx="4" fill="#EEE9FB"/><circle class="auk-btnp" cx="428" cy="428" r="10" fill="#5B2BFF"/></g>
+      <g id="aukPot"><g class="auk-steam"><path d="M528 360c-8-10 8-18 0-30"/><path d="M552 356c-8-10 8-18 0-30"/><path d="M576 360c-8-10 8-18 0-30"/></g>
+        <rect x="474" y="408" width="20" height="12" rx="6" fill="#C8432A"/><rect x="610" y="408" width="20" height="12" rx="6" fill="#C8432A"/>
+        <path d="M486 398h132v48a16 16 0 0 1-16 16H502a16 16 0 0 1-16-16z" fill="#EF5A3C"/><rect x="486" y="424" width="132" height="6" fill="#FF8A6F"/>
+        <g id="aukLid"><path d="M480 400c0-14 32-24 72-24s72 10 72 24z" fill="#FFFDF8"/><rect x="540" y="362" width="24" height="16" rx="6" fill="#F6B93B"/></g></g>
+      <g id="aukBoard"><rect x="648" y="450" width="140" height="12" rx="6" fill="#E8B26A"/>
+        <g id="aukOyster"><circle cx="684" cy="432" r="18" fill="#EF5A3C"/><path class="auk-top" d="M676 416c6 3 11 3 16 0" stroke="#2FA36B" stroke-width="5" stroke-linecap="round" fill="none"/><circle cx="676" cy="428" r="4" fill="#FF8A6F"/></g>
+        <g id="aukKnife"><path d="M712 450h44v-6c-22 0-32-8-44-2z" fill="#F4F2FA"/><rect x="754" y="441" width="34" height="9" rx="4.5" fill="#1B1530"/></g></g>
+      <g><circle cx="356" cy="708" r="17" fill="#EF5A3C"/><circle cx="388" cy="704" r="18" fill="#EF5A3C"/><circle cx="420" cy="708" r="17" fill="#EF5A3C"/><circle cx="452" cy="706" r="16" fill="#C8432A"/>
+        <rect x="330" y="712" width="150" height="62" rx="8" fill="#E8B26A"/><path d="M342 734h126M342 754h126" stroke="#D49A4E" stroke-width="5" stroke-linecap="round"/>
+        <circle cx="528" cy="716" r="20" fill="#2FA36B"/><circle cx="562" cy="712" r="21" fill="#3DBB7C"/><circle cx="596" cy="718" r="18" fill="#2FA36B"/>
+        <rect x="506" y="722" width="120" height="52" rx="8" fill="#E8B26A"/><path d="M518 744h96" stroke="#D49A4E" stroke-width="5" stroke-linecap="round"/>
+        <path d="M664 774c-6-30-4-62 8-86 6-8 14-10 22-8l40 0c8-2 16 0 22 8 12 24 14 56 8 86z" fill="#FFFDF8"/><path d="M684 688c10 6 46 6 58 0" stroke="#E4DCF7" stroke-width="5" stroke-linecap="round" fill="none"/>
+        <text x="714" y="740" text-anchor="middle" font-family="Bricolage Grotesque, ui-sans-serif, sans-serif" font-weight="700" font-size="17" fill="#B5ABD3">Farine</text></g>
     </svg>
     <div class="auk-rail"></div>
-    <div class="auk-ticket" style="left:356px"><div class="auk-tk">Relevé · 07:42</div><div class="auk-tt">Frigo 2</div><div class="auk-tv">3,2<small> °C</small></div><div class="auk-ts"><i></i>Conforme · Léa</div></div>
-    <div class="auk-ticket" style="left:504px;width:140px"><div class="auk-tk">Livraison · 06:10</div><div class="auk-tt">Marée Atlantique</div><div class="auk-tl">Huîtres n°3<br>4 bourriches</div><div class="auk-ts"><i class="w"></i>Reçue à 4,1 °C</div></div>
-    <div class="auk-ticket" style="left:660px;width:120px"><div class="auk-tk">Contrôle</div><div class="auk-tt">Cahier HACCP</div><div class="auk-tv s">100<small> %</small></div><div class="auk-tp"><b></b></div></div>
+    <div class="auk-ticket" style="left:340px"><div class="auk-tk">Relevé · 07:42</div><div class="auk-tt">Chambre froide</div><div class="auk-tv">3,2<small> °C</small></div><div class="auk-ts">Conforme · Léa</div></div>
+    <div class="auk-ticket" style="left:488px;width:140px"><div class="auk-tk">Livraison · 06:10</div><div class="auk-tt">Marée Atlantique</div><div class="auk-tl">Huîtres n°3<br>4 bourriches</div><div class="auk-ts w">Reçue à 4,1 °C</div></div>
+    <div class="auk-ticket" style="left:644px;width:124px"><div class="auk-tk">Contrôle</div><div class="auk-tt">Cahier HACCP</div><div class="auk-tv s">100<small> %</small></div><div class="auk-tp"><b></b></div></div>
     <div class="auk-slot"><div class="auk-dlc printed" id="aukDlc"><div class="auk-dh"><span>GG · LOT 0412</span><i></i></div><div class="auk-dp" id="aukDlcP">Sauce tomate maison</div><div class="auk-dk">DLC</div><div class="auk-dd" id="aukDlcD">07/11</div><div class="auk-dm" id="aukDlcM">Par Léa · 07:40</div><div class="auk-bc"></div></div></div>
-    <div class="auk-stamp" id="aukStamp"><div><b>Prêt</b><span>pour le<br>contrôle</span></div></div>
+    <div class="auk-stamp" id="aukStamp"><div><b>Prêt</b><span>pour le contrôle</span></div></div>
     <div class="auk-cap"><b>Chemin des Sarments</b><br>Bordeaux · 42 couverts</div>`;
   },
 
@@ -306,12 +306,13 @@ const AUTH = {
   cam(instant) {
     const st = $("#auStage"), sc = $("#auk"); if (!st || !sc) return;
     const k = this.sceneKey(), desk = window.matchMedia("(min-width:960px)").matches, vh = window.innerHeight;
-    const F = AUK_FOCUS[desk ? "desk" : "phone"][k];
+    const tab = !desk && (st.clientWidth || window.innerWidth) >= 600;
+    const F = AUK_FOCUS[desk ? "desk" : tab ? "tab" : "phone"][k];
     let W, H;
     if (desk) { st.style.removeProperty("--sh"); W = st.clientWidth; H = st.clientHeight; }
     else {
       W = st.clientWidth || window.innerWidth - 20;
-      if (W >= 600) H = Math.round(Math.min(vh * (k === "form" ? 0.26 : 0.42), W * (k === "form" ? 0.32 : 0.62)));
+      if (W >= 600) H = Math.round(Math.min(vh * (k === "form" ? 0.24 : k === "done" ? 0.42 : 0.37), W * (k === "form" ? 0.32 : 0.55)));
       else H = k === "welcome" ? Math.round(Math.min(300, Math.max(176, vh * 0.3))) : k === "done" ? Math.round(Math.min(420, Math.max(220, vh * 0.46))) : k === "busy" ? Math.round(Math.min(330, Math.max(200, vh * 0.36))) : vh < 700 ? 124 : 152;
       st.style.setProperty("--sh", H + "px");
     }
@@ -440,9 +441,9 @@ const AUTH = {
     const okI = `<i class="au-ok" aria-hidden="true">${AU_SVG.ok}</i>`;
     if (s === "welcome") {
       const inv = auLS.get("gg-invite"), last = auLS.get("gg-last");
-      const lede = this.inApp && DB.mode === "local" ? "Créez votre compte : vos données vous suivent sur tous vos appareils." : inv ? "Connectez-vous pour rejoindre l'équipe. Relevés, étiquettes et planning, partagés en direct." : "Températures, étiquettes DLC, livraisons et équipe, tenues au propre pour le contrôle sanitaire.";
+      const lede = this.inApp && DB.mode === "local" ? "Créez votre compte : vos données vous suivent sur tous vos appareils." : inv ? "Connectez-vous pour rejoindre l'équipe. Relevés, étiquettes et planning, partagés en direct." : "Températures, étiquettes et contrôle sanitaire. Sans papier, sans stress.";
       const lastTag = `<em class="au-last">Dernière fois</em>`;
-      return `${inv ? `<div class="au-invite st" style="--i:0"><span class="au-invic">${ico("users")}</span><div><b>Vous êtes invité dans une équipe</b><span>Connectez-vous pour la rejoindre · code <span class="au-mono">${esc(auFmtCode(inv))}</span></span></div></div>` : `<p class="au-eyebrow st" style="--i:0"><span class="au-dot"></span>Utilisé en cuisine, du coup de feu à la fermeture</p>`}
+      return `${inv ? `<div class="au-invite st" style="--i:0"><span class="au-invic">${ico("users")}</span><div><b>Vous êtes invité dans une équipe</b><span>Connectez-vous pour la rejoindre · code <span class="au-mono">${esc(auFmtCode(inv))}</span></span></div></div>` : `<p class="au-eyebrow st" style="--i:0">Le cahier HACCP qui se remplit tout seul</p>`}
         <h1 class="au-h1 st" style="--i:1">${inv ? "Votre brigade<br><em>vous attend.</em>" : "Tout est relevé.<br><em>Vous, cuisinez.</em>"}</h1>
         <p class="au-lede st" style="--i:2">${lede}</p>
         ${this.errHTML()}
@@ -450,13 +451,13 @@ const AUTH = {
           <button class="au-tac au-btn au-google${busy("google")}" data-act="auGoogle"><span class="au-bl">${AU_G}Continuer avec Google</span>${last === "google" ? lastTag : ""}${dots}</button>
           <button class="au-tac au-btn au-primary au-mailb" data-act="auEmail"><span class="au-bl">${AU_SVG.mail}Continuer avec un e-mail</span>${last === "email" ? lastTag : ""}</button>
         </div>
-        ${DB.mode === "demo" ? "" : `<button class="au-demo st" style="--i:4" data-act="auDemo"><span class="au-demo-ic" aria-hidden="true">${AU_SVG.cloche}</span><span class="au-demo-l"><b>Essayer la démo</b><span>Un vrai restaurant déjà rempli, rien n'est enregistré.</span></span><span class="au-arr" aria-hidden="true">${AU_SVG.arrow}</span></button>`}
+        ${DB.mode === "demo" ? "" : `<button class="au-demo st" style="--i:4" data-act="auDemo"><span class="au-demo-ic" aria-hidden="true">${AU_SVG.cloche}</span><span class="au-demo-l"><b>Essayer la démo</b><span>Un restaurant déjà rempli. Rien n'est enregistré.</span></span><span class="au-arr" aria-hidden="true">${AU_SVG.arrow}</span></button>`}
         ${this.inApp ? "" : `<button class="au-ghost st" style="--i:5" data-act="auLocal">${this.hasLocal() ? "Continuer avec les données de ce téléphone" : "Continuer sans compte"}${AU_SVG.arrowS}</button>`}
         <p class="au-fine au-fine-m st" style="--i:6">Données hébergées en France et chiffrées.</p>`;
     }
     if (s === "soon") {
       return `${top()}${head("Les comptes arrivent.", "Nous finalisons la connexion sécurisée.")}
-        <div class="au-note st" style="--i:3"><p>Très bientôt : un compte pour votre restaurant, synchronisé sur tous vos appareils, et votre équipe invitée en un lien.</p><p class="au-note-s">En attendant, essayez la démo, ou utilisez l'app sur cet appareil : vous pourrez tout importer dans votre compte ensuite.</p></div>
+        <div class="au-note st" style="--i:3"><p>Très bientôt : un compte pour votre restaurant, sur tous vos appareils, et l'équipe invitée en un lien.</p><p class="au-note-s">En attendant, essayez la démo ou utilisez l'app sur cet appareil. Vous pourrez tout importer ensuite.</p></div>
         <div class="au-stack st" style="--i:4"><button class="au-tac au-primary" data-act="auDemo"><span class="au-bl">${AU_SVG.play}Essayer la démo</span></button>${this.inApp ? "" : `<button class="au-tac" data-act="auLocal"><span class="au-bl">${AU_SVG.phone}Continuer sur cet appareil</span></button>`}</div>`;
     }
     if (s === "email") {
@@ -483,7 +484,7 @@ const AUTH = {
         <form class="au-form st" style="--i:3" data-au="reset" novalidate><label class="au-f"><span class="au-lbl">E-mail</span><div class="au-in"><input class="au-input" id="auREmail" type="email" inputmode="email" autocomplete="username" autocapitalize="off" spellcheck="false" placeholder="chef@votre-restaurant.fr" value="${esc(U.email || auLS.get("gg-last-email") || "")}" enterkeyhint="send">${okI}</div></label>
         <button class="au-tac au-primary au-submit${busy("reset")}" type="submit" id="auRGo"><span class="au-bl">Envoyer le lien</span>${dots}</button></form>`;
     }
-    if (s === "busy") return `<div class="au-busyp"><span class="au-busym st" style="--i:0">${auMark("c")}</span><h2 class="au-h2 st" style="--i:1">${esc(U.busyTx || "Connexion…")}</h2><span class="au-bdots st" style="--i:2" aria-hidden="true"><i></i><i></i><i></i></span></div>`;
+    if (s === "busy") return `<div class="au-busyp"><span class="au-busym st" style="--i:0">${appIcon(64)}</span><h2 class="au-h2 st" style="--i:1">${esc(U.busyTx || "Connexion…")}</h2><span class="au-bdots st" style="--i:2" aria-hidden="true"><i></i><i></i><i></i></span></div>`;
     const who = this.user ? `<div class="au-who st" style="--i:0">${this.user.photoURL ? `<img src="${esc(this.user.photoURL)}" alt="" referrerpolicy="no-referrer">` : `<span class="au-wi">${esc(initials(this.user.displayName || this.user.email || "?"))}</span>`}<div><b>${esc(this.user.displayName || firstName(String(this.user.email || "").split("@")[0]))}</b><span>${esc(this.user.email || "")}</span></div><button class="au-chg" data-act="auSwitch">Changer</button></div>` : "";
     if (s === "setup") {
       const me = this.user && this.user.displayName ? firstName(this.user.displayName) : "";
@@ -1004,6 +1005,109 @@ const AUTH = {
     upd();
   },
 };
+/* ───────────── « Ajouter à l'écran d'accueil »: an illustrated guide adapted to the device (ACT.auInstall) ─────────────
+   iPhone/iPad Safari (Partager → Sur l'écran d'accueil → Ajouter; Safari 26+: ••• → Partager first), Chrome on iPhone,
+   Android Chrome (the real install prompt captured by core as `installEvt` when there is one, else ⋮ → Installer l'application),
+   desktop Chrome/Edge (install icon in the address bar, or the captured prompt), Safari on Mac (Fichier → Ajouter au Dock). */
+const AU_INS_IC = {
+  share: auSv('<path d="M12 3v12M8 7l4-4 4 4"/><path d="M8 10H7a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2h-1"/>', 20, 2.1),
+  add: auSv('<rect x="3.5" y="3.5" width="17" height="17" rx="4.5"/><path d="M12 8.5v7M8.5 12h7"/>', 20, 2.1),
+  more: auSv('<circle cx="5.5" cy="12" r="1.2" fill="currentColor"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/><circle cx="18.5" cy="12" r="1.2" fill="currentColor"/>', 20, 2),
+  kebab: auSv('<circle cx="12" cy="5.5" r="1.2" fill="currentColor"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/><circle cx="12" cy="18.5" r="1.2" fill="currentColor"/>', 20, 2),
+  inst: auSv('<rect x="3" y="4" width="18" height="13" rx="2.5"/><path d="M8 21h8M12 7.5v6M9.5 11l2.5 2.5 2.5-2.5"/>', 20, 2),
+  phoneDl: auSv('<rect x="6" y="2.5" width="12" height="19" rx="2.5"/><path d="M12 7.5v6M9.5 11l2.5 2.5 2.5-2.5"/>', 20, 2),
+  back: auSv('<path d="M15 5l-7 7 7 7"/>', 18, 2.2), fwd: auSv('<path d="M9 5l7 7-7 7"/>', 18, 2.2),
+  book: auSv('<path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5z"/><path d="M4 20.5A2.5 2.5 0 0 0 6.5 23H20"/>', 18, 2),
+  tabs: auSv('<rect x="3" y="7" width="13" height="13" rx="2.5"/><path d="M8 4h11a2 2 0 0 1 2 2v11"/>', 18, 2),
+  lock: auSv('<rect x="5" y="11" width="14" height="10" rx="2.5"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>', 13, 2.2),
+  dock: auSv('<rect x="3" y="4" width="18" height="16" rx="3"/><path d="M3 15h18"/>', 20, 2),
+};
+function auInstallInfo() {
+  const ua = navigator.userAgent || "", mac = /Macintosh/.test(ua) && !IS_IOS;
+  const ev = typeof installEvt !== "undefined" ? installEvt : null;
+  if (isStandalone()) return { k: "done" };
+  if (IS_IOS) {
+    if (/CriOS|EdgiOS|FxiOS/.test(ua)) return { k: "iosother", app: /CriOS/.test(ua) ? "Chrome" : /EdgiOS/.test(ua) ? "Edge" : "Firefox" };
+    return { k: IOS_MENU ? "ios26" : "ios", ipad: IS_IPAD };
+  }
+  if (ev) return { k: "prompt", mob: IS_ANDROID };
+  if (IS_ANDROID) return { k: "android", samsung: /SamsungBrowser/.test(ua) };
+  if (mac && /Safari/.test(ua) && !/Chrome|Chromium|Edg|Firefox/.test(ua)) return { k: "macsafari" };
+  if (/Firefox/.test(ua)) return { k: "firefox" };
+  return { k: "desktop", edge: /Edg\//.test(ua) };
+}
+function auInstallHTML() {
+  const I = auInstallInfo(), K = AU_INS_IC, mob = ["ios", "ios26", "iosother", "android"].includes(I.k) || (I.k === "prompt" && I.mob);
+  const key = (ic, t = "") => `<span class="au-ik">${ic}${t ? `<b>${t}</b>` : ""}</span>`;
+  const hi = (h) => `<span class="au-hi">${h}</span>`;
+  /* little drawings of the browser's own buttons, the one to touch circled in saffron */
+  const M = {
+    safbar: `<div class="au-m au-m-bar">${K.back}${K.fwd}${hi(K.share)}${K.book}${K.tabs}</div>`,
+    safbar26: `<div class="au-m au-m-bar">${K.back}<span class="au-m-url">${K.lock}gusto</span>${hi(K.more)}</div>`,
+    padbar: `<div class="au-m au-m-bar top"><span class="au-m-url">${K.lock}gusto</span>${hi(K.share)}${K.add}</div>`,
+    sharerow: `<div class="au-m au-m-list"><span class="dim">Copier</span>${hi(`<span class="au-m-row">Sur l'écran d'accueil${K.add}</span>`)}</div>`,
+    shareRow26: `<div class="au-m au-m-list"><span class="dim">Copier le lien</span>${hi(`<span class="au-m-row">Partager${K.share}</span>`)}</div>`,
+    addbtn: `<div class="au-m au-m-head"><span class="dim">Annuler</span>${hi("<b>Ajouter</b>")}</div>`,
+    crbar: `<div class="au-m au-m-bar top"><span class="au-m-url">${K.lock}gusto</span>${hi(K.share)}</div>`,
+    crrow: `<div class="au-m au-m-list"><span class="dim">Copier</span>${hi(`<span class="au-m-row">Ajouter à l'écran d'accueil${K.add}</span>`)}</div>`,
+    andbar: `<div class="au-m au-m-bar top"><span class="au-m-url">${K.lock}gusto</span>${hi(K.kebab)}</div>`,
+    androw: `<div class="au-m au-m-list"><span class="dim">Nouvel onglet</span>${hi(`<span class="au-m-row">${K.phoneDl}Installer l'application</span>`)}</div>`,
+    andok: `<div class="au-m au-m-dlg"><span class="dim">Annuler</span>${hi("<b>Installer</b>")}</div>`,
+    deskbar: `<div class="au-m au-m-bar top wide"><span class="au-m-url">${K.lock}app.growthgusto.fr</span>${hi(K.inst)}${K.kebab}</div>`,
+    deskok: `<div class="au-m au-m-dlg"><span class="dim">Annuler</span>${hi("<b>Installer</b>")}</div>`,
+    macmenu: `<div class="au-m au-m-list"><span class="dim">Fichier</span>${hi(`<span class="au-m-row">Ajouter au Dock${K.dock}</span>`)}</div>`,
+  };
+  const step = (n, tx, m) => `<li class="au-is st" style="--i:${n + 1}"><span class="au-isn">${n}</span><p>${tx}</p>${m || ""}</li>`;
+  let steps = [], title = mob ? "Ajoutez Gusto à votre écran d'accueil" : "Installez Gusto sur cet ordinateur", cta = "", note = "";
+  if (I.k === "done") return `<div class="au-sh au-ins"><div class="au-ins-hero wall">${auInsHome(true)}</div><div class="h2">Gusto est déjà installée</div><p class="sub">Vous l'utilisez en ce moment, comme une vraie app.</p><button class="btn soft block" data-act="sheetClose">Parfait</button></div>`;
+  if (I.k === "ios") steps = [
+    step(1, `Touchez ${key(K.share)} <b>Partager</b>${I.ipad ? " en haut à droite" : " en bas de l'écran"}.`, I.ipad ? M.padbar : M.safbar),
+    step(2, `Faites défiler, puis touchez ${key(K.add)} <b>Sur l'écran d'accueil</b>.`, M.sharerow),
+    step(3, `Touchez <b>Ajouter</b> en haut à droite. C'est fait.`, M.addbtn)];
+  else if (I.k === "ios26") steps = [
+    step(1, `Touchez ${key(K.more)} en bas à droite, puis <b>Partager</b>.`, M.safbar26),
+    step(2, `Faites défiler, puis touchez ${key(K.add)} <b>Sur l'écran d'accueil</b>.`, M.sharerow),
+    step(3, `Laissez <b>Ouvrir comme app web</b> activé, puis <b>Ajouter</b>.`, M.addbtn)];
+  else if (I.k === "iosother") { steps = [
+    step(1, `Touchez ${key(K.share)} <b>Partager</b>, à droite de l'adresse.`, M.crbar),
+    step(2, `Choisissez ${key(K.add)} <b>Ajouter à l'écran d'accueil</b>.`, M.crrow),
+    step(3, `Touchez <b>Ajouter</b>. C'est fait.`, M.addbtn)];
+    if (I.app === "Firefox") note = "Si l'option n'apparaît pas, ouvrez Gusto dans Safari."; }
+  else if (I.k === "prompt") { cta = `<button class="btn acc block au-ins-go" data-act="auInstallGo">${ico("download")}Installer Gusto</button>`;
+    steps = [step(1, `Touchez <b>Installer Gusto</b> ci-dessous.`), step(2, `Confirmez avec <b>Installer</b>. L'icône arrive ${mob ? "sur l'écran d'accueil" : "avec vos applications"}.`, M.andok)]; }
+  else if (I.k === "android") steps = [
+    step(1, `Touchez ${key(K.kebab)} <b>Menu</b>, en haut à droite.`, M.andbar),
+    step(2, `Choisissez <b>Installer l'application</b>${I.samsung ? "" : " ou <b>Ajouter à l'écran d'accueil</b>"}.`, M.androw),
+    step(3, `Confirmez avec <b>Installer</b>. C'est fait.`, M.andok)];
+  else if (I.k === "macsafari") steps = [
+    step(1, `Dans la barre des menus, ouvrez <b>Fichier</b>.`),
+    step(2, `Choisissez ${key(K.dock)} <b>Ajouter au Dock</b>.`, M.macmenu),
+    step(3, `Cliquez <b>Ajouter</b>. Gusto s'ouvre depuis le Dock.`)];
+  else if (I.k === "firefox") { steps = [
+    step(1, `Ouvrez <b>app.growthgusto.fr</b> dans Chrome ou Edge.`),
+    step(2, `Cliquez ${key(K.inst)} dans la barre d'adresse.`, M.deskbar),
+    step(3, `Cliquez <b>Installer</b>. C'est fait.`, M.deskok)]; note = "Firefox ne sait pas installer les applications web."; }
+  else steps = [
+    step(1, `Cliquez ${key(K.inst)} à droite de la barre d'adresse.`, M.deskbar),
+    step(2, `Cliquez <b>Installer</b>. Gusto s'ouvre dans sa propre fenêtre.`, M.deskok),
+    step(3, `Pas d'icône ? Menu ${key(K.kebab)} › ${I.edge ? "<b>Applications</b> › <b>Installer ce site en tant qu'application</b>" : "<b>Caster, enregistrer et partager</b> › <b>Installer la page en tant qu'application</b>"}.`)];
+  return `<div class="au-sh au-ins${mob ? " mob" : " desk"}">
+    <div class="au-ins-hero wall st" style="--i:0">${auInsHome(mob)}</div>
+    <div class="h2 st" style="--i:1">${title}</div>
+    <p class="sub st" style="--i:1">Elle s'ouvre en plein écran, comme une vraie app. Même sans réseau.</p>
+    <ol class="au-ins-steps">${steps.join("")}</ol>
+    ${note ? `<p class="au-ins-note st" style="--i:5">${note}</p>` : ""}
+    ${cta}<button class="btn ${cta ? "ghost" : "soft"} block st" style="--i:5" data-act="sheetClose">${cta ? "Plus tard" : "J'ai compris"}</button>
+  </div>`;
+}
+/* the home screen (or the desktop dock) with the cream « Gusto » tile landing among the other apps */
+function auInsHome(mob) {
+  const tile = (i) => `<span class="au-ins-app" style="--j:${i}"><i></i><em></em></span>`;
+  if (mob) return `<div class="au-ins-phone"><span class="au-ins-notch"></span><div class="au-ins-grid">${tile(0)}${tile(1)}${tile(2)}${tile(3)}${tile(4)}<span class="au-ins-me">${appIcon(46)}<b>Gusto</b></span>${tile(5)}${tile(6)}</div></div>`;
+  return `<div class="au-ins-dock">${tile(0)}${tile(1)}${tile(2)}<span class="au-ins-me">${appIcon(52)}<b>Gusto</b></span>${tile(3)}${tile(4)}</div>`;
+}
+function auInstallSheet() { SFX.tap(); buzz(4); openSheet(auInstallHTML()); }
+
 function authUser() {
   const u = AUTH.user; if (!u) return null;
   const pid = (u.providerData && u.providerData[0] && u.providerData[0].providerId) || "password";
@@ -1093,6 +1197,8 @@ Object.assign(ACT, {
   auDelAccount: () => { SFX.tap(); if ($("#au.on")) { AUTH.ui.err = ""; AUTH.show("delAccount"); return; } const own = S.restos.filter((r) => r.owner === DB.uid).length; AUTH.confirmSheet({ title: "Supprimer mon compte ?", sub: `${own ? `${own === 1 ? "Le restaurant que vous possédez" : `Les ${own} restaurants que vous possédez`} et toutes ses données seront supprimés pour toute l'équipe. ` : ""}Vous quitterez les équipes dont vous faites partie, puis le compte <b>${esc(authUser()?.email || "")}</b> sera effacé. C'est définitif.`, btn: "Supprimer mon compte", act: "auDelAccountOk" }); },
   auDelAccountOk: () => { if (AUTH.confOk()) AUTH.deleteAccount(); },
   auReauthCancel: () => AUTH.reauthCancel(),
+  auInstall: () => auInstallSheet(),
+  auInstallGo: () => { closeSheet(true); if (typeof installEvt !== "undefined" && installEvt && ACT.installApp) ACT.installApp(); },
 });
 
 /* ───────────── light-touch integration with js/compte.js (it may also call the hooks itself) ───────────── */

@@ -25,7 +25,7 @@ const rid6 = () => { const a = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ"; let s = ""; f
 const slotNow = () => (new Date().getHours() < 16 ? "midi" : "soir");
 const firstName = (n) => (n || "").trim().split(/\s+/)[0] || "";
 const initials = (n) => (n || "?").trim().split(/\s+/).map((w) => w[0]).slice(0, 2).join("").toUpperCase();
-const PALETTE = ["#4A1FE6", "#0B9B6A", "#E0752F", "#D63A7A", "#1F7AE0", "#8A4DFF", "#0E8C9E", "#B85C00"];
+const PALETTE = ["#5B2BFF", "#1E7F55", "#E0582F", "#C2337A", "#3B6FD8", "#8A4DFF", "#0E8C9E", "#B97D0E"];
 const colorFor = (id) => { let h = 0; for (const c of String(id)) h = (h * 31 + c.charCodeAt(0)) >>> 0; return PALETTE[h % PALETTE.length]; };
 const debounce = (fn, ms) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; };
 
@@ -97,13 +97,14 @@ function ico(name, cls = "") {
 let gidN = 0;
 function logoMark({ mono = null, grad = false } = {}) {
   const id = "lg" + gidN++;
-  const paint = mono || (grad ? `url(#${id})` : "#4A1FE6");
+  const paint = mono || (grad ? `url(#${id})` : "#5B2BFF");
   return `<svg viewBox="0 0 100 100" class="mk" aria-hidden="true"><defs><linearGradient id="${id}" x1="12" y1="10" x2="88" y2="90" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#8F63FF"/><stop offset="1" stop-color="#3B16D9"/></linearGradient></defs>
   <path d="M86 16H50A34 34 0 0 0 25.96 74.04" fill="none" stroke="${paint}" stroke-width="14"/>
   <path d="M40.5 83.5 80 44M52 42h30v30" fill="none" stroke="${paint}" stroke-width="12.5" stroke-linejoin="miter" stroke-miterlimit="4"/></svg>`;
 }
 function appIcon(size = 40) {
-  return `<span style="width:${size}px;height:${size}px;border-radius:${size * 0.28}px;display:grid;place-items:center;background:linear-gradient(150deg,#8F63FF,#4A1FE6 55%,#2F1BC4);box-shadow:0 8px 18px -8px rgba(74,31,230,.8),inset 0 1px 0 rgba(255,255,255,.35);flex:none"><span style="width:${size * 0.62}px;height:${size * 0.62}px;display:block">${logoMark({ mono: "#fff" })}</span></span>`;
+  /* « Crème et violet »: cream tile, soft rim, violet G, sitting on a sand edge */
+  return `<span class="gg-appic" style="width:${size}px;height:${size}px;border-radius:${size * 0.28}px;display:grid;place-items:center;background:#FFFDF8;box-shadow:0 0 0 ${size > 60 ? 2 : 1.5}px #DCCFB8 inset,0 ${Math.max(2, Math.round(size / 18))}px 0 #E2D6C2;flex:none"><span style="width:${size * 0.62}px;height:${size * 0.62}px;display:block">${logoMark({ mono: "#5B2BFF" })}</span></span>`;
 }
 
 /* ───────────────────────── sound + haptics ───────────────────────── */
@@ -418,8 +419,8 @@ function renderChrome() {
   const side = $("#side");
   const navOn = (VIEWS[S.route] && VIEWS[S.route].nav) || (TAB_OF[S.route] === "frigos" ? "frigos" : { note: "notes", fiche: "notes", tzEdit: "tickets", regReport: "registre" }[S.route] || S.route);
   const pend = S.fridges.length - todayStats(S.slot || slotNow()).done; /* current service only */
-  side.innerHTML = `<div class="brand"><span style="width:30px;height:30px;display:block">${logoMark()}</span>Growth Gusto</div>
-    ${S.resto ? `<button class="nav" data-act="restoSwitch" style="background:var(--glass-2);margin-bottom:10px"><span style="width:28px;height:28px;flex:none;border-radius:9px;display:grid;place-items:center;background:linear-gradient(135deg,#7A4DFF,#4A1FE6);color:#fff;font-size:11px;font-weight:800">${esc(initials(S.resto.name))}</span><span style="flex:1;min-width:0;text-align:left"><b style="display:block;color:var(--ink);font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(S.resto.name)}</b><span style="font-size:11.5px">${S.restos.length} établissement${S.restos.length > 1 ? "s" : ""}</span></span>${ico("down")}</button>` : ""}
+  side.innerHTML = `<div class="brand">${appIcon(36)}<span>Growth <span class="gg-b">Gusto</span></span></div>
+    ${S.resto ? `<button class="nav" data-act="restoSwitch" style="background:var(--glass-2);margin-bottom:10px"><span style="width:28px;height:28px;flex:none;border-radius:9px;display:grid;place-items:center;background:#F6B93B;color:#1B1530;box-shadow:0 2px 0 #D99A1E;font-size:11px;font-weight:800">${esc(initials(S.resto.name))}</span><span style="flex:1;min-width:0;text-align:left"><b style="display:block;color:var(--ink);font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(S.resto.name)}</b><span style="font-size:11.5px">${S.restos.length} établissement${S.restos.length > 1 ? "s" : ""}</span></span>${ico("down")}</button>` : ""}
     <div class="navs">${NAV.map(([r, i, t]) => r === "sep" ? `<div class="sep">${t}</div>` : `<button class="nav ${navOn === r ? "on" : ""}" data-go="${r}">${ico(i)}<span class="nt">${t}</span>${r === "home" && urgentCount() ? `<span class="count">${urgentCount()}</span>` : ""}${r === "releve" && pend > 0 && S.fridges.length ? `<span class="count" style="background:var(--warn)">${pend}</span>` : ""}</button>`).join("")}</div>
     <div class="me" data-go="reglages" role="button" tabindex="0" title="Réglages">${avatar(S.me.id)}<div style="min-width:0;flex:1"><b>${esc(S.me.name || "Vous")}</b><em>${ROLES[myRole()]}</em></div>${ico("sliders")}</div>`;
   const sv = $(".navs", side);
@@ -816,7 +817,7 @@ function registerSW() {
    to the foreground. A new v means the code running here is old: with nothing in progress the app reloads silently (caches dropped,
    so the reload is guaranteed fresh); otherwise a toast offers « Mettre à jour ». sessionStorage guards against reload loops:
    one reload attempt per version per session, after which the version is simply adopted. */
-const APP_V = "2026-11-04.15";
+const APP_V = "2026-11-05.1";
 const UPD = {
   running: null, offered: null,
   get: (k, store) => { try { return store.getItem(k); } catch (e) { return null; } },
@@ -899,7 +900,7 @@ function toastPlace(t) {
 function toast(msg, kind) { const t = $("#toast"); t.style.pointerEvents = ""; t.classList.toggle("info", kind === "info"); $(".check", t).innerHTML = TOAST_ICONS[kind] || TOAST_CHECK; $("#toastTx").textContent = msg; toastPlace(t); t.classList.toggle("err", kind === "err"); const c = $(".check", t); c.classList.remove("draw"); void c.offsetWidth; c.classList.add("draw"); t.classList.add("on"); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove("on"), kind === "err" ? 3800 : 2300); }
 function burst(x = window.innerWidth / 2, y = window.innerHeight / 3) {
   if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-  const b = document.createElement("div"); b.className = "burst"; const cols = ["#7A4DFF", "#4A1FE6", "#9ED7FF", "#C8B6FF", "#2FB985", "#fff"];
+  const b = document.createElement("div"); b.className = "burst"; const cols = ["#5B2BFF", "#F6B93B", "#EF5A3C", "#9EF5C4", "#9EC5FF", "#4C1FEA"];
   for (let i = 0; i < 34; i++) { const s = document.createElement("i"); const a = Math.random() * Math.PI * 2, d = 90 + Math.random() * 170; s.style.left = x + "px"; s.style.top = y + "px"; s.style.background = cols[i % cols.length]; s.style.setProperty("--x", Math.cos(a) * d + "px"); s.style.setProperty("--y", Math.sin(a) * d + 60 + "px"); s.style.setProperty("--r", Math.random() * 540 + "deg"); s.style.animationDelay = Math.random() * 80 + "ms"; if (i % 3 === 0) s.style.borderRadius = "50%"; b.appendChild(s); }
   document.body.appendChild(b); setTimeout(() => b.remove(), 1500);
 }
@@ -964,6 +965,7 @@ Object.assign(ACT, {
     refresh();
   },
   installHow: (a) => {
+    if (typeof ACT.auInstall === "function") return ACT.auInstall(a); /* the illustrated, device-specific guide (auth.js) */
     SFX.tap(); buzz(4); S.ui.instOpen = !S.ui.instOpen; const c = $("#instCard"); if (!c) return refresh();
     c.classList.toggle("open", S.ui.instOpen); a.textContent = S.ui.instOpen ? "Masquer" : "Comment ?"; a.setAttribute("aria-expanded", String(S.ui.instOpen));
   },
