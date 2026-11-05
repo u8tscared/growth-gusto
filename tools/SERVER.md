@@ -1,6 +1,6 @@
 # Serveur Growth Gusto (Cloud Functions)
 
-Code : `functions/` (Node 20, europe-west9). `functions/index.js` charge les modules listés dans `functions/.env` (`GG_MODULES=sondes,alertes`, ajouter `caisse` quand les clés SumUp existent) et crée **une seule** tâche planifiée `ggTick` (toutes les 15 min) qui appelle `sondesTick`, `alertesTick`, `caisseTick` et, le lundi à 7 h, `alertesWeekly`. Règle de coût : Cloud Scheduler n'offre que 3 tâches gratuites par compte, donc jamais d'`onSchedule` dans un module.
+Code : `functions/` (Node 22, europe-west9). `functions/index.js` charge les modules listés dans `functions/.env` (`GG_MODULES=sondes,alertes`, ajouter `caisse` quand les clés SumUp existent) et crée **une seule** tâche planifiée `ggTick` (toutes les 15 min) qui appelle `sondesTick`, `alertesTick`, `caisseTick` et, le lundi à 7 h, `alertesWeekly`. Règle de coût : Cloud Scheduler n'offre que 3 tâches gratuites par compte, donc jamais d'`onSchedule` dans un module.
 
 ## Déployer (depuis le Mac, dans le dossier du projet)
 
