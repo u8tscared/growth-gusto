@@ -1,0 +1,90 @@
+/* Growth Gusto — area: pennylane (Comptabilité). Prefix pny-. */
+.pny .cols>div{display:flex;flex-direction:column;gap:14px}
+.pny-ic{width:44px;height:44px;border-radius:14px;display:grid;place-items:center;flex:none;background:rgb(var(--k) / .05);color:var(--accent)}
+.pny-ic .ico{width:21px;height:21px}
+.pny-ic.sm{width:38px;height:38px;border-radius:12px}
+.pny-ic.sm .ico{width:18px;height:18px}
+.pny-ic.ok{color:var(--ok);background:rgba(7,138,94,.1)}
+.pny-ic.bad{color:var(--bad);background:rgba(212,42,72,.09)}
+
+/* Finances card */
+.pny-card{all:unset;box-sizing:border-box;cursor:pointer;display:flex;align-items:center;gap:12px;width:100%;margin-top:14px;transition:transform .25s var(--spring)}
+.pny-card .tx{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.pny-card .tx b{font-size:15px;font-weight:750;letter-spacing:-.015em}
+.pny-card .tx em{font-style:normal;font-size:12.5px;font-weight:550;color:var(--muted);line-height:1.35}
+.pny-card>.ico{width:17px;height:17px;color:var(--faint)}
+.pny-card:active{transform:scale(.985)}
+.fin-teach+.pny-card{margin-top:14px}
+
+/* intro */
+.pny-intro{display:flex;flex-direction:column;align-items:flex-start;gap:6px;padding:20px 20px 22px;border:0}
+.pny-intro b{font-family:var(--d);font-size:26px;font-weight:760;letter-spacing:-.035em;line-height:1.05;margin-top:6px}
+.pny-intro>span:last-child{font-size:14.5px;font-weight:550;color:rgba(255,255,255,.86);max-width:32ch;line-height:1.4}
+.pny-introic{width:48px;height:48px;border-radius:50%;display:grid;place-items:center;flex:none;background:var(--saffron, #F6B93B);color:var(--ink);box-shadow:0 3px 0 var(--saffron-edge, #C98F1C);animation:pnyBob 3.2s ease-in-out infinite}
+.pny-introic .ico{width:24px;height:24px}
+.pny-introic.sm{width:42px;height:42px;animation:none}
+.pny-introic.sm .ico{width:20px;height:20px}
+@keyframes pnyBob{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
+.pny-pts{display:flex;flex-direction:column;gap:14px}
+.pny-pt{display:flex;gap:12px;align-items:flex-start}
+.pny-pt .tx{display:flex;flex-direction:column;gap:2px;min-width:0}
+.pny-pt .tx b{font-size:14.5px;font-weight:750;letter-spacing:-.01em}
+.pny-pt .tx em{font-style:normal;font-size:13px;font-weight:550;color:var(--muted);line-height:1.4}
+
+/* connect */
+.pny-conn{display:flex;flex-direction:column;gap:14px}
+.pny-steps{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:12px;counter-reset:none}
+.pny-steps li{display:flex;gap:12px;align-items:flex-start}
+.pny-steps .tx{display:flex;flex-direction:column;gap:2px;min-width:0}
+.pny-steps .tx b{font-size:14px;font-weight:700;line-height:1.3}
+.pny-steps .tx em{font-style:normal;font-size:12.5px;color:var(--muted);font-weight:550;line-height:1.4}
+.pny-n{width:26px;height:26px;border-radius:50%;flex:none;display:grid;place-items:center;font-size:12.5px;font-weight:800;background:var(--accent);color:#fff}
+.pny-or{display:flex;align-items:center;gap:10px;font-size:12px;font-weight:700;color:var(--faint)}
+.pny-or::before,.pny-or::after{content:"";flex:1;height:1.5px;background:rgb(var(--k) / .08)}
+.pny-note{margin:0;font-size:12.5px;line-height:1.45}
+.pny-note.warn{display:flex;gap:6px;align-items:flex-start;color:var(--warn)}
+.pny-note .ico{width:15px;height:15px;flex:none;margin-top:1px}
+.pny .spin{width:16px;height:16px;border-radius:50%;border:2.5px solid currentColor;border-right-color:transparent;display:inline-block;margin-right:8px;animation:pnySpin .8s linear infinite;vertical-align:-3px}
+@keyframes pnySpin{to{transform:rotate(360deg)}}
+
+/* hero (connected) */
+.pny-hero{border:0;padding:18px;display:flex;flex-direction:column;gap:14px;overflow:hidden}
+.pny-hero>.row{display:flex;align-items:center;gap:12px}
+.pny-hero>.row .tx{flex:1;min-width:0;display:flex;flex-direction:column}
+.pny-hero>.row .tx b{font-family:var(--d);font-size:20px;font-weight:760;letter-spacing:-.03em;line-height:1.1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pny-hero>.row .tx em{font-style:normal;font-size:13px;font-weight:600;color:rgba(255,255,255,.82);margin-top:3px}
+.pny-hero .pill.ok{background:rgba(255,255,255,.92)}
+.pny-warn{margin:0;padding:10px 12px;border-radius:14px;background:rgba(255,255,255,.94);color:var(--bad);font-size:13.5px;font-weight:650;line-height:1.4}
+.pny .linkbtn{all:unset;cursor:pointer;font-weight:800;text-decoration:underline;text-underline-offset:3px;color:var(--accent)}
+.pny-ks{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.pny-ks>div{display:flex;flex-direction:column;gap:2px;padding:10px 12px;border-radius:14px;background:rgba(255,255,255,.12)}
+.pny-ks b{font-size:26px;font-weight:760;letter-spacing:-.04em;line-height:1;animation:pnyIn .7s var(--spring) both}
+.pny-ks span{font-size:11px;font-weight:650;color:rgba(255,255,255,.8);line-height:1.3}
+@keyframes pnyIn{from{opacity:0;transform:translateY(8px) scale(.96)}to{opacity:1;transform:none}}
+.pny-hero .btn.pny-wbtn{background:#fff;color:var(--accent-ink, var(--accent));box-shadow:0 3px 0 var(--accent-edge, rgba(0,0,0,.15))!important}
+.pny-wbtn:active{box-shadow:none!important}
+.pny-fine{margin:-4px 0 0;font-size:12px;font-weight:600;color:rgba(255,255,255,.75)}
+
+/* lists */
+.pny-z,.pny-inv,.pny-set{display:flex;flex-direction:column;gap:2px}
+.pny-z>.row,.pny-inv>.row{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+.pny-z .li em.bad{color:var(--bad);font-weight:650}
+.pny-inv a.li{color:inherit;text-decoration:none}
+.pny-amt{font-weight:700;white-space:nowrap;font-size:14px}
+.pny-amt small{font-size:11px;font-weight:600;color:var(--muted)}
+.pny-amt.bad{color:var(--bad)}
+.pny-tot{margin:0 0 6px}
+.pny-set>.lbl{margin-bottom:6px}
+.pny-set .li{display:flex;align-items:center;gap:12px}
+.pny-set .li .tx{flex:1;min-width:0}
+.pny-sw{width:50px;height:30px;border-radius:30px;flex:none;background:#E6DCCB;position:relative;transition:background .3s var(--ease)}
+.pny-sw i{position:absolute;top:3px;left:3px;width:24px;height:24px;border-radius:50%;background:#fff;box-shadow:0 2px 0 rgba(27,21,48,.12);transition:transform .45s var(--spring)}
+.pny-sw.on{background:var(--accent)}
+.pny-sw.on i{transform:translateX(20px)}
+.pny-opt{border-top:1.5px solid #F1E9DA}
+
+/* sheets */
+.pny-sh{display:flex;flex-direction:column;gap:12px}
+.pny-sh .sub{margin:0}
+.pny-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+@media (prefers-reduced-motion:reduce){.pny-introic,.pny-ks b,.pny .spin{animation:none}}

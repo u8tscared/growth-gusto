@@ -147,8 +147,19 @@ service cloud.firestore {
 
       // ── everything else (fridges, readings, lots, stock, tickets, staff, finances…): members only ──
       match /{col}/{doc} {
-        allow read: if !(col in ['members', 'sensorKeys']) && isMember(rid);
-        allow create, update, delete: if !(col in ['members', 'sensorKeys']) && isMemberAfter(rid);
+        allow read: if !(col in ['members', 'sensorKeys', 'pennylane', 'plSent', 'plInv']) && isMember(rid);
+        allow create, update, delete: if !(col in ['members', 'sensorKeys', 'pennylane', 'plSent', 'plInv']) && isMemberAfter(rid);
+      }
+      // Pennylane (js/pennylane.js, functions/src/pennylane.js): accounting, so gérants only; the server writes with admin rights
+      match /pennylane/{doc} {
+        allow read: if isGerant(rid);
+        allow write: if isGerant(rid) && doc == 'cfg';
+      }
+      match /plSent/{doc} {
+        allow read: if isGerant(rid);
+      }
+      match /plInv/{doc} {
+        allow read: if isGerant(rid);
       }
       // sensor cloud accounts (keys, passwords) and the gateway token: gérants only; the server reads them with admin rights
       match /sensorKeys/{doc} {
