@@ -56,7 +56,7 @@ const PM_GROUPS = [
 const PM_MODS = PM_GROUPS.flatMap(([, it]) => it);
 const PM_MOD = Object.fromEntries(PM_MODS.map((m) => [m[0], m]));
 /* routes that belong to a module; any other route (accueil, équipe, réglages, plus…) is open to everyone */
-const PM_ROUTE = { caisse: "tickets", caisseMap: "tickets", frigo: "frigos", sondes: "frigos", alertes: "frigos", note: "notes", fiche: "notes", noteProc: "notes", noteDoc: "notes", noteCarte: "notes", regReport: "registre", obl: "obligations", oblCat: "obligations", tzEdit: "tickets",
+const PM_ROUTE = { pennylane: "finance", caisse: "tickets", caisseMap: "tickets", frigo: "frigos", sondes: "frigos", alertes: "frigos", note: "notes", fiche: "notes", noteProc: "notes", noteDoc: "notes", noteCarte: "notes", regReport: "registre", obl: "obligations", oblCat: "obligations", tzEdit: "tickets",
   finances: "finance", salaires: "staff", salaries: "staff" };
 const PM_REQ = [
   ["readingPhoto", "therm", "Photo pour valider un relevé", "Le thermomètre en photo, à chaque frigo", "prendre une photo à chaque relevé"],

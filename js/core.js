@@ -433,7 +433,7 @@ const onData = debounce(() => { loadProfiles(); refresh(); renderChrome(); }, 60
 const NAV = [
   ["home", "home", "Aujourd'hui"], ["releve", "therm", "Relevés"], ["frigos", "snow", "Frigos"], ["sondes", "sdProbe", "Sondes connectées"], ["scan", "scan", "Scanner"], ["reception", "truck", "Réception"],
   ["sep", "", "Cuisine"], ["notes", "book", "Recettes & allergènes"], ["menage", "spray", "Planning ménage"], ["hygiene", "hygPot", "Hygiène"],
-  ["sep", "", "Gestion"], ["dashboard", "dash", "Tableau de bord"], ["finance", "euro", "Finances"], ["stock", "box", "Stock & inventaire"], ["tickets", "receipt", "Tickets de caisse"], ["caisse", "cxPlug", "Caisse connectée"], ["registre", "shield", "Registre HACCP"], ["documents", "hygVault", "Coffre-fort documents"], ["controle", "ctBadge", "Contrôle sanitaire"], ["rappel", "ctRecall", "Rappel de lot"], ["obligations", "calcheck", "Obligations & contrôles"],
+  ["sep", "", "Gestion"], ["dashboard", "dash", "Tableau de bord"], ["finance", "euro", "Finances"], ["stock", "box", "Stock & inventaire"], ["tickets", "receipt", "Tickets de caisse"], ["caisse", "cxPlug", "Caisse connectée"], ["pennylane", "pnyBook", "Comptabilité"], ["registre", "shield", "Registre HACCP"], ["documents", "hygVault", "Coffre-fort documents"], ["controle", "ctBadge", "Contrôle sanitaire"], ["rappel", "ctRecall", "Rappel de lot"], ["obligations", "calcheck", "Obligations & contrôles"],
   ["sep", "", "Équipe"], ["pointeuse", "clock", "Pointeuse"], ["planning", "cal", "Planning"], ["formation", "book", "Formation HACCP"], ["equipe", "users", "Équipe & salaires"], ["avis", "star", "Votre avis"],
   ["sep", "", "Restaurant"], ["resa", "resa", "Réservations"], ["alertes", "alBell", "Alertes"], ["sites", "store", "Mes établissements"], ["import", "upload", "Importer"], ["imprimante", "printer", "Imprimante"], ["reglages", "sliders", "Réglages"],
 ];
@@ -849,7 +849,7 @@ function registerSW() {
    to the foreground. A new v means the code running here is old: with nothing in progress the app reloads silently (caches dropped,
    so the reload is guaranteed fresh); otherwise a toast offers « Mettre à jour ». sessionStorage guards against reload loops:
    one reload attempt per version per session, after which the version is simply adopted. */
-const APP_V = "2026-11-05.9";
+const APP_V = "2026-11-05.10";
 const UPD = {
   running: null, offered: null,
   get: (k, store) => { try { return store.getItem(k); } catch (e) { return null; } },

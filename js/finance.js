@@ -245,7 +245,7 @@ VIEWS.finance = {
     if (C.empty && !finAll("expenses").length && !finAll("tickets").length) return `<div class="inner wide fin">${topBar("Finances")}${finTeach()}</div>`;
     const cmpTx = D ? `vs ${esc(Q.lab)}${Q.partial ? " à date" : ""}` : "";
     const left = `${finHero(C, D, cmpTx)}${finRatios(C, D)}${finChart(P, Q, U)}${finSplit(C)}`;
-    const side = `${finPnl(C, D, Q)}${finCharges(C, P)}`;
+    const side = `${finPnl(C, D, Q)}${finCharges(C, P)}${typeof pnyCard === "function" ? finTry(pnyCard) || "" : ""}`;
     return `<div class="inner wide fin">${topBar("Finances", { right })}${ctl}<div class="cols fin-cols"><div>${left}</div><div>${side}</div></div></div>`;
   },
   after(v) {
@@ -257,7 +257,7 @@ function finTeach() {
   const st = (n, ic, t, s, go, cta) => `<div class="fin-step st" style="--i:${n + 1}"><span class="ic">${ico(ic)}</span><div class="tx"><b>${t}</b><span>${s}</span></div><button class="btn soft sm" ${go.startsWith("act:") ? `data-act="${go.slice(4)}"` : `data-go="${go}"`}>${cta}${ico("chev")}</button></div>`;
   return `<div class="glass pad fin-teach st" style="--i:1"><span class="fin-teach-ic">${ico("euro")}</span><b class="h2">Vos chiffres, sans tableur</b>
     <p class="sub">Food cost, masse salariale, résultat du mois : tout se calcule tout seul à partir de ce que vous saisissez déjà.</p>
-    <div class="fin-steps">${st(1, "receipt", "Le ticket Z du soir", "Donne le chiffre d'affaires.", "tickets", "Tickets")}${st(2, "truck", "Le montant des livraisons", "À la réception, notez le total HT du bon.", "reception", "Réception")}${st(3, "home", "Vos charges fixes", "Loyer, énergie, assurances : une fois, c'est répété chaque mois.", "act:finAdd", "Ajouter")}${st(4, "clock", "La pointeuse", "Heures × taux horaire = masse salariale chargée.", "pointeuse", "Pointeuse")}</div></div>`;
+    <div class="fin-steps">${st(1, "receipt", "Le ticket Z du soir", "Donne le chiffre d'affaires.", "tickets", "Tickets")}${st(2, "truck", "Le montant des livraisons", "À la réception, notez le total HT du bon.", "reception", "Réception")}${st(3, "home", "Vos charges fixes", "Loyer, énergie, assurances : une fois, c'est répété chaque mois.", "act:finAdd", "Ajouter")}${st(4, "clock", "La pointeuse", "Heures × taux horaire = masse salariale chargée.", "pointeuse", "Pointeuse")}</div></div>${typeof pnyCard === "function" ? finTry(pnyCard) || "" : ""}`;
 }
 function finHero(C, D, cmpTx) {
   const neg = C.ebe < 0; const k = (l, v, d) => `<div class="fin-k"><span class="lbl">${l}</span><b class="mono">${v}</b>${d || ""}</div>`;
