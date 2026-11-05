@@ -11,7 +11,7 @@ for (const m of String(process.env.GG_MODULES || "sondes,alertes,resa,mails").sp
 const TICKS = ["sondesTick", "caisseTick", "alertesTick", "resaTick", "mailsTick"];
 const SECRETS = [];
 const isSecret = (v) => v && typeof v === "object" && typeof v.name === "string" && /Secret/.test((v.constructor && v.constructor.name) || "");
-for (const m of Object.values(mods)) for (const [k, v] of Object.entries(m)) { if (Array.isArray(v) && v.every(isSecret)) { v.forEach((x) => { if (!SECRETS.includes(x)) SECRETS.push(x); }); } else if (isSecret(v)) { if (!SECRETS.includes(v)) SECRETS.push(v); } else if (!TICKS.includes(k) && k !== "alertesWeekly" && k[0] !== "_") exports[k] = v; }
+for (const m of Object.values(mods)) for (const [k, v] of Object.entries(m)) { if (Array.isArray(v) && v.every(isSecret)) { v.forEach((x) => { if (!SECRETS.some((y) => y.name === x.name)) SECRETS.push(x); }); } else if (isSecret(v)) { if (!SECRETS.some((y) => y.name === v.name)) SECRETS.push(v); } else if (!TICKS.includes(k) && k !== "alertesWeekly" && k[0] !== "_") exports[k] = v; }
 exports.ggTick = onSchedule({ schedule: "every 15 minutes", region: "europe-west9", timeZone: "Europe/Paris", secrets: SECRETS }, async () => {
   const fns = []; for (const m of Object.values(mods)) for (const k of TICKS) if (typeof m[k] === "function") fns.push(m[k]);
   const now = new Date(new Date().toLocaleString("en-US", { timeZone: "Europe/Paris" }));
