@@ -1,4 +1,4 @@
-/* Growth Gusto — abonnement (area prefix « ab »): 14-day trial, the three packs (Essentiel 59 € · Pro 109 € · Complet 169 € HT/mois), activation
+/* Growth Gusto — abonnement (area prefix « ab »): 14-day trial, the three packs (Commis 59 € · Second 109 € · Chef 169 € HT/mois; internal keys essentiel / pro / complet), activation
    codes, gentle gating once the trial is over, and the Growth Gusto admin space (GG_ADMINS: every restaurant, every account).
    State on the restaurant doc (restos/{rid}):
      plan: "essai" | "essentiel" | "pro" | "complet" | "suspendu"   pack: "essentiel" | "pro" | "complet" (the pack chosen on the site, Complet by default)
@@ -10,13 +10,13 @@
 
 const AB_DAY = 864e5, AB_TRIAL = 14;
 const AB_PACKS = {
-  essentiel: { t: "Essentiel", price: 59, tag: "Toute l'hygiène et le HACCP", feats: ["Relevés et sondes", "Étiquettes & DLC", "Réception des livraisons", "Plan de nettoyage", "Fiches recettes & allergènes", "Mode contrôle & PMS", "Registre & rappel de lot", "Équipe illimitée"] },
-  pro: { t: "Pro", price: 109, tag: "L'hygiène, la salle et la caisse", feats: ["Tout Essentiel", "Réservations", "Plan de salle", "Caisse connectée & tickets Z", "Stock & inventaire", "Tableau de bord"] },
-  complet: { t: "Complet", price: 169, tag: "Toute la gestion du restaurant", feats: ["Tout Pro", "Pointeuse", "Planning", "Employés & salaires", "Finances & banque", "Pennylane", "Plusieurs restaurants"] },
+  essentiel: { t: "Commis", price: 59, tag: "L'hygiène carrée, sans y penser", feats: ["Relevés et sondes", "Étiquettes & DLC", "Réception des livraisons", "Plan de nettoyage", "Fiches recettes & allergènes", "Mode contrôle & PMS", "Registre & rappel de lot", "Équipe illimitée"] },
+  pro: { t: "Second", price: 109, tag: "La salle et la caisse en plus", feats: ["Tout Commis", "Réservations", "Plan de salle", "Caisse connectée & tickets Z", "Stock & inventaire", "Tableau de bord"] },
+  complet: { t: "Chef", price: 169, tag: "Toute la maison tourne", feats: ["Tout Second", "Pointeuse", "Planning", "Employés & salaires", "Finances & banque", "Pennylane", "Plusieurs restaurants"] },
 };
 const AB_ORDER = ["essentiel", "pro", "complet"], AB_LVL = { essentiel: 1, pro: 2, complet: 3 };
 const abPk = (x) => AB_LVL[x] ? x : "complet";
-/* areas that need a higher pack: with a paid Essentiel or Pro they show an upgrade card instead (during the trial everything is open) */
+/* areas that need a higher pack: with a paid Commis or Second they show an upgrade card instead (during the trial everything is open) */
 const AB_GATE = {
   resa: ["pro", "Réservations"], plan: ["pro", "Plan de salle"], stock: ["pro", "Stock & inventaire"], tickets: ["pro", "Tickets de caisse"], tzEdit: ["pro", "Tickets de caisse"], dashboard: ["pro", "Tableau de bord"], caisse: ["pro", "Caisse connectée"], caisseMap: ["pro", "Caisse connectée"],
   finance: ["complet", "Finances"], pennylane: ["complet", "Pennylane"], pointeuse: ["complet", "Pointeuse"], planning: ["complet", "Planning"], staff: ["complet", "Employés & salaires"], sites: ["complet", "Multi-restaurant"],
@@ -139,7 +139,7 @@ VIEWS.abonnement = {
     const C = +(2 * Math.PI * 42).toFixed(2);
     const ring = p.plan === "essai" ? `<div class="ring ab-ring"><svg viewBox="0 0 100 100"><circle class="tr" cx="50" cy="50" r="42" fill="none" stroke-width="8"/><circle class="br" cx="50" cy="50" r="42" fill="none" stroke-width="8" stroke-linecap="round" stroke-dasharray="${C}" stroke-dashoffset="${(C * (1 - p.pct)).toFixed(2)}"/></svg><div class="num"><span><b class="mono">${p.days}</b><small>${p.days > 1 ? "jours" : "jour"}</small></span></div></div>`
       : `<div class="ab-seal ${p.open ? "ok" : "off"}">${ico(p.plan === "suspendu" ? "abPause" : p.open ? "check" : "lock")}</div>`;
-    const H = p.plan === "essai" ? ["Essai gratuit · tout le pack Complet est ouvert", `${abJours(p.days)} restant${p.days > 1 ? "s" : ""}`, p.days <= 3 ? `Jusqu'au ${abDate(p.ends)}. Ensuite, vos données restent lisibles mais plus rien ne s'enregistre : choisissez votre pack dès maintenant.` : `Jusqu'au ${abDate(p.ends)}. Choisissez votre pack quand vous voulez : rien ne s'arrête d'ici là.`]
+    const H = p.plan === "essai" ? ["Essai gratuit · tout le pack Chef est ouvert", `${abJours(p.days)} restant${p.days > 1 ? "s" : ""}`, p.days <= 3 ? `Jusqu'au ${abDate(p.ends)}. Ensuite, vos données restent lisibles mais plus rien ne s'enregistre : choisissez votre pack dès maintenant.` : `Jusqu'au ${abDate(p.ends)}. Choisissez votre pack quand vous voulez : rien ne s'arrête d'ici là.`]
       : p.plan === "expire" ? (p.why === "paid" ? ["Abonnement arrivé à échéance", "Renouvelez votre pack", `Votre pack ${AB_PACKS[p.pack].t} s'est terminé le ${abDate(p.ends)}. Vos données sont conservées : dès le renouvellement, tout repart.`] : ["Essai terminé", "Choisissez votre pack", "Vos données sont conservées et restent consultables. Dès l'activation, tout repart exactement là où vous en étiez."])
       : p.plan === "suspendu" ? ["Accès suspendu", "Contactez-nous", "L'accès à ce restaurant a été suspendu par Growth Gusto. Vos données sont conservées et restent consultables."]
       : p.plan === "demo" ? ["Démo", "Tout est ouvert", "Créez votre compte pour démarrer votre essai gratuit de 14 jours, sans carte bancaire."]
