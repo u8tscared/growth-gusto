@@ -14,7 +14,7 @@ module.exports = async (page, shot) => {
   ok(r0.plan === "essai" && r0.pack === "complet" && r0.trialEnds > Date.now() + 13 * 864e5, "resto doc has plan/pack/trialEnds " + JSON.stringify(r0));
   // Abonnement screen (trial)
   await page.evaluate(() => go("abonnement")); await page.waitForTimeout(900); await shot("10-abonnement-essai");
-  ok(await page.evaluate(() => /14 jours restants/.test(document.querySelector(".ab-hero").textContent) && document.querySelectorAll(".ab-pack").length === 2), "trial hero + two packs");
+  ok(await page.evaluate(() => /14 jours restants/.test(document.querySelector(".ab-hero").textContent) && document.querySelectorAll(".ab-pack").length === 3), "trial hero + three packs");
   await page.evaluate(() => { const v = document.querySelector("#viewport .view"); v.scrollTop = 99999; }); await page.waitForTimeout(400); await shot("11-abonnement-bas");
   // Plus + Réglages entries
   await page.evaluate(() => go("more")); await page.waitForTimeout(700); ok(await page.evaluate(() => !!document.querySelector('[data-go="abonnement"]')), "tile Abonnement in Plus"); await shot("12-plus");
@@ -44,9 +44,14 @@ module.exports = async (page, shot) => {
   // pack gating: essentiel → stock shows the upgrade card
   await page.evaluate(async () => { await DB.update("restos", S.rid, { plan: "essentiel", pack: "essentiel" }); }); await page.waitForTimeout(300);
   await page.evaluate(() => go("stock")); await page.waitForTimeout(800);
-  ok(await page.evaluate(() => !!document.querySelector(".ab-up") && /pack Complet/.test(document.querySelector(".ab-up").textContent)), "stock gated with an upgrade card under Essentiel"); await shot("30-upgrade-stock");
+  ok(await page.evaluate(() => !!document.querySelector(".ab-up") && /pack Pro/.test(document.querySelector(".ab-up").textContent)), "stock gated with a Pro upgrade card under Essentiel"); await shot("30-upgrade-stock");
   await page.evaluate(() => go("abonnement")); await page.waitForTimeout(800); await shot("31-abonnement-essentiel");
-  ok(await page.evaluate(() => /Pack actuel/.test(document.querySelector(".ab-pack.essentiel").textContent) && /Passer à Complet/.test(document.querySelector(".ab-pack.complet").textContent)), "Essentiel = current, Complet = upgrade");
+  ok(await page.evaluate(() => /Pack actuel/.test(document.querySelector(".ab-pack.essentiel").textContent) && /Passer à Pro/.test(document.querySelector(".ab-pack.pro").textContent) && /Passer à Complet/.test(document.querySelector(".ab-pack.complet").textContent)), "Essentiel = current, Pro and Complet = upgrades");
+  await page.evaluate(() => go("resa")); await page.waitForTimeout(600); ok(await page.evaluate(() => /pack Pro/.test((document.querySelector(".ab-up") || {}).textContent || "")), "reservations gated under Essentiel");
+  await page.evaluate(async () => { await DB.update("restos", S.rid, { plan: "pro", pack: "pro" }); }); await page.evaluate(() => go("stock")); await page.waitForTimeout(600);
+  ok(await page.evaluate(() => !document.querySelector(".ab-up")), "stock open under Pro");
+  await page.evaluate(() => go("pointeuse")); await page.waitForTimeout(600); ok(await page.evaluate(() => /pack Complet/.test((document.querySelector(".ab-up") || {}).textContent || "")), "pointeuse gated with a Complet card under Pro"); await shot("32-upgrade-pointeuse-pro");
+  await page.evaluate(() => go("abonnement")); await page.waitForTimeout(700); ok(await page.evaluate(() => /Pack actuel/.test(document.querySelector(".ab-pack.pro").textContent) && /Nous écrire/.test(document.querySelector(".ab-pack.essentiel").textContent)), "Pro = current, Essentiel = downgrade by mail"); await shot("33-abonnement-pro");
   await page.evaluate(async () => { await DB.update("restos", S.rid, { plan: "complet", pack: "complet" }); }); await page.evaluate(() => go("stock")); await page.waitForTimeout(600);
   ok(await page.evaluate(() => !document.querySelector(".ab-up")), "stock open again under Complet");
   // paidUntil in the past → expire ; suspendu → blocked
@@ -69,7 +74,7 @@ module.exports = async (page, shot) => {
   // deep links from the site
   await page.goto(base + "?signup=1&plan=complet"); await page.waitForTimeout(1600);
   ok(await page.evaluate(() => AUTH.ui.screen === "email" && AUTH.ui.tab === "up" && !!document.querySelector("#au.on") && /Pack Complet/.test(document.querySelector(".au-pack").textContent) && localStorage.getItem("gg-plan") === "complet" && !/signup/.test(location.search)), "?signup=1&plan=complet opens « Créer un compte » with the pack"); await shot("50-signup-complet");
-  await page.goto(base + "?signup=1&plan=essentiel"); await page.waitForTimeout(1400); ok(await page.evaluate(() => /Pack Essentiel/.test(document.querySelector(".au-pack").textContent)), "plan=essentiel shown"); await shot("51-signup-essentiel");
+  await page.goto(base + "?signup=1&plan=essentiel"); await page.waitForTimeout(1400); ok(await page.evaluate(() => /Pack Essentiel/.test(document.querySelector(".au-pack").textContent) && /59 €/.test(document.querySelector(".au-pack").textContent)), "plan=essentiel shown at 59 €"); await shot("51-signup-essentiel");
   await page.goto(base + "?login=1"); await page.waitForTimeout(1400); ok(await page.evaluate(() => AUTH.ui.screen === "email" && AUTH.ui.tab === "in" && !document.querySelector(".au-pack")), "?login=1 opens sign-in"); await shot("52-login");
   await c("[data-act=auBack]"); await page.waitForTimeout(600); ok(await page.evaluate(() => AUTH.ui.screen === "welcome"), "back goes to the welcome");
   await page.goto(base + "?admin=1"); await page.waitForTimeout(1400); ok(await page.evaluate(() => AUTH.ui.screen === "email" && sessionStorage.getItem("gg-admin") === "1"), "?admin=1 asks to sign in");
