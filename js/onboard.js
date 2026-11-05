@@ -86,7 +86,7 @@ const OB = {
       <header class="onb-top">${this.topHTML()}</header>
       <div class="onb-body">
         <div class="onb-form" id="obForm"><div class="onb-pane" id="obPane">${this.paneHTML()}</div><div class="onb-cta" id="obCta">${this.ctaHTML()}</div></div>
-        <aside class="onb-stage" aria-hidden="true"><div class="onb-wall"></div>${this.ficheHTML()}<div class="onb-stage-cap">Fiche du restaurant · mise à jour en direct</div></aside>
+        <aside class="onb-stage" aria-hidden="true"><div class="onb-wall"><span class="onb-dfr cf"><b>3,2°</b></span><span class="onb-dfr"><b>2,8°</b></span><span class="onb-dfr"><b>3,1°</b></span><span class="onb-dfr cg"><b>−19°</b></span></div>${this.ficheHTML()}<div class="onb-stage-cap">Fiche du restaurant, mise à jour en direct</div></aside>
       </div>
     </div>`;
   },
@@ -167,7 +167,7 @@ const OB = {
       const sum = this.summary();
       return `<div class="onb-seal st" style="--i:0">${OB_SVG.seal}</div>
         ${this.head("Étape 6 · C'est prêt", `C'est prêt${me ? ", " + esc(me) : ""}.`, `${esc(d.name || S.resto?.name || "Votre restaurant")} est installé. Voici ce qui est en place.`, 1)}
-        <div class="onb-sum st" style="--i:4">${sum.map((r) => `<div class="onb-sumr ${r.ok ? "ok" : "skip"}"><i>${r.ok ? OB_SVG.ok : ""}</i><b>${r.t}</b><span>${r.s}</span></div>`).join("")}</div>
+        <div class="onb-sum st" style="--i:4">${sum.map((r, i) => `<div class="onb-sumr ${r.ok ? "ok" : "later"}"><i>${[OB_SVG.store, OB_SVG.image, OB_SVG.users, OB_SVG.snow, OB_SVG.users, OB_SVG.printer][i] || OB_SVG.ok}</i><b>${r.t}</b><span>${r.s}</span></div>`).join("")}</div>
         ${sum.some((r) => !r.ok) ? `<p class="onb-fine st" style="--i:5">Le reste se complète plus tard dans <b>Réglages → Compléter la fiche du restaurant</b>.</p>` : `<p class="onb-fine st" style="--i:5">Tout se modifie ensuite dans Réglages.</p>`}`;
     }
     return "";

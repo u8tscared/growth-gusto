@@ -391,7 +391,7 @@ async function labelPng(lots) {
   const c = document.createElement("canvas"); c.width = W; c.height = H * lots.length + GAP * (lots.length - 1); const g = c.getContext("2d");
   try { await document.fonts.ready; } catch (e) {}
   g.fillStyle = "#fff"; g.fillRect(0, 0, c.width, c.height);
-  const SANS = "Manrope, 'Helvetica Neue', Arial, sans-serif", MONO = "'JetBrains Mono', Menlo, monospace";
+  const SANS = "'Instrument Sans', 'Helvetica Neue', Arial, sans-serif", MONO = "'JetBrains Mono', Menlo, monospace";
   const fit = (s, maxW) => { while (g.measureText(s).width > maxW && s.length > 1) s = s.slice(0, -2) + "…"; return s; };
   const wrap = (t, maxW, maxL) => { const out = []; let cur = ""; for (const w of String(t).split(/ +/)) { const nx = cur ? cur + " " + w : w; if (g.measureText(nx).width <= maxW || !cur) cur = nx; else { out.push(cur); cur = w; } } if (cur) out.push(cur); if (out.length > maxL) { out.length = maxL; out[maxL - 1] += "…"; } return out.map((s) => fit(s, maxW)); };
   lots.forEach((l, i) => {

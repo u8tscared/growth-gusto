@@ -1,12 +1,8 @@
 /* Growth Gusto — abonnement (prefix « ab »): trial + packs screen, gating strip, block sheet, upgrade card, admin space. B2 Aurore. */
 
 /* ── hero: the trial ring, or the seal of an active / ended plan ── */
-.ab-hero{display:flex;align-items:center;gap:18px;padding:20px 20px 20px 18px;border-radius:28px;color:#fff;position:relative;overflow:hidden;
-  background:linear-gradient(120deg,#5B2BFF,#3C3CF0 45%,#7A4DFF);box-shadow:0 24px 44px -22px rgba(74,31,230,.75),0 1px 0 rgba(255,255,255,.25) inset}
-.ab-hero::before{content:"";position:absolute;inset:0;background:radial-gradient(70% 100% at 100% -20%,rgba(158,215,255,.55),transparent 65%),radial-gradient(50% 70% at 0% 110%,rgba(255,255,255,.18),transparent 70%);pointer-events:none}
+.ab-hero{display:flex;align-items:center;gap:18px;padding:20px 20px 20px 18px;border-radius:28px;color:#fff;position:relative;overflow:hidden;}
 .ab-hero>*{position:relative}
-.ab-hero.expire,.ab-hero.suspendu{background:linear-gradient(120deg,#2A2550,#3A2E73 55%,#4B3B8F);box-shadow:0 24px 44px -24px rgba(20,16,60,.8)}
-.ab-hero.essentiel,.ab-hero.complet{background:linear-gradient(120deg,#0B8F63,#0D7F6E 50%,#1FA37B);box-shadow:0 24px 44px -22px rgba(7,138,94,.7)}
 .ab-hero.pop{animation:abPop .7s var(--spring)}
 @keyframes abPop{0%{transform:scale(.96)}60%{transform:scale(1.015)}100%{transform:scale(1)}}
 .ab-ring{width:96px;height:96px}
@@ -26,7 +22,6 @@
 .ab-packs{display:grid;grid-template-columns:1fr;gap:14px}
 .ab-pack{padding:20px 20px 18px;display:flex;flex-direction:column;gap:10px;position:relative;overflow:hidden}
 .ab-pack.complet{box-shadow:var(--sh),0 0 0 1.5px rgba(74,31,230,.35) inset}
-.ab-pack.complet::before{content:"";position:absolute;inset:0;background:radial-gradient(60% 50% at 100% 0%,rgba(122,77,255,.16),transparent 70%);pointer-events:none}
 .ab-pack.cur{box-shadow:var(--sh),0 0 0 1.5px rgba(7,138,94,.45) inset}
 .ab-pack>*{position:relative}
 .ab-ph{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
@@ -80,7 +75,7 @@
 .ab-blockic.bad{background:var(--tint-bad);color:var(--bad)}
 .ab-blockic .ico{width:30px;height:30px}
 .ab-up{padding:24px 22px;display:flex;flex-direction:column;gap:10px;align-items:flex-start}
-.ab-upic{width:56px;height:56px;border-radius:20px;display:grid;place-items:center;background:linear-gradient(140deg,#7A4DFF,#4A1FE6);color:#fff;box-shadow:0 14px 26px -12px rgba(74,31,230,.75)}
+.ab-upic{width:56px;height:56px;border-radius:20px;display:grid;place-items:center;color:#fff;box-shadow:0 14px 26px -12px rgba(74,31,230,.75)}
 .ab-upic .ico{width:28px;height:28px}
 .ab-up .h2{font-size:21px;text-wrap:balance}
 .ab-up .sub{line-height:1.5;text-wrap:pretty}
@@ -102,7 +97,7 @@
 .ab-cl:active{transform:scale(.985)}
 .ab-cl:focus-visible{outline:2.5px solid var(--accent)}
 .ab-cl>.ico{flex:none;color:var(--faint)}
-.ab-mono{width:var(--s,44px);height:var(--s,44px);flex:none;border-radius:calc(var(--s,44px) * .32);display:grid;place-items:center;background:linear-gradient(135deg,#7A4DFF,#4A1FE6);color:#fff;font-size:calc(var(--s,44px) * .32);font-weight:800;letter-spacing:-.02em}
+.ab-mono{width:var(--s,44px);height:var(--s,44px);flex:none;border-radius:calc(var(--s,44px) * .32);display:grid;place-items:center;color:#fff;font-size:calc(var(--s,44px) * .32);font-weight:800;letter-spacing:-.02em}
 .ab-logo{width:var(--s,44px);height:var(--s,44px);flex:none;border-radius:calc(var(--s,44px) * .32);object-fit:cover;background:#fff;box-shadow:0 0 0 1px var(--line)}
 .ab-clb{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
 .ab-clh{display:flex;align-items:center;gap:8px;min-width:0}
@@ -139,3 +134,76 @@
   .ab-act .ab-actf{flex:1 1 320px}
   .ab-act .ab-acterr{flex:1 1 100%}
 }
+
+/* ═════════════════════ Version 2 ═════════════════════ */
+/* hero: the violet grid wall (trial / demo), ink when it is over, cream with a mint seal when paid */
+.ab-hero{background-color:var(--wall);background-image:var(--wallbg);background-size:22px 22px;border-radius:28px;box-shadow:0 4px 0 #2A0BA6,0 24px 40px -26px rgba(76,31,234,.6);padding:20px}
+.ab-hero::before{display:none}
+.ab-hero.expire,.ab-hero.suspendu{background-color:var(--ink);background-image:var(--wallbg);box-shadow:0 4px 0 #000,0 24px 40px -26px rgba(27,21,48,.6)}
+.ab-hero.essentiel,.ab-hero.complet{background:var(--paper);color:var(--ink);border:1.5px solid var(--rim);box-shadow:0 4px 0 #EFE6D6,0 18px 30px -24px rgba(27,21,48,.3)}
+.ab-eyebrow{font-family:var(--f);font-size:14px;font-weight:650;letter-spacing:0;text-transform:none;opacity:1;color:#E4DEFF}
+.ab-hero.essentiel .ab-eyebrow,.ab-hero.complet .ab-eyebrow{color:var(--ok)}
+.ab-ht h2{font-family:var(--d);font-variation-settings:"opsz" 96,"wdth" 90;font-size:28px;font-weight:760;letter-spacing:-.03em;line-height:1.04;margin:4px 0 6px}
+.ab-ht p{font-size:14px;font-weight:550;opacity:1;color:#E4DEFF;line-height:1.4}
+.ab-hero.essentiel .ab-ht p,.ab-hero.complet .ab-ht p{color:var(--muted)}
+.ab-seal{width:76px;height:76px;border-radius:50%;background:#fff;color:var(--accent);box-shadow:0 4px 0 #2A0BA6}
+.ab-seal .ico{width:34px;height:34px;stroke-width:2.4}
+.ab-seal.off{background:rgba(255,255,255,.12);color:#fff;box-shadow:none}
+.ab-hero.essentiel .ab-seal,.ab-hero.complet .ab-seal{background:#E3F5EA;color:var(--ok);box-shadow:none}
+.ab-ring .tr{stroke:rgba(255,255,255,.18)}
+.ab-ring .br{stroke:var(--saffron);filter:none}
+.ab-ring .num b{font-family:var(--d);font-weight:780;letter-spacing:-.04em}
+.ab-ring .num small{font-family:var(--f);font-size:12px;font-weight:650;letter-spacing:0;text-transform:none;opacity:1;color:#E4DEFF}
+
+/* packs: cream cards, the recommended one wears a violet rim */
+.ab-pack{border-radius:24px}
+.ab-pack.complet{border-color:var(--accent);box-shadow:0 4px 0 var(--accent-edge),0 18px 30px -24px rgba(76,31,234,.5)}
+.ab-pack.complet::before{display:none}
+.ab-pack.cur{border-color:var(--ok);box-shadow:0 4px 0 #17603F}
+.ab-ph .lbl{font-size:13px;font-weight:650;letter-spacing:0;text-transform:none;color:var(--ink-2)}
+.ab-pn{font-family:var(--d);font-variation-settings:"opsz" 96,"wdth" 92;font-size:26px;font-weight:760;letter-spacing:-.03em}
+.ab-price b{font-family:var(--d);font-variation-settings:"opsz" 96,"wdth" 90;font-size:44px;font-weight:780;letter-spacing:-.045em;color:var(--ink)}
+.ab-pack.complet .ab-price b{color:var(--accent-ink)}
+.ab-price span{font-weight:650;color:var(--ink-2)}
+.ab-ptag{font-weight:600;color:var(--ink-2)}
+.ab-feats{gap:9px}
+.ab-feats li{font-weight:600;color:var(--ink)}
+.ab-feats li .ico{width:22px;height:22px;padding:4px;box-sizing:border-box;border-radius:50%;background:var(--tint);color:var(--accent);stroke-width:3}
+.ab-feats li.all{font-weight:700}
+.ab-feats li.all .ico{background:var(--accent);color:#fff}
+.ab-common{gap:8px}
+.ab-common span{padding:6px 12px;border-radius:999px;background:#F1E9DA;color:var(--ink-2);font-weight:650;font-size:13px}
+.ab-common .ico{display:none}
+
+/* activation */
+.ab-acth b{font-family:var(--d);font-weight:740;font-size:17px;letter-spacing:-.02em}
+.ab-acth .ic{background:var(--saffron-tint);color:#9A6200}
+.ab-actf .input{font-family:var(--lcd);letter-spacing:.06em;height:54px}
+.ab-actf .btn{height:54px}
+.ab-ro{color:var(--muted)}
+
+/* gating strip, block sheet, upgrade card */
+.ab-strip{background:var(--saffron-tint);color:var(--saffron-ink);box-shadow:0 0 0 1.5px #F3DFAE inset;border-radius:18px;padding:12px 14px;font-weight:600}
+.ab-strip.bad{background:var(--tomato-tint);color:var(--bad);box-shadow:0 0 0 1.5px #F6C9B8 inset}
+.ab-strip>span b,.ab-strip>em{font-weight:750}
+.ab-block .lbl{font-size:13px;font-weight:650;letter-spacing:0;text-transform:none;color:var(--ink-2)}
+.ab-blockic{border-radius:50%;background:var(--tint);color:var(--accent)}
+.ab-blockic.bad{background:var(--tomato-tint);color:var(--bad)}
+.ab-up .lbl{font-size:13px;font-weight:650;letter-spacing:0;text-transform:none;color:var(--accent-ink)}
+.ab-upic{border-radius:50%;background:var(--tint);color:var(--accent);box-shadow:none}
+.ab-upic .ico path[fill]{fill:#C9BFFF;opacity:1}
+
+/* admin */
+.ab-kpi .lbl{font-size:12.5px;font-weight:650;letter-spacing:0;text-transform:none;color:var(--ink-2)}
+.ab-kpi>b{font-family:var(--d);font-weight:760;font-size:32px;letter-spacing:-.035em}
+.ab-cl{background:var(--paper);border:1.5px solid var(--rim);border-radius:22px;box-shadow:0 2px 0 #EFE6D6;transition:transform .25s var(--spring),background .2s}
+.ab-cl:hover{box-shadow:0 2px 0 #EFE6D6;background:#fff}
+.ab-cl:active{transform:scale(.98)}
+.ab-clh b{font-weight:700}
+.ab-mono{border-radius:50%;background:var(--tint);color:var(--accent-ink);font-family:var(--d);font-weight:760}
+.ab-logo{border-radius:50%;box-shadow:0 0 0 1.5px var(--rim)}
+.ab-search .input{height:52px;border-radius:16px}
+.ab-ashh .h2{font-family:var(--d)}
+.ab-ash .lbl{font-size:13px;font-weight:650;letter-spacing:0;text-transform:none;color:var(--ink-2)}
+@media (min-width:960px){.ab-hero{padding:26px 28px}.ab-ht h2{font-size:34px}}
+.ab-actf .input::placeholder{font-family:var(--f);letter-spacing:0;text-transform:none}

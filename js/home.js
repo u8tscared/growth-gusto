@@ -206,21 +206,18 @@ VIEWS.home = {
     const TODO_MAX = 6; const cap = S.ui.hmAll ? todo.length : todo.length > TODO_MAX ? TODO_MAX - 1 : TODO_MAX;
     const fresh = homeSteps().filter((x) => x.done).length < 3; const recNow = homeRecLive();
 
-    const ringC = +(2 * Math.PI * 42).toFixed(2);
-    // fridge chips: alerts first, then still to read, then done; capped so many fridges stay tidy
+    // the kitchen, drawn: one fridge per appliance on the violet wall, the next one to read is circled in saffron
     const frRank = (f) => { const r = rsSlot.find((x) => x.fridgeId === f.id); return r ? (r.ok === false ? 0 : 2) : 1; };
-    const frAll = S.fridges.slice().sort((a, b) => frRank(a) - frRank(b)); const FR_MAX = 6;
-    const frChips = frAll.slice(0, frAll.length > FR_MAX ? FR_MAX - 1 : FR_MAX).map((f) => { const r = rsSlot.find((x) => x.fridgeId === f.id); return `<span class="hm-fr ${r ? (r.ok === false ? "bad" : "ok") : ""}">${r ? (r.ok === false ? ico("alert") : ico("check")) : "<i></i>"}<span class="nm">${esc(f.name)}</span>${r ? `<em class="mono">${fmt(r.value)}°</em>` : ""}</span>`; }).join("") + (frAll.length > FR_MAX ? `<span class="hm-fr more">+${frAll.length - FR_MAX + 1}</span>` : "");
-    const hero = `<section class="hero hm-hero st" style="--i:1" data-go="releve" role="button" tabindex="0" aria-label="Ouvrir les relevés">
-      <div class="in">
-        <div class="ring"><svg viewBox="0 0 100 100"><circle class="tr" cx="50" cy="50" r="42" fill="none" stroke-width="9"/><circle class="br" id="ringBar" cx="50" cy="50" r="42" fill="none" stroke-width="9" stroke-linecap="round" stroke-dasharray="${ringC}" stroke-dashoffset="${ringC}" data-to="${ringC * (1 - (exp ? done / exp : 0))}"/></svg><div class="num"><div><b id="ringPct" data-to="${pct}">0</b><b class="pc">%</b><small>${done} / ${exp}</small></div></div></div>
-        <div class="meta"><span class="hm-kick">${ico("therm")}Relevé du ${slot}</span>
-          <b>${!exp ? "Ajoutez vos frigos" : pend.length ? `${homePlural(pend.length, "frigo")} à relever` : slot === "midi" ? "Bouclé pour ce midi" : "Bouclé pour aujourd'hui"}</b>
-          <span>${!exp ? "Pour démarrer les relevés" : pend.length ? `Prochain : ${esc(pend[0].name)}` : slot === "midi" ? "Prochain relevé ce soir" : "Tous les frigos sont signés"}</span>
-        </div>
-      </div>
-      ${exp ? `<div class="hm-frs">${frChips}</div>` : ""}
-      ${!exp ? `<button class="hm-cta-w" data-go="frigos">${ico("plus")}Ajouter un frigo</button>` : pend.length ? `<button class="hm-cta-w" data-act="homeFridge" data-id="${pend[0].id}"><span>Relever ${esc(pend[0].name)}</span>${ico("arrow")}</button>` : `<span class="hm-cta-w done">${ico("check")}Tout est signé</span>`}
+    const FR_MAX = 6; const frAll = S.fridges.slice(0, FR_MAX);
+    const frKind = (f) => { const k = typeof relTypeOf === "function" ? (relTypeOf(f) || {}).k : ""; return k === "congel" || f.max <= -10 ? "cg" : k === "cfp" || /chambre/i.test(f.name || "") ? "cf" : "st"; };
+    const nextId = pend[0] ? pend[0].id : null;
+    const drawn = frAll.map((f, i) => { const r = rsSlot.find((x) => x.fridgeId === f.id); const k = frKind(f); const st = r ? (r.ok === false ? "bad" : "ok") : "todo";
+      return `<button class="hm-dfr ${k} ${st} ${f.id === nextId ? "next" : ""}" style="--j:${i}" ${r ? `data-go="frigo" data-id="${f.id}"` : `data-act="homeFridge" data-id="${f.id}"`} aria-label="${esc(f.name)}${r ? ` : ${fmt(r.value)} °C` : " : à relever"}"><span class="bx"><span class="lcd">${r ? `${fmt(r.value)}°` : "--,-"}</span>${k === "cg" ? "" : `<span class="hd"></span>`}</span><span class="nm">${esc(f.name)}</span></button>`; }).join("") + (S.fridges.length > FR_MAX ? `<button class="hm-dfr plus" data-go="releve" aria-label="Tous les frigos"><span class="bx">+${S.fridges.length - FR_MAX}</span><span class="nm">Autres</span></button>` : "");
+    const hero = `<section class="hero hm-hero wall st" style="--i:1" data-go="releve" role="button" tabindex="0" aria-label="Ouvrir les relevés">
+      <div class="hm-ht"><span class="hm-kick">Relevé du ${slot}</span><span class="hm-cnt mono">${done} / ${exp}</span></div>
+      <div class="hm-big">${!exp ? "Ajoutez vos frigos" : pend.length ? `${homePlural(pend.length, "frigo")} à relever` : slot === "midi" ? "Bouclé pour ce midi" : "Tout est relevé"}</div>
+      ${exp ? `<div class="hm-kitchen"><div class="hm-drawn">${drawn}</div><i class="hm-floor"></i></div>` : ""}
+      ${!exp ? `<button class="hm-cta-w" data-go="frigos">${ico("plus")}Ajouter un frigo</button>` : pend.length ? `<button class="hm-cta-w" data-act="homeFridge" data-id="${pend[0].id}"><span>Relever ${esc(pend[0].name)}</span>${ico("arrow")}</button>` : `<span class="hm-cta-w done">${slot === "midi" ? "Prochain relevé ce soir" : "Tous les frigos sont signés"}</span>`}
     </section>`;
 
     const QA = [["releve", "therm", "Relevé", "c1", pend.length], ["reception", "truck", "Réception", "c2", homeRecLive() ? "•" : 0], ["scan", "scan", "Scanner", "c3", 0], ["menage", "spray", "Ménage", "c4", ch.due.length], ["stock", "list", "Inventaire", "c5", 0]];

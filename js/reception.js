@@ -172,11 +172,14 @@ function recProg(step) {
   const n = recState().lines.length; const live = step < 4;
   return `<div class="rec-prog ${step > 3 ? "all" : ""}" role="progressbar" aria-label="Étape ${Math.min(step, 3)} sur 3" aria-valuemin="1" aria-valuemax="3" aria-valuenow="${Math.min(step, 3)}">${["Fournisseur", "Produits", "Contrôle"].map((t, i) => {
     const s = i + 1; const c = s < step ? "done" : s === step ? "on" : "";
-    return `<button class="s ${c}" ${s < step && live ? `data-act="recGo" data-v="${s}"` : `tabindex="-1"`}><i></i><span>${s < step ? ico("check") : `<b>${s}</b>`}${t}${s === 2 && n ? `<em class="mono">${n}</em>` : ""}</span></button>`;
+    return `<button class="s ${c}" ${s < step && live ? `data-act="recGo" data-v="${s}"` : `tabindex="-1"`}><i></i><span>${s < step ? `<b class="ck">${ico("check")}</b>` : `<b>${s}</b>`}${t}${s === 2 && n ? `<em class="mono">${n}</em>` : ""}</span></button>`;
   }).join("")}</div>`;
 }
 function recAgo(ts) { const d = -daysUntil(dayKey(new Date(ts))); return d <= 0 ? "aujourd'hui" : d === 1 ? "hier" : d < 7 ? `il y a ${d} j` : `le ${shortDate(dayKey(new Date(ts)))}`; }
-const recAv = (name) => `<span class="av" style="background:${colorFor(recNorm(name))}">${esc(initials(name || "?"))}</span>`;
+/* supplier wells: round, pastel tint + coloured initials from the V2 palette (stable per name) */
+const REC_HUES = ["v", "s", "k", "t", "m"];
+const recHue = (name) => { let h = 0; for (const c of recNorm(name)) h = (h * 31 + c.charCodeAt(0)) >>> 0; return REC_HUES[h % REC_HUES.length]; };
+const recAv = (name) => `<span class="av h-${recHue(name)}">${esc(initials(name || "?"))}</span>`;
 
 /* step 1 — fournisseur */
 function recStep1() {
@@ -381,7 +384,7 @@ function recHistSheet(r) {
 /* ───────── in-place updates (no re-render while typing) ───────── */
 /* the big temperature must never clip ("-19,5" on a 320px phone): width in em of its own font-size, font-size shrinks with length and screen */
 const recTEm = (n) => n * 0.56 + 0.12;
-const recTStyle = (v) => { const n = String(v || "").length; return `width:${recTEm(Math.max(1, n))}em;font-size:min(58px,calc((100vw - 272px) / ${recTEm(Math.max(3, n)).toFixed(2)}))`; };
+const recTStyle = (v) => { const n = String(v || "").length; return `width:${recTEm(Math.max(1, n))}em;font-size:min(72px,calc((100vw - 262px) / ${recTEm(Math.max(3, n)).toFixed(2)}))`; };
 const recTFit = (inp) => { inp.style.cssText = recTStyle(inp.value); };
 function recPaintTemp() {
   const L = S.rec?.cur; if (!L) return; const st = recTempState(L);

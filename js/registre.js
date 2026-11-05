@@ -83,7 +83,7 @@ function regEntries() {
     const f = S.fridges.find((x) => x.id === r.fridgeId); const rg = regRange(f); const fx = regFixes(r); const last = fx[fx.length - 1];
     const slot = regSlot(r.slot); const fixTx = last ? `Corrigé${fx.length > 1 ? ` ${fx.length} fois` : ""} : ${last.tx}, par ${firstName(nameOf(last.uid))} le ${shortDate(regDay(last.at))} à ${hm(last.at)}${last.why ? ` (${last.why})` : ""}` : "";
     const ncTx = r.ok ? "" : `Hors seuil${rg ? ` (${rg})` : ""} · ${r.action ? `Action : ${r.action}` : "action corrective non renseignée"}`;
-    E.push({ id: "r" + r.id, at: r.at, kind: "temp", uid: r.uid,
+    E.push({ id: "r" + r.id, at: r.at, kind: "temp", uid: r.uid, photoUrl: regPic(r.photoId, r.photoUrl),
       what: `${regFrName(r)} · relevé du ${slot}`,
       detail: [r.ok ? (rg ? `Seuil ${rg}` : "") : ncTx, fixTx].filter(Boolean).join(" · "), miss: !r.ok && !r.action,
       val: num(r.value), valTx: `${regNum(num(r.value))} °C`, st: r.ok ? (fx.length ? "warn" : "ok") : "bad", stTx: r.ok ? (fx.length ? "Corrigé" : r.peak ? "Pic pendant le service" : "Conforme") : "Non conforme", nc: !r.ok, fixed: !!fx.length,
@@ -163,9 +163,10 @@ function regMatch(all, f) {
 }
 
 const regPill = (x) => (x.st ? `<span class="pill ${x.st}">${x.st === "bad" ? `<span class="dot"></span>` : x.fix || x.fixed ? ico("edit") : ""}${esc(x.stTx)}</span>` : "");
-const regKic = (k) => `<span class="rg-k" style="--k:${REG_K[k].c}">${ico(REG_K[k].ic)}</span>`;
+/* round icon well, one pastel per kind; an out-of-range entry shows the alert icon on tomato (see registre.css) */
+const regKic = (k, x) => `<span class="rg-k k-${k}" title="${REG_K[k].s}">${ico(x && x.nc && !x.cx ? "alert" : REG_K[k].ic)}</span>`;
 const regRowCls = (x) => (x.nc ? "nc" : x.fix || x.fixed ? "fx" : "") + (x.cx ? " cx" : "");
-const regThumb = (x) => (x.photoUrl ? `<a class="thumb" href="${esc(x.photoUrl)}" target="_blank" rel="noopener" aria-label="Voir la photo"><img src="${esc(x.photoUrl)}" alt="" loading="lazy"></a>` : "");
+const regThumb = (x) => (x.photoUrl ? `<a class="thumb rg-ph" href="${esc(x.photoUrl)}" target="_blank" rel="noopener" aria-label="Voir la photo" title="Voir la photo"><img src="${esc(x.photoUrl)}" alt="" loading="lazy"></a>` : "");
 const regVal = (x) => (x.kind === "temp" && x.valTx ? `${x.oldTx ? `<s class="mono">${esc(x.oldTx)}</s>` : ""}<b class="mono ${x.st === "bad" ? "bad" : ""}">${esc(x.valTx)}</b>` : "");
 const regDetail = (x) => (x.detail ? `<em${x.miss ? ` class="miss"` : ""}>${esc(x.detail)}</em>` : "");
 
@@ -178,9 +179,9 @@ function regListHtml(all) {
   const perDay = {}; rows.forEach((x) => (perDay[x.day] = (perDay[x.day] || 0) + 1));
   let tl = ""; let cur = null;
   rows.slice(0, N).forEach((x) => {
-    if (x.day !== cur) { if (cur) tl += `</div></section>`; cur = x.day; tl += `<section class="rg-day"><div class="rg-dh"><span>${esc(regDayLabel(x.day))}</span><em>${perDay[x.day]}</em></div><div class="glass rg-grp">`; }
+    if (x.day !== cur) { if (cur) tl += `</div></section>`; cur = x.day; tl += `<section class="rg-day"><div class="rg-dh"><span class="d">${esc(regDayLabel(x.day))}</span><em>${perDay[x.day]}</em></div><div class="glass rg-grp">`; }
     const v = regVal(x); const pill = x.kind === "temp" && x.st === "ok" ? "" : regPill(x);
-    tl += `<div class="rg-it ${regRowCls(x)}">${regKic(x.kind)}<div class="tx"><b>${esc(x.what)}</b>${regDetail(x)}<span class="rg-who">${avatar(x.uid, true)}${esc(firstName(x.who) || x.who)} · <span class="mono">${hm(x.at)}</span></span></div>${v || pill || x.photoUrl ? `<div class="rg-v">${v}${pill}${regThumb(x)}</div>` : ""}</div>`;
+    tl += `<div class="rg-it ${regRowCls(x)}">${regKic(x.kind, x)}<div class="tx"><b>${esc(x.what)}</b>${regDetail(x)}<span class="rg-who">${avatar(x.uid, true)}${esc(firstName(x.who) || x.who)}<i>·</i><span class="mono">${hm(x.at)}</span></span></div>${v || pill || x.photoUrl ? `<div class="rg-v">${v}${pill}${regThumb(x)}</div>` : ""}</div>`;
   });
   if (cur) tl += `</div></section>`;
   /* desktop: sortable table */
@@ -191,35 +192,70 @@ function regListHtml(all) {
   const th = (k, t, cls = "") => `<th class="${cls}" aria-sort="${so.k === k ? (so.d > 0 ? "ascending" : "descending") : "none"}"><button data-act="regSort" data-v="${k}" class="${so.k === k ? "on" : ""}">${t}${so.k === k ? ico("down", so.d > 0 ? "up" : "") : ico("sortud", "dim")}</button></th>`;
   let tb = ""; let d0 = null;
   sorted.forEach((x) => {
-    if (so.k === "at" && x.day !== d0) { d0 = x.day; tb += `<tr class="rg-tday"><td colspan="7"><span>${esc(regDayLabel(x.day))}</span><em>${perDay[x.day]}</em></td></tr>`; }
-    tb += `<tr class="${regRowCls(x)}"><td class="mono nw">${so.k === "at" ? "" : `${shortDate(x.day)} `}${hm(x.at)}</td><td class="nw"><span class="rg-tk">${regKic(x.kind)}${REG_K[x.kind].s}</span></td><td class="rg-what"><b>${esc(x.what)}</b>${regDetail(x)}</td><td class="nw r rg-tv">${x.kind === "temp" ? regVal(x) : x.kind === "rec" ? `<span class="mono">${esc(x.valTx)}</span>` : ""}</td><td class="nw">${regPill(x)}</td><td class="nw"><span class="rg-who">${avatar(x.uid, true)}${esc(x.who)}</span></td><td class="nw ph">${regThumb(x)}</td></tr>`;
+    if (so.k === "at" && x.day !== d0) { d0 = x.day; tb += `<tr class="rg-tday"><td colspan="7"><span class="d">${esc(regDayLabel(x.day))}</span><em>${perDay[x.day]}</em></td></tr>`; }
+    tb += `<tr class="${regRowCls(x)}"><td class="mono nw">${so.k === "at" ? "" : `${shortDate(x.day)} `}${hm(x.at)}</td><td class="nw rg-tkc">${regKic(x.kind, x)}</td><td class="rg-what"><b>${esc(x.what)}</b>${regDetail(x)}</td><td class="nw r rg-tv">${x.kind === "temp" ? regVal(x) : x.kind === "rec" ? `<span class="mono">${esc(x.valTx)}</span>` : ""}</td><td class="nw">${regPill(x)}</td><td class="nw"><span class="rg-who" title="${esc(x.who)}">${avatar(x.uid, true)}${esc(firstName(x.who) || x.who)}</span></td><td class="nw ph">${regThumb(x)}</td></tr>`;
   });
   const more = rows.length > N ? `<button class="btn soft block rg-more" data-act="regMore">Afficher plus · encore ${rows.length - N}</button>` : "";
-  return `<div class="rg-tl">${tl}</div><div class="glass rg-tw"><table class="rg-tbl"><thead><tr>${th("at", "Date")}${th("kind", "Type")}${th("what", "Détail")}${th("val", "Valeur", "r")}${th("st", "Statut")}${th("who", "Par")}<th aria-label="Photo"></th></tr></thead><tbody>${tb}</tbody></table></div>${more}`;
+  return `<div class="rg-tl">${tl}</div><div class="glass rg-tw"><table class="rg-tbl"><thead><tr>${th("at", "Quand")}${th("kind", "Type")}${th("what", "Quoi")}${th("val", "Valeur", "r")}${th("st", "Statut")}${th("who", "Par")}<th aria-label="Photo"></th></tr></thead><tbody>${tb}</tbody></table></div>${more}`;
 }
 
 function regChips(all) { const f = S.regFilter || "all"; return REG_F.map(([k, t]) => `<button class="chip ${f === k ? "on" : ""}${k === "nc" ? " ncchip" : k === "corr" ? " fxchip" : ""}" data-act="regF" data-v="${k}" aria-pressed="${f === k}">${t}<span class="rg-n">${regMatch(all, k).length}</span></button>`).join(""); }
 function regCountTx(all) { const n = regFiltered(all).length; return `${n} entrée${n > 1 ? "s" : ""}`; }
 function regPaint() { const all = regEntries(); const el = $("#regList"); if (el) el.innerHTML = regListHtml(all); const c = $("#regCount"); if (c) c.textContent = regCountTx(all); const ch = $("#regChips"); if (ch) ch.innerHTML = regChips(all); }
 
+/* 30-day hero: one bar per day, height = share of the expected readings done, saffron when a reading was out of range or corrected */
+const regDShort = (k) => { const d = parseDay(k); try { return d.toLocaleDateString("fr-FR", { day: "numeric", month: "short" }); } catch (e) { return shortDate(k); } };
+function regHeroHtml(all) {
+  const today = dayKey(); const exp = Math.max(1, S.fridges.length * 2); const start = regStartDay();
+  let kept = 0, span = 0;
+  const bars = Array.from({ length: 30 }, (_, i) => {
+    const k = addDays(today, i - 29); const rs = readingsFor(k); const n = new Set(rs.map((r) => r.fridgeId + r.slot)).size;
+    const bad = rs.some((r) => !r.ok); const fixed = rs.some((r) => Array.isArray(r.prev) && r.prev.length);
+    if (k >= start) { span++; if (n) kept++; }
+    const h = n ? Math.max(18, Math.min(100, Math.round((n / exp) * 100))) : 6;
+    const cls = !n ? "z" : bad || fixed ? "s" : k === today ? "t" : "";
+    return `<i class="${cls}" style="--h:${h}%;--j:${i}" title="${shortDate(k)} · ${n}/${exp} relevés${bad ? " · hors seuil" : ""}${fixed ? " · corrigé" : ""}"></i>`;
+  }).join("");
+  const in30 = (x) => daysUntil(x.day) >= -29;
+  const nc30 = all.filter((x) => x.nc && x.kind === "temp" && !x.cx && in30(x)).length;
+  const fx30 = all.filter((x) => x.fix && !x.cx && x.kind === "temp" && in30(x)).length;
+  const rs30 = S.readings.filter((r) => daysUntil(r.day) >= -29);
+  const conf = rs30.length ? Math.round((rs30.filter((r) => r.ok).length / rs30.length) * 1000) / 10 : null;
+  span = Math.max(1, Math.min(30, span));
+  const head = !rs30.length ? "Aucun relevé ces 30 jours" : `${kept === span ? kept : `${kept} sur ${span}`} jour${kept > 1 ? "s" : ""} tenu${kept > 1 ? "s" : ""}`;
+  const ecart = [nc30 ? `${nc30} hors seuil` : "", fx30 ? `${fx30} correction${fx30 > 1 ? "s" : ""}` : ""].filter(Boolean).join(", ");
+  return `<div class="rg-hero wall st" style="--i:1">
+    <div class="rg-htx"><span class="rg-kick">Registre HACCP · 30 derniers jours</span><b class="rg-big">${esc(head)}${rs30.length ? `,<br>${esc(ecart || "aucun écart")}` : ""}</b></div>
+    <div class="rg-chart"><div class="rg-bars" aria-hidden="true">${bars}</div><div class="rg-ax"><span>${esc(regDShort(addDays(today, -29)))}</span><span>${esc(regDShort(addDays(today, -15)))}</span><span>Aujourd'hui</span></div></div>
+    <div class="rg-hfoot"><span class="rg-conf ${regConfSt(conf, nc30)}">${conf != null ? `<b>${fmt(conf, 1)} %</b> conformes` : "Pas encore de relevé"}</span>${rs30.length ? `<span class="rg-lg"><i></i>hors seuil ou corrigé</span>` : ""}</div>
+  </div>`;
+}
+function regRailHtml(all) {
+  const in30 = (ts) => ts && daysUntil(regDay(ts)) >= -29;
+  const rs30 = S.readings.filter((r) => daysUntil(r.day) >= -29);
+  const fx30 = all.filter((x) => x.fix && !x.cx && daysUntil(x.day) >= -29).length;
+  const tile = (n, t, cls = "") => `<div class="rg-tile ${cls}"><b class="mono">${n}</b><span>${t}</span></div>`;
+  const by = {}; rs30.forEach((r) => { if (r.uid) by[r.uid] = (by[r.uid] || 0) + 1; });
+  const top = Object.entries(by).sort((a, b) => b[1] - a[1]).slice(0, 4);
+  return `<div class="rg-tiles st" style="--i:3">${tile(rs30.length, `relevé${rs30.length > 1 ? "s" : ""}`, "acc")}${tile(fx30, `correction${fx30 > 1 ? "s" : ""}`, fx30 ? "warn" : "")}${tile(S.receptions.filter((x) => in30(x.at)).length, "réceptions")}${tile(S.choreLogs.filter((x) => in30(x.at)).length, "ménages")}</div>
+    ${top.length ? `<div class="glass pad rg-whos st" style="--i:4"><b class="h3">Qui a relevé</b>${top.map(([u, n]) => `<div class="rg-wr">${avatar(u)}<span>${esc(nameOf(u))}</span><em class="mono">${n}</em></div>`).join("")}</div>` : ""}`;
+}
+
 VIEWS.registre = {
   render() {
-    const all = regEntries(); const f = S.regFilter || "all";
-    const exp = Math.max(1, S.fridges.length * 2);
-    const cells = Array.from({ length: 30 }, (_, i) => { const k = addDays(dayKey(), i - 29); const rs = readingsFor(k); const n = new Set(rs.map((r) => r.fridgeId + r.slot)).size; const bad = rs.some((r) => !r.ok); const cls = !n ? "" : bad ? "r" : n >= exp ? "g" : "y"; return `<i class="${cls}" title="${shortDate(k)} · ${n}/${exp} relevés${bad ? " · hors seuil" : ""}"></i>`; }).join("");
-    const rs30 = S.readings.filter((r) => daysUntil(r.day) >= -29);
-    const conf = rs30.length ? Math.round((rs30.filter((r) => r.ok).length / rs30.length) * 1000) / 10 : null;
-    const nc30 = all.filter((x) => x.nc && x.kind === "temp" && !x.cx && daysUntil(x.day) >= -29).length;
+    const all = regEntries();
     return `<div class="inner rg">${topBar("Registre HACCP", { right: `<button class="btn soft sm" data-go="regReport">${ico("printer")}Rapport</button>` })}
-      <div class="rg-top">
-        <div class="glass pad st rg-heat" style="--i:1"><div class="row"><span class="lbl">Températures · 30 jours</span><span class="pill ${regConfSt(conf, nc30)}">${conf != null ? `${fmt(conf, 1)} % conformes` : "aucun relevé"}</span></div><div class="heat" style="margin-top:12px">${cells}</div><div class="rg-leg"><span><i class="g"></i>complet</span><span><i class="y"></i>incomplet</span><span><i class="r"></i>hors seuil</span><span class="rg-corr${nc30 ? " on" : ""}">${nc30 ? `${nc30} relevé${nc30 > 1 ? "s" : ""} hors seuil en 30 j` : "Aucun relevé hors seuil en 30 j"}</span></div></div>
-        <button class="glass pad st rg-cta" style="--i:2" data-go="regReport"><span class="ic">${ico("file")}</span><span class="tx"><b>Rapport pour contrôle sanitaire</b><em>Températures, réceptions, traçabilité, ménage, allergènes et contrôles obligatoires. À imprimer ou à exporter.</em></span>${ico("chev")}</button>
-      </div>
-      <div class="rg-bar st" style="--i:3"><label class="rg-q">${ico("search")}<input class="input" id="regQ" type="search" enterkeyhint="search" autocomplete="off" placeholder="Produit, frigo, personne…" value="${esc(S.ui.regQ || "")}" aria-label="Rechercher dans le registre"></label>
-        <div class="chips" id="regChips">${regChips(all)}</div></div>
-      <div class="rg-meta st" style="--i:4"><span class="sub" id="regCount">${regCountTx(all)}</span><span class="sub">Rien ne peut être effacé du registre</span></div>
-      <div id="regList" class="st" style="--i:5">${regListHtml(all)}</div>
-      <div class="glass pad st rg-photo" style="--i:6"><span class="ic">${ico("image")}</span><div class="tx"><b>Photos d'étiquettes et de livraisons</b><em>Les photos de plus de 6 mois sont supprimées. Les relevés et les traces écrites restent dans le registre.</em></div><button class="btn soft sm" data-act="purge">${ico("trash")}Vérifier</button></div>
+      <div class="rg-lay"><div class="rg-main">
+        ${regHeroHtml(all)}
+        <div class="rg-bar st" style="--i:3"><label class="rg-q">${ico("search")}<input class="input" id="regQ" type="search" enterkeyhint="search" autocomplete="off" placeholder="Produit, frigo, personne…" value="${esc(S.ui.regQ || "")}" aria-label="Rechercher dans le registre"></label>
+          <div class="chips" id="regChips">${regChips(all)}</div></div>
+        <div class="rg-meta st" style="--i:4"><span class="sub" id="regCount">${regCountTx(all)}</span><span class="sub">Rien ne peut être effacé du registre</span></div>
+        <div id="regList" class="st" style="--i:5">${regListHtml(all)}</div>
+        <div class="glass pad st rg-photo" style="--i:6"><span class="ic">${ico("image")}</span><div class="tx"><b>Photos de plus de 6 mois</b><em>Elles sont supprimées. Les relevés et les traces écrites restent.</em></div><button class="btn soft sm" data-act="purge">${ico("trash")}Vérifier</button></div>
+      </div><aside class="rg-rail">
+        <button class="rg-cta st" style="--i:2" data-go="regReport"><span class="rg-cic">${ico("file")}</span><span class="tx"><span class="rg-ck">Contrôle sanitaire</span><b>Rapport pour le contrôle sanitaire</b><em>Tout le HACCP en un PDF, prêt à imprimer.</em></span><span class="rg-cgo">${ico("printer")}Préparer le PDF</span>${ico("chev")}</button>
+        ${regRailHtml(all)}
+      </aside></div>
     </div>`;
   },
   after(v) {
@@ -381,8 +417,14 @@ function regReportHtml(P) {
     return kpi("Contrôles obligatoires", `${R.length - late - unk} / ${R.length}`, `à jour · ${late} en retard${unk ? ` · ${unk} sans date` : ""}`, late ? "bad" : unk ? "warn" : ""); })();
   const tObl = regOblHtml(P);
   const tAlg = regAlgHtml();
+  /* photos taken with readings and deliveries over the period (optional photo on a reading): a small annex, at most 24 */
+  const pics = [
+    ...D.rd.map((r) => ({ at: r.at, url: regPic(r.photoId, r.photoUrl), t: `${regFrName(r)} · ${regNum(num(r.value))} °C`, nc: !r.ok, uid: r.uid })),
+    ...D.lines.map(({ rc, L }) => ({ at: rc.at, url: regPic(L.photoId, L.photoUrl), t: `${rc.supplier || "Réception"} · ${L.name}`, nc: !!L.refused, uid: rc.uid })),
+  ].filter((x) => x.url).sort((a, b) => a.at - b.at);
+  const tPics = pics.length ? `<section class="rp-keep"><h3>Photos jointes aux enregistrements</h3><p class="rp-note">${pics.length > 24 ? `Les 24 dernières sur ${pics.length}. ` : ""}Photo prise au moment du relevé ou de la réception, conservée 6 mois.</p><div class="rp-pics">${pics.slice(-24).map((x) => `<figure class="${x.nc ? "nc" : ""}"><img src="${esc(x.url)}" alt="" loading="lazy"><figcaption><b>${esc(x.t)}</b>${shortDate(regDay(x.at))} ${hm(x.at)} · ${esc(firstName(nameOf(x.uid)))}</figcaption></figure>`).join("")}</div></section>` : "";
   return `<article class="rp-paper" id="rpPaper">
-    <header class="rp-head"><div class="rp-brand"><span class="rp-mk">${logoMark()}</span><div><b>${esc(S.resto?.name || "Restaurant")}</b><em>Registre sanitaire · plan de maîtrise sanitaire (HACCP)</em></div></div>
+    <header class="rp-head"><div class="rp-brand"><span class="rp-mk">${typeof appIcon === "function" ? appIcon(36) : logoMark()}</span><div><b>${esc(S.resto?.name || "Restaurant")}</b><em>Registre sanitaire · plan de maîtrise sanitaire (HACCP)</em></div></div>
       <div class="rp-per"><span>Période contrôlée</span><b>du ${regFull(P.from)} au ${regFull(P.to)}</b><em>${D.clipped ? `registre tenu depuis le ${regFull(D.start)}` : `${D.days.length} jour${D.days.length > 1 ? "s" : ""}`}</em></div></header>
     <h1>Rapport pour contrôle sanitaire</h1>
     <div class="rp-kpis${oblK ? " k5" : ""}">${kpi("Relevés de température", `${D.done} / ${D.exp}`, D.exp ? `${Math.round((D.done / D.exp) * 100)} % des relevés attendus` : "–", D.exp && D.done < D.exp ? "warn" : "")}${kpi("Conformité températures", D.conf != null ? `${fmt(D.conf, 1)} %` : "–", `${D.bad.length} hors seuil · ${D.fixes.length} correction${D.fixes.length > 1 ? "s" : ""}`, { ok: "", neu: "", warn: "warn", bad: "bad" }[regConfSt(D.conf, D.bad.length)])}${kpi("Réceptions", `${D.recs.length}`, `${D.lines.length} produit${D.lines.length > 1 ? "s" : ""} · ${D.refused} refus · ${D.reserves} réserve${D.reserves > 1 ? "s" : ""}`, D.refused ? "warn" : "")}${kpi("Plan de nettoyage", D.cRate != null ? `${D.cRate} %` : "–", D.cExp ? `${D.cDone} / ${D.cExp} tâches prévues réalisées` : "aucune tâche encore due", D.cRate != null && D.cRate < 80 ? "warn" : "")}${oblK}</div>
@@ -392,7 +434,7 @@ function regReportHtml(P) {
     <section><h2><span>2</span>Réceptions des marchandises</h2><p class="rp-note">Contrôle à réception : température, DLC, numéro de lot. Un produit refusé repart avec le livreur et n'entre pas en stock.</p>${recTable}</section>
     <section class="${D.opened.length <= 18 ? "rp-keep" : ""}"><h2><span>3</span>Traçabilité des produits ouverts</h2><p class="rp-note">Produits entamés pendant la période, avec la date limite après ouverture, et produits jetés. Une action annulée reste visible, barrée.</p>${tLot}</section>
     <section class="${D.chores.length <= 18 ? "rp-keep" : ""}"><h2><span>4</span>Plan de nettoyage et de désinfection</h2><p class="rp-note">Tâches prévues et réalisées sur la période, comptées à partir du jour où chaque tâche a été ajoutée au plan. Une tâche hebdomadaire ou mensuelle compte une fois par période, dès qu'elle est faite ou que sa période est terminée. En dessous de 80 %, la ligne est signalée.</p>${tClean}${tNotice}</section>
-    ${tObl}${tAlg}
+    ${tObl}${tAlg}${tPics}
     <footer class="rp-foot"><div>Document généré le ${regFull(dayKey())} à ${hm(now)} par ${esc(nameOf(S.me.id))} avec Growth Gusto. Chaque enregistrement est daté et attribué à la personne connectée au moment de la saisie.</div><div class="rp-sign"><span>Visa du responsable</span><i></i></div></footer>
   </article>`;
 }

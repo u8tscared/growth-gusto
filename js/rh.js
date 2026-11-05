@@ -4,14 +4,15 @@
 
 /* ───────────── constants + small helpers ───────────── */
 const RH = { kiosk: false, pin: null, idleT: null, wake: null, doneT: null, undo: null };
-const RH_POSTS = { cuisine: { t: "Cuisine", c: "#4A1FE6" }, salle: { t: "Salle", c: "#1F7AE0" }, plonge: { t: "Plonge", c: "#0E8C9E" }, bar: { t: "Bar", c: "#E0752F" } };
+// c = solid swatch (legend, print, image), bg / ink = the pastel shift block and its readable text (design V2)
+const RH_POSTS = { cuisine: { t: "Cuisine", c: "#5B2BFF", bg: "#EFE9FF", ink: "#3A10D8" }, salle: { t: "Salle", c: "#6FA3F5", bg: "#E6F0FF", ink: "#2F5FBF" }, plonge: { t: "Plonge", c: "#F6B93B", bg: "#FFF3D6", ink: "#7A5A1A" }, bar: { t: "Bar", c: "#EF5A3C", bg: "#FFE9DE", ink: "#C8432A" } };
 const RH_CONTRACTS = { CDI: "CDI", CDD: "CDD", extra: "Extra", apprenti: "Apprenti" };
 const RH_ROLES = ["Chef de cuisine", "Second", "Commis", "Pâtissier", "Plongeur", "Responsable de salle", "Serveur", "Barman", "Apprenti", "Gérant"];
 const RH_KIND = {
-  in: { t: "Arrivée", ic: "into", c: "#078A5E", msg: (n) => `Bon service, ${n} !` },
-  breakStart: { t: "Pause", ic: "rhcoffee", c: "#B86C00", msg: () => "Bonne pause !" },
-  breakEnd: { t: "Fin de pause", ic: "rhplay", c: "#4A1FE6", msg: () => "C'est reparti !" },
-  out: { t: "Départ", ic: "out", c: "#0E1330", msg: (n) => `Merci ${n}, à bientôt !` },
+  in: { t: "Arrivée", ic: "into", c: "#5B2BFF", msg: (n) => `Bon service, ${n} !` },
+  breakStart: { t: "Pause", ic: "rhcoffee", c: "#D99A1E", msg: () => "Bonne pause !" },
+  breakEnd: { t: "Fin de pause", ic: "rhplay", c: "#5B2BFF", msg: () => "C'est reparti !" },
+  out: { t: "Départ", ic: "out", c: "#1B1530", msg: (n) => `Merci ${n}, à bientôt !` },
 };
 const RH_DSHORT = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
 const RH_DLONG = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"];
@@ -320,7 +321,7 @@ const RH_WIDE = window.matchMedia("(min-width:760px)");
 try { RH_WIDE.addEventListener("change", () => { if (S.ready && S.route === "planning") rerender(); }); } catch (e) {}
 function rhShiftChip(s, drag) {
   const P = RH_POSTS[s.post] || null;
-  return `<button class="rh-sh" style="--pc:${P ? P.c : "#5A6386"}" data-act="rhShift" data-id="${s.id}"${drag ? ' draggable="true"' : ""} title="${esc(`${s.start}–${s.end}${s.breakMin ? `, pause ${s.breakMin} min` : ""}${P ? ` · ${P.t}` : ""}${s.note ? ` · ${s.note}` : ""}`)}"><b class="mono">${esc(s.start)}–${esc(s.end)}</b><em>${P ? P.t : "Poste ?"}${s.breakMin ? ` · p. ${s.breakMin}′` : ""}${s.note ? ` · ${esc(s.note)}` : ""}</em></button>`;
+  return `<button class="rh-sh${P ? "" : " nopost"}" style="--pc:${P ? P.c : "#B8AC98"};--pb:${P ? P.bg : "#F4EDE0"};--pi:${P ? P.ink : "#615B74"}" data-act="rhShift" data-id="${s.id}"${drag ? ' draggable="true"' : ""} title="${esc(`${s.start}–${s.end}${s.breakMin ? `, pause ${s.breakMin} min` : ""}${P ? ` · ${P.t}` : ""}${s.note ? ` · ${s.note}` : ""}`)}"><b class="mono">${esc(s.start)}–${esc(s.end)}</b><em>${P ? P.t : "Poste ?"}${s.breakMin ? ` · p. ${s.breakMin}′` : ""}${s.note ? ` · ${esc(s.note)}` : ""}</em></button>`;
 }
 function rhPlanStats(mon) {
   const days = rhWeekDays(mon); const ppl = rhPeople(); const boss = rhIsBoss();
@@ -425,7 +426,7 @@ function rhShiftSheet() {
     <div class="grid2"><label class="field"><span>Début</span><input class="input mono" type="time" id="rhFs" value="${esc(F.start)}" step="900"></label><label class="field"><span>Fin</span><input class="input mono" type="time" id="rhFe" value="${esc(F.end)}" step="900"></label></div>
     ${F.split ? `<div class="grid2"><label class="field"><span>Reprise le soir</span><input class="input mono" type="time" id="rhFs2" value="${esc(F.split[0])}"></label><label class="field"><span>Fin du soir</span><input class="input mono" type="time" id="rhFe2" value="${esc(F.split[1])}"></label></div>` : ""}
     <div class="field"><span>Pause</span><div class="rh-opts">${[0, 15, 30, 45, 60].map((m) => `<button class="${+F.breakMin === m ? "on" : ""}" data-act="rhFBreak" data-v="${m}">${m ? `${m} min` : "Aucune"}</button>`).join("")}</div></div>
-    <div class="field"><span>Poste</span><div class="rh-posts">${Object.entries(RH_POSTS).map(([k, v]) => `<button class="${F.post === k ? "on" : ""}" style="--pc:${v.c}" data-act="rhFPost" data-v="${k}"><i></i>${v.t}</button>`).join("")}</div></div>
+    <div class="field"><span>Poste</span><div class="rh-posts">${Object.entries(RH_POSTS).map(([k, v]) => `<button class="${F.post === k ? "on" : ""}" style="--pc:${v.c};--pb:${v.bg};--pi:${v.ink}" data-act="rhFPost" data-v="${k}"><i></i>${v.t}</button>`).join("")}</div></div>
     <label class="field"><span>Note <em class="rh-opt">facultatif</em></span><input class="input" id="rhFn" maxlength="60" value="${esc(F.note || "")}" placeholder="Ex. livraison, mise en place, fermeture"></label>
     <div class="rh-sum" id="rhFsum">${rhFSum()}</div>
     ${ex ? `<div class="rh-dup"><span class="lbl">Dupliquer aussi sur</span><div class="rh-dupd">${rhWeekDays(mon).map((d, i) => `<button class="chip ${(F.dup || []).includes(d) ? "on" : ""}" data-act="rhFDup" data-v="${d}" ${d === F.day ? "disabled" : ""}>${RH_DSHORT[i]} ${parseDay(d).getDate()}</button>`).join("")}</div></div>` : ""}
@@ -451,19 +452,19 @@ function rhPlanCanvas(mon) {
   const days = rhWeekDays(mon); const ppl = rhPeople(); const W = 1800, top = 150, rowH = 100, x0 = 290, colW = (W - x0 - 150) / 7;
   const rows = ppl.map((p) => ({ p, d: days.map((d) => rhShiftsDay(p.id, d)) })); const H = top + 56 + rows.length * rowH + 90;
   const c = document.createElement("canvas"); c.width = W; c.height = H; const g = c.getContext("2d");
-  const F = (w, s) => `${w} ${s}px Manrope, system-ui, sans-serif`; const M = (s) => `600 ${s}px "JetBrains Mono", ui-monospace, monospace`;
-  g.fillStyle = "#ECEFFB"; g.fillRect(0, 0, W, H);
-  const gr = g.createLinearGradient(0, 0, W, 0); gr.addColorStop(0, "#7A4DFF"); gr.addColorStop(1, "#4A1FE6"); g.fillStyle = gr; g.fillRect(0, 0, W, 112);
+  const F = (w, s) => `${Math.min(w, 700)} ${s}px "Instrument Sans", system-ui, sans-serif`; const M = (s) => `600 ${s}px "JetBrains Mono", ui-monospace, monospace`;
+  g.fillStyle = "#FBF6EC"; g.fillRect(0, 0, W, H);
+  g.fillStyle = "#4C1FEA"; g.fillRect(0, 0, W, 112);
   g.fillStyle = "#fff"; g.font = F(800, 44); g.fillText(`Planning · semaine du ${rhWeekLbl(mon)}`, 40, 64); g.font = F(600, 22); g.globalAlpha = 0.85; g.fillText(S.resto?.name || "", 40, 96); g.globalAlpha = 1;
   g.font = F(800, 22); g.fillStyle = "#5A6386"; days.forEach((d, i) => g.fillText(`${RH_DSHORT[i]} ${parseDay(d).getDate()}`, x0 + i * colW + 12, top + 28)); g.fillText("Total", W - 135, top + 28);
   rows.forEach((r, k) => {
     const y = top + 50 + k * rowH; g.fillStyle = k % 2 ? "rgba(255,255,255,.6)" : "#fff"; g.fillRect(20, y, W - 40, rowH - 8);
     g.fillStyle = r.p.color; g.beginPath(); g.arc(62, y + rowH / 2 - 4, 24, 0, 7); g.fill(); g.fillStyle = "#fff"; g.font = F(800, 18); g.textAlign = "center"; g.fillText(initials(r.p.name), 62, y + rowH / 2 + 2); g.textAlign = "left";
-    g.fillStyle = "#0E1330"; g.font = F(800, 24); g.fillText(rhFirst(r.p), 100, y + rowH / 2 + 4);
+    g.fillStyle = "#1B1530"; g.font = F(800, 24); g.fillText(rhFirst(r.p), 100, y + rowH / 2 + 4);
     let tot = 0;
-    r.d.forEach((l, i) => l.slice(0, 2).forEach((s, j) => { tot += rhShiftMin(s); const x = x0 + i * colW + 6, yy = y + 8 + j * 42, w = colW - 12, col = RH_POSTS[s.post]?.c || "#5A6386"; g.fillStyle = col + "22"; g.fillRect(x, yy, w, 36); g.fillStyle = col; g.fillRect(x, yy, 5, 36); g.fillStyle = "#0E1330"; g.font = M(19); g.fillText(`${s.start}-${s.end}`, x + 13, yy + 25); }));
+    r.d.forEach((l, i) => l.slice(0, 2).forEach((s, j) => { tot += rhShiftMin(s); const x = x0 + i * colW + 6, yy = y + 8 + j * 42, w = colW - 12, col = RH_POSTS[s.post]?.c || "#5A6386"; g.fillStyle = RH_POSTS[s.post]?.bg || "#F4EDE0"; g.fillRect(x, yy, w, 36); g.fillStyle = col; g.fillRect(x, yy, 5, 36); g.fillStyle = "#1B1530"; g.font = M(19); g.fillText(`${s.start}-${s.end}`, x + 13, yy + 25); }));
     r.d.forEach((l) => l.slice(2).forEach((s) => (tot += rhShiftMin(s))));
-    g.fillStyle = "#0E1330"; g.font = M(24); g.fillText(rhHh(tot), W - 135, y + rowH / 2 + 4);
+    g.fillStyle = "#1B1530"; g.font = M(24); g.fillText(rhHh(tot), W - 135, y + rowH / 2 + 4);
   });
   let lx = 40; g.font = F(700, 18); Object.values(RH_POSTS).forEach((p) => { g.fillStyle = p.c; g.fillRect(lx, H - 50, 18, 18); g.fillStyle = "#5A6386"; g.fillText(p.t, lx + 26, H - 35); lx += 150; });
   g.fillText("Growth Gusto", W - 175, H - 35);
@@ -522,7 +523,7 @@ function rhEmpSheet() {
     <div class="rh-act-hd"><span id="rhEava">${rhAva({ name: F.name || "?", color: F.color }, 60)}</span><div><div class="h2">${F.id && !F._new ? "Fiche employé" : F._virtual ? "Compléter la fiche" : "Nouvel employé"}</div><div class="sub">${F.memberId ? "Compte lié : même code pour pointer" : "Pointe avec un code à 4 chiffres"}</div></div></div>
     <label class="field"><span>Prénom et nom</span><input class="input" id="rhEn" value="${esc(F.name || "")}" maxlength="40" placeholder="Ex. Léa Martin" autocomplete="off"></label>
     <label class="field"><span>Poste</span><input class="input" id="rhEr" value="${esc(F.role || "")}" list="rhRoles" maxlength="40" placeholder="Ex. Commis de cuisine"><datalist id="rhRoles">${RH_ROLES.map((r) => `<option value="${esc(r)}">`).join("")}</datalist></label>
-    <div class="field"><span>Poste habituel au planning</span><div class="rh-posts">${Object.entries(RH_POSTS).map(([k, v]) => `<button class="${F.post === k ? "on" : ""}" style="--pc:${v.c}" data-act="rhEPost" data-v="${k}"><i></i>${v.t}</button>`).join("")}</div></div>
+    <div class="field"><span>Poste habituel au planning</span><div class="rh-posts">${Object.entries(RH_POSTS).map(([k, v]) => `<button class="${F.post === k ? "on" : ""}" style="--pc:${v.c};--pb:${v.bg};--pi:${v.ink}" data-act="rhEPost" data-v="${k}"><i></i>${v.t}</button>`).join("")}</div></div>
     <div class="field"><span>Contrat</span><div class="rh-opts">${Object.entries(RH_CONTRACTS).map(([k, v]) => `<button class="${F.contract === k ? "on" : ""}" data-act="rhEContract" data-v="${k}">${v}</button>`).join("")}</div></div>
     <div class="grid2"><label class="field"><span>Heures / semaine</span><input class="input mono" id="rhEh" inputmode="decimal" value="${esc(String(F.weeklyHours ?? 35).replace(".", ","))}"></label>
       <div class="field"><span>Couleur</span><div class="rh-cols">${PALETTE.map((c) => `<button class="${F.color === c ? "on" : ""}" style="background:${c}" data-act="rhEColor" data-v="${c}" aria-label="Couleur ${c}"></button>`).join("")}</div></div></div>
