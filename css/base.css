@@ -644,3 +644,8 @@ body{font-feature-settings:"tnum","ss01","cv11";font-variant-numeric:tabular-num
 
 /* diagnostics overlay (?debug=1, ?debug=0 to stop): live layout numbers for a screen recording */
 .ggdbg{position:absolute;z-index:9999;left:6px;top:calc(var(--sat,0px) + 40px);pointer-events:none;font:600 10px/1.35 ui-monospace,Menlo,monospace;color:#0f0;background:rgba(0,0,0,.78);padding:5px 7px;border-radius:8px;white-space:pre;max-width:60vw}
+
+/* the restaurant's logo tile (restoMark() in js/core.js): sidebar, home, Réglages, établissements, documents */
+.rlogo{--s:28px;width:var(--s);height:var(--s);flex:none;border-radius:calc(var(--s) * .3);overflow:hidden;display:inline-grid;place-items:center;background:#fff;box-shadow:inset 0 0 0 1px rgba(27,21,48,.1);vertical-align:middle;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.rlogo img{width:100%;height:100%;object-fit:contain;display:block}
+.rlogo.ini{background:#F6B93B;color:#1B1530;font-weight:800;font-size:calc(var(--s) * .38);letter-spacing:-.02em;box-shadow:0 2px 0 #D99A1E}

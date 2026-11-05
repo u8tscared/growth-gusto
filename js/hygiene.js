@@ -85,8 +85,8 @@ function hyAskNotify() { try { if ("Notification" in window && Notification.perm
 
 /* ═════════════════════ 1 · Refroidissement & remise en température ═════════════════════ */
 const HY_K = {
-  refroid: { t: "Refroidissement", verb: "Refroidir", lim: 120 * 6e4, remind: 105 * 6e4, ok: (t) => t <= 10, goal: "10 °C", rule: "63 °C → 10 °C en moins de 2 h", ic: "snow", tone: "sky", t0min: 63 },
-  remise: { t: "Remise en température", verb: "Réchauffer", lim: 60 * 6e4, remind: 45 * 6e4, ok: (t) => t >= 63, goal: "63 °C", rule: "Jusqu'à 63 °C à cœur en moins d'1 h", ic: "hygFlame", tone: "tomato" },
+  refroid: { t: "Refroidissement", verb: "Refroidir", lim: 120 * 6e4, remind: 105 * 6e4, ok: (t) => t <= 10, goal: "10 °C", rule: "De +63 °C à moins de +10 °C à cœur en moins de 2 h", ic: "snow", tone: "sky", t0min: 63 },
+  remise: { t: "Remise en température", verb: "Réchauffer", lim: 60 * 6e4, remind: 45 * 6e4, ok: (t) => t >= 63, goal: "63 °C", rule: "De +3 °C à +63 °C à cœur en moins d'1 h", ic: "hygFlame", tone: "tomato" },
 };
 const HY_ACTIONS = { refroid: ["Produit jeté", "Remis à 63 °C et servi aussitôt", "Cellule vérifiée, technicien appelé"], remise: ["Produit jeté", "Servi aussitôt après chauffe", "Matériel de chauffe vérifié"] };
 const hyKind = (b) => HY_K[b.kind] || HY_K.refroid;

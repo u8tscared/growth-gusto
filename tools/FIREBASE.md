@@ -11,7 +11,7 @@ La config publique est dans `js/config.js` (`window.GG_FIREBASE`). La mettre à 
 3. Coller le contenu entier de `firestore.rules` (à la racine du dépôt).
 4. Cliquer **Publier**. C'est actif en moins d'une minute.
 
-Les règles ont été vérifiées sur l'émulateur Firestore (101 cas : création, invitation, rôles, import, avis, abonnement, admin) : `tools/rules.test.js`.
+Les règles ont été vérifiées sur l'émulateur Firestore (105 cas : création, invitation, rôles, import, avis, abonnement, admin) : `tools/rules.test.js`.
 
 ## 1b. Abonnement et espace admin (js/abo.js)
 

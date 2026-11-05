@@ -107,6 +107,16 @@ function appIcon(size = 40) {
   return `<span class="gg-appic" style="width:${size}px;height:${size}px;border-radius:${size * 0.28}px;display:grid;place-items:center;background:#FFFDF8;box-shadow:0 0 0 ${size > 60 ? 2 : 1.5}px #DCCFB8 inset,0 ${Math.max(2, Math.round(size / 18))}px 0 #E2D6C2;flex:none"><span style="width:${size * 0.62}px;height:${size * 0.62}px;display:block">${logoMark({ mono: "#5B2BFF" })}</span></span>`;
 }
 
+/* the restaurant's own logo (r.logo: data:image or http(s) URL, set in onboarding or Réglages › Logo), "" when none */
+const restoLogo = (r) => { if (r === undefined) r = typeof S !== "undefined" ? S.resto : null; const l = r && typeof r.logo === "string" ? r.logo.trim() : ""; return /^(data:image\/|https?:\/\/)/i.test(l) ? l : ""; };
+/* the logo as a small rounded tile (.rlogo, css/base.css); without one: `fb` when given, else the initials tile. A logo that fails to load falls back to the initials. */
+function restoMark(size = 28, r, fb) {
+  if (r === undefined) r = typeof S !== "undefined" ? S.resto : null;
+  const l = restoLogo(r), ini = initials((r && r.name) || "R").replace(/[^\p{L}\p{N}]/gu, "") || "R";
+  if (!l) return fb != null ? fb : `<span class="rlogo ini" style="--s:${size}px">${esc(ini)}</span>`;
+  return `<span class="rlogo" style="--s:${size}px"><img src="${esc(l)}" alt="" referrerpolicy="no-referrer" onerror="var p=this.parentNode;p.classList.add('ini');p.textContent='${ini}'"></span>`;
+}
+
 /* ───────────────────────── sound + haptics ───────────────────────── */
 const SFX = {
   ctx: null, on: true,
@@ -423,7 +433,7 @@ const onData = debounce(() => { loadProfiles(); refresh(); renderChrome(); }, 60
 const NAV = [
   ["home", "home", "Aujourd'hui"], ["releve", "therm", "Relevés"], ["frigos", "snow", "Frigos"], ["sondes", "sdProbe", "Sondes connectées"], ["scan", "scan", "Scanner"], ["reception", "truck", "Réception"],
   ["sep", "", "Cuisine"], ["notes", "book", "Recettes & allergènes"], ["menage", "spray", "Planning ménage"], ["hygiene", "hygPot", "Hygiène"],
-  ["sep", "", "Gestion"], ["dashboard", "dash", "Tableau de bord"], ["finance", "euro", "Finances"], ["stock", "box", "Stock & inventaire"], ["tickets", "receipt", "Tickets de caisse"], ["caisse", "cxPlug", "Caisse connectée"], ["registre", "shield", "Registre HACCP"], ["controle", "ctBadge", "Contrôle sanitaire"], ["rappel", "ctRecall", "Rappel de lot"], ["obligations", "calcheck", "Obligations & contrôles"],
+  ["sep", "", "Gestion"], ["dashboard", "dash", "Tableau de bord"], ["finance", "euro", "Finances"], ["stock", "box", "Stock & inventaire"], ["tickets", "receipt", "Tickets de caisse"], ["caisse", "cxPlug", "Caisse connectée"], ["registre", "shield", "Registre HACCP"], ["documents", "hygVault", "Coffre-fort documents"], ["controle", "ctBadge", "Contrôle sanitaire"], ["rappel", "ctRecall", "Rappel de lot"], ["obligations", "calcheck", "Obligations & contrôles"],
   ["sep", "", "Équipe"], ["pointeuse", "clock", "Pointeuse"], ["planning", "cal", "Planning"], ["formation", "book", "Formation HACCP"], ["equipe", "users", "Équipe & salaires"], ["avis", "star", "Votre avis"],
   ["sep", "", "Restaurant"], ["resa", "resa", "Réservations"], ["alertes", "alBell", "Alertes"], ["sites", "store", "Mes établissements"], ["import", "upload", "Importer"], ["imprimante", "printer", "Imprimante"], ["reglages", "sliders", "Réglages"],
 ];
@@ -435,10 +445,10 @@ const navAllowed = () => { const out = []; NAV.forEach((n) => { if (n[0] !== "se
 function urgentCount() { return activeLots().filter((l) => (daysUntil(dlcOf(l)) ?? 99) <= 1).length; }
 function renderChrome() {
   const side = $("#side");
-  const navOn = (VIEWS[S.route] && VIEWS[S.route].nav) || (TAB_OF[S.route] === "frigos" ? "frigos" : { note: "notes", fiche: "notes", tzEdit: "tickets", regReport: "registre" }[S.route] || S.route);
+  const navOn = (NAV.some((n) => n[0] === S.route) && S.route) || (VIEWS[S.route] && VIEWS[S.route].nav) || (TAB_OF[S.route] === "frigos" ? "frigos" : { note: "notes", fiche: "notes", tzEdit: "tickets", regReport: "registre" }[S.route] || S.route);
   const pend = S.fridges.length - todayStats(S.slot || slotNow()).done; /* current service only */
   side.innerHTML = `<div class="brand">${appIcon(36)}<span>Growth <span class="gg-b">Gusto</span></span></div>
-    ${S.resto ? `<button class="nav" data-act="restoSwitch" style="background:var(--glass-2);margin-bottom:10px"><span style="width:28px;height:28px;flex:none;border-radius:9px;display:grid;place-items:center;background:#F6B93B;color:#1B1530;box-shadow:0 2px 0 #D99A1E;font-size:11px;font-weight:800">${esc(initials(S.resto.name))}</span><span style="flex:1;min-width:0;text-align:left"><b style="display:block;color:var(--ink);font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(S.resto.name)}</b><span style="font-size:11.5px">${S.restos.length} établissement${S.restos.length > 1 ? "s" : ""}</span></span>${ico("down")}</button>` : ""}
+    ${S.resto ? `<button class="nav" data-act="restoSwitch" style="background:var(--glass-2);margin-bottom:10px">${restoMark(28, S.resto, `<span style="width:28px;height:28px;flex:none;border-radius:9px;display:grid;place-items:center;background:#F6B93B;color:#1B1530;box-shadow:0 2px 0 #D99A1E;font-size:11px;font-weight:800">${esc(initials(S.resto.name))}</span>`)}<span style="flex:1;min-width:0;text-align:left"><b style="display:block;color:var(--ink);font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(S.resto.name)}</b><span style="font-size:11.5px">${S.restos.length} établissement${S.restos.length > 1 ? "s" : ""}</span></span>${ico("down")}</button>` : ""}
     <div class="navs">${(typeof pzNav === "function" ? pzNav() : navAllowed()).map(([r, i, t, c]) => r === "sep" ? `<div class="sep">${esc(t)}</div>` : `<button class="nav ${navOn === r ? "on" : ""}${c ? " pz-c " + c : ""}" data-go="${r}">${ico(i)}<span class="nt">${esc(t)}</span>${r === "home" && urgentCount() ? `<span class="count">${urgentCount()}</span>` : ""}${r === "alertes" && typeof ALERTES !== "undefined" && ALERTES.count() ? `<span class="count" style="background:var(--bad)">${ALERTES.count()}</span>` : ""}${r === "releve" && pend > 0 && S.fridges.length ? `<span class="count" style="background:var(--warn)">${pend}</span>` : ""}</button>`).join("")}</div>
     <div class="me" data-go="reglages" role="button" tabindex="0" title="Réglages">${avatar(S.me.id)}<div style="min-width:0;flex:1"><b>${esc(S.me.name || "Vous")}</b><em>${ROLES[myRole()]}</em></div>${ico("sliders")}</div>`;
   const sv = $(".navs", side);
@@ -839,7 +849,7 @@ function registerSW() {
    to the foreground. A new v means the code running here is old: with nothing in progress the app reloads silently (caches dropped,
    so the reload is guaranteed fresh); otherwise a toast offers « Mettre à jour ». sessionStorage guards against reload loops:
    one reload attempt per version per session, after which the version is simply adopted. */
-const APP_V = "2026-11-05.9";
+const APP_V = "2026-11-05.10";
 const UPD = {
   running: null, offered: null,
   get: (k, store) => { try { return store.getItem(k); } catch (e) { return null; } },

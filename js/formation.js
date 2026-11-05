@@ -342,7 +342,7 @@ function fmPrint(pid) {
   let el = $("#fmPrint"); if (!el) { el = document.createElement("div"); el.id = "fmPrint"; document.body.appendChild(el); }
   const today = fmDate(Date.now());
   el.innerHTML = `<div class="fmp">
-    <div class="fmp-h"><span class="fmp-mk">${typeof logoMark === "function" ? logoMark({ mono: "#5B2BFF" }) : ""}</span><div><b>${esc(S.resto?.name || "")}</b><span>Sensibilisation à l'hygiène alimentaire</span></div></div>
+    <div class="fmp-h">${typeof restoMark === "function" && restoLogo() ? `<span class="fmp-mk fmp-rl">${restoMark(40)}</span>` : `<span class="fmp-mk">${typeof logoMark === "function" ? logoMark({ mono: "#5B2BFF" }) : ""}</span>`}<div><b>${esc(S.resto?.name || "")}</b><span>Sensibilisation à l'hygiène alimentaire</span></div></div>
     <h1>Attestation de formation</h1>
     <p class="fmp-lead">L'établissement <b>${esc(S.resto?.name || "")}</b> atteste que <b>${esc(p.name || "")}</b> a suivi et validé les modules suivants (quiz de 5 questions, 4 bonnes réponses minimum) :</p>
     <table><thead><tr><th>Module</th><th>Validé le</th><th>Score</th></tr></thead><tbody>

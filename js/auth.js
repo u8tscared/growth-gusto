@@ -454,9 +454,10 @@ const AUTH = {
     const okI = `<i class="au-ok" aria-hidden="true">${AU_SVG.ok}</i>`;
     if (s === "welcome") {
       const inv = auLS.get("gg-invite"), last = auLS.get("gg-last");
+      if (inv && !U.preInv && !U._preL && this.fs) { U._preL = inv; this.timeout(this.fs.collection("invites").doc(inv).get(), 12000).then((d) => { const v = d && d.exists ? d.data() : null; if (!v || (v.expiresAt && v.expiresAt < Date.now())) return; U.preInv = v; if (v.email && !U.email) U.email = v.email; if (!last) U.tab = "up"; if (this.ui.screen === "welcome") this.paint(); }).catch(() => {}); }
       const lede = this.inApp && DB.mode === "local" ? "Créez votre compte : vos données vous suivent sur tous vos appareils." : inv ? "Connectez-vous pour rejoindre l'équipe. Relevés, étiquettes et planning, partagés en direct." : "Températures, étiquettes et contrôle sanitaire. Sans papier, sans stress.";
       const lastTag = `<em class="au-last">Dernière fois</em>`;
-      return `${inv ? `<div class="au-invite st" style="--i:0"><span class="au-invic">${ico("users")}</span><div><b>Vous êtes invité dans une équipe</b><span>Connectez-vous pour la rejoindre · code <span class="au-mono">${esc(auFmtCode(inv))}</span></span></div></div>` : `<p class="au-eyebrow st" style="--i:0">Le cahier HACCP qui se remplit tout seul</p>`}
+      return `${inv ? `<div class="au-invite st" style="--i:0"><span class="au-invic">${ico("users")}</span><div><b>${U.preInv && U.preInv.restoName ? `Invitation : ${esc(U.preInv.restoName)}` : "Vous êtes invité dans une équipe"}</b><span>Créez votre compte ou connectez-vous : vous arrivez directement dans l'équipe · code <span class="au-mono">${esc(auFmtCode(inv))}</span></span></div></div>` : `<p class="au-eyebrow st" style="--i:0">Le cahier HACCP qui se remplit tout seul</p>`}
         <h1 class="au-h1 st" style="--i:1">${inv ? "Votre brigade<br><em>vous attend.</em>" : "Tout est relevé.<br><em>Vous, cuisinez.</em>"}</h1>
         <p class="au-lede st" style="--i:2">${lede}</p>
         ${this.errHTML()}
@@ -464,6 +465,7 @@ const AUTH = {
           <button class="au-tac au-btn au-google${busy("google")}" data-act="auGoogle"><span class="au-bl">${AU_G}Continuer avec Google</span>${last === "google" ? lastTag : ""}${dots}</button>
           <button class="au-tac au-btn au-primary au-mailb" data-act="auEmail"><span class="au-bl">${AU_SVG.mail}Continuer avec un e-mail</span>${last === "email" ? lastTag : ""}</button>
         </div>
+        ${inv ? `<button class="au-ghost au-joincode st" style="--i:4" data-act="auInvForget">Ce n'est pas mon invitation${AU_SVG.arrowS}</button>` : `<button class="au-ghost au-joincode st" style="--i:4" data-act="auJoinOpen">${ico("users")}Rejoindre une équipe avec un code${AU_SVG.arrowS}</button>`}
         ${DB.mode === "demo" ? "" : `<button class="au-demo st" style="--i:4" data-act="auDemo"><span class="au-demo-ic" aria-hidden="true">${AU_SVG.cloche}</span><span class="au-demo-l"><b>Essayer la démo</b><span>Un restaurant déjà rempli. Rien n'est enregistré.</span></span><span class="au-arr" aria-hidden="true">${AU_SVG.arrow}</span></button>`}
         ${this.inApp ? "" : `<button class="au-ghost st" style="--i:5" data-act="auLocal">${this.hasLocal() ? "Continuer avec les données de ce téléphone" : "Continuer sans compte"}${AU_SVG.arrowS}</button>`}
         <p class="au-fine au-fine-m st" style="--i:6">Données hébergées en France et chiffrées.</p>`;
@@ -486,7 +488,7 @@ const AUTH = {
             <div class="au-in"><input class="au-input" id="auPw" type="${U.show ? "text" : "password"}" autocomplete="${up ? "new-password" : "current-password"}" minlength="8" placeholder="${up ? "8 caractères minimum" : "Votre mot de passe"}" value="${esc(U.pw)}" enterkeyhint="go">${okI}<button type="button" class="au-eye" data-act="auEye" aria-label="${U.show ? "Masquer" : "Afficher"} le mot de passe">${U.show ? AU_SVG.eyeOff : AU_SVG.eye}</button></div>
             ${up ? `<div class="au-meter" id="auMeter" data-s="0" aria-hidden="true"><i></i><i></i><i></i><i></i></div><div class="au-mrow"><span>Solidité</span><em class="au-hint" id="auPwH">${AU_PW_TX[0]}</em></div>` : ""}</div>
           <button class="au-tac au-primary au-submit${busy("email")}" type="submit" id="auGo"><span class="au-bl">${up ? "Créer mon compte" : "Se connecter"}</span>${dots}</button>
-          <p class="au-legal">${up ? "En créant un compte, vous devenez gérant de votre restaurant. Vous inviterez votre équipe ensuite." : "Protégé par chiffrement. Vos données restent en France."}</p>
+          <p class="au-legal">${auLS.get("gg-invite") ? `Votre compte rejoindra ${esc((U.preInv && U.preInv.restoName) || "l'équipe")} automatiquement.` : up ? "En créant un compte, vous devenez gérant de votre restaurant. Vous inviterez votre équipe ensuite." : "Protégé par chiffrement. Vos données restent en France."}</p>
         </form>`;
     }
     if (s === "reset") {
@@ -561,11 +563,11 @@ const AUTH = {
     if (s === "join") {
       const J = (U.join ||= { code: "", inv: null, err: "", loading: false });
       const inv = J.inv; const exp = inv ? Math.max(0, Math.ceil((inv.expiresAt - Date.now()) / 864e5)) : 0;
-      return `${top()}${head("Rejoindre une équipe.", "Le gérant vous a donné un code à 8 caractères.")}
+      return `${top()}${head("Rejoindre une équipe.", this.user ? "Le gérant vous a donné un code à 8 caractères." : "Tapez le code reçu du gérant. Vous créez ensuite votre compte, déjà relié au restaurant.")}
         <form class="au-form st" style="--i:3" data-au="join" novalidate>
           <label class="au-codebox" for="auCode"><input id="auCode" class="au-codein" inputmode="text" autocapitalize="characters" autocomplete="one-time-code" spellcheck="false" maxlength="40" value="${esc(J.code)}" aria-label="Code d'invitation"><span class="au-cells" aria-hidden="true">${Array.from({ length: 8 }, (_, i) => `<i data-i="${i}"></i>${i === 3 ? "<b>–</b>" : ""}`).join("")}</span></label>
           <div class="au-jstate" id="auJState">${J.loading ? `<div class="au-jload">${AU_DOTS_IN}Recherche de l'invitation…</div>` : J.err ? `<div class="au-err" role="alert">${ico("alert")}<span>${esc(J.err)}</span></div>` : inv ? `<div class="au-jcard"><span class="au-pm">${esc(initials(inv.restoName || "R"))}</span><div><b>${esc(inv.restoName || "Restaurant")}</b><em>Invité par ${esc(inv.createdByName || "le gérant")} · rôle ${esc((AU_ROLES[inv.role] || AU_ROLES.equipe).t)}</em></div><span class="au-jexp">${exp > 1 ? `${exp} jours` : "Valable"}</span></div>` : `<p class="au-fine">Vous pouvez aussi coller le lien reçu par message.</p>`}</div>
-          <button class="au-tac au-primary au-submit${busy("join")}" type="submit" ${inv ? "" : "disabled"}><span class="au-bl">${inv ? `Rejoindre ${esc(inv.restoName || "l'équipe")}` : "Rejoindre"}</span>${dots}</button>
+          <button class="au-tac au-primary au-submit${busy("join")}" type="submit" ${inv ? "" : "disabled"}><span class="au-bl">${inv ? (this.user ? `Rejoindre ${esc(inv.restoName || "l'équipe")}` : "Continuer : créer mon compte") : "Rejoindre"}</span>${dots}</button>
         </form>`;
     }
     if (s === "import") {
@@ -876,6 +878,7 @@ const AUTH = {
   },
   async joinSubmit() {
     const J = this.ui.join; if (!J || !J.inv || this.ui.busy) return;
+    if (!this.user) { auLS.set("gg-invite", J.code); this.ui.preInv = J.inv; if (J.inv.email && !this.ui.email) this.ui.email = J.inv.email; this.ui.tab = "up"; SFX.ok(); this.ui.back = []; this.show("welcome", { push: false, reset: true }); return; }
     const u = this.user, fs = this.fs, FV = this.FV(), inv = J.inv, now = Date.now();
     this.setBusy("join");
     try {
@@ -1457,10 +1460,11 @@ Object.assign(ACT, {
   auFr: (a, id, v) => { const C = AUTH.ui.create; const i = C.frs.indexOf(v); i >= 0 ? C.frs.splice(i, 1) : C.frs.push(v); const on = i < 0; a.classList.toggle("on", on); a.setAttribute("aria-pressed", on); const f = AU_FRIDGES.find((x) => x[0] === v); a.innerHTML = auFrHTML(v, f[2], f[3], on); SFX.tick(); buzz(4); AUTH.createPrev(); },
   auJoinOpen: () => {
     SFX.tap(); closeSheet(true);
-    if (!AUTH.user) { if (DB.mode === "demo") { toast("Créez d'abord votre compte.", "info"); return; } AUTH.openWelcome(); return; }
+    if (!AUTH.user) { if (DB.mode === "demo") { toast("Créez d'abord votre compte.", "info"); return; } if (!AUTH.cfg) { AUTH.openWelcome(); return; } if (!$("#au.on")) AUTH.openWelcome(); AUTH.openJoin(auLS.get("gg-invite") || ""); return; }
     if (!$("#au.on")) { AUTH.inApp = true; AUTH.ui.back = []; AUTH.mount(); }
     AUTH.openJoin("");
   },
+  auInvForget: () => { SFX.tap(); auLS.del("gg-invite"); AUTH.ui.preInv = null; AUTH.paint(); },
   auImport: () => AUTH.importLocal(),
   auImportSkip: () => { SFX.tap(); auLS.set("gg-imp-" + AUTH.user.uid, "no"); if (AUTH.restos.length) AUTH.enter(); else AUTH.show("setup", { reset: true }); },
   auImportGo: () => { SFX.tap(); AUTH.enter(AUTH.ui.imp && AUTH.ui.imp.rid); },

@@ -369,7 +369,37 @@ function bqSettingsSheet() {
       ${file ? `<div class="li bq-set"><span class="bq-logo">${ico("bqUp")}</span><span class="tx"><b>Relevés importés</b><em>${file.count || 0} opérations · dernier : ${esc(file.name || "")}</em></span></div>` : ""}
       ${!links.length && !file ? `<div class="empty fin-empty"><b>Aucun compte</b></div>` : ""}</div>
     <div class="grid2"><button class="btn soft" data-act="bqConnect">${ico("bqBank")}Relier une banque</button><button class="btn soft" data-act="bqImport">${ico("bqUp")}Importer</button></div>
+    ${BQ.tx.length ? `<span class="lbl">Comptabilité</span><button class="btn soft block" data-act="bqAcc">${ico("download")}Journal de banque pour le comptable (CSV)</button><p class="note" style="margin:-4px 0 0">Période affichée dans les Finances, au plan comptable : charges HT, TVA déductible, banque 512. S'importe dans Pennylane, Tiime, Cegid ou chez votre expert-comptable.</p>` : ""}
     ${Object.keys(bqRules()).length ? `<button class="btn ghost block sm" data-act="bqRulesReset">${ico("bqTag")}Oublier mes ${Object.keys(bqRules()).length} règles de rangement</button>` : ""}</div>`);
+}
+
+/* ───────── export for the accountant: bank journal (CSV, French chart of accounts) ─────────
+   Every bank movement of the period, in double entry: charge account (HT) + TVA déductible 44566 / bank 512, so an accounting tool
+   (Pennylane, Tiime, Cegid, ACD, Inqom…) or the accountant imports it as the « BQ » journal. Credits go to 471 (à affecter by the accountant):
+   the turnover itself comes from the Z tickets. Same cat → account map later for a direct accounting connection. */
+const BQ_PCG = { achats: ["601000", "Achats matières premières"], loyer: ["613200", "Locations immobilières"], energie: ["606100", "Eau, énergie"], assurances: ["616000", "Assurances"],
+  entretien: ["615000", "Entretien et réparations"], banque: ["627000", "Services bancaires"], autres: ["628000", "Charges diverses"], salaires: ["421000", "Personnel, rémunérations dues"],
+  social: ["431000", "Sécurité sociale"], impots: ["635000", "Impôts et taxes"], emprunt: ["164000", "Emprunts"], retrait: ["580000", "Virements internes"], perso: ["455000", "Compte courant d'associé"] };
+const bqPcg = (cat, t) => (cat === "impots" && /\btva\b/.test(bqNorm(t.label)) ? ["445510", "TVA à décaisser"] : BQ_PCG[cat] || BQ_PCG.autres);
+async function bqAccExport() {
+  const U = finUi(); const P = finPeriod(U.kind, U.off); const to = finEffTo(P); const A = bqAll();
+  const n2 = (v) => (v ? (Math.round(v * 100) / 100).toFixed(2).replace(".", ",") : "");
+  const fr = (d) => `${d.slice(8, 10)}/${d.slice(5, 7)}/${d.slice(0, 4)}`;
+  const rows = [["Date", "Journal", "Compte", "Intitulé du compte", "Libellé", "Pièce", "Débit", "Crédit", "Catégorie Growth Gusto"]];
+  const tx = BQ.tx.filter((t) => t.day >= P.from && t.day <= to).sort((a, b) => a.day.localeCompare(b.day));
+  let n = 0;
+  tx.forEach((t) => {
+    const lab = bqLabel(t).slice(0, 60); const pc = "BQ" + String(++n).padStart(4, "0"); const ttc = +t.amount || 0;
+    if (t.dir === "in") { rows.push([fr(t.day), "BQ", "512000", "Banque", lab, pc, n2(ttc), "", "Entrée"], [fr(t.day), "BQ", "471000", "Compte d'attente", lab, pc, "", n2(ttc), "Entrée"]); return; }
+    const r = A.rows.find((x) => x.t.id === t.id); const cat = r ? r.cat : "autres"; const [acc, accT] = bqPcg(cat, t);
+    const off = !!bqOffCat(cat); const ht = off ? ttc : Math.min(ttc, bqHT(t, cat)); const tva = off ? 0 : Math.round((ttc - ht) * 100) / 100;
+    rows.push([fr(t.day), "BQ", acc, accT, lab, pc, n2(ttc - tva), "", bqCatT(cat)]);
+    if (tva > 0.004) rows.push([fr(t.day), "BQ", "445660", "TVA déductible", lab, pc, n2(tva), "", bqCatT(cat)]);
+    rows.push([fr(t.day), "BQ", "512000", "Banque", lab, pc, "", n2(ttc), bqCatT(cat)]);
+  });
+  if (rows.length < 2) { SFX.err(); toast("Aucune opération bancaire sur cette période", "err"); return; }
+  await saveCsv(`journal-banque-${P.from}-${P.kind}.csv`, rows);
+  SFX.ok(); toast(`${n} opération${n > 1 ? "s" : ""} exportée${n > 1 ? "s" : ""} pour le comptable`);
 }
 
 /* ───────── demo ───────── */
@@ -427,6 +457,7 @@ Object.assign(ACT, {
     BQ.busy = false; refresh();
   },
   bqSettings: () => { SFX.tap(); bqSettingsSheet(); },
+  bqAcc: () => { SFX.tap(); bqAccExport(); },
   bqAch: async (a, id, v) => { SFX.tick(); try { await safe(DB.set("bank", "cfg", { achats: v === "receptions" ? "receptions" : "banque", at: Date.now() })); } catch (e) { return; } setTimeout(bqSettingsSheet, 30); },
   bqOff: (a, id) => openSheet(`<div class="h2" style="font-size:20px">Délier ce compte ?</div><p class="sub" style="margin:0">Les nouvelles opérations n'arriveront plus. Celles déjà reçues restent dans les Finances.</p><div class="grid2"><button class="btn soft" data-act="bqSettings">Annuler</button><button class="btn danger" data-act="bqOffOk" data-id="${esc(id)}">Délier</button></div>`),
   bqOffOk: async (a, id) => {

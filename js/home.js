@@ -137,7 +137,7 @@ function homeFreqTx(c) {
     if (typeof menToday === "function") { try { const o = menToday().groups; const open = (x) => x.c.id === c.id && (x.st === "todo" || x.st === "overdue"); slot = o.midi.some(open) ? "midi" : o.fermeture.some(open) ? "soir" : slot; } catch (e) {} }
     return slot === "midi" ? "après le service du midi" : "après le service du soir";
   }
-  if (c.freq === "jours") return "aujourd'hui";
+  if (["jours", "ndays", "nweeks", "dates", "once"].includes(c.freq)) return "aujourd'hui";
   if (c.freq === "semaine") return "cette semaine";
   if (c.freq === "mois") return "ce mois-ci";
   return "chaque jour";
@@ -257,7 +257,7 @@ VIEWS.home = {
         <div class="hm-col hm-r">${qa}${homeShiftCard()}${stats}${homeDashLink()}${homeFeed(6)}</div>
       </div>`;
     return `<div class="inner hm${ed ? " pz-hedit-on" : ""}">
-      <header class="row st hm-head" style="--i:0"><div style="min-width:0"><button class="hm-date" data-act="restoSwitch"><span>${DAYS[now.getDay()].replace(/^./, (c) => c.toUpperCase())} ${now.getDate()} ${MONTHS[now.getMonth()]} · ${esc(S.resto.name)}</span>${ico("down")}</button><div class="title">${greet}${S.me.name ? " " + esc(firstName(S.me.name)) : ""}</div></div><button class="iconbtn" ${typeof ACT.whoami === "function" ? `data-act="whoami" aria-label="Qui êtes-vous ? Changer d'utilisateur"` : `data-go="reglages" aria-label="Réglages"`} style="padding:0">${avatar(S.me.id)}</button></header>
+      <header class="row st hm-head" style="--i:0"><div style="min-width:0"><button class="hm-date" data-act="restoSwitch">${restoLogo() ? restoMark(22) : ""}<span>${DAYS[now.getDay()].replace(/^./, (c) => c.toUpperCase())} ${now.getDate()} ${MONTHS[now.getMonth()]} · ${esc(S.resto.name)}</span>${ico("down")}</button><div class="title">${greet}${S.me.name ? " " + esc(firstName(S.me.name)) : ""}</div></div><button class="iconbtn" ${typeof ACT.whoami === "function" ? `data-act="whoami" aria-label="Qui êtes-vous ? Changer d'utilisateur"` : `data-go="reglages" aria-label="Réglages"`} style="padding:0">${avatar(S.me.id)}</button></header>
       ${ed ? pzHomeHint() : bn}
       ${grid}${!ed && typeof pzHomeBtn === "function" ? pzHomeBtn() : ""}</div>`;
   },

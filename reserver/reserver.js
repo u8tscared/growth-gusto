@@ -1,5 +1,5 @@
 /* Growth Gusto — public booking page (https://app.growthgusto.fr/reserver/?r=<rid>). No account, no tracking.
-   Reads restos/{rid}/public/resa (name, address, photo, cfg, booked covers per day and slot — never a client's data, see js/resa.js rsPubDoc)
+   Reads restos/{rid}/public/resa (name, logo, address, photo, cfg, booked covers per day and slot — never a client's data, see js/resa.js rsPubDoc)
    and creates one booking restos/{rid}/bookings/{id}, in a batch that also adds its covers to the slot counter of the public doc and
    writes the booking's private manage key resaKeys/{rid}/keys/{id} (firestore.rules check all three: tools/resa.rules.txt).
    Status: "en ligne" (confirmed at once), "avalider" (the restaurant validates each request: cfg.validate), "attente" (waiting list on a
@@ -69,6 +69,11 @@
     else if (atOf(k, t) < Date.now() + (+c.lead || 0) * 3600e3) return "past";
     if (MANAGE && st.mb && st.mb.status === "attente") return "ok";
     if (+c.maxPerSlot && usedAt(k, t) + st.covers > +c.maxPerSlot) return "full";
+    /* floor plan (js/plan.js): the biggest party a free table can still take at this time; the client's own slot keeps its table */
+    const own = MANAGE && st.mb && st.mb.date === k && bucketOf(k, st.mb.time) === t;
+    if (!own && +st.pub.fitMax && st.covers > +st.pub.fitMax) return "full";
+    const fx = st.pub.fit && st.pub.fit[k] && st.pub.fit[k][t];
+    if (!own && fx != null && st.covers > +fx) return "full";
     if (+c.maxService) { const tot = slotsOf(s).reduce((a, x) => a + usedAt(k, x), 0); if (tot + st.covers > +c.maxService) return "full"; }
     return "ok";
   }
@@ -140,10 +145,16 @@
   }
 
   /* ───────── views ───────── */
+  /* the restaurant logo (Réglages › Logo in the app, copied into the public doc by js/resa.js): hero tile and tab icon */
+  const logoOf = (p) => (p && typeof p.logo === "string" && /^(data:image\/|https:\/\/)/.test(p.logo) ? p.logo : "");
+  function brandIcon(p) {
+    const lg = logoOf(p); if (!lg || brandIcon.done === lg) return; brandIcon.done = lg;
+    try { document.querySelectorAll('link[rel~="icon"],link[rel="apple-touch-icon"]').forEach((l) => l.remove()); ["icon", "apple-touch-icon"].forEach((rel) => { const l = document.createElement("link"); l.rel = rel; l.href = lg; document.head.appendChild(l); }); } catch (e) {}
+  }
   function hero() {
-    const p = st.pub || {};
+    const p = st.pub || {}, lg = logoOf(p); brandIcon(p);
     return `<header class="rv-hero"><div class="rv-hero-in">
-      <div class="rv-ph">${p.photo ? `<img src="${esc(p.photo)}" alt="">` : `<span>${esc(initials(p.name))}</span>`}</div>
+      <div class="rv-ph${lg ? " logo" : ""}">${lg ? `<img src="${esc(lg)}" alt="${esc(p.name || "")}" referrerpolicy="no-referrer">` : p.photo ? `<img src="${esc(p.photo)}" alt="">` : `<span>${esc(initials(p.name))}</span>`}</div>
       <div class="rv-hn"><span class="rv-k">${MANAGE ? "Votre réservation" : "Réserver une table"}</span><h1>${esc(p.name || "Restaurant")}</h1>${p.address ? `<p>${svg.pin}${esc(p.address)}</p>` : ""}</div>
     </div></header>`;
   }
@@ -157,7 +168,7 @@
     const ED = MANAGE && st.mview === "edit";
     if (!c.online && !ED) return paintMsg("Réservation en ligne fermée", p.phone ? "Pour réserver, appelez-nous directement." : "La réservation en ligne est fermée pour le moment.");
     if (st.done) return paintDone();
-    const today = dayKey(), end = lastDay(), max = Math.max(1, +c.maxOnline || 8, ED ? +st.mb.covers || 0 : 0);
+    const today = dayKey(), end = lastDay(), max = Math.max(1, Math.min(+c.maxOnline || 8, +st.pub.fitMax || 99), ED ? +st.mb.covers || 0 : 0);
     if (st.covers > max) st.covers = max;
     const strip = []; for (let i = 0; i < 21; i++) { const k = addDays(today, i); if (k > end) break; strip.push(k); }
     const custom = st.date && !strip.includes(st.date);

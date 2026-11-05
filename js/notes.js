@@ -454,9 +454,9 @@ const NOTE_PLIB = [
   ["cuisson", "ntFlame", "Cuisson", "Cuire jusqu'à cœur.", ["≥ +63 °C à cœur", "Sonde à cœur", "Prolonger la cuisson"]],
   ["duree", "clock", "Temps de cuisson", "Respecter le temps de cuisson indiqué sur la fiche.", null],
   ["temp", "therm", "Prise de température en fin de cuisson", "Sonde désinfectée au cœur du produit, valeur notée.", ["≥ +63 °C à cœur", "Sonde, valeur notée dans le registre", "Poursuivre la cuisson puis reprendre la température"], 1],
-  ["refroid", "snow", "Refroidissement rapide en cellule", "En cellule dès la fin de cuisson, en bacs peu épais. Noter la température et l'heure au début et à la fin.", ["De +63 °C à +3 °C en moins de 2 h", "Température et heure notées au début et à la fin", "Au-delà de 2 h : jeter le produit"], 1],
+  ["refroid", "snow", "Refroidissement rapide en cellule", "En cellule dès la fin de cuisson, en bacs peu épais. Noter la température et l'heure au début et à la fin.", ["De +63 °C à moins de +10 °C à cœur en moins de 2 h, puis stockage de 0 à +3 °C", "Température et heure notées au début et à la fin", "Au-delà de 2 h : jeter le produit"], 1],
   ["froid", "snow", "Stockage au froid", "Filmé, étiqueté avec la date de fabrication et la DLC.", ["0 à +3 °C · étiquette et DLC", "Relevé des frigos, lecture des étiquettes", "Jeter si DLC dépassée ou température non conforme"], 1],
-  ["remise", "ntFlame", "Remise en température", "Réchauffer rapidement, une seule fois.", ["≥ +63 °C à cœur en moins d'1 h", "Sonde et heure", "Si la température n'est pas atteinte en 1 h : jeter"], 1],
+  ["remise", "ntFlame", "Remise en température", "Réchauffer rapidement, une seule fois.", ["De +3 °C (sortie du froid) à ≥ +63 °C à cœur en moins d'1 h, une seule fois", "Sonde et heure", "Si +63 °C n'est pas atteint en 1 h : jeter"], 1],
   ["chaud", "therm", "Maintien au chaud", "Bain-marie ou étuve jusqu'au service.", ["≥ +63 °C", "Sonde toutes les heures", "Remettre en température ou jeter"], 1],
   ["service", "ntPlate", "Service", "Dresser avec des ustensiles propres et servir sans attendre.", null],
   ["libre", "edit", "Autre étape", "", null],
@@ -616,7 +616,7 @@ function noteDocHTML(n, P, proposed) {
   return `<article class="ntd">
     <header class="ntd-h"><div class="ntd-hl"><div class="ntd-k">Fiche process HACCP · diagramme de fabrication</div><h1>${esc(n.title || "Sans titre")}</h1>
       <div class="ntd-meta"><span>${esc(S.resto?.name || "")}</span>${por ? `<span>${noteNum(por)} portion${por >= 2 ? "s" : ""}</span>` : ""}<span>${proposed ? "Process proposé, à valider" : `Version ${n.processV || 1}`}</span><span>Édité le ${today}</span></div></div>
-      <div class="ntd-logo">${(() => { try { return typeof appIcon === "function" ? appIcon(36) : logoMark({ mono: "#5B2BFF" }); } catch (e) { return ""; } })()}</div></header>
+      <div class="ntd-logo">${(() => { try { return typeof restoMark === "function" && restoLogo() ? restoMark(40) : typeof appIcon === "function" ? appIcon(36) : logoMark({ mono: "#5B2BFF" }); } catch (e) { return ""; } })()}</div></header>
     <p class="ntd-legend ntd-muted"><span class="ntd-key"></span> Étape &nbsp; <span class="ntd-key ccp"></span> Point critique (CCP) : limite à respecter, contrôle noté.</p>
     ${flow}
     <section class="ntd-two"><div><h2>Ingrédients</h2>${ings.length ? `<table class="ntd-t ntd-ing"><tbody>${ings.map((g) => { const s = noteScale(g.qty, g.unit, 1); return `<tr><td>${esc(g.name)}</td><td class="r">${esc(s.q)} ${esc(s.u)}</td></tr>`; }).join("")}</tbody></table>` : `<p class="ntd-muted">Non renseignés.</p>`}</div>
@@ -1040,7 +1040,7 @@ function noteCarteDocHTML() {
   const body = noteCarteGroups(L).map(([c, G]) => `<tr class="ntc-cat"><td colspan="15">${esc(NOTE_CARTE_PL[c])}</td></tr>${G.map((n) => { const on = recipeAllergens(n, true); return `<tr><td class="ntc-d">${esc(n.title)}</td>${NOTE_ALLERGENS.map(([k]) => `<td class="ntc-a">${on.includes(k) ? "●" : ""}</td>`).join("")}</tr>`; }).join("")}`).join("");
   return `<article class="ntd ntc-doc"><header class="ntd-h"><div class="ntd-hl"><div class="ntd-k">Information des consommateurs · allergènes</div><h1>${esc(S.resto?.name || "Notre carte")}</h1>
       <div class="ntd-meta"><span>Allergènes présents dans nos plats</span><span>Mis à jour le ${today}</span></div></div>
-      <div class="ntd-logo">${(() => { try { return typeof appIcon === "function" ? appIcon(36) : logoMark({ mono: "#5B2BFF" }); } catch (e) { return ""; } })()}</div></header>
+      <div class="ntd-logo">${(() => { try { return typeof restoMark === "function" && restoLogo() ? restoMark(40) : typeof appIcon === "function" ? appIcon(36) : logoMark({ mono: "#5B2BFF" }); } catch (e) { return ""; } })()}</div></header>
     <table class="ntc-t"><thead>${head}</thead><tbody>${body}</tbody></table>
     <p class="ntc-leg">● : le plat contient cet allergène ou des produits qui en contiennent.</p>
     <p class="ntc-law">Liste des 14 allergènes à déclaration obligatoire (règlement UE n° 1169/2011, annexe II ; décret n° 2015-447). Nos plats sont préparés dans une cuisine où tous ces allergènes sont présents : des traces restent possibles. Une allergie ou une intolérance ? Parlez-en à notre équipe avant de commander.</p>

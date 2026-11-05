@@ -336,7 +336,7 @@ function ctPrint(html, title) {
 window.addEventListener("afterprint", () => { if (!document.documentElement.classList.contains("ct-printing")) return; setTimeout(() => { document.documentElement.classList.remove("ct-printing"); const r = $("#ctPrint"); if (r) r.innerHTML = ""; }, 300); });
 const ctSc = (html) => `<div class="ct-sc">${html}</div>`;
 const ctT = (head, rows, cls = "") => ctSc(`<table class="rp-t ${cls}"><thead><tr>${head.map((h) => `<th${/^(T°|Relevé|Valeur|Taux|Réalisé)/.test(h) ? ` class="r"` : ""}>${h}</th>`).join("")}</tr></thead><tbody>${rows.join("")}</tbody></table>`);
-const ctDocHead = (kicker, P) => `<header class="rp-head"><div class="rp-brand"><span class="rp-mk">${typeof appIcon === "function" ? appIcon(36) : ""}</span><div><b>${esc(S.resto?.name || "Restaurant")}</b><em>${esc(kicker)}</em></div></div>${P ? `<div class="rp-per"><span>Période</span><b>${ctPerTx(P)}</b></div>` : ""}</header>`;
+const ctDocHead = (kicker, P) => `<header class="rp-head"><div class="rp-brand"><span class="rp-mk">${typeof restoMark === "function" && restoLogo() ? restoMark(36) : typeof appIcon === "function" ? appIcon(36) : ""}</span><div><b>${esc(S.resto?.name || "Restaurant")}</b><em>${esc(kicker)}</em></div></div>${P ? `<div class="rp-per"><span>Période</span><b>${ctPerTx(P)}</b></div>` : ""}</header>`;
 const ctDocFoot = () => `<footer class="rp-foot"><div>Document établi le ${ctFull(dayKey())} à ${hm(Date.now())} par ${esc(nameOf(S.me.id))} avec Growth Gusto. Chaque enregistrement est daté et attribué à la personne qui l'a saisi ; une correction ne l'efface jamais.</div><div class="rp-sign"><span>Visa du responsable</span><i></i></div></footer>`;
 
 function ctDocTemp(P) {
@@ -404,7 +404,7 @@ function ctDocHtml(P, only) {
   if (only) return `<article class="rp-paper ct-doc">${ctDocHead("Contrôle sanitaire", x0(only) ? null : P)}${body}${picsHtml}${ctDocFoot()}</article>`;
   const late = O.filter((x) => x.st === "late").length; const pms = ctPmsDoc();
   const cover = `<section class="ct-cover"><div class="ct-cvt">${typeof appIcon === "function" ? appIcon(44) : ""}<span>Dossier de contrôle sanitaire</span></div>
-    <h1>${esc(S.resto?.name || "Restaurant")}</h1>${S.resto?.address ? `<p class="ct-cva">${esc(S.resto.address)}</p>` : ""}
+    ${typeof restoMark === "function" && restoLogo() ? `<div class="ct-cvlogo">${restoMark(72)}</div>` : ""}<h1>${esc(S.resto?.name || "Restaurant")}</h1>${S.resto?.address ? `<p class="ct-cva">${esc(S.resto.address)}</p>` : ""}
     <div class="ct-cvp"><span>Période contrôlée</span><b>${ctPerTx(P)}</b></div>
     <div class="ct-cvk">${[["Relevés de température", T.exp ? `${T.rate} %` : "–", `${Math.min(T.done, T.exp)} / ${T.exp} faits · ${T.bad.length} écart${T.bad.length > 1 ? "s" : ""}`], ["Réceptions contrôlées", R.recs.length, `${R.lines.length} produits · ${R.refused} refus`], ["Plan de nettoyage", C.rate != null ? `${C.rate} %` : "–", "des tâches prévues faites"], ["Contrôles obligatoires", O.length ? `${O.length - late} / ${O.length}` : "–", late ? `${late} en retard` : "à jour"], ["Personnel formé", F.people.length ? `${F.trained} / ${F.people.length}` : "–", F.resp && F.resp.ok ? "responsable formé HACCP" : "responsable à former"], ["Plan de maîtrise sanitaire", pms ? "Rédigé" : "À rédiger", pms ? `mis à jour le ${ctFull(ctDayOf(pms.updatedAt || pms.generatedAt))}` : ""]].map(([a, b, c]) => `<div><span>${a}</span><b>${b}</b><em>${c}</em></div>`).join("")}</div>
     <div class="ct-cvf"><span>Établi le ${ctLong(dayKey())} par ${esc(nameOf(S.me.id))}</span><span>Registre tenu dans Growth Gusto depuis le ${ctFull(ctStartDay())}</span></div></section>`;
@@ -803,10 +803,11 @@ function ctRcIdle() {
     <div class="ct-how st" style="--i:3">${[["search", "Cherchez le lot", "ou le nom du produit"], ["ctBlock", "Bloquez", "tout ce qui est en stock"], ["printer", "Imprimez", "la fiche de retrait"]].map(([ic, a, b], i) => `<div>${ctWell(ic, ["vi", "to", "sk"][i])}<b>${a}</b><em>${b}</em></div>`).join("")}</div>${hist}`;
 }
 VIEWS.rappel = {
-  nav: "controle",
+  nav: "rappel",
   render() {
     ctWatch(); const q = S.ui.ctRcQ || "";
     return `<div class="inner narrow ct ct-rc">${topBar("Rappel de lot")}
+      ${q ? "" : `<div class="ct-rcwhy st" style="--i:0"><b>À quoi ça sert ?</b><p>Votre fournisseur vous écrit : « les crevettes, lots X, Y et Z, sont rappelées, rupture de la chaîne du froid ». Tapez le numéro de lot ou le produit : l'app retrouve quand vous l'avez reçu, ce qui reste en stock et les étiquettes concernées, vous bloquez tout en un geste et vous imprimez la fiche de retrait pour le contrôle.</p></div>`}
       <label class="ct-search st" style="--i:1">${ico("search")}<input id="ctRcIn" type="search" enterkeyhint="search" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="N° de lot ou produit" value="${esc(q)}" aria-label="Numéro de lot ou nom du produit">${q ? `<button class="ct-clr" data-act="ctRcClear" aria-label="Effacer">${ico("x")}</button>` : ""}</label>
       <div id="ctRcRes" class="ct-rcres">${ctRcResults()}</div></div>`;
   },
