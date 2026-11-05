@@ -45,8 +45,8 @@ service cloud.firestore {
       allow read: if isMember(rid);
       allow get, list: if isAdmin();
       allow create: if signedIn() && request.resource.data.owner == me() && request.resource.data.name is string;
-      allow update: if isGerant(rid) && unchanged(['owner', 'createdAt'])
-                    || isMember(rid) && unchanged(['owner', 'createdAt', 'name', 'plan', 'pack', 'trialEnds', 'paidUntil', 'paidAt', 'grantedBy', 'grantedAt', 'suspended'])
+      allow update: if isGerant(rid) && unchanged(['owner', 'createdAt', 'server', 'alertMail', 'alertState'])
+                    || isMember(rid) && unchanged(['owner', 'createdAt', 'server', 'alertMail', 'alertState', 'alertCfg', 'resaCfg', 'trainingRequired', 'uiDefault', 'name', 'plan', 'pack', 'trialEnds', 'paidUntil', 'paidAt', 'grantedBy', 'grantedAt', 'suspended'])
                     || isAdmin() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(adminKeys());
       allow delete: if signedIn() && resource.data.owner == me();
 
@@ -82,8 +82,12 @@ service cloud.firestore {
 
       // ── everything else (fridges, readings, lots, stock, tickets, staff, finances…): members only ──
       match /{col}/{doc} {
-        allow read: if col != 'members' && isMember(rid);
-        allow create, update, delete: if col != 'members' && isMemberAfter(rid);
+        allow read: if !(col in ['members', 'sensorKeys']) && isMember(rid);
+        allow create, update, delete: if !(col in ['members', 'sensorKeys']) && isMemberAfter(rid);
+      }
+      // sensor cloud accounts (keys, passwords) and the gateway token: gérants only; the server reads them with admin rights
+      match /sensorKeys/{doc} {
+        allow read, write: if isGerant(rid);
       }
     }
 

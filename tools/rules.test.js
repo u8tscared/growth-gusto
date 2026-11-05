@@ -108,5 +108,19 @@ const t=async(name,p)=>{try{await p;pass++;console.log('ok  ',name)}catch(e){fai
  await t('stranger cannot list restos',assertFails(getDocs(collection(Z,'restos'))));
  await t('stranger cannot list users',assertFails(getDocs(collection(Z,'users'))));
  await t('google admin (unverified flag absent) is accepted',assertSucceeds(getDocs(collection(db('marcg',{email:'marceau.ruis@gmail.com',firebase:{sign_in_provider:'google.com'}}),'restos'))));
+ // wave 4: server-only fields, sensor keys
+ const D=db('dan');
+ await t('gerant adds dan (equipe)',assertSucceeds(setDoc(doc(A,`restos/${rid}/members/dan`),{name:'Dan',role:'equipe',joinedAt:now})));
+ await t('gerant sets alertCfg',assertSucceeds(updateDoc(doc(A,'restos',rid),{alertCfg:{on:true}})));
+ await t('gerant cannot set server flags',assertFails(updateDoc(doc(A,'restos',rid),{server:{alertes:true}})));
+ await t('equipe cannot set alertCfg',assertFails(updateDoc(doc(D,'restos',rid),{alertCfg:{on:false}})));
+ await t('equipe cannot set resaCfg',assertFails(updateDoc(doc(D,'restos',rid),{resaCfg:{on:true}})));
+ await t('gerant writes sensorKeys',assertSucceeds(setDoc(doc(A,`restos/${rid}/sensorKeys/shelly`),{key:'k'})));
+ await t('equipe cannot read sensorKeys',assertFails(getDoc(doc(D,`restos/${rid}/sensorKeys/shelly`))));
+ await t('equipe cannot write sensorKeys',assertFails(setDoc(doc(D,`restos/${rid}/sensorKeys/gateway`),{token:'x'})));
+ await t('equipe writes an alert',assertSucceeds(setDoc(doc(D,`restos/${rid}/alerts/a1`),{type:'temp',seen:false})));
+ await t('equipe writes sensors',assertSucceeds(setDoc(doc(D,`restos/${rid}/sensors/s1`),{name:'S'})));
+ await t('nobody reads caisseTokens',assertFails(getDoc(doc(A,'caisseTokens/x'))));
+ await t('nobody reads _meta',assertFails(getDoc(doc(A,'_meta/brevo'))));
  console.log(`\n${pass} passed, ${fail} failed`);await env.cleanup();process.exit(fail?1:0);
 })();
