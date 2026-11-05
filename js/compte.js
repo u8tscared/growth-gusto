@@ -431,6 +431,7 @@ VIEWS.reglages = {
         <div class="li tap" data-act="restoSwitch"><span class="ic w-sk">${ico("store")}</span><div class="tx"><b>Établissements</b><em>${S.restos.length} · changer ou en ajouter un</em></div>${ico("chev")}</div>
         ${typeof abRow === "function" ? abRow() : ""}
         <div class="li tap" data-go="equipe"><span class="ic w-mi">${ico("users")}</span><div class="tx"><b>Équipe</b><em>${S.members.length} personne${S.members.length > 1 ? "s" : ""}</em></div>${ico("chev")}</div>
+        ${typeof pzRow === "function" ? pzRow() : ""}
         ${typeof ACT.tourStart === "function" ? `<div class="li tap" data-act="tourStart"><span class="ic w-sa">${ico("sparkle")}</span><div class="tx"><b>Revoir la visite guidée</b><em>Les écrans clés en 1 minute</em></div>${ico("chev")}</div>` : ""}
         <div class="li tap" data-go="imprimante"><span class="ic w-nd">${ico("printer")}</span><div class="tx"><b>Imprimante</b><em>${esc(typeof lbPrinterCfg === "function" ? (lbPrinterCfg().name || "À choisir") : "À choisir")}</em></div>${ico("chev")}</div>
       </div></div><div class="cc-col">
@@ -510,11 +511,12 @@ VIEWS.more = {
       ["Équipe", [["pointeuse", "clock", "Pointeuse", ccOnShiftN(), "ok"], ["planning", "cal", "Planning", 0], staffR ? ["staff", "users", "Équipe & salaires", 0] : ["equipe", "users", "Équipe", 0], ["avis", "star", "Votre avis sur l'app", fbNew, "acc"]]],
       ["Restaurant", [...(staffR ? [["equipe", "lock", "Profils & codes", 0]] : []), ["imprimante", "printer", "Imprimante", 0], ["reglages", "sliders", "Réglages", 0], ...(typeof abTile === "function" ? [abTile()] : []), ...(typeof avisIsAdmin === "function" && avisIsAdmin() ? [["avisAdmin", "star", "Retours reçus (admin)", 0], ...(VIEWS.admin ? [["admin", "shield", "Clients (admin)", 0]] : [])] : [])]],
     ];
+    const grp = typeof pzMoreGroups === "function" ? pzMoreGroups(groups) : groups; /* js/perso.js: the person's order, icons, colours, names */
     let k = 2;
     const me = ccMember(S.me.id) || { id: S.me.id, name: S.me.name, color: S.me.color };
     return `<div class="inner narrow cc-more">${topBar("Tout Growth Gusto", { noBack: true })}
       <div class="cc-hero st" style="--i:1">${ccAva(me, 46)}<div style="flex:1;min-width:0"><b>${esc(S.me.name || "Vous")}</b><span>${ROLES[myRole()]} · ${esc(S.resto?.name || "")}</span></div>${ccLocalMode() ? `<button class="btn sm cc-hero-btn" data-act="whoami">${ico("swap")}Changer</button>` : ""}</div>
-      ${groups.map(([g, items]) => { const its = items.filter(([r]) => VIEWS[r] && canSee(r)); if (!its.length) return ""; const n = its.length, c = n % 3 === 0 ? 3 : n === 4 || n === 7 || n === 8 ? 4 : n <= 2 ? 2 : 3; return `<div class="lbl st cc-sec" style="--i:${k++}">${g}</div><div class="cc-grid c${c} st" style="--i:${k++}">${its.map(([r, i, t, b, tone]) => `<button class="cc-gt ${CC_WELL[r] || "w-vi"}" data-go="${r}" ${r === "reception" ? 'data-fresh="1"' : ""}><span class="ic">${ico(IC[i] ? i : "grid")}${b ? `<span class="cc-gb mono ${tone || ""}">${b}</span>` : ""}</span><span class="t">${t}</span></button>`).join("")}</div>`; }).join("")}
+      ${grp.map(([g, items]) => { const its = items.filter(([r]) => VIEWS[r] && canSee(r)); if (!its.length) return ""; const n = its.length, c = n % 3 === 0 ? 3 : n === 4 || n === 7 || n === 8 ? 4 : n <= 2 ? 2 : 3; return `<div class="lbl st cc-sec" style="--i:${k++}">${g}</div><div class="cc-grid c${c} st" style="--i:${k++}">${its.map(([r, i, t, b, tone, w]) => `<button class="cc-gt ${w || CC_WELL[r] || "w-vi"}" data-go="${r}" ${r === "reception" ? 'data-fresh="1"' : ""}><span class="ic">${ico(IC[i] ? i : "grid")}${b ? `<span class="cc-gb mono ${tone || ""}">${b}</span>` : ""}</span><span class="t">${esc(t)}</span></button>`).join("")}</div>`; }).join("")}
       ${myRole() !== "gerant" && ccLocalMode() ? `<p class="note st cc-more-note" style="--i:${k}">${ico("lock")}Finances, salaires et tableau de bord sont réservés au gérant.</p>` : ""}
     </div>`;
   },

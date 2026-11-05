@@ -220,8 +220,11 @@ VIEWS.home = {
       ${!exp ? `<button class="hm-cta-w" data-go="frigos">${ico("plus")}Ajouter un frigo</button>` : pend.length ? `<button class="hm-cta-w" data-act="homeFridge" data-id="${pend[0].id}"><span>Relever ${esc(pend[0].name)}</span>${ico("arrow")}</button>` : `<span class="hm-cta-w done">${slot === "midi" ? "Prochain relevé ce soir" : "Tous les frigos sont signés"}</span>`}
     </section>`;
 
-    const QA = [["releve", "therm", "Relevé", "c1", pend.length], ["reception", "truck", "Réception", "c2", homeRecLive() ? "•" : 0], ["scan", "scan", "Scanner", "c3", 0], ["menage", "spray", "Ménage", "c4", ch.due.length], ["stock", "list", "Inventaire", "c5", 0]];
-    const qa = `<nav class="hm-qa st" style="--i:2" aria-label="Actions rapides">${QA.filter((q) => typeof permOk !== "function" || permOk(q[0])).map(([r, ic, t, c, n]) => `<button class="${c}" ${r === "releve" && pend.length ? `data-act="homeFridge" data-id="${pend[0].id}"` : `data-go="${r}"`}${r === "reception" && !homeRecLive() ? ' data-fresh="1"' : ""}><span class="qi">${ico(ic)}${n ? `<span class="bdg mono">${n}</span>` : ""}</span><span class="ql">${t}</span></button>`).join("")}</nav>`;
+    const QB = { releve: pend.length, reception: homeRecLive() ? "•" : 0, menage: ch.due.length, scan: 0, stock: 0 };
+    /* js/perso.js: the person's 3–6 shortcuts */
+    const QA = typeof pzQA === "function" ? pzQA().map(([r, ic, t, c]) => [r, ic, t, c, QB[r] || 0]) : [["releve", "therm", "Relevé", "c1", pend.length], ["reception", "truck", "Réception", "c2", homeRecLive() ? "•" : 0], ["scan", "scan", "Scanner", "c3", 0], ["menage", "spray", "Ménage", "c4", ch.due.length], ["stock", "list", "Inventaire", "c5", 0]];
+    const qaN = QA.filter((q) => typeof permOk !== "function" || permOk(q[0])).length;
+    const qa = `<nav class="hm-qa st${qaN !== 5 ? ` n${qaN}` : ""}" style="--i:2${qaN !== 5 ? `;grid-template-columns:repeat(${qaN},minmax(0,1fr))` : ""}" aria-label="Actions rapides">${QA.filter((q) => typeof permOk !== "function" || permOk(q[0])).map(([r, ic, t, c, n]) => `<button class="${c}" ${r === "releve" && pend.length ? `data-act="homeFridge" data-id="${pend[0].id}"` : `data-go="${r}"`}${r === "reception" && !homeRecLive() ? ' data-fresh="1"' : ""}><span class="qi">${ico(ic)}${n ? `<span class="bdg mono">${n}</span>` : ""}</span><span class="ql">${t}</span></button>`).join("")}</nav>`;
 
     const stat = (lbl, val, sub, go, tone, bar) => `<button class="hm-stat ${tone || ""}" data-go="${go}"><span class="sl">${lbl}</span><span class="sv mono">${val == null ? "–" : `<span class="hm-n" data-to="${val}">0</span>${bar != null ? "<small>%</small>" : ""}`}</span>${bar != null ? `<span class="sb"><i style="--w:${bar}%"></i></span>` : ""}<span class="ss">${sub}</span></button>`;
     const stats = `<section class="hm-stats st" style="--i:4" aria-label="Chiffres du jour">
@@ -239,13 +242,24 @@ VIEWS.home = {
     const stepsCard = homeStepsCard(fresh ? 3 : 5);
     const inst = typeof installHint === "function" ? installHint() : ""; let bn; { const r = S.route; S.route = "home-noinst"; try { bn = banner(); } finally { S.route = r; } } /* banner() without its install card: it goes under the hero */
     const instCard = inst ? `<div class="hm-inst">${inst}</div>` : "";
-    return `<div class="inner hm">
-      <header class="row st hm-head" style="--i:0"><div style="min-width:0"><button class="hm-date" data-act="restoSwitch"><span>${DAYS[now.getDay()].replace(/^./, (c) => c.toUpperCase())} ${now.getDate()} ${MONTHS[now.getMonth()]} · ${esc(S.resto.name)}</span>${ico("down")}</button><div class="title">${greet}${S.me.name ? " " + esc(firstName(S.me.name)) : ""}</div></div><button class="iconbtn" ${typeof ACT.whoami === "function" ? `data-act="whoami" aria-label="Qui êtes-vous ? Changer d'utilisateur"` : `data-go="reglages" aria-label="Réglages"`} style="padding:0">${avatar(S.me.id)}</button></header>
-      ${bn}
-      <div class="hm-grid ${fresh ? "fresh" : ""} ${recNow ? "rec" : ""}">
+    /* js/perso.js: « Modifier l'accueil » (edit mode) and the person's block order / hidden blocks */
+    const B = { hero, svc: homeSvcCard(), steps: stepsCard, todo: todoCard, qa, shift: homeShiftCard(), stats, dash: homeDashLink(), feed: homeFeed(6) };
+    const ed = typeof pzHomeEdit === "function" ? pzHomeEdit() : null; const lay = !ed && typeof pzHome === "function" ? pzHome() : null;
+    const ord = (h, n) => (h ? h.replace('style="', `style="order:${n};`) : "");
+    const col = (keys) => keys.filter((k) => !lay.hide.has(k)).sort((a, b) => lay.order.indexOf(a) - lay.order.indexOf(b)).map((k) => ord(B[k], lay.order.indexOf(k) * 2 + 2) + (k === "hero" && instCard ? ord(instCard.replace('<div class="hm-inst"', '<div class="hm-inst" style=""'), lay.order.indexOf(k) * 2 + 3) : "")).join("");
+    const grid = ed ? `<div class="hm-grid pz-editing">${ed.order.map((k, i) => pzHomeWrap(k, B[k], i, ed.order.length)).join("")}</div>${pzHomeEditBar()}`
+      : lay ? `<div class="hm-grid ${recNow ? "rec" : ""}">
+        <div class="hm-col hm-l">${lay.hide.has("hero") ? instCard : ""}${col(["hero", "svc", "steps", "todo"])}</div>
+        <div class="hm-col hm-r">${col(["qa", "shift", "stats", "dash", "feed"])}</div>
+      </div>`
+      : `<div class="hm-grid ${fresh ? "fresh" : ""} ${recNow ? "rec" : ""}">
         <div class="hm-col hm-l">${hero}${instCard}${homeSvcCard()}${fresh && !recNow ? stepsCard : ""}${todoCard}${fresh && !recNow ? "" : stepsCard}</div>
         <div class="hm-col hm-r">${qa}${homeShiftCard()}${stats}${homeDashLink()}${homeFeed(6)}</div>
-      </div></div>`;
+      </div>`;
+    return `<div class="inner hm${ed ? " pz-hedit-on" : ""}">
+      <header class="row st hm-head" style="--i:0"><div style="min-width:0"><button class="hm-date" data-act="restoSwitch"><span>${DAYS[now.getDay()].replace(/^./, (c) => c.toUpperCase())} ${now.getDate()} ${MONTHS[now.getMonth()]} · ${esc(S.resto.name)}</span>${ico("down")}</button><div class="title">${greet}${S.me.name ? " " + esc(firstName(S.me.name)) : ""}</div></div><button class="iconbtn" ${typeof ACT.whoami === "function" ? `data-act="whoami" aria-label="Qui êtes-vous ? Changer d'utilisateur"` : `data-go="reglages" aria-label="Réglages"`} style="padding:0">${avatar(S.me.id)}</button></header>
+      ${ed ? pzHomeHint() : bn}
+      ${grid}${!ed && typeof pzHomeBtn === "function" ? pzHomeBtn() : ""}</div>`;
   },
   after(v) {
     const still = v.classList.contains("nost");

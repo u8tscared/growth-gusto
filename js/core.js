@@ -424,7 +424,7 @@ function renderChrome() {
   const pend = S.fridges.length - todayStats(S.slot || slotNow()).done; /* current service only */
   side.innerHTML = `<div class="brand">${appIcon(36)}<span>Growth <span class="gg-b">Gusto</span></span></div>
     ${S.resto ? `<button class="nav" data-act="restoSwitch" style="background:var(--glass-2);margin-bottom:10px"><span style="width:28px;height:28px;flex:none;border-radius:9px;display:grid;place-items:center;background:#F6B93B;color:#1B1530;box-shadow:0 2px 0 #D99A1E;font-size:11px;font-weight:800">${esc(initials(S.resto.name))}</span><span style="flex:1;min-width:0;text-align:left"><b style="display:block;color:var(--ink);font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(S.resto.name)}</b><span style="font-size:11.5px">${S.restos.length} établissement${S.restos.length > 1 ? "s" : ""}</span></span>${ico("down")}</button>` : ""}
-    <div class="navs">${navAllowed().map(([r, i, t]) => r === "sep" ? `<div class="sep">${t}</div>` : `<button class="nav ${navOn === r ? "on" : ""}" data-go="${r}">${ico(i)}<span class="nt">${t}</span>${r === "home" && urgentCount() ? `<span class="count">${urgentCount()}</span>` : ""}${r === "releve" && pend > 0 && S.fridges.length ? `<span class="count" style="background:var(--warn)">${pend}</span>` : ""}</button>`).join("")}</div>
+    <div class="navs">${(typeof pzNav === "function" ? pzNav() : navAllowed()).map(([r, i, t, c]) => r === "sep" ? `<div class="sep">${esc(t)}</div>` : `<button class="nav ${navOn === r ? "on" : ""}${c ? " pz-c " + c : ""}" data-go="${r}">${ico(i)}<span class="nt">${esc(t)}</span>${r === "home" && urgentCount() ? `<span class="count">${urgentCount()}</span>` : ""}${r === "releve" && pend > 0 && S.fridges.length ? `<span class="count" style="background:var(--warn)">${pend}</span>` : ""}</button>`).join("")}</div>
     <div class="me" data-go="reglages" role="button" tabindex="0" title="Réglages">${avatar(S.me.id)}<div style="min-width:0;flex:1"><b>${esc(S.me.name || "Vous")}</b><em>${ROLES[myRole()]}</em></div>${ico("sliders")}</div>`;
   const sv = $(".navs", side);
   if (sv) {
@@ -435,10 +435,11 @@ function renderChrome() {
     const fades = () => { const more = sv.scrollHeight - sv.clientHeight; sv.classList.toggle("ft", more > 1 && sv.scrollTop > 2); sv.classList.toggle("fb", more > 1 && sv.scrollTop < more - 2); };
     fades(); sv.addEventListener("scroll", () => { side._st = sv.scrollTop; fades(); }, { passive: true });
   }
-  const tb = $("#tabbar"); const on = TAB_OF[S.route] || "more";
-  if (!tb.dataset.built) {
-    tb.dataset.built = 1;
-    tb.innerHTML = `<span class="ind" id="ind"></span>` + TABS.map(([r, i, t]) => `<button class="tab" data-tab="${r}" aria-label="${t || "Scanner"}">${r === "scan" ? `<span class="fab">${ico("scan")}</span>` : `${ico(i)}${t}`}</button>`).join("");
+  if (typeof pzApplyTabs === "function") { try { pzApplyTabs(); } catch (e) {} } /* js/perso.js: the person's 2 free tabs */
+  const tb = $("#tabbar"); const on = TAB_OF[S.route] || "more"; const tsig = TABS.map((t) => t.join(",")).join("|");
+  if (tb.dataset.built !== tsig) {
+    tb.dataset.built = tsig;
+    tb.innerHTML = `<span class="ind" id="ind"></span>` + TABS.map(([r, i, t]) => `<button class="tab" data-tab="${r}" aria-label="${esc(t || "Scanner")}">${r === "scan" ? `<span class="fab">${ico("scan")}</span>` : `${ico(i)}${esc(t)}`}</button>`).join("");
   }
   $$(".tab", tb).forEach((b) => { const r = b.dataset.tab; b.style.display = r === "home" || r === "more" || permOk(r) ? "" : "none"; });
   $$(".tab", tb).forEach((b) => { const was = b.classList.contains("on"), now = b.dataset.tab === on; b.classList.toggle("on", now); if (now && !was && tb.dataset.on) { b.classList.remove("pop"); void b.offsetWidth; b.classList.add("pop"); } });
@@ -823,7 +824,7 @@ function registerSW() {
    to the foreground. A new v means the code running here is old: with nothing in progress the app reloads silently (caches dropped,
    so the reload is guaranteed fresh); otherwise a toast offers « Mettre à jour ». sessionStorage guards against reload loops:
    one reload attempt per version per session, after which the version is simply adopted. */
-const APP_V = "2026-11-05.2";
+const APP_V = "2026-11-05.3";
 const UPD = {
   running: null, offered: null,
   get: (k, store) => { try { return store.getItem(k); } catch (e) { return null; } },
