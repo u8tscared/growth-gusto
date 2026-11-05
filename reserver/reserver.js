@@ -69,6 +69,11 @@
     else if (atOf(k, t) < Date.now() + (+c.lead || 0) * 3600e3) return "past";
     if (MANAGE && st.mb && st.mb.status === "attente") return "ok";
     if (+c.maxPerSlot && usedAt(k, t) + st.covers > +c.maxPerSlot) return "full";
+    /* floor plan (js/plan.js): the biggest party a free table can still take at this time; the client's own slot keeps its table */
+    const own = MANAGE && st.mb && st.mb.date === k && bucketOf(k, st.mb.time) === t;
+    if (!own && +st.pub.fitMax && st.covers > +st.pub.fitMax) return "full";
+    const fx = st.pub.fit && st.pub.fit[k] && st.pub.fit[k][t];
+    if (!own && fx != null && st.covers > +fx) return "full";
     if (+c.maxService) { const tot = slotsOf(s).reduce((a, x) => a + usedAt(k, x), 0); if (tot + st.covers > +c.maxService) return "full"; }
     return "ok";
   }
@@ -163,7 +168,7 @@
     const ED = MANAGE && st.mview === "edit";
     if (!c.online && !ED) return paintMsg("Réservation en ligne fermée", p.phone ? "Pour réserver, appelez-nous directement." : "La réservation en ligne est fermée pour le moment.");
     if (st.done) return paintDone();
-    const today = dayKey(), end = lastDay(), max = Math.max(1, +c.maxOnline || 8, ED ? +st.mb.covers || 0 : 0);
+    const today = dayKey(), end = lastDay(), max = Math.max(1, Math.min(+c.maxOnline || 8, +st.pub.fitMax || 99), ED ? +st.mb.covers || 0 : 0);
     if (st.covers > max) st.covers = max;
     const strip = []; for (let i = 0; i < 21; i++) { const k = addDays(today, i); if (k > end) break; strip.push(k); }
     const custom = st.date && !strip.includes(st.date);

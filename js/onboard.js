@@ -748,7 +748,9 @@ Object.assign(OB, {
       if (p === "pick") return H("Lequel ?") + this.tiles(OB_RESA, a.prov);
       if (p === "offer") return H("Le nôtre est gratuit et inclus.", a.prov === "google" ? "Et votre lien marche aussi sur Google." : `Vous pouvez arrêter de payer ${esc(pn)}.`) + `<div class="onb-acts st" style="--i:3">${this.big("Passer à Growth Gusto", "obTqDo", "resaOn", "pri", obI("resa", "cal"))}${this.big(`Garder ${esc(pn)}`, "obTqDo", "resaKeep", "light")}</div>`;
       if (p === "keep") return H(`On garde ${esc(pn)}.`, `On affichera vos réservations ${esc(pn)} dès que la connexion sera ouverte.`) + `<div class="onb-done st" style="--i:3"><span class="onb-tool-ic">${OB_SVG.check}</span><span>Rien d'autre à faire.</span></div>`;
-      if (p === "on") return H("Vos réservations sont ouvertes.", S.resto && S.resto.resaCfg && S.resto.resaCfg.online ? "Partagez le lien : vos clients réservent seuls." : "Notez chaque appel en 10 secondes.") + `<div class="onb-live st" style="--i:3" id="obTqLive">${this.tqLiveHTML()}</div>`;
+      if (p === "salle" && typeof plQuickHTML === "function") return H("Combien de tables ?", "On dessine votre plan de salle. Les réservations s'y placent toutes seules.") + `<div class="st" style="--i:3">${plQuickHTML("ob")}</div>`;
+      const plBtn = typeof plQuickHTML === "function" && !((S.resto && S.resto.resaCfg && S.resto.resaCfg.tables) || []).length ? `<div class="onb-acts st" style="--i:4">${this.big("Dessiner ma salle", "obTqDo", "plSalle", "light", obI("plZone", "plus"))}</div>` : "";
+      if (p === "on") return H("Vos réservations sont ouvertes.", S.resto && S.resto.resaCfg && S.resto.resaCfg.online ? "Partagez le lien : vos clients réservent seuls." : "Notez chaque appel en 10 secondes.") + `<div class="onb-live st" style="--i:3" id="obTqLive">${this.tqLiveHTML()}</div>` + plBtn;
       return H("Vous prenez des réservations comment ?") + this.opts([
         this.opt("none", "Pas de réservation", "", OB_SVG.x, "v", a.v === "none", 0),
         this.opt("tel", "Au téléphone, sur un cahier", "", OB_SVG.phone, "tm", a.v === "tel", 1),
@@ -825,6 +827,7 @@ Object.assign(OB, {
     const { L, i, k, p } = this.tqCur(), last = i === L.length - 1;
     const skip = (tx = "Passer") => `<button class="onb-later" data-act="obTqSkip">${tx}</button>`;
     if (k === "extras") return `${btn(`Continuer${OB_SVG.arrow}`, "obTqNext")}${skip()}`;
+    if (k === "resa" && p === "salle") return `<button class="onb-go" data-act="obTqDo" data-v="plSalleOk" id="obGo"><span class="onb-bl">Continuer${OB_SVG.arrow}</span><span class="onb-dots" aria-hidden="true"><i></i><i></i><i></i></span></button><button class="onb-later" data-act="obTqDo" data-v="plSalleSkip">Pas de plan pour l'instant</button>`;
     if (p === "brand" && !this.tqDone()) return btn("Plus tard", "obTqNext", " light");
     if (["on", "keep", "z", "brand", "buy"].includes(p)) return btn(`Continuer${OB_SVG.arrow}`, "obTqNext");
     if (p === "go") return btn("Plus tard", "obTqNext", " light");
@@ -892,9 +895,15 @@ Object.assign(ACT, {
     if (v === "resaOn") {
       if (a) a.disabled = true; const ok = await OB.resaOn(); if (a) a.disabled = false; if (!ok) return;
       d.ans.resa = { ...ans, on: 1 }; delete d.ans.resa.keep; OB.setTool("resa", true); OB.saveAns({ resaProvider: "growthgusto" });
-      SFX.done(); buzz([10, 30, 10]); OB.tqTo("on");
+      SFX.done(); buzz([10, 30, 10]); OB.tqTo(typeof plQuickHTML === "function" && !((S.resto.resaCfg || {}).tables || []).length ? "salle" : "on");
       setTimeout(() => { const r = $(".onb-tq h2"); if (r && !obReduce()) { const b = r.getBoundingClientRect(); burst(b.left + Math.min(b.width, 180) / 2, b.top + 20); } }, 260);
       return;
+    }
+    if (v === "plSalle") { SFX.tap(); if (typeof PL !== "undefined") PL.q = null; OB.tqTo("salle"); return; }
+    if (v === "plSalleOk" || v === "plSalleSkip") {
+      if (v === "plSalleOk" && typeof plQSave === "function") { if (a) a.disabled = true; const ok = await plQSave(); if (a) a.disabled = false; if (!ok) return; d.ans.resa = { ...(d.ans.resa || ans), salle: 1 }; OB.saveAns(); SFX.done(); buzz([8, 30, 10]); toast("Plan de salle créé. Ajustez-le dans Réservations."); }
+      else SFX.tap();
+      OB.tqTo("on"); return;
     }
     if (v === "resaKeep") { d.ans.resa = { ...ans, keep: 1 }; delete d.ans.resa.on; OB.setTool("resa", false); OB.saveAns({ resaProvider: ans.prov || "autre" }); SFX.ok(); buzz(6); OB.tqTo("keep"); return; }
     if (v === "tz") { SFX.tap(); if (typeof ACT.tzPick === "function") ACT.tzPick(); else go("tickets"); return; }
