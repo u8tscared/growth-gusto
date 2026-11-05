@@ -147,8 +147,19 @@ service cloud.firestore {
 
       // ── everything else (fridges, readings, lots, stock, tickets, staff, finances…): members only ──
       match /{col}/{doc} {
-        allow read: if !(col in ['members', 'sensorKeys', 'bankTx', 'bank']) && isMember(rid);
-        allow create, update, delete: if !(col in ['members', 'sensorKeys', 'bankTx', 'bank']) && isMemberAfter(rid);
+        allow read: if !(col in ['members', 'sensorKeys', 'pennylane', 'plSent', 'plInv', 'bankTx', 'bank']) && isMember(rid);
+        allow create, update, delete: if !(col in ['members', 'sensorKeys', 'pennylane', 'plSent', 'plInv', 'bankTx', 'bank']) && isMemberAfter(rid);
+      }
+      // Pennylane (js/pennylane.js, functions/src/pennylane.js): accounting, so gérants only; the server writes with admin rights
+      match /pennylane/{doc} {
+        allow read: if isGerant(rid);
+        allow write: if isGerant(rid) && doc == 'cfg';
+      }
+      match /plSent/{doc} {
+        allow read: if isGerant(rid);
+      }
+      match /plInv/{doc} {
+        allow read: if isGerant(rid);
       }
       // bank operations and bank links (js/banque.js, functions/src/banque.js): money, so gérants only; the server writes with admin rights
       match /bankTx/{doc} {

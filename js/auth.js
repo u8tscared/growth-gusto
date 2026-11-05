@@ -1006,7 +1006,7 @@ const AUTH = {
 
   /* ───────────── remise à zéro (accounts): wipe the restaurant's data, delete the restaurant, leave a team, delete my account ─────────────
      Every subcollection of restos/{rid} is deleted client-side in batches of 400 (Firestore never cascades). */
-  COLS: ["fridges", "readings", "lots", "products", "counts", "receptions", "events", "notes", "chores", "choreLogs", "tickets", "tkLinks", "moves", "stockMoves", "staff", "shifts", "punches", "obligations", "oblLogs", "feedback", "expenses", "bankTx", "bank"],
+  COLS: ["fridges", "readings", "lots", "products", "counts", "receptions", "events", "notes", "chores", "choreLogs", "tickets", "tkLinks", "moves", "stockMoves", "staff", "shifts", "punches", "obligations", "oblLogs", "feedback", "expenses", "bankTx", "bank", "pennylane", "plSent", "plInv"],
   online() { return navigator.onLine !== false; },
   isOwner() { return !!(DB.uid && S.resto && S.resto.owner === DB.uid); },
   /* typed confirmation, same pattern as the local « Tout effacer » (compte.js): the button wakes up on EFFACER */

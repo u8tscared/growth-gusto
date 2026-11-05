@@ -94,8 +94,12 @@ function bqAll() {
   if (BQ.memo && BQ.memo.ver === BQ.ver && BQ.memo.exp === S.expenses) return BQ.memo;
   const manual = finAll("expenses").filter((e) => !e.recurring && !e.receptionId && +e.amountHT > 0);
   const rows = []; const cover = new Set(); let from = null, to = null;
+  /* the same movement can come from several sources (bank link, Pennylane, an imported statement): keep the most direct one */
+  const PRI = { banque: 0, pennylane: 1, fichier: 2 }; const pri = (t) => PRI[t.src] ?? 3; const byAmt = {};
+  BQ.tx.forEach((t) => { (byAmt[t.dir + "|" + t.amount] ||= []).push(t); });
+  const twin = (t) => (byAmt[t.dir + "|" + t.amount] || []).some((o) => o !== t && o.src !== t.src && pri(o) < pri(t) && o.day && Math.abs(finDays(o.day, t.day)) <= 2);
   BQ.tx.forEach((t) => {
-    if (!t.day) return; if (!from || t.day < from) from = t.day; if (!to || t.day > to) to = t.day;
+    if (!t.day || twin(t)) return; if (!from || t.day < from) from = t.day; if (!to || t.day > to) to = t.day;
     if (t.dir !== "out") return;
     const c = bqCat(t); const off = !!bqOffCat(c.cat); const ht = off ? 0 : bqHT(t, c.cat);
     /* the same charge typed by hand: keep the typed one */
@@ -181,12 +185,14 @@ function bqCard(P) {
     const err = L.status === "error" || L.status === "expired";
     return (L.accounts || []).map((a) => `<div class="bq-acc ${err ? "bad" : ""}">${bqLogo(L.bank, L.logo)}<span class="tx"><b>${esc(L.bank)}${a.name ? ` · ${esc(a.name)}` : ""}</b><em>${a.iban ? `•• ${esc(a.iban)} · ` : ""}${err ? esc(L.lastError || "À reconnecter") : `synchro ${bqAgo(L.lastSync || L.connectedAt)}`}</em></span>${err ? `<button class="btn soft sm" data-act="bqConnect">Reconnecter</button>` : a.balance != null ? `<span class="mono bq-bal">${bqEur(a.balance, 0)}</span>` : ""}</div>`).join("");
   }).join("");
+  const pl = BQ.tx.filter((t) => t.src === "pennylane");
+  const plRow = pl.length ? `<div class="bq-acc"><span class="bq-logo"><b>PL</b></span><span class="tx"><b>Banque via Pennylane</b><em>${pl.length} opération${pl.length > 1 ? "s" : ""} · dernière le ${esc(shortDate(pl.reduce((m, t) => (t.day > m ? t.day : m), "")))}</em></span></div>` : "";
   const fileRow = file ? `<div class="bq-acc">${`<span class="bq-logo">${ico("bqUp")}</span>`}<span class="tx"><b>Relevé importé</b><em>${esc(file.name || "fichier")} · ${bqAgo(file.lastImport)}</em></span></div>` : "";
   return `<div class="glass pad bq-card st" style="--i:2"><div class="row"><span class="lbl">${ico("bqBank")}Banque</span>
       <span class="bq-tools">${links.length ? `<button class="iconbtn sm ${BQ.busy ? "spin" : ""}" data-act="bqSync" aria-label="Synchroniser maintenant" title="Synchroniser">${ico("bqSync")}</button>` : ""}<button class="iconbtn sm" data-act="bqSettings" aria-label="Réglages de la banque" title="Réglages">${ico("sliders")}</button></span></div>
-    <div class="bq-accs">${accRows}${fileRow}</div>
+    <div class="bq-accs">${accRows}${plRow}${fileRow}</div>
     <button class="bq-sum" data-act="bqList"><span class="tx"><b>${counted.length} dépense${counted.length > 1 ? "s" : ""} comptée${counted.length > 1 ? "s" : ""}</b><em>${esc(P.lab)} · ${bqEur(tot, 0)} HT${inP.length - counted.length > 0 ? ` · ${inP.length - counted.length} mise${inP.length - counted.length > 1 ? "s" : ""} de côté` : ""}</em></span>${todo ? `<span class="pill warn">${todo} à vérifier</span>` : ""}${ico("chev")}</button>
-    ${!links.length ? `<button class="btn soft block sm" data-act="bqConnect">${ico("bqBank")}Relier la banque pour tout recevoir seul</button>` : ""}</div>`;
+    ${!links.length && !pl.length ? `<button class="btn soft block sm" data-act="bqConnect">${ico("bqBank")}Relier la banque pour tout recevoir seul</button>` : ""}</div>`;
 }
 
 /* ───────── list of operations ───────── */
@@ -220,7 +226,7 @@ function bqTxSheet(id) {
   const paint = () => {
     const x = S.ui.bqX; const off = !!bqOffCat(x.cat); const est = (+t.amount || 0) / (1 + (BQ_VAT[x.cat] ?? 0.2));
     const cb = (cat) => `<button class="fin-catb ${x.cat === cat.k ? "on" : ""}" data-act="bqXCat" data-v="${cat.k}" role="radio" aria-checked="${x.cat === cat.k}">${ico(cat.ic)}<span>${cat.t}</span></button>`;
-    openSheet(`<div class="fin-sh bq-sh"><div class="bq-xh"><span class="bq-cic big">${ico(bqCatIc(x.cat))}</span><div><div class="h2">${esc(bqLabel(t))}</div><div class="sub">${esc(shortDate(t.day))} · <b class="mono">−${bqEur(t.amount, 2)}</b> TTC${t.src === "fichier" ? " · relevé importé" : ""}</div></div></div>
+    openSheet(`<div class="fin-sh bq-sh"><div class="bq-xh"><span class="bq-cic big">${ico(bqCatIc(x.cat))}</span><div><div class="h2">${esc(bqLabel(t))}</div><div class="sub">${esc(shortDate(t.day))} · <b class="mono">−${bqEur(t.amount, 2)}</b> TTC${t.src === "fichier" ? " · relevé importé" : t.src === "pennylane" ? " · via Pennylane" : ""}</div></div></div>
       <p class="bq-raw mono">${esc(t.label)}${t.who && !String(t.label).includes(t.who) ? ` · ${esc(t.who)}` : ""}</p>
       <span class="lbl">Compter dans les charges</span>
       <div class="fin-catgrid" role="radiogroup" aria-label="Catégorie">${FIN_CATS.map(cb).join("")}</div>
@@ -334,7 +340,7 @@ async function bqImport() {
   /* ids: same day + amount + label, numbered when they repeat in the file, so a second import of an overlapping file adds nothing */
   const seen = {}; const rows = ops.map((o) => { const k = `${o.day}|${o.amount}|${bqNorm(o.label)}`; seen[k] = (seen[k] || 0) + 1; return { ...o, id: "f_" + bqHash(k + "|" + seen[k]) + bqHash(k).slice(0, 3) }; });
   const have = new Set(BQ.tx.map((t) => t.id));
-  const api = BQ.tx.filter((t) => t.src === "banque"); /* the connected bank already has it: skip */
+  const api = BQ.tx.filter((t) => t.src === "banque" || t.src === "pennylane"); /* the connected bank already has it: skip */
   const fresh = rows.filter((r) => !have.has(r.id) && !api.some((t) => t.amount === Math.round(Math.abs(r.amount) * 100) / 100 && (t.dir === "out") === (r.amount < 0) && Math.abs(finDays(t.day, r.day)) <= 2));
   const outs = fresh.filter((r) => r.amount < 0); const days = rows.map((r) => r.day).sort();
   S.ui.bqImp = { name: f.name, rows: fresh, total: rows.length };
