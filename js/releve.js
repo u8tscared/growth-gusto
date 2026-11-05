@@ -145,9 +145,80 @@ function relRing(done, exp, size = 58) {
   return `<span class="rel-ring ${done >= exp && exp ? "full" : ""}" style="width:${size}px;height:${size}px"><svg viewBox="0 0 ${size} ${size}"><circle cx="${size / 2}" cy="${size / 2}" r="${R}" class="tr"/><circle cx="${size / 2}" cy="${size / 2}" r="${R}" class="pr" id="relRing" stroke-dasharray="${C}" stroke-dashoffset="${C * (1 - prev)}"/></svg><b class="mono">${done >= exp && exp ? ico("check") : `${done}<small>/${exp}</small>`}</b></span>`;
 }
 
+/* ───────────────────────── Relevés : jours précédents ───────────────────────── */
+const REL_NDAYS = 14;
+function relPickedDay() {
+  try { if (typeof lastNav !== "undefined" && S.ui.relDayT !== lastNav.t) { S.ui.relDayT = lastNav.t; S.ui.relDay = null; S.ui.relDaySc = null; } } catch (e) {}
+  const t = dayKey(), k = S.ui.relDay;
+  if (!k || k >= t || daysUntil(k) < -(REL_NDAYS - 1)) { S.ui.relDay = null; return t; }
+  return k;
+}
+/* fridges that existed that day, and the reading that stands for each round (the round one, else a service one) */
+function relDayFridges(k) { const end = parseDay(k).getTime() + 864e5; return S.fridges.filter((f) => !f.createdAt || f.createdAt < end); }
+function relRoundOf(k, slot, fid) { const rs = S.readings.filter((r) => r.day === k && r.slot === slot && r.fridgeId === fid); return rs.find((r) => !r.mid) || rs[0] || null; }
+function relDayStat(k, slots = ["midi", "soir"]) {
+  const frs = relDayFridges(k); let done = 0, bad = 0;
+  slots.forEach((sl) => frs.forEach((f) => { const r = relRoundOf(k, sl, f.id); if (r) { done++; if (!r.ok) bad++; } }));
+  const exp = frs.length * slots.length;
+  return { exp, done, bad, miss: exp - done, tone: bad ? "bad" : done < exp ? "warn" : "acc" };
+}
+function relDayStrip(sel) {
+  const t = dayKey(); const days = Array.from({ length: REL_NDAYS }, (_, i) => addDays(t, i - REL_NDAYS + 1));
+  const ini = ["D", "L", "M", "M", "J", "V", "S"];
+  const pills = days.map((k, i) => {
+    const today = k === t; const st = relDayStat(k); const tone = today ? (st.bad ? "bad" : st.done >= st.exp && st.exp ? "acc" : "now") : st.exp ? st.tone : "none";
+    const lab = today ? "Aujourd'hui" : relDayLabel(k);
+    const sx = tone === "acc" ? "complet" : tone === "warn" ? `${st.miss} non relevé${st.miss > 1 ? "s" : ""}` : tone === "bad" ? `${st.bad} hors seuil` : today ? "en cours" : "";
+    return `<button class="rel-dp ${k === sel ? "on" : ""} ${today ? "today" : ""}" style="--j:${i}" data-act="relDay" data-v="${k}" aria-label="${esc(lab)}${sx ? ", " + sx : ""}" aria-pressed="${k === sel}"><span class="w">${today ? "Auj." : ini[parseDay(k).getDay()]}</span><b>${parseDay(k).getDate()}</b><i class="s ${tone}"></i></button>`;
+  }).join("");
+  const first = days[0];
+  return `<div class="rel-days st" style="--i:1"><button class="iconbtn rel-dnav" data-act="relDayStep" data-v="-1" aria-label="Jour précédent" ${sel <= first ? "disabled" : ""}>${ico("back")}</button><div class="rel-dstrip" id="relDays">${pills}</div><button class="iconbtn rel-dnav nx" data-act="relDayStep" data-v="1" aria-label="Jour suivant" ${sel >= t ? "disabled" : ""}>${ico("back")}</button></div>`;
+}
+function relLcd(r) { const tone = !r ? "off" : r.ok ? (r.peak ? "pk" : "ok") : "bad"; return `<span class="rel-lcd ${tone}">${r ? fmt(r.value) + "°" : "– –"}</span>`; }
+function relPastRow(f, r) {
+  if (!r) return `<div class="li rel-prow miss"><span class="ic neu">${relIco(f)}</span><div class="tx"><b class="rel-ell">${esc(f.name)}</b><em class="rel-pmiss">Pas relevé</em></div>${relLcd(null)}</div>`;
+  const note = r.ok ? (r.peak ? `<span class="rel-pk">pic de service</span>` : r.mid ? " · en service" : "") : ` · <span class="rel-bad">${esc(r.action || "hors seuil")}</span>`;
+  return `<div class="li tap rel-prow" role="button" tabindex="0" data-act="relEdit" data-id="${r.id}" aria-label="${esc(f.name)}, ${fmt(r.value)} °C"><span class="ic ${r.ok ? (r.peak ? "warn" : "") : "bad"}">${relIco(f)}</span><div class="tx"><div class="rel-nm"><b class="rel-ell">${esc(f.name)}</b>${relFixedPill(r)}</div><em class="rel-pwho">${avatar(r.uid, true)}<span class="rel-ell">${esc(firstName(nameOf(r.uid)))} · ${hm(r.at)}${r.peak && r.ok ? " · " : ""}${note}</span></em></div>${relPhThumb(r)}${relLcd(r)}</div>`;
+}
+function relPastView(k) {
+  const frs = relDayFridges(k); const st = relDayStat(k);
+  const round = (slot, i) => {
+    const s1 = relDayStat(k, [slot]);
+    const pill = !frs.length ? "" : s1.bad ? `<span class="pill bad">${s1.bad} hors seuil</span>` : s1.miss ? `<span class="pill warn">${s1.miss === s1.exp ? "Pas fait" : `${s1.miss} manquant${s1.miss > 1 ? "s" : ""}`}</span>` : `<span class="pill acc">Complet</span>`;
+    const extra = s1.bad && s1.miss ? `<span class="pill warn">${s1.miss} manquant${s1.miss > 1 ? "s" : ""}</span>` : "";
+    return `<section class="glass pad rel-round st" style="--i:${i}"><div class="rel-rh"><span class="rel-slot ${slot}">${relSlotCap(slot)}</span><span class="rel-rpills">${extra}${pill}</span></div><div class="rel-rows">${frs.map((f) => relPastRow(f, relRoundOf(k, slot, f.id))).join("")}</div></section>`;
+  };
+  const sub = !st.exp ? "Aucun frigo ce jour-là" : !st.done ? "Aucun relevé ce jour-là" : [st.miss ? `${st.miss} non relevé${st.miss > 1 ? "s" : ""}` : "", st.bad ? `${st.bad} hors seuil` : ""].filter(Boolean).join(" · ") || "Tout est conforme";
+  const hero = `<div class="glass pad rel-psum ${st.tone} st" style="--i:2"><span class="rel-pbig mono">${st.done}<small>/${st.exp}</small></span><div class="rel-sumtx"><b class="h3">${relDayLabel(k)}</b><div class="sub">${sub}</div></div></div>`;
+  return `<div class="inner rel-page rel-past">${topBar("Relevé des frigos", { right: `<button class="btn soft sm rel-today" data-act="relDay" data-v="${dayKey()}">Aujourd'hui</button>` })}
+    ${relDayStrip(k)}${hero}
+    <div class="rel-pgrid">${round("midi", 3)}${round("soir", 4)}</div>
+    <p class="note st" style="--i:6;text-align:center">Touchez un relevé pour le voir ou le corriger. L'ancienne valeur reste dans le registre.</p></div>`;
+}
+function relStripAfter(v) {
+  const sc = $("#relDays", v); if (!sc) return; const on = $(".rel-dp.on", sc) || sc.lastElementChild; if (!on) return;
+  const want = on.offsetLeft - (sc.clientWidth - on.offsetWidth) / 2; const prev = S.ui.relDaySc;
+  sc.scrollLeft = prev != null ? prev : sc.scrollWidth;
+  requestAnimationFrame(() => { sc.scrollTo({ left: Math.max(0, want), behavior: prev != null && !matchMedia("(prefers-reduced-motion: reduce)").matches ? "smooth" : "auto" }); });
+  sc.addEventListener("scroll", () => { S.ui.relDaySc = sc.scrollLeft; }, { passive: true });
+}
+Object.assign(ACT, {
+  relDay: (a, id, v) => {
+    const t = dayKey(); const k = !v || v >= t ? null : v; if ((S.ui.relDay || null) === k) return;
+    S.ui.relDay = k; SFX.tick(); buzz(5); rerender();
+  },
+  relGoDay: (a, id, v) => { SFX.tap(); go("releve"); S.ui.relDay = v && v < dayKey() ? v : null; S.ui.relDayT = typeof lastNav !== "undefined" ? lastNav.t : 0; rerender(); },
+  relDayStep: (a, id, v) => {
+    const cur = S.ui.relDay || dayKey(); const k = addDays(cur, +v); const t = dayKey();
+    if (k > t || daysUntil(k) < -(REL_NDAYS - 1)) return; ACT.relDay(a, null, k);
+  },
+});
+
 /* ───────────────────────── Relevés ───────────────────────── */
 VIEWS.releve = {
   render() {
+    const pick = relPickedDay();
+    if (S.fridges.length && pick !== dayKey()) return relPastView(pick);
     const day = dayKey(), slot = S.slot;
     if (!S.fridges.length) return `<div class="inner narrow">${topBar("Relevé des frigos")}<div class="glass st empty" style="--i:1"><div class="ic">${ico("snow")}</div><b>Aucun frigo</b>Ajoutez vos frigos et chambres froides avec leurs seuils.<div style="margin-top:14px"><button class="btn acc" data-act="fridgeEdit">Ajouter un frigo</button></div></div></div>`;
     const rs = readingsFor(day, slot);
@@ -174,12 +245,14 @@ VIEWS.releve = {
       ? `<div class="glass pad rel-sum full st ${celeb ? "celeb" : ""}" style="--i:2"><div class="rel-sumrow">${relRing(done, exp)}<div class="rel-sumtx"><b class="h3">Relevé du ${relSlotName(slot)} terminé</b><div class="sub">${exp} frigo${exp > 1 ? "s" : ""} signé${exp > 1 ? "s" : ""}${rs.some((r) => !r.ok) ? ` · <span style="color:var(--bad)">${rs.filter((r) => !r.ok).length} hors seuil</span>` : ", tout est conforme"}. Touchez un frigo pour le corriger.</div></div></div>${slot === "midi" && readingsFor(day, "soir").length < exp ? `<button class="btn soft block" data-act="slot" data-v="soir">Passer au relevé du soir${ico("chev")}</button>` : ""}</div>`
       : `<div class="glass pad rel-sum st" style="--i:2"><div class="rel-sumrow">${relRing(done, exp)}<div class="rel-sumtx"><b class="h3">${done ? `${done} relevé${done > 1 ? "s" : ""} sur ${exp}` : `${exp} frigo${exp > 1 ? "s" : ""} à relever`}</b><div class="sub rel-ell">Reste : ${pending.map((f) => esc(f.name)).join(", ")}</div></div></div><div id="relAllW" class="rel-allw">${relAllBtn(pending)}</div></div>`;
     return `<div class="inner rel-page">${topBar("Relevé des frigos")}
+      ${relDayStrip(day)}
       <div class="seg st" style="--i:1" id="slotSeg"><span class="knob" style="width:calc(50% - 4px);transform:translateX(${slot === "soir" ? "100%" : "0"})"></span><button class="${slot === "midi" ? "on" : ""}" data-act="slot" data-v="midi">Midi</button><button class="${slot === "soir" ? "on" : ""}" data-act="slot" data-v="soir">Soir</button></div>
       ${sum}
       <div class="rel-grid">${cards}</div>
       <p class="note st" style="--i:9;text-align:center">Chaque relevé est daté et signé par la personne connectée. Une correction garde l'ancienne valeur dans le registre.</p></div>`;
   },
   after(v) {
+    relStripAfter(v);
     S.ui.relJust = null;
     const ring = $("#relRing", v); const to = S.ui.relRingTo;
     if (ring && to != null) { requestAnimationFrame(() => requestAnimationFrame(() => { ring.style.strokeDashoffset = S.ui.relRingC * (1 - to); })); S.ui.relRingPrev = to; }
@@ -298,13 +371,26 @@ function relEvents(f) {
   });
   return E.sort((a, b) => b.at - a.at);
 }
+/* « Ces 7 derniers jours » : one glance at the fridge's week; a day opens that day's relevé */
+function relWeekCard(f) {
+  const t = dayKey(); const days = Array.from({ length: 7 }, (_, i) => addDays(t, i - 6)); const ini = ["D", "L", "M", "M", "J", "V", "S"];
+  let exp = 0, done = 0, bad = 0, fixed = 0;
+  const cells = days.map((k) => {
+    const alive = !f.createdAt || f.createdAt < parseDay(k).getTime() + 864e5; let d = 0, b = 0;
+    ["midi", "soir"].forEach((sl) => { const r = relRoundOf(k, sl, f.id); if (r) { d++; if (!r.ok) b++; if (r.editedAt) fixed++; } });
+    const e = !alive ? 0 : k === t ? d : 2; exp += e; done += Math.min(d, e || d); bad += b;
+    const tone = !alive ? "none" : b ? "bad" : k === t ? (d >= 2 ? "acc" : "now") : d < 2 ? "warn" : "acc";
+    return `<button class="rel-wkc ${k === t ? "today" : ""}" data-act="relGoDay" data-v="${k}" aria-label="${esc(relDayLabel(k))}"><span>${k === t ? "Auj." : ini[parseDay(k).getDay()]}</span><i class="s ${tone}"></i></button>`;
+  }).join("");
+  return `<div class="glass pad rel-wk st" style="--i:4"><span class="lbl">Ces 7 derniers jours</span><div class="rel-wkg"><div class="${done < exp ? "warn" : ""}"><b class="mono">${done}<small>/${exp}</small></b><em>relevés</em></div><div class="${bad ? "bad" : ""}"><b class="mono">${bad}</b><em>hors seuil</em></div><div><b class="mono">${fixed}</b><em>corrigé${fixed > 1 ? "s" : ""}</em></div></div><div class="rel-wkd">${cells}</div></div>`;
+}
 function relTimeline(f) {
   const flt = S.ui.relHf || "all"; const all = relEvents(f); const E = all.filter((e) => flt === "all" || e.k === flt);
   const cnt = (k) => all.filter((e) => e.k === k).length;
   const chips = [["all", "Tout", all.length], ["temp", "Températures", cnt("temp")], ["move", "Entrées · sorties", cnt("move")], ["fix", "Corrections", cnt("fix")]].filter(([k, , n]) => k === "all" || n);
   const days = [...new Set(E.map((e) => dayKey(new Date(e.at))))].sort().reverse(); const n = S.ui.relDays || 7; const shown = days.slice(0, n);
   const curve = flt === "all" || flt === "temp" ? `<div class="glass pad st" style="--i:4"><div class="row"><span class="lbl">7 derniers jours</span><span class="sub" style="font-size:12px">Seuil ${relRange(f)}</span></div><div class="rel-chart" id="relChart" data-id="${f.id}"></div><div class="rel-legend"><span><i class="m"></i>Midi</span><span><i class="s"></i>Soir</span>${relIsService(f) ? `<span><i class="p"></i>Pic de service</span>` : ""}<span><i class="x"></i>Hors seuil</span></div></div>` : "";
-  return `<div class="chips rel-hf st" style="--i:4">${chips.map(([k, t, c]) => `<button class="chip ${flt === k ? "on" : ""}" data-act="relHf" data-v="${k}">${t}<em>${c}</em></button>`).join("")}</div>${curve}
+  return `${relWeekCard(f)}<div class="chips rel-hf st" style="--i:4">${chips.map(([k, t, c]) => `<button class="chip ${flt === k ? "on" : ""}" data-act="relHf" data-v="${k}">${t}<em>${c}</em></button>`).join("")}</div>${curve}
     <div class="glass pad st" style="--i:5">${E.length ? shown.map((k) => `<div class="rel-day"><div class="rel-dayh"><span>${relDayLabel(k)}</span><span>${shortDate(k)}</span></div>${E.filter((e) => dayKey(new Date(e.at)) === k).map((e) => `<div class="li tap rel-hev" role="button" tabindex="0" ${e.act}><span class="rel-evi ${e.tone}">${ico(e.ic)}</span><div class="tx"><b>${esc(e.t)}</b><em>${esc(e.s)}</em></div>${e.ph || ""}<span class="rel-evt mono">${hm(e.at)}</span></div>`).join("")}</div>`).join("") + (days.length > n ? `<button class="btn ghost block" data-act="relMore">Voir les jours précédents</button>` : "")
       : `<div class="empty" style="padding:16px 0 4px">${flt === "all" ? "Rien pour l'instant. Les relevés, entrées, sorties et corrections de ce frigo s'afficheront ici." : "Rien de ce type pour ce frigo."}</div>`}</div>`;
 }
