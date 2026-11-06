@@ -1,0 +1,109 @@
+/* Growth Gusto — « Récupérer mes réservations Zenchef » (js/resaimport.js). Prefix rz. Same cream + violet language as css/resa.css. */
+.rz{display:flex;flex-direction:column;gap:14px}
+.rz-h{display:flex;align-items:center;gap:10px;min-width:0}
+.rz .rs-ctab button{padding:10px 4px;font-size:14.5px}
+.rz-h .h2{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rz-lg{width:40px;height:40px;flex:none;border-radius:12px;background:#fff;box-shadow:0 0 0 1.5px var(--rim) inset,0 2px 0 #EFE6D6;display:grid;place-items:center;overflow:hidden}
+.rz-lg .brand-logo{width:26px;height:26px;object-fit:contain}
+.rz-b{display:flex;flex-direction:column;gap:14px;animation:rzIn .42s var(--ease) both}
+@keyframes rzIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.rz-lead{margin:0;font-size:15px;line-height:1.45;color:var(--ink-2);font-weight:560}
+.rz-fine{margin:0;font-size:12.5px;line-height:1.45;color:var(--muted);font-weight:560}
+.rz-lk{all:unset;cursor:pointer;display:inline-flex;align-items:center;gap:5px;color:var(--accent-ink);font-weight:700;font-size:inherit}
+.rz-lk .ico{width:14px;height:14px}
+.rz-lk:hover{text-decoration:underline}
+.rz-err{font-size:14px;font-weight:620;color:var(--bad);background:var(--tomato-tint);border-radius:14px;padding:11px 13px}
+
+/* the address */
+.rz-addr{min-height:48px}
+.rz-addr span{font-size:13.5px;white-space:normal;word-break:break-all;line-height:1.4}
+.rz-addr.sk{border-radius:14px;background:#F7F0E3;position:relative;overflow:hidden}
+.rz-addr.sk i,.rz-log.sk i{position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(255,255,255,.7),transparent);animation:rzSk 1.2s infinite}
+@keyframes rzSk{from{transform:translateX(-100%)}to{transform:translateX(100%)}}
+
+/* numbered steps */
+.rz-steps{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}
+.rz-steps li{display:flex;gap:12px;align-items:flex-start;font-size:14.5px;line-height:1.45;color:var(--ink);animation:rzIn .45s var(--ease) both;animation-delay:calc(var(--j) * 70ms + 80ms)}
+.rz-steps li>span{width:28px;height:28px;flex:none;border-radius:50%;background:var(--tint);color:var(--accent-ink);font-weight:800;font-size:14px;display:grid;place-items:center;margin-top:-2px}
+.rz-steps li>div{flex:1;min-width:0}
+.rz-steps b{font-weight:720}
+.rz-ia{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+
+/* waiting for the first e-mail */
+.rz-wait{display:flex;gap:12px;align-items:center;padding:13px 14px;border-radius:18px;background:var(--paper);box-shadow:0 0 0 1.5px var(--rim) inset}
+.rz-wait b{display:block;font-weight:740;font-size:14.5px}
+.rz-wait span{display:block;font-size:13px;color:var(--muted);font-weight:560;line-height:1.4}
+.rz-pulse{width:12px;height:12px;flex:none;border-radius:50%;background:var(--accent);box-shadow:0 0 0 0 rgba(74,31,230,.45);animation:rzP 1.8s infinite}
+@keyframes rzP{70%{box-shadow:0 0 0 10px rgba(74,31,230,0)}100%{box-shadow:0 0 0 0 rgba(74,31,230,0)}}
+
+/* the log of e-mails */
+.rz-log{display:flex;flex-direction:column;gap:6px;position:relative}
+.rz-log.sk{height:96px;border-radius:18px;background:#F7F0E3;overflow:hidden}
+.rz-lh{display:flex;align-items:center;justify-content:space-between;font-size:13px;color:var(--muted);margin-bottom:2px}
+.rz-lh b{font-weight:720}
+.rz-m{display:flex;align-items:center;gap:11px;padding:10px 12px;border-radius:16px;background:var(--paper);box-shadow:0 0 0 1.5px var(--rim) inset;animation:rzIn .4s var(--ease) both}
+.rz-m>div{flex:1;min-width:0}
+.rz-m b{display:block;font-size:14.5px;font-weight:720;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rz-m em{display:block;font-style:normal;font-size:12.5px;color:var(--muted);font-weight:560}
+.rz-m.gm{box-shadow:0 0 0 1.5px var(--accent) inset;background:var(--tint-2)}
+.rz-mk{flex:none;font-size:11.5px;font-weight:760;border-radius:999px;padding:3px 9px;background:#F1E9DA;color:var(--ink-2)}
+.rz-mk.ok{background:var(--tint);color:var(--accent-ink)}
+.rz-mk.warn{background:var(--saffron-tint);color:var(--saffron-ink)}
+.rz-mk.bad{background:var(--tomato-tint);color:var(--bad)}
+.rz-mk.acc{background:var(--accent);color:#fff}
+
+/* file */
+.rz-drop{cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:4px;text-align:center;padding:22px 16px;border-radius:22px;border:2px dashed var(--rim-2);background:var(--paper);transition:border-color .2s,background .2s,transform .3s var(--spring)}
+.rz-drop:hover,.rz-drop.over{border-color:var(--accent);background:var(--tint-2)}
+.rz-drop.over{transform:scale(1.015)}
+.rz-drop:active{transform:scale(.98)}
+.rz-di{width:52px;height:52px;border-radius:50%;background:var(--tint);color:var(--accent);display:grid;place-items:center;margin-bottom:6px;transition:transform .35s var(--spring)}
+.rz-drop:hover .rz-di{transform:translateY(-3px)}
+.rz-di .ico{width:24px;height:24px}
+.rz-drop b{font-weight:760;font-size:16px}
+.rz-drop span{font-size:13px;color:var(--muted);font-weight:560}
+.rz-or{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:13px;font-weight:650}
+.rz-or::before,.rz-or::after{content:"";flex:1;height:1.5px;background:var(--rim)}
+.rz-paste{min-height:96px;resize:vertical;font-size:14px;line-height:1.4}
+
+/* preview */
+.rz-sum{display:flex;flex-direction:column;gap:6px}
+.rz-big{display:flex;align-items:center;gap:12px}
+.rz-big>b{font-family:var(--d);font-variation-settings:"opsz" 96,"wdth" 90;font-size:52px;line-height:1;font-weight:780;letter-spacing:-.04em;color:var(--accent-ink);animation:rzPop .6s var(--spring) both}
+@keyframes rzPop{from{opacity:0;transform:scale(.6)}to{opacity:1;transform:none}}
+.rz-big span{font-size:16px;font-weight:720;line-height:1.25}
+.rz-big em{display:block;font-style:normal;font-size:13px;color:var(--muted);font-weight:580}
+.rz-prev{display:flex;flex-direction:column;gap:6px}
+.rz-pr{display:flex;align-items:center;gap:11px;padding:8px 12px 8px 8px;border-radius:18px;background:var(--paper);box-shadow:0 0 0 1.5px var(--rim) inset;animation:rzIn .4s var(--ease) both;animation-delay:calc(var(--j) * 45ms)}
+.rz-pr .rs-cv{width:44px;height:44px}
+.rz-pr .rs-cv b{font-size:18px}
+.rz-pr>div{flex:1;min-width:0}
+.rz-pr>div b{display:block;font-weight:720;font-size:14.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rz-pr>div em{display:block;font-style:normal;font-size:12.5px;color:var(--muted);font-weight:560}
+.rz-more{margin:2px 0 0;text-align:center;font-size:13px;color:var(--muted);font-weight:650}
+.rz-empty{display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center;padding:18px 8px}
+.rz-empty>.ico{width:44px;height:44px;padding:11px;box-sizing:border-box;border-radius:50%;background:var(--tint);color:var(--accent)}
+.rz-empty b{font-weight:760;font-size:16px}
+.rz-empty span{font-size:13.5px;color:var(--muted);font-weight:560;max-width:34ch;line-height:1.45}
+.rz-empty .btn{margin-top:8px}
+
+/* switch */
+.rz-hero{display:flex;gap:12px;align-items:flex-start;padding:15px;border-radius:20px;background:var(--acc-grad);color:#fff;box-shadow:var(--sh-acc)}
+.rz-hi{width:40px;height:40px;flex:none;border-radius:12px;background:rgba(255,255,255,.18);display:grid;place-items:center}
+.rz-hi .ico{width:22px;height:22px;color:#fff}
+.rz-hero b{display:block;font-size:16px;font-weight:780;letter-spacing:-.01em}
+.rz-hero span{display:block;font-size:13px;line-height:1.45;opacity:.9;margin-top:3px;font-weight:560}
+
+/* side card in Réservations */
+.rz-card{padding:16px;display:flex;flex-direction:column;gap:12px}
+.rz-card .rz-lg{width:44px;height:44px}
+.rz-card .rz-lg>.ico{width:21px;height:21px;color:var(--accent)}
+.rz-cb{display:flex;flex-direction:column;gap:6px}
+.rz-cb .btn{justify-content:center}
+.rz-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--faint);margin-right:6px;vertical-align:1px}
+.rz-dot.on{background:var(--ok);box-shadow:0 0 0 3px var(--tint-ok)}
+
+/* booking card tag */
+.rz-tag{font-size:12px;font-weight:700;color:#2F5FBF;background:var(--sky-tint);border-radius:999px;padding:2px 9px}
+
+@media (prefers-reduced-motion:reduce){.rz-b,.rz-steps li,.rz-m,.rz-pr,.rz-big>b{animation:none}.rz-pulse{animation:none}}

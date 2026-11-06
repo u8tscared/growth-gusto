@@ -5,7 +5,7 @@
    Data:
      restos/{rid}/bookings/{id}  { date:"YYYY-MM-DD", time:"HH:MM", covers, name, phone?, email?, notes?, table?, status, source, createdAt, by?, at?, seen? }
                                  status: "avenir" | "en ligne" (created by the public page) | "arrive" | "noshow" | "annule"
-                                 source: "tel" (in the app) | "web" (public page)
+                                 source: "tel" (in the app) | "web" (public page) | "zenchef", "thefork"… (js/resaimport.js, with ext { p, id?, by })
      restos/{rid}.resaCfg        { services:[{id,name,from,to,days:[0..6]}], slot, maxPerSlot, maxService, closures:[{from,to}], online, lead, maxOnline,
                                    horizon, msg, address, phone, photo, tables:[{id,n,seats,zone}] }   (gérant)
      restos/{rid}/public/resa    projection read by the public page, written here by any member (see rsSync): name, address, cfg,
@@ -216,7 +216,7 @@ VIEWS.resa = {
         ${rsHero(cfg, day, svcs, svc, all, mine)}
         ${tools}
         ${body}
-      </div><aside class="rs-side">${rsLinkCard(cfg)}</aside></div>
+      </div><aside class="rs-side">${rsLinkCard(cfg)}${typeof rzCardHTML === "function" ? rzCardHTML(cfg) : ""}</aside></div>
       <div class="ctabar rs-cta"><button class="btn acc block rs-new" data-act="rsNew">${ico("plus")}Nouvelle réservation</button></div>
     </div>`;
   },
@@ -277,7 +277,7 @@ function rsCard(b, cfg, i) {
     <button class="rs-hit" data-act="rsOpen" data-id="${esc(b.id)}" aria-label="${esc(b.name || "Réservation")}, ${+b.covers || 0} personnes à ${b.time}"></button>
     <span class="rs-cv"><b>${+b.covers || 0}</b><i>pers.</i></span>
     <span class="rs-tx"><b>${esc(b.name || "Sans nom")}</b>
-      <em>${cl && cl.vip ? `<span class="rs-vip">VIP</span>` : ""}${cs && cs.noshow ? `<span class="rs-nsw">${rsPl(cs.noshow, "no-show")}</span>` : ""}${tb ? `<span class="rs-tbl">T${esc(typeof plLabel === "function" ? plLabel(b, cfg) || tb.n : tb.n)}</span>` : ""}${web ? `<span class="rs-web">${fresh ? "Nouveau · " : ""}en ligne</span>` : ""}${b.phone ? `<span>${esc(b.phone)}</span>` : ""}</em>
+      <em>${cl && cl.vip ? `<span class="rs-vip">VIP</span>` : ""}${cs && cs.noshow ? `<span class="rs-nsw">${rsPl(cs.noshow, "no-show")}</span>` : ""}${tb ? `<span class="rs-tbl">T${esc(typeof plLabel === "function" ? plLabel(b, cfg) || tb.n : tb.n)}</span>` : ""}${web ? `<span class="rs-web">${fresh ? "Nouveau · " : ""}en ligne</span>` : ""}${typeof rzBadge === "function" ? rzBadge(b) : ""}${b.phone ? `<span>${esc(b.phone)}</span>` : ""}</em>
       ${b.notes ? `<span class="rs-note ${nk}">${nk ? ico("alert") : ""}${esc(b.notes)}</span>` : ""}</span>
     ${btn}
   </div>`;
