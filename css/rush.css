@@ -248,3 +248,4 @@ html.cf-live .nav[data-go=coupdefeu]::after{content:"";width:8px;height:8px;bord
 @media (prefers-reduced-motion:reduce){
   .cf-head::before,.cf-head::after,.cf-hcaur i,.cf-fl .ico,.cf-fl i,.cf-dot,.cf-tb.k-ready,.cf-mini .k-ready,.cf-rdn{animation:none!important}
 }
+.cf-svcs em.cf-today{margin-top:-8px;color:var(--ink);font-weight:600}
