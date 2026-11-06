@@ -109,10 +109,12 @@ function appIcon(size = 40) {
 
 /* the restaurant's own logo (r.logo: data:image or http(s) URL, set in onboarding or Réglages › Logo), "" when none */
 const restoLogo = (r) => { if (r === undefined) r = typeof S !== "undefined" ? S.resto : null; const l = r && typeof r.logo === "string" ? r.logo.trim() : ""; return /^(data:image\/|https?:\/\/)/i.test(l) ? l : ""; };
+/* a restaurant's initials skip the articles: « Le Comptoir » and « La Cantine » must not both read « LC » */
+const restoIni = (n) => { const w = String(n || "R").replace(/[’']/g, " ").split(/\s+/).filter((x) => x && !/^(le|la|les|l|du|de|des|d|au|aux|chez|et|&)$/i.test(x)); return w.length ? w.slice(0, 2).map((x) => x[0]).join("").toUpperCase() : initials(n); };
 /* the logo as a small rounded tile (.rlogo, css/base.css); without one: `fb` when given, else the initials tile. A logo that fails to load falls back to the initials. */
 function restoMark(size = 28, r, fb) {
   if (r === undefined) r = typeof S !== "undefined" ? S.resto : null;
-  const l = restoLogo(r), ini = initials((r && r.name) || "R").replace(/[^\p{L}\p{N}]/gu, "") || "R";
+  const l = restoLogo(r), ini = restoIni((r && r.name) || "R").replace(/[^\p{L}\p{N}]/gu, "") || "R";
   if (!l) return fb != null ? fb : `<span class="rlogo ini" style="--s:${size}px">${esc(ini)}</span>`;
   return `<span class="rlogo" style="--s:${size}px"><img src="${esc(l)}" alt="" referrerpolicy="no-referrer" onerror="var p=this.parentNode;p.classList.add('ini');p.textContent='${ini}'"></span>`;
 }
@@ -453,7 +455,7 @@ function renderChrome() {
   const navOn = (NAV.some((n) => n[0] === S.route) && S.route) || (VIEWS[S.route] && VIEWS[S.route].nav) || (TAB_OF[S.route] === "frigos" ? "frigos" : { note: "notes", fiche: "notes", tzEdit: "tickets", regReport: "registre" }[S.route] || S.route);
   const pend = S.fridges.length - todayStats(S.slot || slotNow()).done; /* current service only */
   side.innerHTML = `<div class="brand">${appIcon(36)}<span>Growth <span class="gg-b">Gusto</span></span></div>
-    ${S.resto ? `<button class="nav" data-act="restoSwitch" style="background:var(--glass-2);margin-bottom:10px">${restoMark(28, S.resto, `<span style="width:28px;height:28px;flex:none;border-radius:9px;display:grid;place-items:center;background:#F6B93B;color:#1B1530;box-shadow:0 2px 0 #D99A1E;font-size:11px;font-weight:800">${esc(initials(S.resto.name))}</span>`)}<span style="flex:1;min-width:0;text-align:left"><b style="display:block;color:var(--ink);font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(S.resto.name)}</b><span style="font-size:11.5px">${S.restos.length} établissement${S.restos.length > 1 ? "s" : ""}</span></span>${ico("down")}</button>` : ""}
+    ${S.resto ? `<button class="nav" data-act="restoSwitch" style="background:var(--glass-2);margin-bottom:10px">${restoMark(28, S.resto, `<span style="width:28px;height:28px;flex:none;border-radius:9px;display:grid;place-items:center;background:#F6B93B;color:#1B1530;box-shadow:0 2px 0 #D99A1E;font-size:11px;font-weight:800">${esc(restoIni(S.resto.name))}</span>`)}<span style="flex:1;min-width:0;text-align:left"><b style="display:block;color:var(--ink);font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(S.resto.name)}</b><span style="font-size:11.5px">${S.restos.length} établissement${S.restos.length > 1 ? "s" : ""}</span></span>${ico("down")}</button>` : ""}
     <div class="navs">${(typeof pzNav === "function" ? pzNav() : navAllowed()).concat(navAdmin()).map(([r, i, t, c]) => r === "sep" ? `<div class="sep">${esc(t)}</div>` : `<button class="nav ${navOn === r ? "on" : ""}${c ? " pz-c " + c : ""}" data-go="${r}">${ico(i)}<span class="nt">${esc(t)}</span>${r === "home" && urgentCount() ? `<span class="count">${urgentCount()}</span>` : ""}${r === "consignes" && typeof csUnread === "function" && csUnread() ? `<span class="count" style="background:var(--accent)">${csUnread()}</span>` : ""}${r === "alertes" && typeof ALERTES !== "undefined" && ALERTES.count() ? `<span class="count" style="background:var(--bad)">${ALERTES.count()}</span>` : ""}${r === "releve" && pend > 0 && S.fridges.length ? `<span class="count" style="background:var(--warn)">${pend}</span>` : ""}</button>`).join("")}</div>
     <div class="me" data-go="reglages" role="button" tabindex="0" title="Réglages">${avatar(S.me.id)}<div style="min-width:0;flex:1"><b>${esc(S.me.name || "Vous")}</b><em>${ROLES[myRole()]}</em></div>${ico("sliders")}</div>`;
   const sv = $(".navs", side);
@@ -854,7 +856,7 @@ function registerSW() {
    to the foreground. A new v means the code running here is old: with nothing in progress the app reloads silently (caches dropped,
    so the reload is guaranteed fresh); otherwise a toast offers « Mettre à jour ». sessionStorage guards against reload loops:
    one reload attempt per version per session, after which the version is simply adopted. */
-const APP_V = "2026-11-06.15";
+const APP_V = "2026-11-06.17";
 /* logos of the tools Growth Gusto connects to (img/logos/<id>.svg|png): caisses, réservations, comptabilité, banque, paiement */
 const BRAND_LOGOS = { sumup: "svg", zelty: "png", lightspeed: "svg", tiller: "svg", square: "svg", innovorder: "svg", popina: "png", zenchef: "svg", thefork: "png", sevenrooms: "png", guestonline: "png", resy: "svg", opentable: "svg", formitable: "svg", google: "svg", pennylane: "svg", qonto: "svg", quickbooks: "svg", sage: "svg", odoo: "svg", stripe: "svg", zebra: "svg" };
 const brandLogo = (id) => BRAND_LOGOS[id] ? `<img class="brand-logo" src="img/logos/${id}.${BRAND_LOGOS[id]}" alt="" loading="lazy" decoding="async" draggable="false">` : "";

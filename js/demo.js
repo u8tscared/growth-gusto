@@ -260,6 +260,8 @@ window.GG_DEMO = {
     }
     /* ── bank already linked (js/banque.js), so Finances shows real bank lines from the first tap ── */
     if (typeof bqDemoData === "function") { const B = bqDemoData(); put("bank", B.link, "eb_demo"); B.tx.forEach(([k, t]) => put("bankTx", t, k)); }
+    /* ── multi-restaurant (js/multi.js): two sister restaurants of the same owner, reshaped from this one, and transfers between them ── */
+    if (typeof mrDemoSisters === "function") { try { mrDemoSisters(D, RID, rnd); } catch (e) { console.warn("demo sites", e); } }
     return { rid: RID, data: D, me: { id: "demo-camille", name: "Camille Laurent", color: "#4A1FE6" } };
   },
 };
