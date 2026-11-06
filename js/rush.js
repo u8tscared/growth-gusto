@@ -3,9 +3,10 @@
      - Salle : les plats prêts à servir (« Servi » d'un geste), les tables ouvertes, ouvrir une table, les arrivées des réservations.
      - Cuisine : les bons en cours (les cartes de l'écran cuisine, js/salle.js), les ruptures, les relevés de température à faire.
      - Pilotage (gérant, chef) : tout le service en direct : couverts, tables, temps en cuisine, retards, plats qui attendent au passe.
-   Allumage : tout seul sur l'Accueil, 15 min avant chaque service (horaires des Réservations : restos/{rid}.resaCfg.services),
-   une fois par service et par appareil ; ou d'un geste (carte de l'Accueil, menu « Coup de feu »). Extinction : 45 min après la
-   dernière table du service, avec le bilan. « Quitter » le coupe jusqu'au service suivant.
+   Allumage : tout seul sur l'Accueil (services des Réservations : restos/{rid}.resaCfg.services),
+   calé sur les réservations du jour : 15 min avant la première résa du service, une fois par service et par appareil ; ou d'un
+   geste (carte de l'Accueil, menu « Coup de feu »). Extinction : 45 min après la dernière résa du service, avec le bilan. Un service
+   sans aucune résa garde ses horaires des Réservations. « Quitter » le coupe jusqu'au service suivant.
    Rôle : d'après le poste de la personne (js/perms.js : salle / bar → Salle, cuisine / plonge / second → Cuisine, gérant → Pilotage),
    changeable d'un geste ; le choix est gardé sur l'appareil (la tablette de la cuisine reste en Cuisine).
    Data: none of its own. Reads js/salle.js (salleTabs + clientOrders), js/resa.js (bookings, services), the fridges and readings.
@@ -34,20 +35,36 @@ const cfMin = (t) => { const m = /^(\d{1,2}):(\d{2})/.exec(t || ""); return m ? 
 const cfPl = (n, w, ws) => `${n} ${n > 1 ? ws || w + "s" : w}`;
 const cfOn = () => typeof abHas !== "function" || abHas("coupdefeu");
 
-/* ───────── the service going on now (from the booking hours), or null ───────── */
+/* ───────── the service going on now, or null ─────────
+   The window follows the day's bookings: it opens 15 min before the first booking of the service and closes 45 min after
+   the last one. A service with no booking today falls back to its hours in the Réservations settings (from → to). */
+function cfSpan(cfg, k, s) {
+  let times = [];
+  try { times = rsOfDay(k).filter((b) => rsLive(b) && b.time && rsSvcOf(cfg, k, b.time).id === s.id).map((b) => rsMin(b.time)); } catch (e) {}
+  if (!times.length) return { from: s.from, to: s.to, n: 0 };
+  const a = Math.min(...times), b = Math.max(...times), h = (m) => `${String(Math.floor(m / 60) % 24).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
+  return { from: h(a), to: h(b), n: times.length };
+}
 function cfSvc(now = new Date()) {
   if (!S.resto) return null;
-  let list = [];
-  try { const cfg = rsCfg(); list = typeof rsSvcsOn === "function" ? rsSvcsOn(cfg, dayKey()) : cfg.services; } catch (e) { list = [{ id: "midi", name: "Midi", from: "12:00", to: "13:45" }, { id: "soir", name: "Soir", from: "19:00", to: "21:45" }]; }
+  let list = [], cfg = null; const k = dayKey();
+  try { cfg = rsCfg(); list = typeof rsDaySvcs === "function" ? rsDaySvcs(cfg, k) : typeof rsSvcsOn === "function" ? rsSvcsOn(cfg, k) : cfg.services; } catch (e) { list = [{ id: "midi", name: "Midi", from: "12:00", to: "13:45" }, { id: "soir", name: "Soir", from: "19:00", to: "21:45" }]; }
   const m = now.getHours() * 60 + now.getMinutes(), d0 = new Date(now); d0.setHours(0, 0, 0, 0);
   for (const s of list) {
-    const a = cfMin(s.from) - CF_PRE, b = cfMin(s.to) + CF_POST;
-    if (m >= a && m < b) return { id: s.id, name: s.name || "Service", from: s.from, to: s.to, key: dayKey() + "|" + s.id, t0: d0.getTime() + a * 6e4, t1: d0.getTime() + b * 6e4, live: m >= cfMin(s.from), inMin: cfMin(s.from) - m };
+    const sp = cfg ? cfSpan(cfg, k, s) : { from: s.from, to: s.to, n: 0 };
+    const a = cfMin(sp.from) - CF_PRE, b = cfMin(sp.to) + CF_POST;
+    if (m >= a && m < b) return { id: s.id, name: s.name || "Service", from: sp.from, to: sp.to, resa: sp.n, key: k + "|" + s.id, t0: d0.getTime() + a * 6e4, t1: d0.getTime() + b * 6e4, live: m >= cfMin(sp.from), inMin: cfMin(sp.from) - m };
   }
-  /* demo: there is always a service in full swing (js/salle.js seeds a lunch rush) */
-  if (DB.mode === "demo") { const mid = now.getHours() < 16; return { id: "demo", name: mid ? "Midi" : "Soir", from: mid ? "12:00" : "19:00", to: mid ? "13:45" : "21:45", key: dayKey() + "|demo", t0: Date.now() - 3 * 36e5, t1: Date.now() + 3 * 36e5, live: true, inMin: 0, demo: true }; }
+  /* demo: there is always a service in full swing (js/salle.js seeds a lunch rush); hours from the demo bookings when there are some */
+  if (DB.mode === "demo") {
+    const mid = now.getHours() < 16, s0 = { id: mid ? "midi" : "soir", from: mid ? "12:00" : "19:00", to: mid ? "13:45" : "21:45" };
+    const sp = cfg ? cfSpan(cfg, k, (list.find((x) => x.id === s0.id) || s0)) : { from: s0.from, to: s0.to, n: 0 };
+    return { id: "demo", name: mid ? "Midi" : "Soir", from: sp.from, to: sp.to, resa: sp.n, key: k + "|demo", t0: Date.now() - 3 * 36e5, t1: Date.now() + 3 * 36e5, live: true, inMin: 0, demo: true };
+  }
   return null;
 }
+/* "19:30 – 21:15 · 1re à dernière résa" or "19:00 – 21:45 · horaires du service" */
+const cfSpanT = (s) => `${esc(s.from)} – ${esc(s.to)} · ${s.resa ? (s.resa > 1 ? "1re à dernière résa" : "1 seule résa") : "horaires du service"}`;
 const cfSvcT = (s) => { const n = String((s && s.name) || "").toLowerCase(); return n === "midi" ? "service du midi" : n === "soir" ? "service du soir" : `service « ${(s && s.name) || ""} »`; };
 
 /* ───────── who needs what ───────── */
@@ -131,7 +148,7 @@ VIEWS.coupdefeu = {
     return `<div class="inner wide cf cf-r-${role}">
       <header class="cf-head st" style="--i:0">
         <span class="cf-fl" aria-hidden="true"><i></i><i></i>${ico("cfFlame")}</span>
-        <div class="cf-ht"><span class="cf-kick"><i class="cf-dot"></i>Coup de feu</span><b>${s ? esc(cfSvcT(s).replace(/^./, (c) => c.toUpperCase())) : "Hors service"}</b><em>${s ? `${esc(s.from)} – ${esc(s.to)}${!s.live && s.inMin > 0 ? ` · dans ${s.inMin} min` : ""}` : "Allumé à la main"}</em></div>
+        <div class="cf-ht"><span class="cf-kick"><i class="cf-dot"></i>Coup de feu</span><b>${s ? esc(cfSvcT(s).replace(/^./, (c) => c.toUpperCase())) : "Hors service"}</b><em>${s ? `${cfSpanT(s)}${!s.live && s.inMin > 0 ? ` · dans ${s.inMin} min` : ""}` : "Allumé à la main"}</em></div>
         <span class="cf-clock mono" id="cfClock">${hm(Date.now())}</span>
         <button class="iconbtn cf-set" data-act="cfSet" aria-label="Réglages du coup de feu" title="Réglages">${ico("sliders")}</button>
         <button class="btn soft cf-exit" data-act="cfExit">${ico("cfDoor")}<span>Quitter</span></button>
@@ -274,13 +291,14 @@ function cfNewTableSheet() {
       : `<p class="sub">Toutes les tables sont occupées.</p>`}</div>`);
 }
 function cfSetSheet() {
-  let svcs = []; try { svcs = rsCfg().services || []; } catch (e) {}
+  let svcs = [], cfg = null; try { cfg = rsCfg(); svcs = cfg.services || []; } catch (e) {}
+  const today = (s) => { if (!cfg) return ""; let on = true; try { on = rsDaySvcs(cfg, dayKey()).some((x) => x.id === s.id); } catch (e) {} if (!on) return "fermé aujourd'hui"; const sp = cfSpan(cfg, dayKey(), s); return sp.n ? `aujourd'hui ${sp.from} – ${sp.to} · ${cfPl(sp.n, "résa")}` : "aujourd'hui pas encore de résa"; };
   const on = cfAuto(), D = ["dim", "lun", "mar", "mer", "jeu", "ven", "sam"];
   openSheet(`<div class="cf-sh"><div class="sl-shh"><span class="h2">Coup de feu</span><button class="iconbtn" data-act="sheetClose" aria-label="Fermer">${ico("x")}</button></div>
-    <button class="cf-sw${on ? " on" : ""}" data-act="cfAutoTog" role="switch" aria-checked="${on}"><span><b>S'allume tout seul</b><em>Sur cet appareil, ${CF_PRE} min avant chaque service, et s'éteint ${CF_POST} min après la dernière table.</em></span><i></i></button>
+    <button class="cf-sw${on ? " on" : ""}" data-act="cfAutoTog" role="switch" aria-checked="${on}"><span><b>S'allume tout seul</b><em>Sur cet appareil, ${CF_PRE} min avant la première réservation du service, et s'éteint ${CF_POST} min après la dernière.</em></span><i></i></button>
     <div class="lbl">Vos services</div>
-    <div class="glass cf-svcs">${svcs.map((s) => `<div><b>${esc(s.name)}</b><span class="mono">${esc(s.from)} – ${esc(s.to)}</span><em>${(s.days || []).slice().sort((a, b) => ((a + 6) % 7) - ((b + 6) % 7)).map((d) => D[d]).join(" ")}</em></div>`).join("") || `<p class="sub">Aucun service.</p>`}</div>
-    <p class="note">Les horaires viennent des Réservations : changez-les là-bas, le coup de feu suit.</p>
+    <div class="glass cf-svcs">${svcs.map((s) => `<div><b>${esc(s.name)}</b><span class="mono">${esc(s.from)} – ${esc(s.to)}</span><em>${(s.days || []).slice().sort((a, b) => ((a + 6) % 7) - ((b + 6) % 7)).map((d) => D[d]).join(" ")}</em>${cfg ? `<em class="cf-today">${esc(today(s))}</em>` : ""}</div>`).join("") || `<p class="sub">Aucun service.</p>`}</div>
+    <p class="note">Le coup de feu suit les réservations du jour : il démarre avant la première et s'arrête après la dernière. Un service sans réservation garde ses horaires, réglés dans les Réservations.</p>
     ${myRole() === "gerant" || DB.mode === "demo" ? `<button class="btn soft block" data-act="cfHours">${ico("clock")}Modifier les horaires</button>` : ""}</div>`);
 }
 
