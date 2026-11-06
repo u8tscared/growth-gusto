@@ -245,6 +245,19 @@ window.GG_DEMO = {
     const EV = [[0, "reading", "a fait le relevé du midi", "demo-lucas"], [0, "move", "a mis 5 bourriches de fines de claire au frigo de service 1", "demo-lucas"], [1, "lot", "a fabriqué 60 croquettes de jambon", "demo-ines"], [1, "reception", "a réceptionné Primeurs Lucas", "demo-thomas"], [2, "reception", "a réceptionné Crèmerie Duval", "demo-thomas"], [3, "reading", "a signalé le frigo de service 1 à 7,6 °C (porte mal fermée)", "demo-sarah"], [3, "reception", "a réceptionné Maison Ripert", "demo-ines"], [4, "ticket", "a enregistré le ticket Z", "demo-camille"], [6, "obl", "a enregistré le passage des nuisibles", "demo-camille"], [8, "team", "a ajouté Hugo Martin à l'équipe", "demo-camille"]];
     EV.forEach(([ago, type, text, uid], i) => put("events", { type, text, at: at(addDays(today, -ago), 11 + (i % 6), 10 + i), uid }));
 
+    /* ── consignes & discussion (js/consignes.js) ── */
+    {
+      const mn = (k) => now - k * 60000; const yest = addDays(today, -1);
+      const c1 = put("consignes", { kind: "plat", text: "Joue de bœuf braisée, purée maison · 18 €\nDessert : tarte fine aux pommes", day: today, keep: false, at: mn(95), uid: "demo-thomas", by: "Thomas Girard" }, "cs-plat");
+      const c2 = put("consignes", { kind: "rupture", text: "Plus de bar de ligne ce midi", day: today, keep: true, at: mn(70), uid: "demo-thomas", by: "Thomas Girard" }, "cs-bar");
+      const c3 = put("consignes", { kind: "info", text: "Livraison Metro vers 10 h : Lucas réceptionne. Contrôle des extincteurs jeudi matin.", day: today, keep: false, at: mn(120), uid: "demo-camille", by: "Camille Laurent" }, "cs-info");
+      put("consignes", { kind: "rupture", text: "Plus de Chablis 2022 (commande en cours)", day: yest, keep: true, at: now - 26 * 36e5, uid: "demo-camille", by: "Camille Laurent" }, "cs-chablis");
+      [[c3, "demo-thomas", "Thomas Girard", 110], [c3, "demo-ines", "Inès Benali", 98], [c3, "demo-lucas", "Lucas Petit", 64], [c1, "demo-ines", "Inès Benali", 80], [c1, "demo-sarah", "Sarah Lemoine", 40], [c2, "demo-sarah", "Sarah Lemoine", 38], [c2, "demo-ines", "Inès Benali", 60], ["cs-chablis", "demo-sarah", "Sarah Lemoine", 1500], ["cs-chablis", "demo-thomas", "Thomas Girard", 1450]]
+        .forEach(([cid, pid, name, k]) => put("csReads", { cid, pid, name, at: mn(k) }, `${cid}~${pid}`));
+      [["demo-ines", "Inès Benali", "Je peux échanger mon samedi soir avec quelqu'un ? J'ai un mariage.", 1560], ["demo-hugo", "Hugo Martin", "Moi je prends, je suis dispo.", 1530], ["demo-camille", "Camille Laurent", "Merci Hugo ! Je change le planning.", 1500],
+        ["demo-thomas", "Thomas Girard", "Le lave-vaisselle fuit encore un peu côté gauche, j'ai mis un seau.", 140], ["demo-camille", "Camille Laurent", "Le technicien passe demain à 9 h.", 125], ["demo-sarah", "Sarah Lemoine", "Table de 12 ce soir à 20 h, anniversaire : prévoir une bougie 🎂", 30]]
+        .forEach(([uid, by, text, k]) => put("chat", { text, at: mn(k), uid, by }));
+    }
     return { rid: RID, data: D, me: { id: "demo-camille", name: "Camille Laurent", color: "#4A1FE6" } };
   },
 };
