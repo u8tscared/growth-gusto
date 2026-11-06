@@ -322,22 +322,6 @@ details[open] summary i::before,details[open] summary i::after{background:#fff}
 @media (min-width:980px){.band{padding:0 16px}.band .wall{padding:84px 48px}}
 
 /* footer (also used by the home page) */
-.sf{margin-top:96px;background:var(--ink);color:#C9C2E0;padding:64px var(--g) 36px;border-radius:40px 40px 0 0}
-.sf-in{max-width:1240px;margin:0 auto;display:grid;gap:40px}
-.sf-brand .brand{color:#fff;font-size:28px}
-.sf-brand .brand b{color:#A98CFF}
-.sf-brand p{margin-top:14px;font-size:15px;line-height:1.55;max-width:22em;color:#B9B2CF}
-.sf-brand .btn{margin-top:22px}
-.sf-cols{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:32px 20px}
-.sf-col h3{font:700 13px/1 var(--f);letter-spacing:.08em;text-transform:uppercase;color:#8E86AA;margin-bottom:14px}
-.sf-col ul{list-style:none;padding:0;margin:0;display:grid;gap:9px}
-.sf-col a{color:#E4DEFF;text-decoration:none;font-size:15px;transition:color .2s}
-.sf-col a:hover{color:#fff;text-decoration:underline;text-underline-offset:3px}
-.sf-bot{max-width:1240px;margin:44px auto 0;padding-top:22px;border-top:1px solid rgba(255,255,255,.12);display:flex;flex-wrap:wrap;gap:10px 22px;font-size:13.5px;color:#8E86AA}
-.sf-bot a{color:#B9B2CF;text-decoration:none}
-.sf-bot a:hover{color:#fff}
-@media (min-width:760px){.sf-cols{grid-template-columns:repeat(4,minmax(0,1fr))}}
-@media (min-width:1100px){.sf-in{grid-template-columns:300px minmax(0,1fr);gap:64px}}
 
 /* motion: reveal on scroll */
 .js [data-r]{opacity:0;transform:translateY(30px);transition:opacity .7s var(--ease),transform .9s var(--spring);transition-delay:calc(var(--dl,0)*80ms)}
