@@ -7,6 +7,15 @@ Chaque merge sur `main` lance `.github/workflows/deploy.yml` :
 
 Suivi : onglet **Actions** du dépôt, workflow « Mise en ligne ». Plus besoin de lancer `firebase deploy` depuis le Mac.
 
+## PR fusionnées toutes seules
+
+`.github/workflows/pr.yml` vérifie chaque PR (`node tools/ci.js` : syntaxe de tous les fichiers, puis l'app s'ouvre dans un
+vrai navigateur, crée un restaurant et enregistre un relevé, sans aucune erreur). Une PR de Claude (branche `claude/…`)
+qui passe est fusionnée automatiquement, puis la mise en ligne est lancée.
+
+Rien n'est fusionné si : la vérification échoue, la PR est en conflit avec `main`, elle est en brouillon, elle porte le
+label `attendre`, ou elle modifie `.github/workflows/` (GitHub l'interdit à l'automate). Un commentaire le dit sur la PR.
+
 ## Connexion sans clé (réglage unique, déjà fait une fois)
 
 GitHub se connecte à Google par Workload Identity Federation : aucune clé, aucun secret. Seul le dépôt
