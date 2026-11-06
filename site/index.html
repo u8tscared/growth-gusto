@@ -92,14 +92,14 @@ p{margin:0}
 @supports (backdrop-filter:blur(2px)){.top{background:rgba(251,246,236,.86);backdrop-filter:saturate(1.3) blur(12px);-webkit-backdrop-filter:saturate(1.3) blur(12px)}}
 .top.sc{box-shadow:0 1.5px 0 var(--rim)}
 .top .wrap{display:flex;align-items:center;gap:10px;height:68px}
-.brand{display:inline-flex;align-items:center;gap:10px;text-decoration:none;font:780 21px/1 var(--d);font-variation-settings:"opsz" 96,"wdth" 90;letter-spacing:-.035em;color:var(--ink);margin-right:auto;white-space:nowrap}
+.brand{display:inline-flex;align-items:baseline;text-decoration:none;font:800 23px/1 var(--d);font-variation-settings:"opsz" 96,"wdth" 88;letter-spacing:-.045em;color:var(--ink);margin-right:auto;white-space:nowrap}
 /* the mark: cream tile, square and level, the G centred by eye (no tilt, no lip) */
 .gg-mk{flex:none;display:grid;place-items:center;width:36px;height:36px;border-radius:10px;background:#FFFDF8;box-shadow:inset 0 0 0 1.5px #DCCFB8,0 1px 2px rgba(27,21,48,.08);transition:transform .4s var(--spring)}
 .gg-mk img{display:block;width:23px;height:23px}
 .gg-mk.sm{width:22px;height:22px;border-radius:7px;box-shadow:none}
 .gg-mk.sm img{width:14px;height:14px}
 @media (hover:hover){.brand:hover .gg-mk{transform:translateY(-1px) scale(1.05)}}
-.brand b{color:var(--v);font-weight:inherit}
+.brand b{color:var(--v);font-weight:inherit;margin-left:.22em}
 .links{display:none;gap:4px}
 .links a{white-space:nowrap;font:650 15px/1 var(--f);color:var(--ink2);text-decoration:none;padding:11px 14px;border-radius:12px;transition:background .2s,color .2s}
 .links a:hover{background:var(--bg2);color:var(--ink)}
@@ -445,7 +445,23 @@ summary:hover i{background:var(--tint)}
 }
 
 /* ── footer ── */
-footer{padding:64px var(--g) 40px}
+/* shared footer (same as /css/site.css) */
+.sf{margin-top:96px;background:var(--ink);color:#C9C2E0;padding:64px var(--g) 36px;border-radius:40px 40px 0 0}
+.sf-in{max-width:1240px;margin:0 auto;display:grid;gap:40px}
+.sf-brand .brand{color:#fff;font-size:28px}
+.sf-brand .brand b{color:#A98CFF}
+.sf-brand p{margin-top:14px;font-size:15px;line-height:1.55;max-width:22em;color:#B9B2CF}
+.sf-brand .btn{margin-top:22px}
+.sf-cols{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:32px 20px}
+.sf-col h3{font:700 13px/1 var(--f);letter-spacing:.08em;text-transform:uppercase;color:#8E86AA;margin-bottom:14px}
+.sf-col ul{list-style:none;padding:0;margin:0;display:grid;gap:9px}
+.sf-col a{color:#E4DEFF;text-decoration:none;font-size:15px;transition:color .2s}
+.sf-col a:hover{color:#fff;text-decoration:underline;text-underline-offset:3px}
+.sf-bot{max-width:1240px;margin:44px auto 0;padding-top:22px;border-top:1px solid rgba(255,255,255,.12);display:flex;flex-wrap:wrap;gap:10px 22px;font-size:13.5px;color:#8E86AA}
+.sf-bot a{color:#B9B2CF;text-decoration:none}
+.sf-bot a:hover{color:#fff}
+@media (min-width:760px){.sf-cols{grid-template-columns:repeat(4,minmax(0,1fr))}}
+@media (min-width:1100px){.sf-in{grid-template-columns:300px minmax(0,1fr);gap:64px}}
 .foot{display:grid;gap:26px;max-width:1240px;margin:0 auto;padding-top:28px;border-top:1.5px solid var(--rim)}
 .foot p{color:var(--muted);font-size:14.5px;margin-top:12px}
 .foot nav{display:flex;flex-wrap:wrap;gap:6px 22px;align-items:center}
@@ -498,7 +514,7 @@ footer{padding:64px var(--g) 40px}
 .menu-b .btn{height:48px;padding:0 10px;font-size:15px;width:100%}
 @keyframes menu{0%{opacity:0;transform:translateY(-8px) scale(.97)}100%{opacity:1;transform:none}}
 @media (min-width:900px){.burger,.menu{display:none!important}}
-@media (max-width:380px){.top .wrap{gap:6px}.brand{font-size:19px;gap:8px}.brand .gg-mk{width:32px;height:32px;border-radius:9px}.brand .gg-mk img{width:20px;height:20px}.top .btn.sm{padding:0 13px}}
+@media (max-width:380px){.top .wrap{gap:6px}.brand{font-size:21px}.top .btn.sm{padding:0 13px}}
 
 /* hero on small phones: kitchen on the left, phone on the right, nothing overlaps */
 @media (max-width:979px){.hero h1{font-size:clamp(40px,11vw,80px)}}
@@ -641,14 +657,8 @@ footer{padding:64px var(--g) 40px}
 <body>
 <header class="top" id="nav">
 <div class="wrap">
-<a class="brand" href="#top" aria-label="Growth Gusto, accueil"><span class="gg-mk" aria-hidden="true"><img src="mark.svg" alt="" width="22" height="22"></span><span>Growth <b>Gusto</b></span></a>
-<nav class="links" aria-label="Sections">
-<a href="#fonctionnalites">Fonctionnalités</a>
-<a class="xl" href="#integrations">Ce qui se relie</a>
-<a href="#comparatif">Comparatif</a>
-<a href="#tarifs">Tarifs</a>
-<a href="#faq">FAQ</a>
-</nav>
+<a class="brand" href="#top" aria-label="Growth Gusto, accueil">Growth<b>Gusto</b></a>
+<nav class="links" aria-label="Sections"><!--nav:start--><a href="/fonctionnalites">Fonctionnalités</a><a href="/restaurants">Restaurants</a><a href="#tarifs">Tarifs</a><a href="/guides">Guides</a><a class="xl" href="#comparatif">Comparatif</a><!--nav:end--></nav>
 <button class="mute" id="mute" type="button" aria-pressed="true" aria-label="Sons de l'interface" title="Sons">
 <svg class="on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/></svg>
 <svg class="off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="M16 9.5l5 5M21 9.5l-5 5"/></svg>
@@ -657,14 +667,7 @@ footer{padding:64px var(--g) 40px}
 <a class="btn v sm" href="https://app.growthgusto.fr/?signup=1" target="_blank" rel="noopener"><span class="cta-long">Essayer 14 jours</span><span class="cta-short">Essayer</span></a>
 <button class="burger" id="burger" type="button" aria-expanded="false" aria-controls="menu" aria-label="Menu"><i></i><i></i></button>
 </div>
-<nav class="menu" id="menu" aria-label="Menu" hidden>
-<a href="#fonctionnalites">Fonctionnalités</a>
-<a href="#automatique">Sondes et alertes</a>
-<a href="#integrations">Ce qui se relie</a>
-<a href="#comparatif">Comparatif</a>
-<a href="#tarifs">Tarifs</a>
-<a href="#faq">FAQ</a>
-<div class="menu-b"><a class="btn soft" href="https://app.growthgusto.fr/?login=1" target="_blank" rel="noopener">Se connecter</a><a class="btn soft" href="https://app.growthgusto.fr/?demo=1" target="_blank" rel="noopener">Voir la démo</a></div>
+<nav class="menu" id="menu" aria-label="Menu" hidden><!--menu:start--><a href="/fonctionnalites">Fonctionnalités</a><a href="/restaurants">Restaurants</a><a href="#tarifs">Tarifs</a><a href="/guides">Guides</a><a href="#comparatif">Comparatif</a><a href="#integrations">Ce qui se relie</a><a href="#faq">Questions fréquentes</a><a href="/contact">Contact</a><!--menu:end--><div class="menu-b"><a class="btn soft" href="https://app.growthgusto.fr/?login=1" target="_blank" rel="noopener">Se connecter</a><a class="btn soft" href="https://app.growthgusto.fr/?demo=1" target="_blank" rel="noopener">Voir la démo</a></div>
 </nav>
 </header>
 
@@ -1027,6 +1030,49 @@ footer{padding:64px var(--g) 40px}
 </div>
 </section>
 
+<section class="pricing wrap" id="tarifs" aria-labelledby="h-price">
+<div class="sh" data-r><span class="kick">Tarifs</span><h2 id="h-price">Trois packs. <span class="em">C'est tout.</span></h2>
+<p>Pas de frais d'installation, pas de commission sur les réservations, utilisateurs illimités.</p></div>
+<div class="plans">
+<article class="plan" data-r>
+<div class="pk-h"><span class="pk pk-commis" aria-hidden="true"><svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><g class="pk-a"><path d="M24 5v12" stroke-width="4.2"/><path d="M24 17c-7 3.6-8.4 12.4 0 16 8.4-3.6 7-12.4 0-16Z"/><path d="M24 17c-3 4-3 12 0 16M24 17c3 4 3 12 0 16"/></g><path class="pk-b" d="M8.5 30h31c0 6.6-6.9 11-15.5 11S8.5 36.6 8.5 30Z" fill="var(--tint)"/><g class="pk-d" fill="var(--saf)" stroke="none"><circle cx="13" cy="25" r="1.7"/><circle cx="35" cy="24" r="1.4"/></g></svg></span><h3>Commis</h3></div>
+<p class="who">L'hygiène carrée, sans y penser&nbsp;: tout le HACCP d'un restaurant.</p>
+<div class="price"><b>59</b><span>€ HT<br>par mois</span></div>
+<p class="eq">Sans engagement · sans frais d'installation</p>
+<ul><li class="grp">Températures</li><li>Relevés au doigt, à la voix ou au thermomètre Bluetooth</li><li>Sondes sans fil et relevés automatiques</li><li>Alertes par e-mail et bilan du lundi</li>
+<li class="grp">Hygiène et cuisine</li><li>Frigos, mise en place, réception des livraisons</li><li>Étiquettes DLC, QR et scan</li><li>Plan de nettoyage, refroidissement, friture</li><li>Fiches recettes, 14 allergènes, process HACCP</li><li>Formation HACCP de l'équipe</li>
+<li class="grp">Contrôle sanitaire</li><li>Mode contrôle et dossier PDF</li><li>PMS rédigé pour vous</li><li>Registre, rappel de lot, obligations</li>
+<li class="grp">Achats et marges</li><li>Marge de chaque plat, fiches techniques chiffrées</li><li>Factures fournisseurs scannées</li><li>Commandes fournisseurs préparées</li><li>Gaspillage en euros</li>
+<li class="grp">Et aussi</li><li>Consignes et messagerie d'équipe</li><li>Import depuis votre ancien logiciel</li><li>Comptes équipe illimités</li></ul>
+<a class="btn soft" href="https://app.growthgusto.fr/?signup=1&amp;plan=essentiel" target="_blank" rel="noopener">Essayer Commis 14 jours</a>
+</article>
+<article class="plan" data-r style="--dl:1">
+<div class="pk-h"><span class="pk pk-second" aria-hidden="true"><svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><g class="pk-s" stroke="var(--safedge)" stroke-width="2.6"><path d="M19 22c-2-2 2-4 0-6"/><path d="M24 21c-2-2 2-4 0-6"/><path d="M29 22c-2-2 2-4 0-6"/></g><g class="pk-a"><path d="M10 34a14 14 0 0 1 28 0Z" fill="var(--tint)"/><path d="M24 17.5v2.5"/><circle cx="24" cy="16" r="1.8"/></g><path d="M7 37.5h34"/></svg></span><h3>Second</h3></div>
+<p class="who">La salle et la caisse en plus&nbsp;: tout le service, du frigo à l'addition.</p>
+<div class="price"><b>109</b><span>€ HT<br>par mois</span></div>
+<p class="eq">Sans engagement · sans frais d'installation</p>
+<ul><li class="all">Tout Commis, plus&nbsp;:</li>
+<li class="grp">Salle</li><li>Carnet de réservations, sans commission</li><li>Lien de réservation pour vos clients</li><li>Plan de salle et placement automatique des tables</li><li>Prise de commande au téléphone, écran cuisine</li><li>Menu QR et commande en ligne, carte importée</li><li>Réservations Zenchef et TheFork, par import</li><li>Fichier clients et fidélité</li>
+<li class="grp">Caisse et stock</li><li>Caisse reliée en direct&nbsp;: SumUp, Square</li><li>Autres caisses&nbsp;: import des ventes ou photo du ticket Z</li><li>Uber Eats, Deliveroo, Just Eat&nbsp;: import des relevés, commissions comprises</li><li>Stock déduit des ventes, selon vos recettes</li><li>Inventaire mensuel guidé</li><li>Tableau de bord</li></ul>
+<a class="btn soft" href="https://app.growthgusto.fr/?signup=1&amp;plan=pro" target="_blank" rel="noopener">Essayer Second 14 jours</a>
+</article>
+<article class="plan plan-plus" data-r style="--dl:2">
+<span class="sticker">Tout compris</span>
+<div class="pk-h"><span class="pk pk-chef" aria-hidden="true"><svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><g class="pk-a"><path d="M15 31c-6-1.5-6.6-11 .4-11.6C15.6 12 24 9.6 26.6 14.2 31 10 39.6 13 37.6 20c6 1.6 4.6 10-2.6 11Z" fill="var(--tint)"/><path d="M15 31v6.5h20V31" fill="var(--saf)" stroke="currentColor"/><path d="M21 17.5c1.2-1.6 3.4-2 5-1"/></g></svg></span><h3>Chef</h3></div>
+<p class="who">Toute la maison tourne&nbsp;: HACCP, salle, caisse, stock, équipe et chiffres.</p>
+<div class="price"><b>169</b><span>€ HT<br>par mois</span></div>
+<p class="eq">Sans engagement · sans frais d'installation</p>
+<ul><li class="all">Tout Second, plus&nbsp;:</li>
+<li class="grp">Équipe</li><li>Pointeuse</li><li>Planning, heures et repères HCR</li><li>Export paie pour le comptable</li><li>Employés et salaires</li>
+<li class="grp">Finances</li><li>Finances et marges</li><li>Banque&nbsp;: import du relevé (connexion directe bientôt)</li><li>Lien direct avec Pennylane</li>
+<li class="grp">Et aussi</li><li>Plusieurs restaurants, 49&nbsp;€ HT par restaurant en plus</li><li>Mise en route avec nous (visio 30 min)</li><li>Support prioritaire 7 j/7</li></ul>
+<a class="btn v" href="https://app.growthgusto.fr/?signup=1&amp;plan=complet" target="_blank" rel="noopener">Essayer Chef 14 jours</a>
+</article>
+</div>
+<p class="trial" data-r><span>14 jours gratuits</span><span>Sans carte bancaire</span><span>Sans engagement</span><span>Utilisateurs illimités</span></p>
+<p class="hw" data-r>Sondes, thermomètre Bluetooth et imprimante ne sont pas fournis&nbsp;: l'app marche avec le matériel du commerce, et sans matériel du tout.</p>
+</section>
+
 <section class="cmp-s wrap" id="comparatif" aria-labelledby="h-cmp">
 <div class="sh" data-r><span class="kick">Comparatif</span><h2 id="h-cmp">Une app au lieu de quatre <span class="em">abonnements.</span></h2>
 <p>Les logiciels pour restaurants font souvent une seule chose&nbsp;: l'hygiène, le stock, le planning ou les réservations. Growth Gusto réunit tout.</p></div>
@@ -1076,49 +1122,6 @@ footer{padding:64px var(--g) 40px}
 </div>
 </div>
 <p class="cmp-note">Fonctions et tarifs publics constatés le 5 novembre 2026 sur les sites des éditeurs, hors taxes, hors matériel sauf mention. «&nbsp;—&nbsp;» veut dire que la fonction n'est pas indiquée sur le site de l'éditeur. Pointeuse Combo et sondes Octopus facturées en plus par salarié ou par sonde. Les offres évoluent&nbsp;: vérifiez-les auprès de chaque éditeur. Certaines fonctions peuvent exister chez eux via des partenaires. Les noms cités sont des marques de leurs propriétaires respectifs&nbsp;; Growth Gusto n'est pas affilié à ces éditeurs.</p>
-</section>
-
-<section class="pricing wrap" id="tarifs" aria-labelledby="h-price">
-<div class="sh" data-r><span class="kick">Tarifs</span><h2 id="h-price">Trois packs. <span class="em">C'est tout.</span></h2>
-<p>Pas de frais d'installation, pas de commission sur les réservations, utilisateurs illimités.</p></div>
-<div class="plans">
-<article class="plan" data-r>
-<div class="pk-h"><span class="pk pk-commis" aria-hidden="true"><svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><g class="pk-a"><path d="M24 5v12" stroke-width="4.2"/><path d="M24 17c-7 3.6-8.4 12.4 0 16 8.4-3.6 7-12.4 0-16Z"/><path d="M24 17c-3 4-3 12 0 16M24 17c3 4 3 12 0 16"/></g><path class="pk-b" d="M8.5 30h31c0 6.6-6.9 11-15.5 11S8.5 36.6 8.5 30Z" fill="var(--tint)"/><g class="pk-d" fill="var(--saf)" stroke="none"><circle cx="13" cy="25" r="1.7"/><circle cx="35" cy="24" r="1.4"/></g></svg></span><h3>Commis</h3></div>
-<p class="who">L'hygiène carrée, sans y penser&nbsp;: tout le HACCP d'un restaurant.</p>
-<div class="price"><b>59</b><span>€ HT<br>par mois</span></div>
-<p class="eq">Sans engagement · sans frais d'installation</p>
-<ul><li class="grp">Températures</li><li>Relevés au doigt, à la voix ou au thermomètre Bluetooth</li><li>Sondes sans fil et relevés automatiques</li><li>Alertes par e-mail et bilan du lundi</li>
-<li class="grp">Hygiène et cuisine</li><li>Frigos, mise en place, réception des livraisons</li><li>Étiquettes DLC, QR et scan</li><li>Plan de nettoyage, refroidissement, friture</li><li>Fiches recettes, 14 allergènes, process HACCP</li><li>Formation HACCP de l'équipe</li>
-<li class="grp">Contrôle sanitaire</li><li>Mode contrôle et dossier PDF</li><li>PMS rédigé pour vous</li><li>Registre, rappel de lot, obligations</li>
-<li class="grp">Achats et marges</li><li>Marge de chaque plat, fiches techniques chiffrées</li><li>Factures fournisseurs scannées</li><li>Commandes fournisseurs préparées</li><li>Gaspillage en euros</li>
-<li class="grp">Et aussi</li><li>Consignes et messagerie d'équipe</li><li>Import depuis votre ancien logiciel</li><li>Comptes équipe illimités</li></ul>
-<a class="btn soft" href="https://app.growthgusto.fr/?signup=1&amp;plan=essentiel" target="_blank" rel="noopener">Essayer Commis 14 jours</a>
-</article>
-<article class="plan" data-r style="--dl:1">
-<div class="pk-h"><span class="pk pk-second" aria-hidden="true"><svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><g class="pk-s" stroke="var(--safedge)" stroke-width="2.6"><path d="M19 22c-2-2 2-4 0-6"/><path d="M24 21c-2-2 2-4 0-6"/><path d="M29 22c-2-2 2-4 0-6"/></g><g class="pk-a"><path d="M10 34a14 14 0 0 1 28 0Z" fill="var(--tint)"/><path d="M24 17.5v2.5"/><circle cx="24" cy="16" r="1.8"/></g><path d="M7 37.5h34"/></svg></span><h3>Second</h3></div>
-<p class="who">La salle et la caisse en plus&nbsp;: tout le service, du frigo à l'addition.</p>
-<div class="price"><b>109</b><span>€ HT<br>par mois</span></div>
-<p class="eq">Sans engagement · sans frais d'installation</p>
-<ul><li class="all">Tout Commis, plus&nbsp;:</li>
-<li class="grp">Salle</li><li>Carnet de réservations, sans commission</li><li>Lien de réservation pour vos clients</li><li>Plan de salle et placement automatique des tables</li><li>Prise de commande au téléphone, écran cuisine</li><li>Menu QR et commande en ligne, carte importée</li><li>Réservations Zenchef et TheFork, par import</li><li>Fichier clients et fidélité</li>
-<li class="grp">Caisse et stock</li><li>Caisse reliée en direct&nbsp;: SumUp, Square</li><li>Autres caisses&nbsp;: import des ventes ou photo du ticket Z</li><li>Uber Eats, Deliveroo, Just Eat&nbsp;: import des relevés, commissions comprises</li><li>Stock déduit des ventes, selon vos recettes</li><li>Inventaire mensuel guidé</li><li>Tableau de bord</li></ul>
-<a class="btn soft" href="https://app.growthgusto.fr/?signup=1&amp;plan=pro" target="_blank" rel="noopener">Essayer Second 14 jours</a>
-</article>
-<article class="plan plan-plus" data-r style="--dl:2">
-<span class="sticker">Tout compris</span>
-<div class="pk-h"><span class="pk pk-chef" aria-hidden="true"><svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><g class="pk-a"><path d="M15 31c-6-1.5-6.6-11 .4-11.6C15.6 12 24 9.6 26.6 14.2 31 10 39.6 13 37.6 20c6 1.6 4.6 10-2.6 11Z" fill="var(--tint)"/><path d="M15 31v6.5h20V31" fill="var(--saf)" stroke="currentColor"/><path d="M21 17.5c1.2-1.6 3.4-2 5-1"/></g></svg></span><h3>Chef</h3></div>
-<p class="who">Toute la maison tourne&nbsp;: HACCP, salle, caisse, stock, équipe et chiffres.</p>
-<div class="price"><b>169</b><span>€ HT<br>par mois</span></div>
-<p class="eq">Sans engagement · sans frais d'installation</p>
-<ul><li class="all">Tout Second, plus&nbsp;:</li>
-<li class="grp">Équipe</li><li>Pointeuse</li><li>Planning, heures et repères HCR</li><li>Export paie pour le comptable</li><li>Employés et salaires</li>
-<li class="grp">Finances</li><li>Finances et marges</li><li>Banque&nbsp;: import du relevé (connexion directe bientôt)</li><li>Lien direct avec Pennylane</li>
-<li class="grp">Et aussi</li><li>Plusieurs restaurants, 49&nbsp;€ HT par restaurant en plus</li><li>Mise en route avec nous (visio 30 min)</li><li>Support prioritaire 7 j/7</li></ul>
-<a class="btn v" href="https://app.growthgusto.fr/?signup=1&amp;plan=complet" target="_blank" rel="noopener">Essayer Chef 14 jours</a>
-</article>
-</div>
-<p class="trial" data-r><span>14 jours gratuits</span><span>Sans carte bancaire</span><span>Sans engagement</span><span>Utilisateurs illimités</span></p>
-<p class="hw" data-r>Sondes, thermomètre Bluetooth et imprimante ne sont pas fournis&nbsp;: l'app marche avec le matériel du commerce, et sans matériel du tout.</p>
 </section>
 
 <section class="faq wrap" id="faq" aria-labelledby="h-faq">
@@ -1171,18 +1174,17 @@ footer{padding:64px var(--g) 40px}
 </section>
 </main>
 
-<footer>
-<div class="foot">
-<div>
-<a class="brand" href="#top" aria-label="Growth Gusto"><span class="gg-mk" aria-hidden="true"><img src="mark.svg" alt="" width="22" height="22"></span><span>Growth <b>Gusto</b></span></a>
-<p>Né dans la cuisine du Chemin des Sarments. Données hébergées en France.</p>
+<!--sf:start-->
+<footer class="sf">
+<div class="sf-in">
+<div class="sf-brand"><a class="brand" href="/" aria-label="Growth Gusto, accueil">Growth<b>Gusto</b></a>
+<p>L'app de gestion pour restaurants&nbsp;: hygiène et HACCP, salle, commandes, stock, marges, caisse et équipe, au même endroit. Conçue à Lyon, données hébergées en France.</p>
+<a class="btn v" href="https://app.growthgusto.fr/?signup=1" target="_blank" rel="noopener">Essayer 14 jours <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a></div>
+<div class="sf-cols"><div class="sf-col"><h3>Fonctionnalités</h3><ul><li><a href="/fonctionnalites/haccp-temperatures">Relevés de températures</a></li><li><a href="/fonctionnalites/etiquettes-dlc">Étiquettes DLC et traçabilité</a></li><li><a href="/fonctionnalites/controle-sanitaire">Contrôle sanitaire et PMS</a></li><li><a href="/fonctionnalites/recettes-allergenes">Recettes et allergènes</a></li><li><a href="/fonctionnalites/reservations">Réservations et plan de salle</a></li><li><a href="/fonctionnalites/prise-de-commande">Prise de commande et écran cuisine</a></li><li><a href="/fonctionnalites/menu-qr">Menu QR et commande en ligne</a></li><li><a href="/fonctionnalites/marges-achats">Marges, achats et gaspillage</a></li><li><a href="/fonctionnalites/caisse-stock">Caisse, stock et ventes</a></li><li><a href="/fonctionnalites/equipe-planning">Équipe, planning et pointeuse</a></li><li><a href="/fonctionnalites/fidelite-clients">Fichier clients et fidélité</a></li><li><a href="/fonctionnalites/finances">Finances et banque</a></li></ul></div><div class="sf-col"><h3>Restaurants</h3><ul><li><a href="/restaurants/bistrot-brasserie">Bistrot et brasserie</a></li><li><a href="/restaurants/restaurant-gastronomique">Restaurant gastronomique</a></li><li><a href="/restaurants/pizzeria">Pizzeria</a></li><li><a href="/restaurants/traiteur">Traiteur</a></li><li><a href="/restaurants/cafe-bar">Café, bar et salon de thé</a></li><li><a href="/restaurants/restauration-rapide">Restauration rapide et snacking</a></li><li><a href="/restaurants">Tous les restaurants</a></li></ul></div><div class="sf-col"><h3>Guides</h3><ul><li><a href="/guides">Tous les guides</a></li><li><a href="/guides/normes-haccp-restaurant">Normes HACCP en restaurant</a></li><li><a href="/guides/temperatures-reglementaires">Températures réglementaires</a></li><li><a href="/guides/dlc-ddm-etiquetage">DLC, DDM et étiquetage</a></li><li><a href="/guides/plan-de-maitrise-sanitaire">Plan de maîtrise sanitaire</a></li><li><a href="/guides/controle-sanitaire-ddpp">Préparer un contrôle sanitaire</a></li><li><a href="/guides/allergenes-restaurant">Les 14 allergènes</a></li></ul></div><div class="sf-col"><h3>Growth Gusto</h3><ul><li><a href="/tarifs">Tarifs</a></li><li><a href="/integrations">Ce qui se relie</a></li><li><a href="/comparatif">Comparatif</a></li><li><a href="/faq">Questions fréquentes</a></li><li><a href="/a-propos">À propos</a></li><li><a href="/contact">Contact</a></li></ul></div></div>
 </div>
-<nav aria-label="Informations">
-<a href="/mentions-legales">Mentions légales</a><a href="/cgv">CGV</a><a href="/confidentialite">Confidentialité</a><a href="mailto:contact@growthgusto.fr">contact@growthgusto.fr</a>
-</nav>
-</div>
-<p class="copy-r">© 2026 Growth Gusto. Chaud devant.</p>
+<div class="sf-bot"><span>© 2026 Growth Gusto · EI Ruis Global, Lyon</span><a href="/mentions-legales">Mentions légales</a><a href="/cgv">CGV</a><a href="/confidentialite">Confidentialité</a><a href="mailto:contact@growthgusto.fr">contact@growthgusto.fr</a><a href="https://app.growthgusto.fr/?login=1">Se connecter</a></div>
 </footer>
+<!--sf:end-->
 <script>
 (() => {
 const $ = (s, r = document) => r.querySelector(s), $$ = (s, r = document) => [...r.querySelectorAll(s)];
