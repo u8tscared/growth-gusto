@@ -119,7 +119,7 @@ const slCovers = (tab) => `${+tab.covers || 0} couv.`;
     const a0 = cmAlert;
     cmAlert = function (o) {
       if (o && o.src === "salle") {
-        if (SL.mine.has(o.id) || !["cuisine", "commandes"].includes(S.route)) return;
+        if (SL.mine.has(o.id) || !slKRoute(true)) return;
         CM.fresh.add(o.id);
         try { SFX.init(); SFX.tone(1047, 0.22, "sine", 0.055); SFX.tone(1319, 0.24, "sine", 0.05, 0.13); SFX.tone(1568, 0.42, "sine", 0.045, 0.26); buzz([22, 50, 22]); } catch (e) {}
         if (SL.print && S.route === "cuisine") slPrint(o);
@@ -130,20 +130,22 @@ const slCovers = (tab) => `${+tab.covers || 0} couv.`;
     };
   }
 })();
+/* a kitchen screen is on: the écran cuisine, or the « coup de feu » mode in its Cuisine role (js/rush.js); qr = the Commandes en ligne screen counts too */
+const slKRoute = (qr) => S.route === "cuisine" || (qr && S.route === "commandes") || (S.route === "coupdefeu" && typeof cfRole === "function" && cfRole() === "cuisine");
 function slOnRows(rows) {
   rows.forEach((o) => {
     if (o.src !== "salle") return; const k = o.status + "|" + (o.call || 0) + "|" + (o.mod || 0) + "|" + (o.push || 0), p = SL.st.get(o.id); SL.st.set(o.id, k);
     if (!SL.stInit || !p || p === k) return;
     const [ps, pc, pm, pp] = p.split("|");
-    if (S.route === "cuisine" && slLive(o) && (String(o.mod || 0) !== pm || String(o.push || 0) !== pp)) { try { if (typeof CM !== "undefined" && CM.fresh) CM.fresh.add(o.id); SFX.init(); SFX.tone(660, 0.16, "square", 0.04); SFX.tone(990, 0.22, "square", 0.04, 0.14); buzz([50, 40, 50]); } catch (e) {} }
+    if (slKRoute(false) && slLive(o) && (String(o.mod || 0) !== pm || String(o.push || 0) !== pp)) { try { if (typeof CM !== "undefined" && CM.fresh) CM.fresh.add(o.id); SFX.init(); SFX.tone(660, 0.16, "square", 0.04); SFX.tone(990, 0.22, "square", 0.04, 0.14); buzz([50, 40, 50]); } catch (e) {} }
     if (pc === undefined) return;
     if (o.status === "prete" && ps !== "prete") slReady(o, false); else if (o.status === "prete" && o.call && String(o.call) !== pc) slReady(o, true);
   });
   SL.stInit = true;
 }
 function slReady(o, recall) {
-  if (S.route === "cuisine" || S.route === "commandes") return;
-  if (o.waiter !== S.me.id && S.route !== "salle") return;
+  if (slKRoute(true)) return;
+  if (o.waiter !== S.me.id && S.route !== "salle" && !(S.route === "coupdefeu" && typeof cfRole === "function" && cfRole() !== "cuisine")) return;
   try { SFX.init(); SFX.tone(784, 0.18, "triangle", 0.06); SFX.tone(1175, 0.2, "triangle", 0.055, 0.12); SFX.tone(1568, 0.5, "sine", 0.05, 0.24); buzz(recall ? [80, 60, 80, 60, 160] : [60, 40, 60, 40, 120]); } catch (e) {}
   toast(`Table ${o.table} · ${o.courseT || "commande"} ${recall ? ": la cuisine vous appelle" : "prêt à servir"}`, "info");
   if (S.route === "salle") onData();
