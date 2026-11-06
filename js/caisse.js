@@ -23,9 +23,9 @@ const CX_EXPORT = "Rapports (ou Statistiques) → ventes par article → Exporte
 const CX_POS = [
   { id: "sumup", name: "SumUp", kind: "oauth", well: "w-vi", rec: true, need: "Votre identifiant SumUp, rien d'autre.",
     steps: ["Touchez « Connecter SumUp ».", "Identifiez-vous et acceptez l'accès aux ventes.", "C'est fait : les ventes arrivent toutes les 15 min."], csv: "Dans SumUp : Ventes → Exporter (CSV ou Excel)." },
-  { id: "zelty", name: "Zelty", kind: "key", well: "w-sa", need: "Une clé API Zelty (back-office).",
+  { id: "zelty", name: "Zelty", kind: "key", soon: true, well: "w-sa", need: "Une clé API Zelty (back-office).",
     steps: ["Back-office Zelty → Paramètres → API.", "Créez une clé et copiez-la.", "Collez-la ici : c'est connecté."], csv: "Dans Zelty : " + CX_EXPORT },
-  { id: "lightspeed", name: "Lightspeed", sub: "K-Series", kind: "oauth", well: "w-sk", need: "Votre compte Lightspeed Restaurant.",
+  { id: "lightspeed", name: "Lightspeed", sub: "K-Series", kind: "oauth", soon: true, well: "w-sk", need: "Votre compte Lightspeed Restaurant.",
     steps: ["Touchez « Connecter Lightspeed ».", "Identifiez-vous et choisissez l'établissement.", "Les ventes arrivent toutes les 15 min."], csv: "Dans Lightspeed : " + CX_EXPORT },
   { id: "tiller", name: "Tiller", sub: "SumUp POS Pro", kind: "csv", well: "w-to", need: "Un export des ventes depuis le back-office.",
     steps: ["Back-office Tiller → Rapports.", "Exportez les ventes par produit (CSV ou Excel).", "Importez le fichier ici."], csv: "Dans Tiller : " + CX_EXPORT },
@@ -220,7 +220,7 @@ VIEWS.caisse = {
 
 function cxPickerHtml(first) {
   const tile = (p, i) => { const st = cxStatOf(p.id); const on = st && st.status !== "off" && (st.mode !== "csv" || st.lastImport);
-    const tag = on ? (st.status === "error" ? `<span class="pill bad">Erreur</span>` : `<span class="pill acc">${st.mode === "csv" ? "Fichier importé" : "Connectée"}</span>`) : p.rec ? `<span class="pill warn">Recommandé</span>` : `<span class="cx-how">${p.kind === "csv" ? "Import de fichier" : p.kind === "key" ? "Clé API" : "Connexion directe"}</span>`;
+    const tag = on ? (st.status === "error" ? `<span class="pill bad">Erreur</span>` : `<span class="pill acc">${st.mode === "csv" ? "Fichier importé" : "Connectée"}</span>`) : p.rec ? `<span class="pill warn">Recommandé</span>` : `<span class="cx-how">${p.kind === "csv" ? "Import de fichier" : p.soon ? "Bientôt en direct" : "Relié en direct"}</span>`;
     return `<button class="cx-tile st ${p.rec ? "big" : ""}" style="--i:${i + 2}" data-act="cxPos" data-v="${p.id}">${cxWell(p, p.rec ? "lg" : "")}<span class="tx"><b>${esc(p.name)}</b>${p.sub ? `<em>${esc(p.sub)}</em>` : ""}</span>${tag}</button>`; };
   return `${first ? `<div class="glass wall cx-intro st" style="--i:1"><span class="cx-introic">${ico("cxPlug")}</span><b>Branchez votre caisse</b><span>Le chiffre du jour arrive seul, le stock se déduit à chaque vente.</span></div>` : ""}
     <span class="lbl cx-q st" style="--i:1">Quelle caisse utilisez-vous ?</span>
@@ -244,7 +244,7 @@ function cxHeroHtml(A) {
 
 /* a Z ticket typed by hand for a day the caisse already covers: the day would count twice */
 function cxConflictHtml() {
-  const from = addDays(dayKey(), -6); const pos = new Set(S.tickets.filter((t) => t.source === "caisse" && t.date >= from).map((t) => t.date));
+  const from = addDays(dayKey(), -6); const pos = new Set(S.tickets.filter((t) => t.source === "caisse" && t.date >= from && !(typeof LV_IDS !== "undefined" && LV_IDS.has(t.provider))).map((t) => t.date));
   const dup = S.tickets.filter((t) => t.source !== "caisse" && pos.has(t.date)); if (!dup.length) return "";
   return `<div class="glass pad cx-warn st" style="--i:2"><span class="ic warn">${ico("alert")}</span><div class="tx"><b>${dup.length > 1 ? `${dup.length} jours comptés deux fois` : "Un jour compté deux fois"}</b><em>Un ticket Z saisi à la main existe aussi ${dup.length > 1 ? "pour ces jours" : `pour ${dup[0].date === dayKey() ? "aujourd'hui" : "le " + shortDate(dup[0].date)}`}. Supprimez-le dans Tickets.</em></div><button class="btn soft sm" data-act="ticket" data-id="${dup[0].id}">Voir</button></div>`;
 }
@@ -294,6 +294,7 @@ function cxPosHtml(id) {
   const apiOn = st && st.mode === "api" && st.status === "connected";
   if (apiOn) cta = `<button class="btn acc block ${busy ? "spin" : ""}" data-act="cxSync" data-v="${p.id}" ${busy ? "disabled" : ""}>${ico("cxSync")}${busy ? "Synchro…" : "Synchroniser maintenant"}</button>`;
   else if (p.kind === "csv") cta = `<button class="btn acc block" data-act="cxImport" data-v="${p.id}">${ico("cxFile")}Importer un export</button>`;
+  else if (p.soon) cta = `<p class="cx-soon">${ico("cxBolt")}<span><b>Pas encore relié en direct.</b> La connexion directe à ${esc(p.name)} arrive bientôt. En attendant, l'import du fichier des ventes fait tout.</span></p><button class="btn acc block" data-act="cxImport" data-v="${p.id}">${ico("cxFile")}Importer un export</button>`;
   else if (live && !cxIsAdmin()) cta = `<p class="cx-soon">${ico("lock")}Seul le gérant peut connecter la caisse.</p><button class="btn soft block" data-act="cxImport" data-v="${p.id}">${ico("cxFile")}Importer un export</button>`;
   else if (live && p.kind === "key") cta = `<label class="field"><span>Clé API ${esc(p.name)}</span><input class="input mono" id="cxKey" autocomplete="off" spellcheck="false" placeholder="Collez la clé ici"></label><button class="btn acc block ${busy ? "spin" : ""}" data-act="cxKeyGo" data-v="${p.id}" ${busy ? "disabled" : ""}>${ico("cxKey")}${busy ? "Vérification…" : "Connecter " + esc(p.name)}</button>`;
   else if (live) cta = `<button class="btn acc block ${busy ? "spin" : ""}" data-act="cxGo" data-v="${p.id}" ${busy ? "disabled" : ""}>${ico("cxPlug")}${busy ? "Ouverture…" : "Connecter " + esc(p.name)}</button>`;
