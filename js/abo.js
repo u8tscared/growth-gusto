@@ -1,11 +1,11 @@
-/* Growth Gusto — abonnement (area prefix « ab »): 14-day trial, the three packs (Commis 59 € · Second 109 € · Chef 169 € HT/mois; internal keys essentiel / pro / complet), activation
-   codes, gentle gating once the trial is over, and the Growth Gusto admin space (GG_ADMINS: every restaurant, every account).
+/* Growth Gusto — abonnement (area prefix « ab »): 14-day trial, the three packs (Commis 59 € · Second 109 € · Chef 169 € HT/mois; internal keys essentiel / pro / complet), online
+   payment (Stripe, functions/src/stripe.js), gentle gating once the trial is over, and the Growth Gusto admin space (GG_ADMINS: every restaurant, every account).
    State on the restaurant doc (restos/{rid}):
      plan: "essai" | "essentiel" | "pro" | "complet" | "suspendu"   pack: "essentiel" | "pro" | "complet" (the pack chosen on the site, Complet by default)
      trialEnds (ms) · paidAt, paidUntil (ms | null = unlimited), activatedBy, activationCode · grantedBy, grantedAt · suspended { at, by, plan, pack }
    abPlan(resto?) → { plan: "essai" | "essentiel" | "pro" | "complet" | "expire" | "suspendu" | "demo", pack, feat (the pack whose areas are
    open), open (writes allowed), days, ends, until, why }. Hooks for other areas: abBlocked(col), abRefuse(col) (called by DB in core.js),
-   abTile() / abRow() (menu Plus and Réglages, js/compte.js). Config: window.GG_STRIPE, GG_ACTIVATION, GG_CONTACT (js/config.js). */
+   abTile() / abRow() (menu Plus and Réglages, js/compte.js). Config: GG_CONTACT (js/config.js); online payment is switched on from the admin space (ggPublic/billing). */
 "use strict";
 
 const AB_DAY = 864e5, AB_TRIAL = 14;
@@ -135,7 +135,7 @@ window.addEventListener("gg:ready", () => { let f = null; try { f = sessionStora
 /* ───────────────────────── Abonnement ───────────────────────── */
 VIEWS.abonnement = {
   render() {
-    const p = abPlan(), g = abGerant(), stripe = window.GG_STRIPE || {}, online = AB_ORDER.some((k) => stripe[k]);
+    const p = abPlan(), g = abGerant(), online = abOnline(), sx = (S.resto && S.resto.stripe) || {}; abBillLoad();
     const C = +(2 * Math.PI * 42).toFixed(2);
     const ring = p.plan === "essai" ? `<div class="ring ab-ring"><svg viewBox="0 0 100 100"><circle class="tr" cx="50" cy="50" r="42" fill="none" stroke-width="8"/><circle class="br" cx="50" cy="50" r="42" fill="none" stroke-width="8" stroke-linecap="round" stroke-dasharray="${C}" stroke-dashoffset="${(C * (1 - p.pct)).toFixed(2)}"/></svg><div class="num"><span><b class="mono">${p.days}</b><small>${p.days > 1 ? "jours" : "jour"}</small></span></div></div>`
       : `<div class="ab-seal ${p.open ? "ok" : "off"}">${ico(p.plan === "suspendu" ? "abPause" : p.open ? "check" : "lock")}</div>`;
@@ -147,10 +147,10 @@ VIEWS.abonnement = {
     const hero = `<section class="ab-hero ${p.plan} st" style="--i:1">${ring}<div class="ab-ht"><span class="ab-eyebrow">${H[0]}</span><h2>${H[1]}</h2><p>${H[2]}</p></div></section>`;
     const paid = !!AB_LVL[p.plan];
     const card = (k, i) => {
-      const P = AB_PACKS[k], cur = paid && p.plan === k, best = k === "complet";
+      const P = AB_PACKS[k], cur = paid ? p.plan === k : abLive(sx) && sx.pack === k, best = k === "complet";
       const cta = !g ? "" : cur ? `<button class="btn soft block" disabled>${ico("check")}Pack actuel</button>`
-        : paid && AB_LVL[k] < AB_LVL[p.plan] ? `<button class="btn soft block" data-act="abContact" data-v="${k}">${ico("abMail")}Nous écrire</button>`
-        : `<button class="btn ${best ? "acc" : "soft"} block" data-act="abChoose" data-v="${k}">${paid ? "Passer à " : "Choisir "}${P.t}</button>`;
+        : paid && !online && AB_LVL[k] < AB_LVL[p.plan] ? `<button class="btn soft block" data-act="abContact" data-v="${k}">${ico("abMail")}Nous écrire</button>`
+        : `<button class="btn ${best ? "acc" : "soft"} block" data-act="abChoose" data-v="${k}" ${AB.busy === k ? "disabled" : ""}>${AB.busy === k ? `<span class="spin"></span>Ouverture du paiement…` : `${paid || abLive(sx) ? "Passer à " : "Choisir "}${P.t}`}</button>`;
       return `<article class="glass ab-pack ${k} ${cur ? "cur" : ""} st" style="--i:${i}">
         <div class="ab-ph"><div><span class="lbl">Pack</span><h3 class="ab-pn">${P.t}</h3></div>${cur ? `<span class="pill ok">Votre pack</span>` : best ? `<span class="pill acc">Recommandé</span>` : ""}</div>
         <div class="ab-price"><b class="mono">${P.price} €</b><span>HT / mois</span></div>
@@ -159,10 +159,10 @@ VIEWS.abonnement = {
     };
     const packs = `<div class="ab-packs">${AB_ORDER.map((k, i) => card(k, 2 + i)).join("")}</div>
       <div class="ab-common st" style="--i:5">${["Mensuel, sans engagement", "Essai gratuit 14 jours", "Utilisateurs illimités", "Données hébergées en France"].map((t) => `<span>${ico("check")}${t}</span>`).join("")}</div>`;
-    const act = !g || p.plan === "demo" || paid ? (g ? "" : `<p class="note st ab-ro" style="--i:5">${ico("lock")}Seul le gérant peut choisir le pack ou saisir un code d'activation.</p>`)
-      : `<div class="glass pad ab-act st" style="--i:5"><div class="ab-acth"><span class="ic">${ico("abKey")}</span><div><b>${online ? "J'ai un code d'activation" : "Activer mon abonnement"}</b><em>${online ? "Reçu de Growth Gusto après votre commande" : "Le paiement en ligne arrive. En attendant, contactez-nous : vous recevez un code d'activation."}</em></div></div>
-        ${online ? "" : `<a class="btn soft block ab-mailto" href="${abMailto(p.pack)}">${ico("abMail")}Nous écrire</a><p class="note ab-addr">${esc(window.GG_CONTACT || "")} · réponse dans la journée, du lundi au samedi</p>`}
-        <form class="ab-actf" data-ab="code" novalidate><input class="input mono" id="abCode" placeholder="GG-XXXXXXXX-2026" autocomplete="off" autocapitalize="characters" spellcheck="false" enterkeyhint="go" aria-label="Code d'activation"><button class="btn acc" type="submit">Activer</button></form><em class="ab-acterr" id="abCodeErr" role="alert"></em></div>`;
+    const act = p.plan === "demo" ? "" : !g ? `<p class="note st ab-ro" style="--i:5">${ico("lock")}Seul le gérant peut choisir le pack et gérer le paiement.</p>`
+      : online ? abBillCard(p, sx)
+      : paid ? "" : `<div class="glass pad ab-act st" style="--i:5"><div class="ab-acth"><span class="ic">${ico("abMail")}</span><div><b>Activer mon abonnement</b><em>Le paiement en ligne arrive. En attendant, écrivez-nous : votre pack est activé dans la journée.</em></div></div>
+        <a class="btn soft block ab-mailto" href="${abMailto(p.pack)}">${ico("abMail")}Nous écrire</a><p class="note ab-addr">${esc(window.GG_CONTACT || "")} · réponse dans la journée, du lundi au samedi</p></div>`;
     const adm = abAdmin() ? `<div class="glass pad st ab-admrow" style="--i:6"><div class="li tap" data-go="admin"><span class="ic">${ico("shield")}</span><div class="tx"><b>Espace admin Growth Gusto</b><em>Tous les restaurants, offrir ou suspendre l'accès</em></div>${ico("chev")}</div></div>` : "";
     return `<div class="inner cc-wide ab-wrap">${topBar("Abonnement")}${hero}${packs}${act}${adm}</div>`;
   },
@@ -173,34 +173,90 @@ function abMailto(pack) {
   const body = `Bonjour,\n\nJe souhaite activer le pack ${P.t} pour ${r.name || "mon restaurant"}.\nIdentifiant du restaurant : ${S.rid || ""}\nE-mail du compte : ${abEmail() || "(sans compte)"}\n\nMerci !`;
   return `mailto:${window.GG_CONTACT || ""}?subject=${encodeURIComponent(subj)}&body=${encodeURIComponent(body)}`;
 }
-async function abActivate(raw, errEl, inp) {
-  const code = String(raw || "").trim().toUpperCase().replace(/\s+/g, "");
-  const fail = (m) => { SFX.err(); buzz([30, 50, 30]); if (errEl) errEl.textContent = m; if (inp) { inp.classList.remove("shake"); void inp.offsetWidth; inp.classList.add("shake"); inp.focus(); } };
-  if (!abGerant()) return fail("Seul le gérant peut activer l'abonnement.");
-  if (!code) return fail("Saisissez votre code d'activation.");
-  const plan = (window.GG_ACTIVATION || {})[code]; if (!AB_LVL[plan]) return fail("Code inconnu. Vérifiez-le, ou écrivez-nous.");
-  if (!S.rid || !S.resto) return fail("Aucun restaurant ouvert.");
-  const patch = { plan, pack: plan, paidAt: Date.now(), paidUntil: null, activatedBy: abEmail() || S.me.name || S.me.id, activationCode: code };
-  try { await DB.update("restos", S.rid, patch); } catch (e) { return fail("Impossible d'enregistrer pour l'instant. Vérifiez la connexion et réessayez."); }
-  Object.assign(S.resto, patch); const r = S.restos.find((x) => x.id === S.rid); if (r) Object.assign(r, patch);
-  try { logEvent("team", `a activé le pack ${AB_PACKS[plan].t}`); } catch (e) {}
-  closeSheet(true); SFX.done(); buzz([12, 40, 12, 40, 30]); burst(); toast(`Pack ${AB_PACKS[plan].t} activé !`);
-  AB.flash = true; if (S.route === "abonnement") { rerender(); const v = $("#viewport .view"); if (v) v.scrollTo({ top: 0, behavior: "smooth" }); } else go("abonnement");
-  renderChrome();
+/* ───────────────────────── paiement en ligne (Stripe, functions/src/stripe.js) ─────────────────────────
+   ggPublic/billing { stripe } says whether it is on. The restaurant doc carries stripe { customer, sub, status, pack, periodEnd, cancelAt,
+   trialEnd, lastInvoice, failedAt }, written by the server only (firestore.rules billKeys). */
+const abLive = (sx) => !!(sx && sx.sub && ["active", "trialing", "past_due"].includes(sx.status));
+const abOnline = () => DB.mode === "db" && !!(AB.bill && AB.bill.stripe);
+function abBillLoad(force) {
+  if (DB.mode !== "db" || !DB.db || (AB.billAt && !force && Date.now() - AB.billAt < 300000)) return;
+  AB.billAt = Date.now();
+  DB.db.doc("ggPublic/billing").get().then((d) => { const b = d.exists ? d.data() : {}; const ch = !AB.bill || !!AB.bill.stripe !== !!b.stripe; AB.bill = b; if (ch && (S.route === "abonnement" || S.route === "admin")) rerender(); }).catch(() => { AB.billAt = 0; });
 }
-document.addEventListener("submit", (e) => { const f = e.target; if (!f.dataset || f.dataset.ab !== "code") return; e.preventDefault(); SFX.init && SFX.init(); const i = $("#abCode", f); abActivate(i && i.value, $("#abCodeErr"), i); });
+async function abCall(op, data) {
+  if (typeof AUTH === "undefined" || !AUTH.call) throw new Error("offline");
+  return AUTH.call("stripeApi", { op, rid: S.rid, ...(data || {}) });
+}
+function abBillCard(p, sx) {
+  const L = [];
+  if (sx.failedAt && sx.status === "past_due") L.push(`<div class="ab-bl bad">${ico("alert")}<span><b>Le dernier paiement n'est pas passé.</b> Stripe réessaie automatiquement. Mettez à jour votre carte pour éviter l'interruption.</span></div>`);
+  if (sx.status === "trialing" && sx.trialEnd) L.push(`<div class="ab-bl">${ico("abPack")}<span>Pack <b>${AB_PACKS[abPk(sx.pack)].t}</b> choisi, carte enregistrée. <b>Premier prélèvement le ${abDate(sx.trialEnd)}</b>, rien avant.</span></div>`);
+  else if (abLive(sx) && sx.cancelAt) L.push(`<div class="ab-bl warn">${ico("clock")}<span>Résiliation demandée : le pack reste actif <b>jusqu'au ${abDate(sx.cancelAt)}</b>. Vous pouvez la retirer depuis « Gérer mon abonnement ».</span></div>`);
+  else if (abLive(sx) && sx.periodEnd) L.push(`<div class="ab-bl">${ico("clock")}<span>Prochain prélèvement le <b>${abDate(sx.periodEnd)}</b> : ${AB_PACKS[abPk(sx.pack)].price} €, ${AB.bill && AB.bill.tva ? `soit ${(AB_PACKS[abPk(sx.pack)].price * 1.2).toFixed(2).replace(".", ",")} € TTC` : "TVA non applicable"}.</span></div>`);
+  if (sx.lastInvoice && sx.lastInvoice.url) L.push(`<a class="ab-bl tap" href="${esc(sx.lastInvoice.url)}" target="_blank" rel="noopener">${ico("receipt")}<span>Dernière facture${sx.lastInvoice.number ? ` <b>${esc(sx.lastInvoice.number)}</b>` : ""} · ${String(sx.lastInvoice.ttc.toFixed(2)).replace(".", ",")} € TTC</span>${ico("chev")}</a>`);
+  const head = sx.customer ? ["Paiement et factures", "Carte bancaire ou prélèvement, factures téléchargeables, résiliation en un geste."] : ["Paiement sécurisé par Stripe", p.plan === "essai" ? "Choisissez votre pack : la carte est enregistrée maintenant, le premier prélèvement a lieu à la fin de l'essai." : "Choisissez votre pack ci-dessus : paiement par carte, facture envoyée chaque mois, sans engagement."];
+  return `<div class="glass pad ab-act st" style="--i:5"><div class="ab-acth"><span class="ic">${ico("abKey")}</span><div><b>${head[0]}</b><em>${head[1]}</em></div></div>
+    ${L.join("")}
+    ${sx.customer ? `<button class="btn soft block" data-act="abPortal" ${AB.busy === "portal" ? "disabled" : ""}>${AB.busy === "portal" ? `<span class="spin"></span>Ouverture…` : `${ico("abPack")}Gérer mon abonnement`}</button>` : ""}
+    <p class="note ab-addr">Paiement traité par Stripe : Growth Gusto ne voit jamais votre numéro de carte.</p></div>`;
+}
+const AB_ERR = { stripe_off: "Le paiement en ligne n'est pas encore ouvert. Écrivez-nous : on active votre pack dans la journée.", suspendu: "L'accès à ce restaurant est suspendu : contactez-nous.", "permission-denied": "Seul le gérant peut gérer l'abonnement.", no_customer: "Aucun paiement enregistré pour ce restaurant." };
+const abErrTx = (e) => { const m = String((e && e.message) || ""); return AB_ERR[m] || AB_ERR[String((e && e.code) || "").replace(/^functions\//, "")] || "Impossible de joindre le paiement pour l'instant. Vérifiez la connexion et réessayez."; };
+async function abCheckout(k) {
+  AB.busy = k; refresh();
+  try {
+    const r = await abCall("checkout", { pack: k });
+    if (r.url) { location.href = r.url; return; }
+    if (r.changed) { closeSheet(true); SFX.done(); buzz([12, 40, 12, 40, 30]); burst(); toast(`Pack ${AB_PACKS[k].t} activé !`); AB.flash = true; }
+  } catch (e) { SFX.err(); toast(abErrTx(e)); }
+  AB.busy = null; refresh();
+}
+/* back from Stripe: ?abo=ok&session=… | ?abo=annule | ?abo=retour */
+(function abCatchReturn() {
+  try {
+    const u = new URL(location.href); const a = u.searchParams.get("abo"); if (!a) return;
+    sessionStorage.setItem("gg-abo-ret", JSON.stringify({ a, session: u.searchParams.get("session") || "" }));
+    ["abo", "session"].forEach((k) => u.searchParams.delete(k)); history.replaceState(null, "", u.pathname + u.search + u.hash);
+  } catch (e) {}
+})();
+window.addEventListener("gg:ready", () => setTimeout(async () => {
+  let ret = null; try { ret = JSON.parse(sessionStorage.getItem("gg-abo-ret") || "null"); sessionStorage.removeItem("gg-abo-ret"); } catch (e) {}
+  if (!ret || !S.rid) return;
+  if (ret.a === "annule") { go("abonnement"); toast("Paiement annulé : rien n'a été prélevé."); return; }
+  if (ret.a === "retour") { go("abonnement"); return; }
+  if (ret.a === "ok") {
+    go("abonnement"); toast("Paiement validé, activation…");
+    try { const r = await abCall("confirm", { session: ret.session }); if (r.ok) { SFX.done(); buzz([12, 40, 12, 40, 30]); burst(); AB.flash = true; toast(r.status === "trialing" ? `Pack ${AB_PACKS[abPk(r.pack)].t} choisi : premier prélèvement à la fin de l'essai.` : `Pack ${AB_PACKS[abPk(r.pack)].t} activé, merci !`); } }
+    catch (e) { toast("Paiement reçu : l'activation arrive dans une minute."); }
+    refresh();
+  }
+}, 700));
 
 Object.assign(ACT, {
   abGoAbo: () => { closeSheet(true); go("abonnement"); },
   abChoose: (a, id, v) => {
-    const k = abPk(v); const url = (window.GG_STRIPE || {})[k];
-    SFX.tap(); buzz(6);
-    if (url) { const u = url + (url.includes("?") ? "&" : "?") + "client_reference_id=" + encodeURIComponent(S.rid || "") + (abEmail() ? "&prefilled_email=" + encodeURIComponent(abEmail()) : ""); try { window.open(u, "_blank", "noopener"); } catch (e) { location.href = u; } return; }
+    const k = abPk(v); SFX.tap(); buzz(6); if (AB.busy) return;
+    if (abOnline()) {
+      const sx = (S.resto && S.resto.stripe) || {}; const p = abPlan();
+      if (abLive(sx) && sx.status !== "trialing") { /* already paying: confirm the change first, it is billed today (prorated) */
+        const up = AB_LVL[k] > AB_LVL[abPk(sx.pack)];
+        openSheet(`<div class="ab-block"><span class="ab-blockic">${ico("abPack")}</span><div class="lbl">Pack ${AB_PACKS[k].t} · ${AB_PACKS[k].price} € HT/mois</div><div class="h2">Passer au pack ${AB_PACKS[k].t} ?</div>
+          <p class="sub">${up ? "Le changement est immédiat. La différence, au prorata des jours restants, est prélevée aujourd'hui sur votre carte." : "Le changement est immédiat. Les jours déjà payés du pack actuel sont déduits de la prochaine facture."}</p>
+          <button class="btn acc block" data-act="abChange" data-v="${k}">${ico("check")}Oui, passer à ${AB_PACKS[k].t}</button><button class="btn ghost block" data-act="sheetClose">Annuler</button></div>`);
+        return;
+      }
+      void p; abCheckout(k); return;
+    }
     openSheet(`<div class="ab-block"><span class="ab-blockic">${ico("abPack")}</span><div class="lbl">Pack ${AB_PACKS[k].t} · ${AB_PACKS[k].price} € HT/mois</div><div class="h2">Paiement en ligne bientôt disponible</div><p class="sub">Pour activer votre abonnement, écrivez-nous : nous vous envoyons un code d'activation dans la journée. Sans engagement, résiliable à tout moment.</p>
-      <a class="btn acc block" href="${abMailto(k)}">${ico("abMail")}Nous écrire</a>
-      <form class="ab-actf" data-ab="code" novalidate><input class="input mono" id="abCode" placeholder="Code d'activation" autocomplete="off" autocapitalize="characters" spellcheck="false" enterkeyhint="go" aria-label="Code d'activation"><button class="btn soft" type="submit">Activer</button></form><em class="ab-acterr" id="abCodeErr" role="alert"></em></div>`);
+      <a class="btn acc block" href="${abMailto(k)}">${ico("abMail")}Nous écrire</a></div>`);
   },
   abContact: (a, id, v) => { SFX.tap(); location.href = abMailto(v); },
+  abChange: (a, id, v) => { SFX.tap(); abCheckout(abPk(v)); },
+  abPortal: async () => {
+    SFX.tap(); if (AB.busy) return; AB.busy = "portal"; refresh();
+    try { const r = await abCall("portal"); if (r.url) { location.href = r.url; return; } } catch (e) { SFX.err(); toast(abErrTx(e)); }
+    AB.busy = null; refresh();
+  },
 });
 
 /* ───────────────────────── Admin Growth Gusto ───────────────────────── */
@@ -265,14 +321,40 @@ VIEWS.admin = {
       <label class="ab-search st" style="--i:2">${ico("abSearch")}<input class="input" id="abQ" type="search" placeholder="${AB.tab === "comptes" ? "Nom, e-mail…" : "Restaurant, e-mail du gérant…"}" value="${esc(AB.q)}" autocomplete="off"></label>`;
     return `<div class="inner cc-wide ab-wrap ab-adm">${topBar("Admin Growth Gusto", { right: `${typeof auMailPrev === "function" ? `<button class="iconbtn" data-act="auMailPrev" aria-label="Aperçu des e-mails" title="Aperçu des e-mails">${ico("abMail")}</button>` : ""}<button class="iconbtn" data-act="abAdmReload" aria-label="Actualiser" title="Actualiser">${ico("abRefresh")}</button>` })}
       <p class="sub st" style="--i:0;margin:-6px 0 0">${DB.mode === "db" ? "Tous les restaurants et comptes du projet." : "Cet appareil seulement (sans compte, l'admin ne voit que les restaurants de ce téléphone)."}${A.loading ? " Actualisation…" : ""}</p>
-      ${kpi}${tabs}<div id="abList" class="ab-list">${AB.tab === "comptes" ? abAdminUsers() : abAdminList()}</div></div>`;
+      ${kpi}${abStripeAdm()}${tabs}<div id="abList" class="ab-list">${AB.tab === "comptes" ? abAdminUsers() : abAdminList()}</div></div>`;
   },
 };
+/* Espace admin › Paiement en ligne: paste the Stripe secret key once; the server builds everything on the Stripe account */
+const AB_STATUS = { trialing: "carte enregistrée, essai", active: "payé", past_due: "paiement en retard", canceled: "résilié", unpaid: "impayé", incomplete: "paiement inachevé", incomplete_expired: "paiement abandonné" };
+function abStripeAdm() {
+  if (DB.mode !== "db") return "";
+  const X = (AB.sadm ||= { st: null, busy: false, err: "", edit: false });
+  if (!X.st && !X.busy && !X.err) { X.busy = true; abCall("status").then((r) => { X.st = r; }).catch((e) => { X.err = abErrTx(e); }).finally(() => { X.busy = false; if (S.route === "admin") rerender(); }); }
+  const st = X.st || {};
+  const head = X.busy && !X.st ? "Lecture…" : st.on ? `Actif · ${st.live ? "paiements réels" : "mode test"} · ${st.tva ? "TVA 20 %" : "sans TVA"}${st.account ? ` · ${esc(st.account)}` : ""}` : "Pas encore branché : les gérants voient « Nous écrire »";
+  const form = !st.on || X.edit ? `<form class="ab-actf" data-ab="sk" novalidate><input class="input mono" id="abSk" type="password" placeholder="sk_live_…" autocomplete="off" spellcheck="false" aria-label="Clé secrète Stripe"><button class="btn acc" type="submit" ${X.busy ? "disabled" : ""}>${X.busy ? `<span class="spin"></span>` : ""}Brancher</button></form>
+      <label class="ab-tva"><input type="checkbox" id="abTva" ${st.tva ? "checked" : ""}> Facturer la TVA (20 %). Laissez décoché en micro-entreprise : les factures portent « TVA non applicable, art. 293 B du CGI ».</label>
+      <p class="note">Stripe › Développeurs › Clés API › <b>Clé secrète</b> (Révéler, puis copier). Une clé de test (sk_test_) permet de tout essayer avec la carte 4242 4242 4242 4242. La clé est chiffrée côté serveur et n'est jamais renvoyée à l'appli.</p>` : "";
+  return `<div class="glass pad ab-act ab-sadm st" style="--i:2"><div class="ab-acth"><span class="ic">${ico("abKey")}</span><div><b>Paiement en ligne (Stripe)</b><em>${head}</em></div>
+      ${st.on && !X.edit ? `<button class="btn ghost sm" data-act="abSkEdit">Changer la clé</button>` : ""}</div>
+    ${form}<em class="ab-acterr" id="abSkErr" role="alert">${esc(X.err || "")}</em>
+    ${st.on ? `<p class="note">Les packs (« Growth Gusto · Pack … »), le portail client et un webhook dédié sont créés sur le compte Stripe, sans toucher à ce qui existe déjà. Prix : ${AB_ORDER.map((k) => `${AB_PACKS[k].t} ${AB_PACKS[k].price} €`).join(", ")} HT par mois.${X.edit ? "" : ` <a href="#" data-act="abSkOff">Couper le paiement en ligne</a>`}</p>` : ""}</div>`;
+}
+document.addEventListener("submit", async (e) => {
+  const f = e.target; if (!f.dataset || f.dataset.ab !== "sk") return; e.preventDefault();
+  const X = AB.sadm; const i = $("#abSk", f); const key = String((i && i.value) || "").trim();
+  if (!/^(sk|rk)_(live|test)_/.test(key)) { SFX.err(); const er = $("#abSkErr"); if (er) er.textContent = "Collez la clé secrète : elle commence par sk_live_ ou sk_test_."; return; }
+  X.busy = true; X.err = ""; rerender();
+  try { const tv = $("#abTva"); const r = await abCall("setup", { key, tva: !!(tv && tv.checked) }); X.st = { on: true, live: r.live, account: r.account, tva: r.tva }; X.edit = false; AB.billAt = 0; abBillLoad(true); SFX.done(); burst(); toast(r.live ? "Stripe branché : les gérants peuvent payer en ligne." : "Stripe branché en mode test."); }
+  catch (er) { SFX.err(); X.err = /badkey/.test(String(er && er.message)) ? "Clé refusée par Stripe : vérifiez-la." : abErrTx(er) + (er && er.message && /stripe:/.test(er.message) ? ` (${er.message})` : ""); }
+  X.busy = false; rerender();
+});
 function abAdmSheet(id) {
   const A = AB.admin || {}; const r = (A.restos || []).find((x) => x.id === id) || S.restos.find((x) => x.id === id); if (!r) return;
   const st = (S.ui.abAdm ||= { pack: "complet", dur: 1 }); st.id = id; const p = abPlan(r);
   const dur = [[1, "1 mois"], [3, "3 mois"], [12, "1 an"], [0, "Illimité"]];
-  const line = p.plan === "essai" ? `Essai jusqu'au ${abDate(p.ends)}` : p.plan === "expire" ? (p.why === "paid" ? `Pack ${AB_PACKS[p.pack].t} échu le ${abDate(p.ends)}` : `Essai terminé le ${abDate(p.ends)}`) : p.plan === "suspendu" ? `Suspendu${r.suspended && r.suspended.at ? ` le ${abDate(r.suspended.at)}` : ""}` : p.plan === "demo" ? "Démo" : `Pack ${AB_PACKS[p.plan].t}${p.until ? ` jusqu'au ${abDate(p.until)}` : " · illimité"}${r.grantedBy ? ` · offert par ${esc(r.grantedBy)}` : r.activationCode ? ` · code ${esc(r.activationCode)}` : ""}`;
+  let line = p.plan === "essai" ? `Essai jusqu'au ${abDate(p.ends)}` : p.plan === "expire" ? (p.why === "paid" ? `Pack ${AB_PACKS[p.pack].t} échu le ${abDate(p.ends)}` : `Essai terminé le ${abDate(p.ends)}`) : p.plan === "suspendu" ? `Suspendu${r.suspended && r.suspended.at ? ` le ${abDate(r.suspended.at)}` : ""}` : p.plan === "demo" ? "Démo" : `Pack ${AB_PACKS[p.plan].t}${p.until ? ` jusqu'au ${abDate(p.until)}` : " · illimité"}${r.grantedBy ? ` · offert par ${esc(r.grantedBy)}` : r.activationCode ? ` · code ${esc(r.activationCode)}` : ""}`;
+  if (r.stripe && r.stripe.status) line += ` · Stripe : ${AB_STATUS[r.stripe.status] || r.stripe.status}`;
   openSheet(`<div class="ab-ash"><div class="ab-ashh">${abMono(r, 52)}<div style="flex:1;min-width:0"><div class="h2" style="font-size:20px">${esc(r.name || "Sans nom")}</div><div class="sub">${esc(r.ownerEmail || r.ownerName || r.owner || "")}${r.createdAt ? ` · créé le ${abDate(r.createdAt)}` : ""}</div></div>${abPlanPill(p)}</div>
     <p class="note ab-line">${line} · ${r.nMembers == null ? "équipe inconnue" : `${r.nMembers} membre${r.nMembers > 1 ? "s" : ""}`} · <span class="mono">${esc(r.id)}</span></p>
     ${p.plan === "suspendu" ? `<button class="btn acc block" data-act="abAdmRestore">${ico("abPlay")}Rétablir l'accès</button>` : `
@@ -292,7 +374,10 @@ async function abAdmWrite(id, patch, msg) {
 Object.assign(ACT, {
   abAdmOpen: (a, id) => { SFX.tap(); abAdmSheet(id); },
   abAdmTab: (a, id, v) => { if (AB.tab === v) return; AB.tab = v; AB.q = ""; SFX.tick(); rerender(); },
-  abAdmReload: () => { SFX.tap(); abAdminFetch(true); },
+  abAdmReload: () => { SFX.tap(); abAdminFetch(true); if (AB.sadm) { AB.sadm.st = null; AB.sadm.err = ""; } },
+  abSkEdit: () => { SFX.tap(); AB.sadm.edit = true; rerender(); setTimeout(() => { const i = $("#abSk"); i && i.focus(); }, 60); },
+  abSkOff: async () => { SFX.tap(); if (!AB.sadm.confirmOff) { AB.sadm.confirmOff = true; toast("Touchez encore une fois pour couper le paiement en ligne."); setTimeout(() => { AB.sadm.confirmOff = false; }, 4000); return; }
+    try { await abCall("off"); AB.sadm.st = { on: false }; AB.billAt = 0; abBillLoad(true); toast("Paiement en ligne coupé."); } catch (e) { toast(abErrTx(e)); } rerender(); },
   /* delete an account for good (functions/src/admin.js adminDeleteUser): its own restaurants, its memberships, its sign-in */
   abUserDel: (a, id) => {
     const A = AB.admin || {}; const u = (A.users || []).find((x) => x.id === id); if (!u) return;

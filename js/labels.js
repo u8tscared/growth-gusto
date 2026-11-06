@@ -289,9 +289,10 @@ function svcSibHtml(l) {
 /* ───────────── imprimante : modèles, rouleaux DK, réglages ─────────────
    Settings live on the resto doc: printer: { model, roll, mode }. The old shape (printer: "Zebra ZD421d", printTest: bool) still reads. */
 const LB_MODELS = [
-  { id: "ql810wc", name: "Brother QL-810Wc", short: "QL-810W", tag: "Votre imprimante", d: "Wi-Fi et USB, compatible AirPrint : le téléphone imprime directement, sans application.", link: ["Wi-Fi", "USB", "AirPrint"] },
-  { id: "ql820nwb", name: "Brother QL-820NWB", short: "QL-820NWB", tag: "Même famille", d: "Wi-Fi, Bluetooth et USB, compatible AirPrint. Mêmes rouleaux DK.", link: ["Wi-Fi", "Bluetooth", "AirPrint"] },
-  { id: "zd421", name: "Zebra ZD421d", short: "ZD421", tag: "Cuisine pro", d: "Robuste et rapide. Elle imprime en AirPrint une fois sur le Wi-Fi.", link: ["Wi-Fi", "Bluetooth"] },
+  { id: "ql810wc", name: "Brother QL-810Wc", short: "QL-810W", tag: "Petit budget", d: "Wi-Fi et USB, compatible AirPrint : le téléphone imprime directement, sans application.", link: ["Wi-Fi", "USB", "AirPrint"] },
+  { id: "ql820nwb", name: "Brother QL-820NWBc", short: "QL-820NWB", tag: "Conseillée", d: "Wi-Fi, câble réseau, Bluetooth et USB, compatible AirPrint, écran. Mêmes rouleaux DK, rouge pour les allergènes.", link: ["Wi-Fi", "Ethernet", "AirPrint"] },
+  { id: "td2350", name: "Brother TD-2350D", short: "TD-2350D", tag: "Cuisine pro", d: "Machine pro, compatible AirPrint, rouleaux standard : vraies étiquettes congélateur ou hydrosolubles.", link: ["Wi-Fi", "Bluetooth", "AirPrint"] },
+  { id: "zd421", name: "Zebra ZD421d", short: "ZD421", tag: "", d: "Robuste, mais pensée pour l'application Zebra : l'impression directe depuis le téléphone n'est pas garantie.", link: ["Wi-Fi", "Bluetooth"] },
   { id: "other", name: "Autre imprimante", short: "imprimante", tag: "", d: "Toute imprimante AirPrint, ou reliée à l'ordinateur : choisissez-la dans la fenêtre d'impression.", link: ["AirPrint"] },
 ];
 const LB_ROLLS = [
@@ -1146,6 +1147,19 @@ function lbPrinterStepHTML() { return lbWizardHTML({ embedded: true }); }
 window.lbPrinterStepHTML = lbPrinterStepHTML;
 
 /* ───────────── imprimante ───────────── */
+/* « Quelle imprimante acheter ? »: bought once, no rental (competitors rent theirs ~20 € HT/month). Prices checked 2026-11-06 at French
+   retailers (LDLC, Pearl, OfficeEasy), Amazon links for one-tap buying; research in /mnt/project-files/growth-gusto/vente/recherche.md */
+const LB_BUY = [
+  { n: "Brother QL-820NWBc", tag: "Le meilleur choix", p: "250 à 280 €", why: "AirPrint, Wi-Fi, câble réseau et Bluetooth, impression rouge, écran. Rouleaux DK 62 mm.", url: "https://www.amazon.fr/dp/B0BN1R61WY" },
+  { n: "Brother QL-810Wc", tag: "Le petit budget", p: "environ 200 €", why: "AirPrint et Wi-Fi, rouge. Pas de Bluetooth ni de câble réseau : suffisant pour une petite cuisine.", url: "https://www.amazon.fr/dp/B0BN1QDHQQ" },
+  { n: "Brother TD-2350D", tag: "Cuisine intensive", p: "environ 400 € HT", why: "Machine pro, AirPrint, rouleaux standard moins chers : étiquettes congélateur et hydrosolubles.", url: "https://www.amazon.fr/dp/B0DLL27GYM" },
+];
+function lbBuyHTML() {
+  return `<div class="glass pad st lb-buy" style="--i:6"><span class="lbl">Quelle imprimante acheter ?</span>
+    <p class="note" style="margin:6px 0 12px">Achetée une fois, sans abonnement. Elles impriment directement depuis le téléphone (AirPrint), sans application.</p>
+    ${LB_BUY.map((b, i) => `<a class="lb-buyi ${i ? "" : "rec"}" href="${b.url}" target="_blank" rel="noopener"><span class="ic">${ico("printer")}</span><span class="tx"><b>${b.n}</b><i>${b.tag} · ${b.p}</i><em>${b.why}</em></span>${ico("chev")}</a>`).join("")}
+    <p class="note" style="margin:10px 0 0">À éviter : Dymo (rouleaux verrouillés), Niimbot et Phomemo (application obligatoire, pas d'impression depuis le navigateur).</p></div>`;
+}
 VIEWS.imprimante = {
   live: false,
   render() {
@@ -1170,7 +1184,8 @@ VIEWS.imprimante = {
         <div class="li tap" data-act="lbTestMode" style="padding:0" role="switch" aria-checked="${test}" tabindex="0"><span class="ic">${ico("sparkle")}</span><div class="tx"><b>Mode test sans imprimante</b><em>${test ? "Activé" : "Désactivé"}</em></div><span class="lb-sw ${test ? "on" : ""}"><i></i></span></div>
         <p class="note" style="margin:12px 0 0">Les étiquettes s'affichent <b>à l'écran</b> : un autre téléphone peut scanner le QR.</p>
         <button class="btn soft block" style="margin-top:14px" data-act="lbTestLabel">${ico("qr")}Créer une étiquette test à l'écran</button></div>
-      <div class="glass pad st" style="--i:6"><span class="lbl">En cas de souci</span><div class="lb-faqs">${lbFaqHtml()}</div></div>
+      ${lbBuyHTML()}
+      <div class="glass pad st" style="--i:7"><span class="lbl">En cas de souci</span><div class="lb-faqs">${lbFaqHtml()}</div></div>
     </div></div></div>`;
   },
 };
