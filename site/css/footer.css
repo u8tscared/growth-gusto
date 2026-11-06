@@ -40,7 +40,7 @@
 @media (min-width:1200px){.sf-end{padding-inline:80px}}
 .sf-word{font:800 clamp(72px,10.5vw,150px)/.86 var(--d,system-ui);font-variation-settings:"opsz" 96,"wdth" 88;letter-spacing:-.06em;color:#fff;text-decoration:none;white-space:nowrap}
 .sf-word span{display:inline-block}
-.sf-word .hl{background:#fff;color:#5B2BFF;padding:0 .14em .05em;border-radius:.14em;box-shadow:0 .07em 0 #2A0BA6;animation:sf-wob 6s ease-in-out infinite}
+.sf-word .sf-hl{background:#fff;color:#5B2BFF;padding:0 .14em .05em;border-radius:.14em;box-shadow:0 .07em 0 #2A0BA6;animation:sf-wob 6s ease-in-out infinite}
 @media (max-width:899px){.sf-word span:first-child{display:block}}
 @keyframes sf-wob{0%,100%{transform:rotate(-2.5deg)}50%{transform:rotate(1.5deg) translateY(-5px)}}
 .sf-legal{display:flex;flex-direction:column;gap:10px;font-size:13.5px;color:#D9CFFF}
@@ -49,4 +49,4 @@
 .sf-legal a{color:#D9CFFF;text-decoration:none;transition:color .2s}
 .sf-legal a:hover{color:#FFC24B}
 
-@media (prefers-reduced-motion:reduce){.sf::after,.sf-mq-t,.sf-badge svg,.sf-word .hl{animation:none}}
+@media (prefers-reduced-motion:reduce){.sf::after,.sf-mq-t,.sf-badge svg,.sf-word .sf-hl{animation:none}}
