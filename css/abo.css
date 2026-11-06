@@ -234,3 +234,9 @@
 .ab-sadm .note a{color:var(--bad);font-weight:700}
 @media (prefers-reduced-motion:reduce){.ab-wrap .spin{animation:none}}
 .ab-tva{display:flex;gap:9px;align-items:flex-start;font-size:12.5px;line-height:1.45;color:var(--muted)}.ab-tva input{margin-top:2px;accent-color:var(--acc)}
+
+/* admin › caisses connectées */
+.ab-cxadm .ab-cxr{padding:12px 0 0;margin-top:12px;border-top:1px solid var(--line,rgba(0,0,0,.08))}
+.ab-cxadm .ab-cxr .ic .brand-logo{width:22px;height:22px;object-fit:contain}
+.ab-cxf{display:grid;grid-template-columns:1fr 1fr auto;gap:8px;margin-top:10px}
+@media (max-width:640px){.ab-cxf{grid-template-columns:1fr}}

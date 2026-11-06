@@ -13,4 +13,4 @@ window.GG_ADMINS = ["marceau.ruis@gmail.com"];
 window.GG_CONTACT = "contact@growthgusto.fr";
 
 /* server modules deployed with functions/ (tools/SERVER.md): the app shows them as active */
-window.GG_SERVER = { sondes: true, alertes: true, resa: true, mails: true };
+window.GG_SERVER = { sondes: true, alertes: true, resa: true, mails: true, caisse: true };
