@@ -155,6 +155,7 @@ const onResaBooking = onDocumentWritten({ document: "restos/{rid}/bookings/{bid}
   if (!b) return;
   const rs = await db().doc(`restos/${rid}`).get(); if (!rs.exists) return; const resto = rs.data();
   if (!(resto.server && resto.server.resa)) await db().doc(`restos/${rid}`).set({ server: { resa: true } }, { merge: true });
+  if (b.ext) return; /* a booking of another tool (Zenchef…, functions/src/resaimport.js): that tool e-mails its client, never us */
   const kind = mailKind(a, b); if (!kind) return;
   try { if (await sendMail(kind, rid, bid, b, resto)) logger.info("resa: mail", kind, rid, bid); } catch (e) { logger.error("resa: mail failed", e); }
 });
@@ -218,7 +219,7 @@ async function resaTick() {
     const snap = await db().collection(`restos/${r.id}/bookings`).where("date", "==", tomorrow).get();
     for (const s of snap.docs) {
       const b = s.data();
-      if (!CONF.includes(b.status) || !b.email || b.remindedAt || (+b.createdAt || 0) > Date.now() - 12 * 3600e3) continue;
+      if (b.ext || !CONF.includes(b.status) || !b.email || b.remindedAt || (+b.createdAt || 0) > Date.now() - 12 * 3600e3) continue;
       await s.ref.set({ remindedAt: Date.now() }, { merge: true });
       try { await sendMail("rappel", r.id, s.id, b, resto); } catch (e) { logger.error("resa: reminder", e); }
     }

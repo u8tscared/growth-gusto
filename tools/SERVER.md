@@ -27,6 +27,14 @@ Avec `caisse` : `firebase functions:secrets:set SUMUP_CLIENT_ID`, `SUMUP_CLIENT_
   - `caisseTick` : synchronise les ventes (`restos/{rid}/sales`) ; jetons chiffrés AES-GCM dans `caisseTokens` (serveur seulement).
   - Comptes à créer : app développeur SumUp (redirect `https://app.growthgusto.fr/?caisse=sumup`, scopes `transactions.history user.profile_readonly`).
 
+- **resaimport** (`functions/src/resaimport.js`, lecteur `functions/src/rzparse.js` = copie exacte de `js/rzparse.js`)
+  - Réservations Zenchef (et TheFork Manager, ou tout outil qui envoie un e-mail par réservation), sans API partenaire ni coût par restaurant.
+  - `resaInbox` (callable, gérant) : crée l'adresse du restaurant `<nom>.<jeton>@in.growthgusto.fr` (`resaInbox/{jeton}` → rid, serveur seulement).
+  - `resaInbound` (HTTPS, appelé par Brevo, jeton secret dans l'URL, `_meta/inbound.token`) : lit chaque e-mail, crée / modifie / annule la réservation (`source: "zenchef"…`, `ext`), garde les 40 derniers e-mails dans `restos/{rid}/resaMails`.
+  - `resaImportTick` : enregistre tout seul le webhook « inbound » dans Brevo (une fois ; nouvel essai toutes les 6 h, erreur dans `_meta/inbound.err`).
+  - **Une seule fois, chez IONOS** (DNS de growthgusto.fr) : deux enregistrements MX pour le sous-domaine `in` : `in` MX 10 `inbound1.sendinblue.com`, `in` MX 20 `inbound2.sendinblue.com`.
+  - Les réservations `ext` ne reçoivent jamais nos e-mails (l'outil d'origine les envoie déjà) : `functions/src/resa.js` les ignore.
+
 ## Drapeaux côté app
 
 `S.resto.server.<module>` est posé par le serveur au premier passage. `window.GG_SERVER = { sondes: true, alertes: true }` dans `js/config.js` force l'affichage « actif » une fois le déploiement fait.
