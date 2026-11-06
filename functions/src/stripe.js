@@ -130,7 +130,7 @@ async function setup(key, by, tva) {
   }
   /* customer portal: invoices, card, billing details, cancel at the end of the month */
   const portal = (await st(key, "/billing_portal/configurations", { method: "POST", body: {
-    business_profile: { headline: "Growth Gusto · votre abonnement" },
+    business_profile: { headline: "Growth Gusto · votre abonnement", privacy_policy_url: "https://growthgusto.fr/confidentialite", terms_of_service_url: "https://growthgusto.fr/cgv" },
     default_return_url: APP + "?abo=retour",
     features: { invoice_history: { enabled: true }, payment_method_update: { enabled: true }, customer_update: { enabled: true, allowed_updates: ["email", "address", "name", "tax_id"] }, subscription_cancel: { enabled: true, mode: "at_period_end", cancellation_reason: { enabled: true, options: ["too_expensive", "missing_features", "switched_service", "unused", "other"] } } },
   } })).id;
@@ -221,7 +221,7 @@ const stripeApi = onCall({ region: REGION, cors: true, secrets: STRIPE_SECRETS, 
         allow_promotion_codes: true, billing_address_collection: "required", tax_id_collection: { enabled: true }, customer_update: { name: "auto", address: "auto" },
         subscription_data: { metadata: { rid: r.id, pack, app: "growth-gusto" }, trial_end: trialEnd, description: `Growth Gusto · Pack ${P.t} · ${String(r.name || "").slice(0, 80)}` },
         metadata: { rid: r.id, pack, app: "growth-gusto" },
-        custom_text: { submit: { message: trialEnd ? `Rien n'est prélevé avant la fin de votre essai, le ${new Date(trialEnd * 1000).toLocaleDateString("fr-FR", { day: "numeric", month: "long", timeZone: "Europe/Paris" })}. Sans engagement, résiliable à tout moment.` : "Mensuel, sans engagement : résiliable à tout moment depuis l'application." } },
+        custom_text: { submit: { message: trialEnd ? `Rien n'est prélevé avant la fin de votre essai, le ${new Date(trialEnd * 1000).toLocaleDateString("fr-FR", { day: "numeric", month: "long", timeZone: "Europe/Paris" })}. Sans engagement, résiliable à tout moment. En validant, vous acceptez les CGV : growthgusto.fr/cgv` : "Mensuel, sans engagement : résiliable à tout moment depuis l'application. En validant, vous acceptez les CGV : growthgusto.fr/cgv" } },
         success_url: APP + "?abo=ok&session={CHECKOUT_SESSION_ID}", cancel_url: APP + "?abo=annule",
       } });
       return { url: ses.url };
