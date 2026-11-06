@@ -97,7 +97,7 @@ const OB_TOOLS = [
     done: () => { try { if (typeof imWatch === "function") imWatch(); return typeof IM !== "undefined" && IM.wRid === S.rid && (IM.hist || []).some((h) => !h.undone); } catch (e) { return false; } } },
   { k: "sondes", n: "Sondes", ic: "sdProbe", fb: "therm", tone: "sky", t: "Sondes connectées", s: "Les frigos se relèvent seuls.", todo: "Brancher vos sondes", ts: () => (OB.ansOf("sondes").v === "buy" ? "Quand vous les aurez reçues" : "Shelly, SensorPush, Govee…"), r: "sondes",
     done: () => { try { if (typeof sdWatch === "function") sdWatch(); return !!(window.SONDES && window.SONDES.list().length); } catch (e) { return false; } } },
-  { k: "caisse", n: "Caisse", ic: "cxPlug", fb: "receipt", tone: "sf", t: "Caisse connectée", s: "SumUp, Zelty, Square, Lightspeed.", todo: () => { const p = obPosName(); return p ? `Connecter ${p}` : "Connecter la caisse"; }, ts: "Ou importer un fichier de ventes", r: "caisse",
+  { k: "caisse", n: "Caisse", ic: "cxPlug", fb: "receipt", tone: "sf", t: "Caisse connectée", s: "SumUp et Square en direct, les autres par import.", todo: () => { const p = obPosName(); return p ? `Connecter ${p}` : "Connecter la caisse"; }, ts: "Ou importer un fichier de ventes", r: "caisse",
     done: () => { try { if (typeof cxEnsure === "function") cxEnsure(); } catch (e) {} return (S.cxStat || []).some((c) => c.status === "connected" || c.lastImport) || (S.cxSales || []).length > 0; } },
   /* « Une caisse classique » (question Caisse): the paper ticket Z, photographed each evening (js/tickets.js) */
   { k: "ticketz", n: "Ticket Z", ic: "receipt", fb: "receipt", tone: "sf", t: "Ticket Z en photo", s: "Le stock se déduit seul.", todo: "Photographier le ticket Z", ts: "Ce soir, après le service", r: "tickets", hide: true,
@@ -772,7 +772,7 @@ Object.assign(OB, {
       }
       const L = [this.opt("none", "Pas de caisse", "", OB_SVG.x, "v", a.v === "none", 0)];
       if (VIEWS.tickets && obPerm("tickets")) L.push(this.opt("z", "Une caisse classique", "Ticket Z papier", obI("receipt", "receipt"), "sf", a.v === "z", 1));
-      if (obToolOk(obTool("caisse"))) L.push(this.opt("pos", "Une caisse connectée", "SumUp, Zelty, Lightspeed…", obI("cxPlug", "receipt"), "sky", a.v === "pos", 2));
+      if (obToolOk(obTool("caisse"))) L.push(this.opt("pos", "Une caisse connectée", "SumUp, Square en direct", obI("cxPlug", "receipt"), "sky", a.v === "pos", 2));
       return H("Votre caisse ?") + this.opts(L);
     }
     if (k === "sondes") {
@@ -807,6 +807,7 @@ Object.assign(OB, {
       const imp = (tx = "Importer mes ventes", cls = "pri") => this.big(tx, "obTqDo", "cxImport", cls, obI("cxFile", "upload"));
       if (st && st.status === "connected" && (st.mode !== "csv" || st.lastImport)) return `<div class="onb-done ok"><span class="onb-tool-ic">${OB_SVG.check}</span><span><b>${st.mode === "csv" ? "Ventes importées" : "Caisse connectée"}</b>${st.mode === "csv" && typeof cxAgo === "function" ? ` · ${esc(cxAgo(st.lastImport))}` : ""}</span></div>${st.mode === "csv" ? `<div class="onb-acts">${imp("Importer un autre fichier", "light")}</div>` : ""}`;
       if (kind === "csv") return `<div class="onb-acts">${imp()}</div>`;
+      if (P && P.soon) return `<p class="onb-soon">${obI("cxBolt", "sparkle")}<span><b>Pas encore relié en direct : ça arrive bientôt.</b> En attendant, importez vos ventes, ça fait tout.</span></p><div class="onb-acts">${imp()}</div>`;
       if (live && admin && kind === "key") return `<label class="onb-f"><span class="onb-lbl">Clé API ${esc(P.name)}</span><div class="onb-in"><input class="onb-input mono" id="cxKey" autocomplete="off" spellcheck="false" placeholder="Collez la clé ici"></div></label><div class="onb-acts">${this.big(`Connecter ${esc(P.name)}`, "obTqDo", "cxKey", "pri", obI("cxKey", "lock"))}</div>`;
       if (live && admin) return `<div class="onb-acts">${this.big(`Connecter ${esc(P.name)}`, "obTqDo", "cxGo", "pri", obI("cxPlug", "receipt"))}${imp("Importer un fichier", "light")}</div>`;
       return `<p class="onb-soon">${obI("cxBolt", "sparkle")}<span><b>Connexion directe très bientôt.</b> En attendant, importez vos ventes.</span></p><div class="onb-acts">${imp()}</div>`;
