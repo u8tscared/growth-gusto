@@ -27,6 +27,8 @@ Object.assign(IC, {
   rsNote: ["M15.5 3H5a2 2 0 0 0-2 2v14c0 1.1.9 2 2 2h14a2 2 0 0 0 2-2V8.5L15.5 3Z", "M15 3v6h6"],
   rsSeat: ["c:12,7,4", "M5 21v-2a7 7 0 0 1 14 0v2", "f:M5 21v-2a7 7 0 0 1 14 0v2z"],
   rsMail: ["r:2,4,20,16,2", "m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"],
+  rsHelp: ["c:12,12,10", "M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3", "M12 17h.01"],
+  rsStar: ["M11.52 2.3a.53.53 0 0 1 .95 0l2.31 4.68a2.12 2.12 0 0 0 1.6 1.16l5.16.76a.53.53 0 0 1 .3.9l-3.74 3.64a2.12 2.12 0 0 0-.61 1.88l.88 5.14a.53.53 0 0 1-.77.56l-4.62-2.43a2.12 2.12 0 0 0-1.97 0L6.4 21.01a.53.53 0 0 1-.77-.56l.88-5.14a2.12 2.12 0 0 0-.61-1.88L2.16 9.8a.53.53 0 0 1 .3-.9l5.16-.76a2.12 2.12 0 0 0 1.6-1.16z", "f:M11.52 2.3a.53.53 0 0 1 .95 0l2.31 4.68a2.12 2.12 0 0 0 1.6 1.16l5.16.76a.53.53 0 0 1 .3.9l-3.74 3.64a2.12 2.12 0 0 0-.61 1.88l.88 5.14a.53.53 0 0 1-.77.56l-4.62-2.43a2.12 2.12 0 0 0-1.97 0L6.4 21.01a.53.53 0 0 1-.77-.56l.88-5.14a2.12 2.12 0 0 0-.61-1.88L2.16 9.8a.53.53 0 0 1 .3-.9l5.16-.76a2.12 2.12 0 0 0 1.6-1.16z"],
 });
 
 /* ───────── constants + config ───────── */
@@ -471,7 +473,7 @@ function rsOpenSheet(id) {
   const busyT = new Set(rsOfDay(b.date).filter((x) => rsLive(x) && x.id !== b.id && x.table && rsSvcOf(cfg, b.date, x.time).id === svc.id).map((x) => x.table));
   const tabs = cfg.tables.slice().sort((a, c) => String(a.n).localeCompare(String(c.n), "fr", { numeric: true }));
   const srv = rsSrv(), log = Array.isArray(b.mailLog) ? b.mailLog : [], lastMail = log[log.length - 1];
-  const KN = { demande: "demande reçue", confirme: "confirmation", modifie: "modification", rappel: "rappel", refuse: "refus", annule: "annulation", annule_client: "annulation" };
+  const KN = { demande: "demande reçue", confirme: "confirmation", modifie: "modification", rappel: "rappel", refuse: "refus", annule: "annulation", annule_client: "annulation", avis: "demande d'avis" };
   const main = b.status === "avalider"
     ? `<div class="rs-rqb big"><button class="btn soft" data-act="rsRefuse" data-id="${esc(b.id)}">${ico("x")}Refuser</button><button class="btn acc" data-act="rsAccept" data-id="${esc(b.id)}">${ico("check")}Accepter</button></div>`
     : b.status === "attente"
@@ -487,9 +489,18 @@ function rsOpenSheet(id) {
     ${main}
     ${tabs.length && rsLive(b) ? `<div class="rs-etab"><span>Table</span><div>${["", ...tabs.map((t) => t.id)].map((tid) => { const t = tabs.find((x) => x.id === tid); return `<button class="${(b.table || "") === tid ? "on" : ""}${t && busyT.has(tid) ? " busy" : ""}" data-act="rsSetTable" data-id="${esc(b.id)}" data-v="${esc(tid)}">${t ? `${esc(t.n)}<i>${+t.seats || 0}</i>` : "Aucune"}</button>`; }).join("")}</div></div>` : ""}
     ${b.email ? `<div class="rs-mailr">${ico("rsMail")}<span><b>${esc(b.email)}</b><em>${lastMail ? `E-mail de ${KN[lastMail.k] || "réservation"} envoyé ${when(lastMail.at)}` : srv ? "Le client reçoit les e-mails de sa réservation" : "E-mails au client : bientôt actif"}</em></span>${srv && (rsConf(b) || b.status === "avalider") ? `<button class="btn soft sm" data-act="rsResend" data-id="${esc(b.id)}">Renvoyer</button>` : ""}</div>` : ""}
+    ${rsRevLine(b)}
     <div class="rs-bkf">${b.phone ? `<a class="btn soft" href="tel:${esc(String(b.phone).replace(/[^\d+]/g, ""))}">${ico("rsPhone")}Appeler</a>` : ""}<button class="btn ${b.phone ? "soft" : "soft block"}" data-act="rsEdit" data-id="${esc(b.id)}">${ico("edit")}Modifier</button></div>
   </div>`);
 }
+/* booking sheet: where the « Votre repas s'est bien passé ? » stands for this guest */
+function rsRevLine(b) {
+  if (b.status !== "arrive" || b.ext) return ""; const c = rsCfg(), url = rsGoogleUrl(c.googleReview); if (!url || c.reviewAsk === false && !b.phone) return "";
+  const sms = rsRevSms(b), asked = +b.reviewAskAt > 0, smsAt = +b.reviewSmsAt > 0;
+  const txt = asked ? `Avis demandé par e-mail ${when(b.reviewAskAt)}` : smsAt ? `Avis demandé par SMS ${when(b.reviewSmsAt)}` : b.email && c.reviewAsk !== false ? `L'e-mail d'avis part ${c.reviewWhen === "lendemain" ? "demain à 11 h" : "après le repas"}` : "Pas d'e-mail : demandez l'avis par SMS";
+  return `<div class="rs-mailr rs-revl">${ico("rsStar")}<span><b>Avis Google</b><em>${esc(txt)}</em></span>${sms && !asked ? `<a class="btn soft sm" href="${esc(sms)}" data-act="rsRevSent" data-id="${esc(b.id)}">Demander un avis</a>` : ""}</div>`;
+}
+
 /* cancel / refuse with an optional message to the client */
 function rsMsgSheet(id, kind) {
   const b = rsRows().find((x) => x.id === id); if (!b) return;
@@ -534,10 +545,24 @@ const RS_MAIL_KINDS = {
   refuse: { t: "Réservation impossible", s: (r) => `Votre demande chez ${r.name}` },
   annule: { t: "Réservation annulée", s: (r) => `Réservation annulée · ${r.name}` },
   annule_client: { t: "Annulation confirmée", s: (r) => `Annulation confirmée · ${r.name}` },
+  avis: { t: "Votre dîner s'est bien passé ?", s: (r, b) => `Votre ${rsMeal(b)} chez ${r.name} s'est bien passé ?` },
 };
+const rsMeal = (b) => (rsMin(b && b.time) < 16 * 60 ? "déjeuner" : "dîner");
+/* the restaurant's Google review link: a Place ID (ChIJ…) or an https link on a Google domain (g.page/r/…/review, maps.app.goo.gl…).
+   Same function in functions/src/resa.js (googleUrl): keep both in sync. */
+function rsGoogleUrl(v) {
+  const s = String(v || "").trim(); if (!s || s.length > 600) return "";
+  if (/^ChIJ[\w-]{10,}$/.test(s)) return "https://search.google.com/local/writereview?placeid=" + s;
+  let u; try { u = new URL(/^https?:\/\//i.test(s) ? s : "https://" + s); } catch (e) { return ""; }
+  if (u.protocol !== "https:" && u.protocol !== "http:") return "";
+  const h = u.hostname.toLowerCase();
+  if (!/(^|\.)(google\.[a-z.]{2,6}|g\.page|goo\.gl)$/.test(h)) return "";
+  u.protocol = "https:"; return u.toString();
+}
 function rsMailDay(k) { const D = ["dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi"], M = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"]; const [y, m, d] = String(k || "").split("-").map(Number); if (!y) return ""; const dt = new Date(Date.UTC(y, m - 1, d, 12)); return `${D[dt.getUTCDay()]} ${d} ${M[m - 1]}`; }
 function rsMailHtml(kind, b, r, L) {
   const e = (v) => String(v == null ? "" : v).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  if (kind === "avis") return rsAvisHtml(b, r, L, e);
   const K = RS_MAIL_KINDS[kind] || RS_MAIL_KINDS.confirme, nm = e(String(b.name || "").trim().split(/\s+/)[0] || ""), rn = e(r.name || "le restaurant");
   /* the restaurant logo, only as an https URL: most mail clients block data: images */
   const lg = typeof r.logo === "string" && /^https:\/\/[^\s"'<>]+$/.test(r.logo) && r.logo.length <= 2000 ? r.logo : "";
@@ -577,11 +602,36 @@ function rsMailHtml(kind, b, r, L) {
 </div></body></html>`;
 }
 
+/* « Votre dîner s'est bien passé ? » — every guest gets the same Google button (no filtering of unhappy guests: Google forbids it) */
+function rsAvisHtml(b, r, L, e) {
+  const nm = e(String(b.name || "").trim().split(/\s+/)[0] || ""), rn = e(r.name || "le restaurant"), m = rsMeal(b);
+  const lg = typeof r.logo === "string" && /^https:\/\/[^\s"'<>]+$/.test(r.logo) && r.logo.length <= 2000 ? r.logo : "";
+  const g = e(L.review || "#"), star = `<a href="${g}" style="text-decoration:none;color:#F5B700;font-size:38px;line-height:1;padding:0 3px">&#9733;</a>`;
+  return `<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Votre ${m} s'est bien passé ?</title></head>
+<body style="margin:0;padding:0;background:#FBF6EC;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;color:#1B1530">
+<div style="max-width:500px;margin:0 auto;padding:24px 14px 32px">
+ <div style="background:#4C1FEA;border-radius:26px 26px 0 0;padding:26px 24px 30px;color:#ffffff">
+  ${lg ? `<img src="${e(lg)}" width="52" height="52" alt="${rn}" style="display:block;width:52px;height:52px;border-radius:15px;background:#ffffff;object-fit:contain;margin:0 0 14px;border:0">` : ""}
+  <div style="font-size:14px;color:#D9D2FF;font-weight:600">${rn}</div>
+  <div style="font-size:28px;line-height:1.1;font-weight:800;letter-spacing:-.5px;margin-top:6px">Votre ${m} s'est bien passé ?</div>
+ </div>
+ <div style="background:#FFFDF8;border:1.5px solid #E9DFCD;border-top:0;border-radius:0 0 26px 26px;padding:22px 22px 24px;box-shadow:0 3px 0 #E2D6C2">
+  <p style="margin:0 0 14px;font-size:16px;line-height:1.5;color:#4A4560">Bonjour ${nm}, merci d'être venu${+b.covers > 1 ? "s" : ""} chez <b>${rn}</b>. Toute l'équipe espère que vous vous êtes régalé${+b.covers > 1 ? "s" : ""} !</p>
+  <p style="margin:0 0 6px;font-size:16px;line-height:1.5;color:#4A4560">Votre avis compte énormément pour nous. Trente secondes sur Google aident d'autres gourmands à nous découvrir.</p>
+  <div style="text-align:center;margin:18px 0 6px">${star}${star}${star}${star}${star}</div>
+  <a href="${g}" style="display:block;text-align:center;text-decoration:none;font-weight:700;font-size:16px;padding:15px 18px;border-radius:16px;margin-top:10px;background:#5B2BFF;color:#ffffff;box-shadow:0 4px 0 #2A0BA6">Laisser un avis sur Google</a>
+  ${r.phone ? `<div style="margin-top:16px;font-size:14px;color:#4A4560;text-align:center;line-height:1.45">Quelque chose ne vous a pas plu ? Dites-le nous aussi, on veut s'améliorer : <a href="tel:${e(String(r.phone).replace(/[^\d+]/g, ""))}" style="color:#3A10D8;font-weight:700;text-decoration:none">${e(r.phone)}</a></div>` : ""}
+  ${L.book ? `<div style="margin-top:14px;text-align:center"><a href="${e(L.book)}" style="color:#3A10D8;font-weight:700;font-size:14px;text-decoration:none">Réserver à nouveau</a></div>` : ""}
+ </div>
+ <div style="text-align:center;font-size:12px;color:#6E6880;margin-top:18px;line-height:1.5">Un seul message après votre venue, pas plus d'une fois tous les 4 mois.<br>Réservation par Growth Gusto</div>
+</div></body></html>`;
+}
+
 /* ───────── settings (gérant) ───────── */
 const RS_MAIL_LIST = [["demande", "Demande reçue", "Mode validation : avant votre réponse"], ["confirme", "Table réservée", "Jour, heure, adresse, agenda, lien pour modifier"], ["modifie", "Réservation modifiée", "Quand l'heure, le jour ou le nombre change"], ["rappel", "Rappel la veille", "Envoyé la veille au matin"], ["refuse", "Demande refusée", "Avec votre message"], ["annule", "Annulée par le restaurant", "Avec votre message"]];
 function rsCfgPaint() {
   const c = R.ce; if (!c) return; const t = R.ctab;
-  const tabs = [["h", "Horaires"], ["w", "En ligne"], ["t", "Tables"]];
+  const tabs = [["h", "Horaires"], ["w", "En ligne"], ["a", "Avis"], ["t", "Tables"]];
   const step = (k, v, min, max, unit) => `<div class="rs-stp2"><button data-act="rsCeStep" data-v="${k}:-1" aria-label="Moins" ${v <= min ? "disabled" : ""}>${ico("minus")}</button><b>${v}${unit ? `<i>${unit}</i>` : ""}</b><button data-act="rsCeStep" data-v="${k}:1" aria-label="Plus" ${v >= max ? "disabled" : ""}>${ico("plus")}</button></div>`;
   const seg = (k, opts) => `<div class="rs-seg">${opts.map(([v, l]) => `<button class="${String(c[k]) === String(v) ? "on" : ""}" data-act="rsCeSet" data-v="${k}:${v}">${l}</button>`).join("")}</div>`;
   let body = "";
@@ -615,6 +665,8 @@ function rsCfgPaint() {
       <div class="rs-pubh"><b>E-mails à vos clients</b>${rsSrv() ? "" : `<span class="rs-soon">bientôt actif</span>`}</div>
       <p class="sub rs-mlp">${rsSrv() ? "Envoyés tout seuls dès qu'un client laisse son e-mail. Touchez pour voir." : "En attendant, la page de réservation confirme que la table est enregistrée. Touchez pour voir les e-mails."}</p>
       <div class="rs-mls">${RS_MAIL_LIST.filter(([k]) => k !== "demande" || c.validate).map(([k, t, d]) => `<div class="rs-ml"><button class="rs-mlb" data-act="rsMailPrev" data-v="${k}">${ico("rsMail")}<span><b>${t}</b><em>${d}</em></span>${ico("chev")}</button>${k === "rappel" ? `<button class="rs-swi${c.reminder !== false ? " on" : ""}" data-act="rsCeRem" aria-pressed="${c.reminder !== false}" aria-label="Rappel la veille"><i></i></button>` : ""}</div>`).join("")}</div>`;
+  } else if (t === "a") {
+    body = rsRevCard(c);
   } else if (typeof plCfgCard === "function") {
     body = plCfgCard(c);
   } else {
@@ -635,6 +687,34 @@ function rsCfgPaint() {
     <button class="btn acc block" data-act="rsCeSave">Enregistrer</button>
   </div>`);
 }
+/* ── « Votre dîner s'est bien passé ? » settings: Google link, when, on/off, how many sent (server: functions/src/resa.js reviewTick) ── */
+const RS_REV_WHEN = [["soir", "Le soir même", "2 h 30 après l'heure de la table (le lendemain 10 h si c'est tard)"], ["lendemain", "Le lendemain", "À 11 h, le jour d'après"]];
+function rsRevSent(days) { const from = Date.now() - days * 864e5; return rsRows().filter((b) => +b.reviewAskAt > from).length; }
+function rsRevCard(c) {
+  const url = rsGoogleUrl(c.googleReview), on = c.reviewAsk !== false, bad = String(c.googleReview || "").trim() && !url, w = c.reviewWhen === "lendemain" ? "lendemain" : "soir";
+  const n = rsRevSent(30);
+  return `<div class="rs-rev">
+    <div class="rs-revh"><span class="rs-revs" aria-hidden="true">${ico("rsStar").repeat(5)}</span><div><b>Plus d'avis Google, sans y penser</b><em>Après le repas, chaque client venu reçoit « Votre ${"dîner"} s'est bien passé ? » avec un bouton vers votre fiche Google.</em></div></div>
+    <button class="rs-tog${on ? " on" : ""}" data-act="rsCeRevAsk" aria-pressed="${on}"><span><b>Demander un avis après le repas</b><em>${on ? (url ? "Actif : envoyé tout seul aux clients marqués Arrivé." : "Il manque votre lien Google, juste en dessous.") : "Coupé : aucun e-mail d'avis."}</em></span><i></i></button>
+    <label class="rs-big-in sm"><span>Votre lien d'avis Google</span><input class="input${bad ? " rs-bad" : ""}" data-rsce="googleReview" id="rsGr" value="${esc(c.googleReview || "")}" maxlength="600" placeholder="https://g.page/r/…/review" inputmode="url" autocapitalize="off" autocomplete="off" spellcheck="false"></label>
+    ${bad ? `<p class="rs-revbad">${ico("alert")}Ce lien ne mène pas à Google. Copiez celui que Google vous donne (il commence souvent par g.page).</p>` : ""}
+    <div class="rs-revb">${url ? `<a class="btn soft sm" href="${esc(url)}" target="_blank" rel="noopener">${ico("rsWeb")}Tester mon lien</a>` : ""}<button class="btn soft sm" data-act="rsRevHelp">${ico("rsHelp")}Où trouver mon lien ?</button></div>
+    ${R.revHelp ? `<ol class="rs-revhelp"><li>Sur Google, cherchez le nom de votre restaurant (connecté au compte de votre fiche).</li><li>Touchez <b>Demander des avis</b> (ou <b>Recevoir plus d'avis</b>).</li><li>Copiez le lien et collez-le ici. C'est tout.</li></ol>` : ""}
+    <div class="rs-row"><div><b>Quand l'envoyer</b><em>${esc((RS_REV_WHEN.find((x) => x[0] === w) || RS_REV_WHEN[0])[2])}</em></div><div class="rs-seg">${RS_REV_WHEN.map(([v, l]) => `<button class="${w === v ? "on" : ""}" data-act="rsCeRevWhen" data-v="${v}">${l}</button>`).join("")}</div></div>
+    <div class="rs-ml"><button class="rs-mlb" data-act="rsMailPrev" data-v="avis">${ico("rsMail")}<span><b>Voir l'e-mail</b><em>Le même pour tous les clients, avec vos étoiles et votre téléphone</em></span>${ico("chev")}</button></div>
+    <ul class="rs-revrules"><li>Une seule fois par réservation, et pas plus d'une fois tous les 4 mois pour un même client.</li><li>Seulement les clients qui ont laissé leur e-mail et qui sont marqués <b>Arrivé</b> (ou dont vous avez ouvert la table en salle).</li><li>Sans e-mail ? Dans la fiche de la réservation, « Demander un avis » ouvre un SMS tout prêt.</li></ul>
+    ${n ? `<div class="rs-revn"><b>${n}</b><span>${n > 1 ? "demandes d'avis envoyées" : "demande d'avis envoyée"} ces 30 derniers jours</span></div>` : ""}
+    ${rsSrv() || DB.mode === "demo" ? "" : `<div class="rs-mail">${ico("rsMail")}<span>Bientôt actif : ces e-mails partiront tout seuls dès que l'envoi sera branché.</span></div>`}
+  </div>`;
+}
+/* the SMS a waiter can send from the phone (free) when the client left no e-mail */
+function rsRevSms(b) {
+  const url = rsGoogleUrl(rsCfg().googleReview); if (!url || !b.phone) return "";
+  const rn = (S.resto && S.resto.name) || "le restaurant";
+  const txt = `Bonjour ${firstName(b.name) || ""}, merci d'être venu chez ${rn} ! Votre ${rsMeal(b)} s'est bien passé ? Un petit avis nous aiderait beaucoup : ${url}`;
+  return `sms:${String(b.phone).replace(/[^\d+]/g, "")}?&body=${encodeURIComponent(txt)}`;
+}
+
 function rsCeKeep() {
   document.querySelectorAll("#sheetBody [data-rsce]").forEach((el) => rsSetPath(R.ce, el.dataset.rsce, el.value));
 }
@@ -775,7 +855,8 @@ Object.assign(ACT, {
     rsCeKeep(); const c = R.ce; if (!c || !S.resto) return;
     c.services = c.services.filter((s) => s.from && s.to).map((s, i) => ({ id: s.id || "s" + i, name: (s.name || "").trim() || `Service ${i + 1}`, from: s.from, to: rsMin(s.to) < rsMin(s.from) ? s.from : s.to, days: s.days || [] }));
     c.tables = c.tables.map((t) => ({ ...t, id: t.id, n: String(t.n || "").trim() || "?", seats: +t.seats || 2, zone: t.zone || "salle" }));
-    ["address", "phone", "msg"].forEach((k) => { c[k] = String(c[k] || "").trim(); });
+    ["address", "phone", "msg", "googleReview"].forEach((k) => { c[k] = String(c[k] || "").trim(); });
+    if (c.googleReview && !rsGoogleUrl(c.googleReview)) { SFX.err(); R.ctab = "a"; rsCfgPaint(); toast("Ce lien d'avis ne mène pas à Google", "err"); return; }
     if (!rsCanOnline()) c.online = false;
     a.disabled = true;
     try { await safe(DB.update("restos", S.rid, { resaCfg: DB.clean(c) })); } catch (e) { a.disabled = false; return; }
@@ -833,10 +914,14 @@ Object.assign(ACT, {
   rsCeVal: (a, id, v) => { rsCeKeep(); SFX.tick(); buzz(4); R.ce.validate = v === "1"; rsCfgPaint(); },
   rsCeWl: () => { rsCeKeep(); R.ce.waitlist = R.ce.waitlist === false; R.ce.waitlist ? SFX.ok() : SFX.tap(); rsCfgPaint(); },
   rsCeRem: () => { rsCeKeep(); R.ce.reminder = R.ce.reminder === false; R.ce.reminder ? SFX.ok() : SFX.tap(); rsCfgPaint(); },
+  rsCeRevAsk: () => { rsCeKeep(); R.ce.reviewAsk = R.ce.reviewAsk === false; R.ce.reviewAsk ? SFX.ok() : SFX.tap(); buzz(6); rsCfgPaint(); },
+  rsCeRevWhen: (a, id, v) => { rsCeKeep(); SFX.tick(); buzz(3); R.ce.reviewWhen = v === "lendemain" ? "lendemain" : "soir"; rsCfgPaint(); },
+  rsRevHelp: () => { rsCeKeep(); SFX.tap(); R.revHelp = !R.revHelp; rsCfgPaint(); },
+  rsRevSent: (a, id) => { const b = rsRows().find((x) => x.id === id); if (!b) return; SFX.ok(); rsSave(id, { reviewSmsAt: Date.now() }); },
   rsMailPrev: (a, id, v) => {
     rsCeKeep(); SFX.tap(); const c = R.ce || rsCfg(), d = addDays(dayKey(), 3);
     const b = { name: "Camille Martin", date: d, time: "20:00", covers: 4, notes: "Anniversaire", resaMsg: v === "refuse" ? "Complet ce soir-là, désolés ! Le lendemain nous avons encore de la place." : v === "annule" ? "Fermeture exceptionnelle, toutes nos excuses." : "" };
-    const html = rsMailHtml(v, b, { name: (S.resto && S.resto.name) || "Votre restaurant", address: c.address || "", phone: c.phone || "", logo: rsLogo() }, { manage: "#", ics: "#", book: "#" });
+    const html = rsMailHtml(v, b, { name: (S.resto && S.resto.name) || "Votre restaurant", address: c.address || "", phone: c.phone || "", logo: rsLogo() }, { manage: "#", ics: "#", book: "#", review: "#" });
     const K = RS_MAIL_KINDS[v] || RS_MAIL_KINDS.confirme;
     openSheet(`<div class="rs-mpv"><div class="rs-edh"><span class="h2">Aperçu</span><button class="iconbtn" data-act="rsMailBack" aria-label="Retour">${ico("x")}</button></div>
       <div class="rs-mpo"><span>Objet</span><b>${esc(K.s({ name: (S.resto && S.resto.name) || "Votre restaurant" }, b, rsMailDay(d)))}</b></div>
@@ -844,7 +929,7 @@ Object.assign(ACT, {
       ${rsSrv() ? "" : `<div class="rs-mail">${ico("rsMail")}<span>Bientôt actif : ces e-mails partiront tout seuls dès que l'envoi sera branché.</span></div>`}
       <button class="btn soft block" data-act="rsMailBack">Retour aux réglages</button></div>`, (el) => { const f = el.querySelector(".rs-mpf"); if (f) f.srcdoc = html; const sb = $("#sheetBody"); if (sb) sb.scrollTop = 0; });
   },
-  rsMailBack: () => { SFX.tap(); if (R.ce) { R.ctab = "w"; rsCfgPaint(); setTimeout(() => { const m = document.querySelector("#sheetBody .rs-mls"); if (m) m.scrollIntoView({ block: "center" }); }, 30); } else closeSheet(); },
+  rsMailBack: () => { SFX.tap(); if (R.ce) { R.ctab = R.ctab === "a" ? "a" : "w"; rsCfgPaint(); setTimeout(() => { const m = document.querySelector("#sheetBody .rs-mls"); if (m) m.scrollIntoView({ block: "center" }); }, 30); } else closeSheet(); },
 });
 
 /* drag & drop (mouse): a card onto a time (group header or timeline bar) moves it; a booking onto a table seats it */
@@ -867,9 +952,11 @@ function rsSeedDemo() {
   const path = `restos/${S.rid}/bookings`; const rs = DB.local.restos && DB.local.restos[S.rid];
   if (rs && !rs.resaCfg) {
     rs.resaCfg = { ...rsDefCfg(), online: true, validate: true, maxPerSlot: 14, address: "8 place du Marché, Lyon 2e", phone: "04 78 42 18 90", msg: "Terrasse chauffée. Au-delà de 8 personnes, appelez-nous.",
+      googleReview: "https://g.page/r/CbistrotDemoGG/review", reviewAsk: true, reviewWhen: "soir",
       tables: [["1", 2], ["2", 2], ["3", 4], ["4", 4], ["5", 4], ["6", 4], ["7", 6], ["8", 6], ["9", 8], ["20", 2, "terrasse"], ["21", 4, "terrasse"], ["22", 4, "terrasse"], ["23", 6, "terrasse"]].map(([n, seats, zone], i) => ({ id: "dt" + i, n, seats, zone: zone || "salle" })) };
     try { DB.emit("restos"); } catch (e) {}
   }
+  if (rs && rs.resaCfg && rs.resaCfg.googleReview == null) rs.resaCfg.googleReview = "https://g.page/r/CbistrotDemoGG/review";
   if (DB.local[path]) return;
   let seed = 61106; const rnd = () => { seed = (seed * 1103515245 + 12345) % 2147483648; return seed / 2147483648; };
   const pick = (a) => a[Math.floor(rnd() * a.length)];
@@ -912,6 +999,8 @@ function rsSeedDemo() {
   add({ date: k0, time: "20:30", covers: 3, name: reg[2][0], phone: reg[2][1], status: "attente", source: "web", seen: false, createdAt: Date.now() - 50 * 60e3 });
   add({ date: k0, time: "20:00", covers: 2, name: "Paul Henry", phone: "06 47 19 82 66", email: "paul.henry@mail.fr", status: "attente", source: "web", seen: true, createdAt: Date.now() - 3 * 3600e3 });
   add({ date: k1, time: "12:30", covers: 4, name: reg[1][0], phone: reg[1][1], email: reg[1][2], status: "en ligne", source: "web", mailLog: [{ k: "confirme", at: Date.now() - 864e5 }] });
+  /* « Votre dîner s'est bien passé ? »: already asked to the guests who came and left an e-mail, a few by SMS */
+  Object.values(D).filter((b) => b.status === "arrive" && b.date < today).forEach((b, i) => { const t = new Date(`${b.date}T${b.time}:00`).getTime() + 150 * 60e3; if (b.email) { b.reviewAskAt = t; b.mailLog = [...(b.mailLog || []), { k: "avis", at: t }]; } else if (i % 5 === 0) b.reviewSmsAt = t - 60 * 60e3; });
   Object.values(D).filter((b) => b.email && rsConf(b) && b.date >= today && !b.mailLog).slice(0, 12).forEach((b) => { b.mailLog = [{ k: "confirme", at: (+b.createdAt || Date.now()) + 4000 }]; });
   DB.local[`restos/${S.rid}/clients`] = Object.fromEntries(reg.slice(0, 2).map(([nm, ph, em, vip, notes]) => [rsPk(ph), { name: nm, phone: ph, email: em, vip, notes, updatedAt: Date.now() - 6 * 864e5 }]));
   DB.local[path] = D;

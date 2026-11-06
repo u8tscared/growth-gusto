@@ -5,7 +5,8 @@
                     an e-mail, accepted request, promoted from the waiting list, « Renvoyer » = resendAt), modifiée, refusée (+ message),
                     annulée par le restaurant (+ message), annulation confirmée (client cancel). Never twice for the same change.
      resaManage     callable (no account): the client's own page reserver/?r=&b=&k= — get / cancel / modify, checked against the key.
-     resaTick       plain async function for the lead's single 15-min job: the « à demain » reminder, once per booking (remindedAt).
+     resaTick       plain async function for the lead's single 15-min job: the « à demain » reminder, once per booking (remindedAt),
+                    and the « Votre dîner s'est bien passé ? » e-mail with the restaurant's Google review link (reviewAskAt, see reviewTick).
      BREVO_KEY      the secret (shared with alertes.js); the daily cap _meta/brevo is shared too.
    Manage keys: resaKeys/{rid}/keys/{bid} { k } — no client can read them (firestore rules), the public page writes its own at creation.
    The first event sets restos/{rid}.server.resa = true: the app then says the e-mails are active and the public page offers « gérer ». */
@@ -60,10 +61,24 @@ const KINDS = {
   refuse: { t: "Réservation impossible", s: (r) => `Votre demande chez ${r.name}` },
   annule: { t: "Réservation annulée", s: (r) => `Réservation annulée · ${r.name}` },
   annule_client: { t: "Annulation confirmée", s: (r) => `Annulation confirmée · ${r.name}` },
+  avis: { t: "Votre dîner s'est bien passé ?", s: (r, b) => `Votre ${meal(b)} chez ${r.name} s'est bien passé ?` },
 };
+const meal = (b) => (toMin(b && b.time) < 16 * 60 ? "déjeuner" : "dîner");
+/* the restaurant's Google review link: a Place ID (ChIJ…) or an https link on a Google domain (g.page/r/…/review, maps.app.goo.gl…).
+   Same function in js/resa.js (rsGoogleUrl): keep both in sync. */
+function googleUrl(v) {
+  const s = String(v || "").trim(); if (!s || s.length > 600) return "";
+  if (/^ChIJ[\w-]{10,}$/.test(s)) return "https://search.google.com/local/writereview?placeid=" + s;
+  let u; try { u = new URL(/^https?:\/\//i.test(s) ? s : "https://" + s); } catch (e) { return ""; }
+  if (u.protocol !== "https:" && u.protocol !== "http:") return "";
+  const h = u.hostname.toLowerCase();
+  if (!/(^|\.)(google\.[a-z.]{2,6}|g\.page|goo\.gl)$/.test(h)) return "";
+  u.protocol = "https:"; return u.toString();
+}
 function longDay(k) { const D = ["dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi"], M = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"]; const [y, m, d] = String(k || "").split("-").map(Number); if (!y) return ""; const dt = new Date(Date.UTC(y, m - 1, d, 12)); return `${D[dt.getUTCDay()]} ${d} ${M[m - 1]}`; }
 function mailHtml(kind, b, r, L) {
   const e = (v) => String(v == null ? "" : v).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  if (kind === "avis") return avisHtml(b, r, L, e);
   const K = KINDS[kind] || KINDS.confirme, nm = e(String(b.name || "").trim().split(/\s+/)[0] || ""), rn = e(r.name || "le restaurant");
   /* the restaurant logo, only as an https URL: most mail clients block data: images */
   const lg = typeof r.logo === "string" && /^https:\/\/[^\s"'<>]+$/.test(r.logo) && r.logo.length <= 2000 ? r.logo : "";
@@ -103,9 +118,34 @@ function mailHtml(kind, b, r, L) {
 </div></body></html>`;
 }
 
-async function quota(n) {
+/* « Votre dîner s'est bien passé ? » — every guest gets the same Google button (no filtering of unhappy guests: Google forbids it) */
+function avisHtml(b, r, L, e) {
+  const nm = e(String(b.name || "").trim().split(/\s+/)[0] || ""), rn = e(r.name || "le restaurant"), m = meal(b);
+  const lg = typeof r.logo === "string" && /^https:\/\/[^\s"'<>]+$/.test(r.logo) && r.logo.length <= 2000 ? r.logo : "";
+  const g = e(L.review || "#"), star = `<a href="${g}" style="text-decoration:none;color:#F5B700;font-size:38px;line-height:1;padding:0 3px">&#9733;</a>`;
+  return `<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Votre ${m} s'est bien passé ?</title></head>
+<body style="margin:0;padding:0;background:#FBF6EC;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;color:#1B1530">
+<div style="max-width:500px;margin:0 auto;padding:24px 14px 32px">
+ <div style="background:#4C1FEA;border-radius:26px 26px 0 0;padding:26px 24px 30px;color:#ffffff">
+  ${lg ? `<img src="${e(lg)}" width="52" height="52" alt="${rn}" style="display:block;width:52px;height:52px;border-radius:15px;background:#ffffff;object-fit:contain;margin:0 0 14px;border:0">` : ""}
+  <div style="font-size:14px;color:#D9D2FF;font-weight:600">${rn}</div>
+  <div style="font-size:28px;line-height:1.1;font-weight:800;letter-spacing:-.5px;margin-top:6px">Votre ${m} s'est bien passé ?</div>
+ </div>
+ <div style="background:#FFFDF8;border:1.5px solid #E9DFCD;border-top:0;border-radius:0 0 26px 26px;padding:22px 22px 24px;box-shadow:0 3px 0 #E2D6C2">
+  <p style="margin:0 0 14px;font-size:16px;line-height:1.5;color:#4A4560">Bonjour ${nm}, merci d'être venu${+b.covers > 1 ? "s" : ""} chez <b>${rn}</b>. Toute l'équipe espère que vous vous êtes régalé${+b.covers > 1 ? "s" : ""} !</p>
+  <p style="margin:0 0 6px;font-size:16px;line-height:1.5;color:#4A4560">Votre avis compte énormément pour nous. Trente secondes sur Google aident d'autres gourmands à nous découvrir.</p>
+  <div style="text-align:center;margin:18px 0 6px">${star}${star}${star}${star}${star}</div>
+  <a href="${g}" style="display:block;text-align:center;text-decoration:none;font-weight:700;font-size:16px;padding:15px 18px;border-radius:16px;margin-top:10px;background:#5B2BFF;color:#ffffff;box-shadow:0 4px 0 #2A0BA6">Laisser un avis sur Google</a>
+  ${r.phone ? `<div style="margin-top:16px;font-size:14px;color:#4A4560;text-align:center;line-height:1.45">Quelque chose ne vous a pas plu ? Dites-le nous aussi, on veut s'améliorer : <a href="tel:${e(String(r.phone).replace(/[^\d+]/g, ""))}" style="color:#3A10D8;font-weight:700;text-decoration:none">${e(r.phone)}</a></div>` : ""}
+  ${L.book ? `<div style="margin-top:14px;text-align:center"><a href="${e(L.book)}" style="color:#3A10D8;font-weight:700;font-size:14px;text-decoration:none">Réserver à nouveau</a></div>` : ""}
+ </div>
+ <div style="text-align:center;font-size:12px;color:#6E6880;margin-top:18px;line-height:1.5">Un seul message après votre venue, pas plus d'une fois tous les 4 mois.<br>Réservation par Growth Gusto</div>
+</div></body></html>`;
+}
+
+async function quota(n, cap = DAILY_CAP) {
   const ref = db().doc("_meta/brevo"), day = paris().day;
-  return db().runTransaction(async (t) => { const s = await t.get(ref); const d = s.exists ? s.data() : {}; const used = d.day === day ? d.n || 0 : 0; if (used + n > DAILY_CAP) return false; t.set(ref, { day, n: used + n }); return true; });
+  return db().runTransaction(async (t) => { const s = await t.get(ref); const d = s.exists ? s.data() : {}; const used = d.day === day ? d.n || 0 : 0; if (used + n > cap) return false; t.set(ref, { day, n: used + n }); return true; });
 }
 function icsOf(b, r, bid) {
   const p = (n) => String(n).padStart(2, "0"); const s = new Date(parisAt(b.date, b.time)), e = new Date(s.getTime() + 2 * 3600e3);
@@ -121,10 +161,12 @@ async function keyOf(rid, bid) {
 }
 async function sendMail(kind, rid, bid, b, resto) {
   const email = String(b.email || "").trim(); if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return false;
-  if (!(await quota(1))) { logger.warn("resa: Brevo daily cap reached"); return false; }
+  const review = kind === "avis" ? googleUrl((resto.resaCfg || {}).googleReview) : ""; if (kind === "avis" && !review) return false;
+  /* review requests never eat the last 50 e-mails of the day: confirmations and reminders keep room */
+  if (!(await quota(1, kind === "avis" ? DAILY_CAP - 50 : DAILY_CAP))) { logger.warn("resa: Brevo daily cap reached"); return false; }
   const c = resto.resaCfg || {}, r = { name: resto.name || "Restaurant", address: c.address || "", phone: c.phone || "", logo: typeof resto.logo === "string" ? resto.logo : "" };
   const k = await keyOf(rid, bid), q = `?r=${encodeURIComponent(rid)}&b=${encodeURIComponent(bid)}&k=${k}`;
-  const L = { manage: BASE + q, ics: BASE + q + "&ics=1", book: BASE + "?r=" + encodeURIComponent(rid) };
+  const L = { manage: BASE + q, ics: BASE + q + "&ics=1", book: BASE + "?r=" + encodeURIComponent(rid), review };
   const K = KINDS[kind] || KINDS.confirme;
   const body = { sender: { name: String(r.name).slice(0, 60), email: SENDER_EMAIL }, to: [{ email, name: String(b.name || "").slice(0, 60) }], subject: K.s(r, b, longDay(b.date)), htmlContent: mailHtml(kind, b, r, L) };
   if (["confirme", "modifie", "rappel"].includes(kind)) body.attachment = [{ name: "reservation.ics", content: Buffer.from(icsOf(b, r, bid)).toString("base64") }];
@@ -209,13 +251,49 @@ const resaManage = onCall({ region: REGION, cors: true, maxInstances: 10 }, asyn
   return { ok: true, b: pubView(out.b) };
 });
 
+/* ───────── « Votre dîner s'est bien passé ? » ─────────
+   Who: bookings marked « Arrivé » (one tap in the list, or the table opened in Salle), with an e-mail, not imported from another tool
+   (b.ext: Zenchef & co. send their own), once per booking (reviewAskAt) and at most once every 120 days per e-mail address.
+   When (resaCfg.reviewWhen): "soir" (default) 2 h 30 after the table time, moved to 10:00 the next morning when that falls between
+   22:30 and 9:00; "lendemain" the next day at 11:00. Never more than 36 h late (switching it on does not mail last month's guests).
+   Needs resaCfg.googleReview (a valid Google link) and resaCfg.reviewAsk !== false. */
+function reviewDue(b, c) {
+  const base = parisAt(b.date, b.time || "20:00");
+  if (c.reviewWhen === "lendemain") return parisAt(addDays(b.date, 1), "11:00");
+  const t = base + 150 * 60e3, p = paris(t);
+  if (p.min >= 22 * 60 + 30) return parisAt(addDays(p.day, 1), "10:00");
+  if (p.min < 9 * 60) return parisAt(p.day, "10:00");
+  return t;
+}
+const REVIEW_GAP = 120 * 864e5;
+async function reviewTick(rid, resto, now = Date.now()) {
+  const c = resto.resaCfg || {}; if (c.reviewAsk === false || !googleUrl(c.googleReview)) return 0;
+  const today = paris(now).day, days = [addDays(today, -2), addDays(today, -1), today];
+  const snap = await db().collection(`restos/${rid}/bookings`).where("date", "in", days).get();
+  let n = 0;
+  for (const s of snap.docs) {
+    const b = s.data();
+    if (b.ext || b.status !== "arrive" || !b.email || b.reviewAskAt) continue;
+    const due = reviewDue(b, c); if (now < due || now > due + 36 * 3600e3) continue;
+    const email = String(b.email).trim().toLowerCase();
+    const prev = await db().collection(`restos/${rid}/bookings`).where("email", "==", b.email).get().catch(() => null);
+    if (prev && prev.docs.some((d) => d.id !== s.id && +d.get("reviewAskAt") > now - REVIEW_GAP && String(d.get("email") || "").trim().toLowerCase() === email)) { await s.ref.set({ reviewAskAt: -1 }, { merge: true }); continue; }
+    await s.ref.set({ reviewAskAt: now }, { merge: true });
+    try { if (await sendMail("avis", rid, s.id, b, resto)) n++; } catch (e) { logger.error("resa: review", e); }
+  }
+  return n;
+}
+
 /* ───────── the « à demain » reminder, from the lead's 15-min job ───────── */
 async function resaTick() {
-  const now = paris(); if (now.min < 10 * 60) return; /* from 10:00 the day before */
+  const now = paris();
   const tomorrow = addDays(now.day, 1);
   const restos = await db().collection("restos").where("server.resa", "==", true).get();
   for (const r of restos.docs) {
-    const resto = r.data(); if (resto.resaCfg && resto.resaCfg.reminder === false) continue;
+    const resto = r.data();
+    try { await reviewTick(r.id, resto); } catch (e) { logger.error("resa: reviews", r.id, e); }
+    if (now.min < 10 * 60) continue; /* the reminder: from 10:00 the day before */
+    if (resto.resaCfg && resto.resaCfg.reminder === false) continue;
     const snap = await db().collection(`restos/${r.id}/bookings`).where("date", "==", tomorrow).get();
     for (const s of snap.docs) {
       const b = s.data();
@@ -226,4 +304,4 @@ async function resaTick() {
   }
 }
 
-module.exports = { onResaBooking, resaManage, resaTick, BREVO_KEY, _mailKind: mailKind, _bucket: bucket, _parisAt: parisAt };
+module.exports = { onResaBooking, resaManage, resaTick, BREVO_KEY, _mailKind: mailKind, _bucket: bucket, _parisAt: parisAt, _reviewDue: reviewDue, _googleUrl: googleUrl, _mailHtml: mailHtml };

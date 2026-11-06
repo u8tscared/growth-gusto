@@ -81,12 +81,13 @@ FEATURES = [
   img="resa", tags=[SECOND],
   card="Carnet, lien de réservation, plan de salle, import Zenchef et TheFork.",
   blocks=[
-   ("Le carnet du midi et du soir", "Une réservation par téléphone se note en quelques secondes. Les demandes en ligne arrivent à valider ou à refuser, et le client reçoit un e-mail.", ["Demandes à valider ou refuser", "Couverts du jour et de la semaine", "Fiche client : visites, notes", "E-mail de confirmation au client"], "resa", "r", []),
+   ("Le carnet du midi et du soir", "Une réservation par téléphone se note en quelques secondes. Les demandes en ligne arrivent à valider ou à refuser, et le client reçoit un e-mail.", ["Demandes à valider ou refuser", "Couverts du jour et de la semaine", "Fiche client : visites, notes", "E-mail de confirmation au client", "Après le repas : « Votre dîner s'est bien passé ? » avec un lien vers vos avis Google"], "resa", "r", []),
    ("Un lien de réservation à vous", "Le client choisit le nombre de personnes, le jour et l'heure. Seules les tables réellement libres sont proposées, et la liste d'attente prend le relais.", ["Sur Google, Instagram, votre site", "Sans compte à créer pour le client", "Liste d'attente", "Aucune commission"], "reserver", "v", []),
    ("Zenchef et TheFork : vous gardez votre outil", "Chaque e-mail de réservation, de modification ou d'annulation est repris dans votre carnet et sur le plan de salle. Ou importez le fichier.", ["Une adresse e-mail à vous", "Import du fichier des réservations", "Passer à nos réservations quand vous voulez"], "zenchef", "k", ["Par import"]),
    ("Le plan de salle vivant", "Salle, terrasse, zones, tables de 1 à 20 places. Le placement automatique enchaîne les tables pour en perdre moins.", ["Éditeur de salle", "Curseur horaire et rotation", "Placement automatique"], "salle", "s", []),
   ],
   faq=[("Y a-t-il une commission par couvert ?", "Non, aucune. Le carnet, le plan de salle et le lien de réservation sont inclus dans les packs Second et Chef."),
+       ("Comment avoir plus d'avis Google ?", "Collez une fois le lien d'avis de votre fiche Google. Après le repas, chaque client venu qui a laissé son e-mail reçoit « Votre dîner s'est bien passé ? » avec un bouton vers Google, le soir même ou le lendemain. Une seule fois par réservation, jamais plus d'une fois tous les 4 mois pour un même client. Sans e-mail, le serveur l'envoie par SMS en un geste."),
        ("Zenchef et TheFork sont-ils reliés en direct ?", "Non, par import : vous transférez les e-mails de réservation vers une adresse Growth Gusto, ou vous importez le fichier. Les réservations arrivent alors dans le carnet et sur le plan de salle.")],
   related=["prise-de-commande", "fidelite-clients", "menu-qr"], guides=[]),
 
