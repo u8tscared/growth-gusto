@@ -18,7 +18,7 @@ const AB_ORDER = ["essentiel", "pro", "complet"], AB_LVL = { essentiel: 1, pro: 
 const abPk = (x) => AB_LVL[x] ? x : "complet";
 /* areas that need a higher pack: with a paid Commis or Second they show an upgrade card instead (during the trial everything is open) */
 const AB_GATE = {
-  resa: ["pro", "Réservations"], plan: ["pro", "Plan de salle"], stock: ["pro", "Stock & inventaire"], tickets: ["pro", "Tickets de caisse"], tzEdit: ["pro", "Tickets de caisse"], dashboard: ["pro", "Tableau de bord"], caisse: ["pro", "Caisse connectée"], caisseMap: ["pro", "Caisse connectée"],
+  resa: ["pro", "Réservations"], commandes: ["pro", "Commande en ligne"], plan: ["pro", "Plan de salle"], stock: ["pro", "Stock & inventaire"], tickets: ["pro", "Tickets de caisse"], tzEdit: ["pro", "Tickets de caisse"], dashboard: ["pro", "Tableau de bord"], caisse: ["pro", "Caisse connectée"], caisseMap: ["pro", "Caisse connectée"],
   finance: ["complet", "Finances"], pennylane: ["complet", "Pennylane"], pointeuse: ["complet", "Pointeuse"], planning: ["complet", "Planning"], staff: ["complet", "Employés & salaires"], sites: ["complet", "Multi-restaurant"],
 };
 const abHas = (route, p = abPlan()) => !AB_GATE[route] || AB_LVL[p.feat] >= AB_LVL[AB_GATE[route][0]];

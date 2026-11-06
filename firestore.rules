@@ -148,7 +148,7 @@ service cloud.firestore {
 
       // ── réservations: public projection, read by the booking page ──
       match /public/{doc} {
-        allow get: if doc == 'resa';
+        allow get: if doc == 'resa' || doc == 'menu';
         // the booking page adds the covers of the booking it creates in the same batch, and nothing else
         allow update: if doc == 'resa' && resaCounterOk(rid);
       }
@@ -159,8 +159,8 @@ service cloud.firestore {
 
       // ── everything else (fridges, readings, lots, stock, tickets, staff, finances…): members only ──
       match /{col}/{doc} {
-        allow read: if !(col in ['members', 'sensorKeys', 'pennylane', 'plSent', 'plInv']) && isMember(rid);
-        allow create, update, delete: if !(col in ['members', 'sensorKeys', 'pennylane', 'plSent', 'plInv']) && isMemberAfter(rid);
+        allow read: if !(col in ['members', 'sensorKeys', 'pennylane', 'plSent', 'plInv', 'qrPay']) && isMember(rid);
+        allow create, update, delete: if !(col in ['members', 'sensorKeys', 'pennylane', 'plSent', 'plInv', 'qrPay']) && isMemberAfter(rid);
       }
       // Pennylane (js/pennylane.js, functions/src/pennylane.js): accounting, so gérants only; the server writes with admin rights
       match /pennylane/{doc} {
@@ -172,6 +172,10 @@ service cloud.firestore {
       }
       match /plInv/{doc} {
         allow read: if isGerant(rid);
+      }
+      // commande en ligne (js/commande.js, functions/src/commande.js): the restaurant's Stripe account state, written by the server only
+      match /qrPay/{doc} {
+        allow read: if isMember(rid);
       }
       // sensor cloud accounts (keys, passwords) and the gateway token: gérants only; the server reads them with admin rights
       match /sensorKeys/{doc} {
