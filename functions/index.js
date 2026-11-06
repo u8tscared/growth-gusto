@@ -4,7 +4,7 @@ const admin = require("firebase-admin");
 if (!admin.apps.length) admin.initializeApp();
 const { onSchedule } = require("firebase-functions/v2/scheduler");
 const mods = {};
-/* modules switched on in functions/.env (GG_MODULES): caisse needs its SumUp keys set as secrets before it can be deployed */
+/* modules switched on in functions/.env (GG_MODULES). caisse: app keys are pasted in Espace admin › Caisses connectées (no secret to create) */
 for (const m of String(process.env.GG_MODULES || "sondes,alertes,resa,mails,admin").split(",").map((x) => x.trim()).filter(Boolean)) {
   try { mods[m] = require("./src/" + m); } catch (e) { if (e.code !== "MODULE_NOT_FOUND") throw e; }
 }

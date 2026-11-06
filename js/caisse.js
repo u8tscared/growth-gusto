@@ -66,7 +66,7 @@ function cxAgo(ts) {
 }
 const cxIsAdmin = () => { try { return DB.mode === "demo" || typeof PERMS === "undefined" || PERMS.isAdmin(); } catch (e) { return true; } };
 const cxCanWrite = () => { try { return DB.mode === "demo" || typeof PERMS === "undefined" || PERMS.can("tickets") !== false; } catch (e) { return true; } };
-const cxServerOn = () => !!(S.resto && S.resto.server && S.resto.server.caisse);
+const cxServerOn = () => !!((S.resto && S.resto.server && S.resto.server.caisse) || (window.GG_SERVER && window.GG_SERVER.caisse));
 const cxLive = () => cxServerOn() && DB.mode === "db";
 
 /* ───────── abonnements ───────── */
@@ -186,7 +186,7 @@ async function cxCall(op, body = {}) {
   const r = await fetch(CX_API, { method: "POST", headers: { "content-type": "application/json", authorization: "Bearer " + tok }, body: JSON.stringify({ op, rid: S.rid, ...body }) });
   const j = await r.json().catch(() => ({})); if (!r.ok || j.error) throw Object.assign(new Error(j.error || "http " + r.status), { code: j.error || "http" }); return j;
 }
-const CX_ERR = { auth: "Connectez-vous à votre compte pour brancher la caisse.", forbidden: "Seul le gérant peut connecter la caisse.", badkey: "Clé refusée par la caisse. Vérifiez-la et recommencez.", state: "Le lien a expiré. Recommencez la connexion.", denied: "Connexion annulée.", http: "Le serveur ne répond pas. Réessayez dans un instant." };
+const CX_ERR = { not_configured: "La connexion directe à cette caisse n'est pas encore ouverte. En attendant, importez un export : ça fait tout.", auth: "Connectez-vous à votre compte pour brancher la caisse.", forbidden: "Seul le gérant peut connecter la caisse.", badkey: "Clé refusée par la caisse. Vérifiez-la et recommencez.", state: "Le lien a expiré. Recommencez la connexion.", denied: "Connexion annulée.", http: "Le serveur ne répond pas. Réessayez dans un instant." };
 const cxErr = (e) => CX_ERR[e && e.code] || "Connexion impossible pour l'instant. Réessayez, ou importez un fichier.";
 /* retour d'OAuth : https://app.growthgusto.fr/?caisse=sumup&code=…&state=… */
 (function cxCatchReturn() {

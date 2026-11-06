@@ -16,9 +16,10 @@
  *   restos/{rid}/caisse/{provider}         { provider, mode:"api", status:"connected"|"error"|"off", merchant, connectedAt, lastSync, lastError, active }
  * The app turns each day of sales into a Z ticket (tickets/pos_{provider}_{day}) and deducts the stock: nothing else to do here.
  *
- * Secrets (firebase functions:secrets:set NAME): SUMUP_CLIENT_ID, SUMUP_CLIENT_SECRET, SQUARE_CLIENT_ID, SQUARE_CLIENT_SECRET,
- *   LIGHTSPEED_CLIENT_ID, LIGHTSPEED_CLIENT_SECRET, CAISSE_ENC_KEY (any long random string: encrypts the stored tokens).
- *   A provider whose client id is missing simply answers « not_configured »: SumUp alone is enough to start.
+ * App keys (client id + secret of the SumUp / Square / Lightspeed developer apps): NO Firebase secret to create. The Growth Gusto
+ *   admin pastes them once in the app (Espace admin › Caisses connectées, op "config"); they are stored ENCRYPTED in ggPrivate/caisse
+ *   (no client access) with the existing PL_ENC_KEY secret, and ggPublic/caisse { sumup, square, lightspeed } tells the app which
+ *   providers are on. A provider whose keys are missing simply answers « not_configured »: SumUp alone is enough to start.
  * Every third-party API used here is free for the developer (SumUp, Square, Lightspeed K-Series once the partner app is approved, Zelty API key). */
 "use strict";
 const { onRequest } = require("firebase-functions/v2/https");
@@ -29,15 +30,14 @@ const crypto = require("crypto");
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
 
-const S_ = (n) => defineSecret(n);
-const SEC = {
-  SUMUP_CLIENT_ID: S_("SUMUP_CLIENT_ID"), SUMUP_CLIENT_SECRET: S_("SUMUP_CLIENT_SECRET"),
-  SQUARE_CLIENT_ID: S_("SQUARE_CLIENT_ID"), SQUARE_CLIENT_SECRET: S_("SQUARE_CLIENT_SECRET"),
-  LIGHTSPEED_CLIENT_ID: S_("LIGHTSPEED_CLIENT_ID"), LIGHTSPEED_CLIENT_SECRET: S_("LIGHTSPEED_CLIENT_SECRET"),
-  CAISSE_ENC_KEY: S_("CAISSE_ENC_KEY"),
-};
+/* one secret only (already used by Pennylane and Stripe): it derives the AES keys for the app keys and the restaurants' tokens */
+const SEC = { PL_ENC_KEY: defineSecret("PL_ENC_KEY") };
 const CAISSE_SECRETS = Object.values(SEC);
-const sec = (k) => { try { return SEC[k].value() || ""; } catch (e) { return ""; } };
+const ADMINS = ["marceau.ruis@gmail.com"];
+const KEYS = { sumup: ["SUMUP_CLIENT_ID", "SUMUP_CLIENT_SECRET"], square: ["SQUARE_CLIENT_ID", "SQUARE_CLIENT_SECRET"], lightspeed: ["LIGHTSPEED_CLIENT_ID", "LIGHTSPEED_CLIENT_SECRET"] };
+let CFG = {}; let cfgAt = 0;
+const sec = (k) => String(CFG[k] || "");
+const cfgRef = () => db.doc("ggPrivate/caisse");
 
 const APP = "https://app.growthgusto.fr/";
 const REGION = "europe-west9";
@@ -49,7 +49,7 @@ const first = (...v) => { for (const x of v) if (n(x) != null) return n(x); retu
 class CxErr extends Error { constructor(code, status = 400) { super(code); this.code = code; this.status = status; } }
 
 /* ───────── token encryption (AES-256-GCM) ───────── */
-const encKey = () => { const k = sec("CAISSE_ENC_KEY"); if (!k) throw new CxErr("not_configured", 500); return crypto.createHash("sha256").update(k).digest(); };
+const encKey = () => { let k = ""; try { k = String(SEC.PL_ENC_KEY.value() || "").trim(); } catch (e) {} if (!k) throw new CxErr("not_configured", 500); return crypto.createHash("sha256").update("caisse:" + k).digest(); };
 function seal(obj) {
   const iv = crypto.randomBytes(12); const c = crypto.createCipheriv("aes-256-gcm", encKey(), iv);
   const data = Buffer.concat([c.update(JSON.stringify(obj), "utf8"), c.final()]);
@@ -60,6 +60,15 @@ function open(s) {
   const d = crypto.createDecipheriv("aes-256-gcm", encKey(), iv); d.setAuthTag(tag);
   return JSON.parse(Buffer.concat([d.update(data), d.final()]).toString("utf8"));
 }
+
+/* app keys pasted by the admin, decrypted once a minute per instance */
+async function loadCfg(force) {
+  if (!force && Date.now() - cfgAt < 60e3) return CFG;
+  const d = await cfgRef().get(); let c = {};
+  if (d.exists && d.data().enc) { try { c = open(d.data().enc) || {}; } catch (e) { logger.error("caisse cfg", e.message); } }
+  CFG = c; cfgAt = Date.now(); return CFG;
+}
+const cfgPublic = () => Object.fromEntries(Object.entries(KEYS).map(([p, [a, b]]) => [p, !!(CFG[a] && CFG[b])]));
 
 /* ───────── http helpers ───────── */
 async function http(url, { method = "GET", headers = {}, json, form, token, basic } = {}) {
@@ -277,11 +286,34 @@ async function caller(req, rid, needAdmin) {
   return u.uid;
 }
 
+async function platformAdmin(req) {
+  const h = req.get("authorization") || ""; const m = h.match(/^Bearer (.+)$/); if (!m) throw new CxErr("auth", 401);
+  let u; try { u = await admin.auth().verifyIdToken(m[1]); } catch (e) { throw new CxErr("auth", 401); }
+  const ok = ADMINS.includes(String(u.email || "").toLowerCase()) && (u.email_verified === true || (u.firebase && u.firebase.sign_in_provider === "google.com"));
+  if (!ok) throw new CxErr("forbidden", 403); return u.email;
+}
+
 /* ───────── HTTPS endpoint ───────── */
 const caisseApi = onRequest({ region: REGION, cors: [/growthgusto\.fr$/, /growth-gusto\.web\.app$/, /growth-gusto\.firebaseapp\.com$/], secrets: CAISSE_SECRETS, timeoutSeconds: 120, memory: "256MiB", maxInstances: 5 }, async (req, res) => {
   if (req.method !== "POST") { res.status(405).json({ error: "method" }); return; }
   const b = req.body || {}; const { op, rid } = b; const prov = String(b.provider || "");
   try {
+    await loadCfg(op === "cfgStatus" || op === "config");
+    if (op === "cfgStatus") { await platformAdmin(req); res.json({ ok: true, on: cfgPublic(), ids: Object.fromEntries(Object.entries(KEYS).map(([p, [a]]) => [p, CFG[a] ? String(CFG[a]).slice(0, 10) + "…" : ""])) }); return; }
+    if (op === "config") {
+      const by = await platformAdmin(req); const next = { ...CFG };
+      for (const [p, [a, bk]] of Object.entries(KEYS)) {
+        const v = b[p]; if (!v || typeof v !== "object") continue;
+        if (v.off) { delete next[a]; delete next[bk]; continue; }
+        const id = String(v.id || "").trim(), secret = String(v.secret || "").trim();
+        if (id.length < 6 || id.length > 300 || secret.length < 8 || secret.length > 500 || /\s/.test(id + secret)) throw new CxErr("badkey", 400);
+        next[a] = id; next[bk] = secret;
+      }
+      await cfgRef().set({ enc: seal(next), at: Date.now(), by });
+      CFG = next; cfgAt = Date.now();
+      await db.doc("ggPublic/caisse").set({ ...cfgPublic(), at: Date.now() });
+      res.json({ ok: true, on: cfgPublic() }); return;
+    }
     const p = P[prov]; if (!p) throw new CxErr("provider", 400);
     if (op === "start") {
       const uid = await caller(req, rid, true); if (p.key) throw new CxErr("provider", 400); if (!p.configured()) throw new CxErr("not_configured", 503);
@@ -327,7 +359,7 @@ const caisseApi = onRequest({ region: REGION, cors: [/growthgusto\.fr$/, /growth
 
 /* ───────── every 15 min (called by the lead's single scheduled job) ───────── */
 async function caisseTick({ budgetMs = 8 * 60 * 1000 } = {}) {
-  const t0 = Date.now(); const q = await db.collection("caisseTokens").where("status", "==", "connected").get();
+  const t0 = Date.now(); await loadCfg(); const q = await db.collection("caisseTokens").where("status", "==", "connected").get();
   const due = q.docs.map((d) => d.data()).filter((d) => !d.lastSync || Date.now() - d.lastSync > 10 * 6e4).sort((a, b) => (a.lastSync || 0) - (b.lastSync || 0));
   let ok = 0, ko = 0;
   for (const d of due) {

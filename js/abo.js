@@ -321,7 +321,7 @@ VIEWS.admin = {
       <label class="ab-search st" style="--i:2">${ico("abSearch")}<input class="input" id="abQ" type="search" placeholder="${AB.tab === "comptes" ? "Nom, e-mail…" : "Restaurant, e-mail du gérant…"}" value="${esc(AB.q)}" autocomplete="off"></label>`;
     return `<div class="inner cc-wide ab-wrap ab-adm">${topBar("Admin Growth Gusto", { right: `${typeof auMailPrev === "function" ? `<button class="iconbtn" data-act="auMailPrev" aria-label="Aperçu des e-mails" title="Aperçu des e-mails">${ico("abMail")}</button>` : ""}<button class="iconbtn" data-act="abAdmReload" aria-label="Actualiser" title="Actualiser">${ico("abRefresh")}</button>` })}
       <p class="sub st" style="--i:0;margin:-6px 0 0">${DB.mode === "db" ? "Tous les restaurants et comptes du projet." : "Cet appareil seulement (sans compte, l'admin ne voit que les restaurants de ce téléphone)."}${A.loading ? " Actualisation…" : ""}</p>
-      ${kpi}${abStripeAdm()}${tabs}<div id="abList" class="ab-list">${AB.tab === "comptes" ? abAdminUsers() : abAdminList()}</div></div>`;
+      ${kpi}${abStripeAdm()}${abCxAdm()}${tabs}<div id="abList" class="ab-list">${AB.tab === "comptes" ? abAdminUsers() : abAdminList()}</div></div>`;
   },
 };
 /* Espace admin › Paiement en ligne: paste the Stripe secret key once; the server builds everything on the Stripe account */
@@ -340,6 +340,35 @@ function abStripeAdm() {
     ${form}<em class="ab-acterr" id="abSkErr" role="alert">${esc(X.err || "")}</em>
     ${st.on ? `<p class="note">Les packs (« Growth Gusto · Pack … »), le portail client et un webhook dédié sont créés sur le compte Stripe, sans toucher à ce qui existe déjà. Prix : ${AB_ORDER.map((k) => `${AB_PACKS[k].t} ${AB_PACKS[k].price} €`).join(", ")} HT par mois.${X.edit ? "" : ` <a href="#" data-act="abSkOff">Couper le paiement en ligne</a>`}</p>` : ""}</div>`;
 }
+/* Espace admin › Caisses connectées: client id + secret of the SumUp / Square developer apps, pasted once (encrypted on the server) */
+const AB_CX = [["sumup", "SumUp", "me.sumup.com › Paramètres › Paramètres développeur › Applications OAuth2 › Growth Gusto › Identifiants client"], ["square", "Square", "developer.squareup.com › Growth Gusto › OAuth › Production : Application ID et Application secret"]];
+async function abCxCall(op, body = {}) {
+  const u = typeof firebase !== "undefined" && firebase.auth && firebase.auth().currentUser; if (!u) throw Object.assign(new Error("auth"), { code: "auth" });
+  const r = await fetch(CX_API, { method: "POST", headers: { "content-type": "application/json", authorization: "Bearer " + (await u.getIdToken()) }, body: JSON.stringify({ op, ...body }) });
+  const j = await r.json().catch(() => ({})); if (!r.ok || j.error) throw Object.assign(new Error(j.error || "http " + r.status), { code: j.error || "http" }); return j;
+}
+function abCxAdm() {
+  if (DB.mode !== "db" || typeof CX_API === "undefined") return "";
+  const X = (AB.cxadm ||= { st: null, busy: false, err: "", edit: "" });
+  if (!X.st && !X.busy && !X.err) { X.busy = true; abCxCall("cfgStatus").then((r) => { X.st = r; }).catch((e) => { X.err = e.code === "http" || e.code === "op" ? "Le serveur des caisses n'est pas encore en ligne." : "Lecture impossible."; }).finally(() => { X.busy = false; if (S.route === "admin") rerender(); }); }
+  const on = (X.st && X.st.on) || {};
+  const rows = AB_CX.map(([id, name, where]) => {
+    const edit = X.edit === id || (!on[id] && X.edit === "");
+    return `<div class="ab-cxr"><div class="ab-acth"><span class="ic">${typeof brandLogo === "function" ? brandLogo(id) || ico("abKey") : ico("abKey")}</span><div><b>${name}</b><em>${X.busy && !X.st ? "Lecture…" : on[id] ? `Branché · ${esc((X.st.ids && X.st.ids[id]) || "")}` : "Pas encore branché"}</em></div>${on[id] && !edit ? `<button class="btn ghost sm" data-act="abCxEdit" data-v="${id}">Changer</button>` : ""}</div>
+      ${edit ? `<form class="ab-cxf" data-ab="cx" data-v="${id}" novalidate><input class="input mono" name="id" placeholder="Client ID" autocomplete="off" spellcheck="false" aria-label="Client ID ${name}"><input class="input mono" name="secret" type="password" placeholder="Client secret" autocomplete="off" spellcheck="false" aria-label="Client secret ${name}"><button class="btn acc" type="submit" ${X.busy ? "disabled" : ""}>${X.busy ? `<span class="spin"></span>` : ""}Brancher</button></form><p class="note">${where}</p>` : ""}</div>`;
+  }).join("");
+  return `<div class="glass pad ab-act ab-sadm ab-cxadm st" style="--i:2"><div class="ab-acth"><span class="ic">${ico("abKey")}</span><div><b>Caisses connectées</b><em>Les gérants branchent leur caisse en un clic une fois les clés collées ici. Elles sont chiffrées côté serveur.</em></div></div>
+    ${rows}<em class="ab-acterr" role="alert">${esc(X.err || "")}</em></div>`;
+}
+document.addEventListener("submit", async (e) => {
+  const f = e.target; if (!f.dataset || f.dataset.ab !== "cx") return; e.preventDefault();
+  const X = AB.cxadm; const prov = f.dataset.v; const id = String(f.elements.id.value || "").trim(), secret = String(f.elements.secret.value || "").trim();
+  if (id.length < 6 || secret.length < 8) { SFX.err(); X.err = "Collez le Client ID et le Client secret."; rerender(); return; }
+  X.busy = true; X.err = ""; rerender();
+  try { const r = await abCxCall("config", { [prov]: { id, secret } }); X.st = null; X.edit = ""; SFX.done(); burst(); toast(`${prov === "sumup" ? "SumUp" : "Square"} branché : les gérants peuvent connecter leur caisse.`); }
+  catch (er) { SFX.err(); X.err = er.code === "badkey" ? "Clés incomplètes : vérifiez le Client ID et le secret." : er.code === "forbidden" ? "Réservé aux administrateurs Growth Gusto." : "Enregistrement impossible pour l'instant."; }
+  X.busy = false; rerender();
+});
 document.addEventListener("submit", async (e) => {
   const f = e.target; if (!f.dataset || f.dataset.ab !== "sk") return; e.preventDefault();
   const X = AB.sadm; const i = $("#abSk", f); const key = String((i && i.value) || "").trim();
@@ -375,6 +404,7 @@ Object.assign(ACT, {
   abAdmOpen: (a, id) => { SFX.tap(); abAdmSheet(id); },
   abAdmTab: (a, id, v) => { if (AB.tab === v) return; AB.tab = v; AB.q = ""; SFX.tick(); rerender(); },
   abAdmReload: () => { SFX.tap(); abAdminFetch(true); if (AB.sadm) { AB.sadm.st = null; AB.sadm.err = ""; } },
+  abCxEdit: (a, id, v) => { SFX.tap(); AB.cxadm.edit = v; rerender(); },
   abSkEdit: () => { SFX.tap(); AB.sadm.edit = true; rerender(); setTimeout(() => { const i = $("#abSk"); i && i.focus(); }, 60); },
   abSkOff: async () => { SFX.tap(); if (!AB.sadm.confirmOff) { AB.sadm.confirmOff = true; toast("Touchez encore une fois pour couper le paiement en ligne."); setTimeout(() => { AB.sadm.confirmOff = false; }, 4000); return; }
     try { await abCall("off"); AB.sadm.st = { on: false }; AB.billAt = 0; abBillLoad(true); toast("Paiement en ligne coupé."); } catch (e) { toast(abErrTx(e)); } rerender(); },
