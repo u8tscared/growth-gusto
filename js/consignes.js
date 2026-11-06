@@ -26,7 +26,7 @@ Object.assign(IC, {
   csBack: ["M3.5 12a8.5 8.5 0 1 0 2.5-6", "M3.5 3.5V8H8"],
   csBell: ["M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9", "f:M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9", "M10.3 21a1.94 1.94 0 0 0 3.4 0"],
 });
-(function csNav() { if (NAV.some((n) => n[0] === "consignes")) return; const i = NAV.findIndex((n) => n[0] === "pointeuse"); NAV.splice(i >= 0 ? i : NAV.length, 0, ["consignes", "csMega", "Consignes & messages"]); })();
+(function csNav() { if (NAV.some((n) => n[0] === "consignes")) return; const i = NAV.findIndex((n) => n[0] === "pointeuse"); NAV.splice(i >= 0 ? i : NAV.length, 0, ["consignes", "csMega", "Consignes"]); })();
 
 /* [label, icon, colour class, placeholder] */
 const CS_K = {
