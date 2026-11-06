@@ -95,23 +95,33 @@ def header(cur):
 </header>'''
 
 def footer():
-    from content_features import FEATURES
+    from content_features import BY
     from content_types import TYPES
     from content_guides import GUIDES
-    col = lambda title, items: f'<div class="sf-col"><h3>{title}</h3><ul>' + "".join(f'<li><a href="{u}">{e(t)}</a></li>' for u, t in items) + "</ul></div>"
-    feats = [(f"/fonctionnalites/{f['slug']}", f["short"]) for f in FEATURES]
+    def col(title, c, items, more=None):
+        li = "".join(f'<li><a href="{u}">{e(t)}</a></li>' for u, t in items)
+        if more:
+            li += f'<li><a class="all" href="{more[0]}">{e(more[1])}</a></li>'
+        return f'<div class="sf-col" style="--c:{c}"><h3><i></i>{title}</h3><ul>{li}</ul></div>'
+    feats = [(f"/fonctionnalites/{s}", BY[s]["short"]) for s in ("haccp-temperatures", "etiquettes-dlc", "controle-sanitaire", "reservations", "caisse-stock", "equipe-planning")]
     types = [(f"/restaurants/{t['slug']}", t["short"]) for t in TYPES]
-    res = [("/guides", "Tous les guides")] + [(f"/guides/{g['slug']}", g["short"]) for g in GUIDES[:6]]
+    guides = [(f"/guides/{g['slug']}", g["short"]) for g in GUIDES[:5]]
     co = [("/tarifs", "Tarifs"), ("/integrations", "Ce qui se relie"), ("/comparatif", "Comparatif"), ("/faq", "Questions fréquentes"), ("/a-propos", "À propos"), ("/contact", "Contact")]
     return f'''<!--sf:start-->
 <footer class="sf">
+<div class="sf-glow" aria-hidden="true"><i></i><i></i><i></i></div>
 <div class="sf-in">
-<div class="sf-brand"><a class="brand" href="/" aria-label="Growth Gusto, accueil">Growth<b>Gusto</b></a>
-<p>L'app de gestion pour restaurants&nbsp;: hygiène et HACCP, salle, commandes, stock, marges, caisse et équipe, au même endroit. Conçue à Lyon, données hébergées en France.</p>
-{btn_try("v", "Essayer 14 jours")}</div>
-<div class="sf-cols">{col("Fonctionnalités", feats)}{col("Restaurants", types + [("/restaurants", "Tous les restaurants")])}{col("Guides", res)}{col("Growth Gusto", co)}</div>
+<div class="sf-top">
+<div><h2>Tout le restaurant,<br><em>une seule app.</em></h2>
+<p>Hygiène et HACCP, salle, commandes, stock, marges, caisse et équipe. Conçue à Lyon, données hébergées en France.</p></div>
+<div class="sf-act"><a class="sf-b p" href="{APP}/?signup=1" target="_blank" rel="noopener">Essayer 14 jours {ARROW}</a><a class="sf-b s" href="{APP}/?demo=1" target="_blank" rel="noopener">Voir la démo</a></div>
 </div>
+<nav class="sf-grid" aria-label="Plan du site">{col("Fonctionnalités", "#9C7BFF", feats, ("/fonctionnalites", "Toutes les fonctionnalités"))}{col("Restaurants", "#FFC24B", types, ("/restaurants", "Tous les restaurants"))}{col("Guides", "#5EC8FF", guides, ("/guides", "Tous les guides"))}{col("Growth Gusto", "#FF8FB1", co)}</nav>
+<div class="sf-facts"><span>14 jours gratuits</span><span>Sans engagement</span><span>Utilisateurs illimités</span><span>Hébergé en France</span></div>
+</div>
+<div class="sf-word" aria-hidden="true">Growth<b>Gusto</b></div>
 <div class="sf-bot"><span>© 2026 Growth Gusto · EI Ruis Global, Lyon</span><a href="/mentions-legales">Mentions légales</a><a href="/cgv">CGV</a><a href="/confidentialite">Confidentialité</a><a href="mailto:contact@growthgusto.fr">contact@growthgusto.fr</a><a href="{APP}/?login=1">Se connecter</a></div>
+<script>(()=>{{const w=document.querySelector('.sf-word');if(!w)return;if(!('IntersectionObserver'in window)){{w.classList.add('in');return}}const o=new IntersectionObserver(es=>es.forEach(x=>{{if(x.isIntersecting){{w.classList.add('in');o.disconnect()}}}}),{{threshold:.2}});o.observe(w)}})()</script>
 </footer>
 <!--sf:end-->'''
 
@@ -183,6 +193,7 @@ def page(path, title, desc, body, trail, ld=(), og=None, cur=None, extra_head=""
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wdth,wght@12..96,75..100,400..800&amp;family=Instrument+Sans:wght@400..700&amp;family=JetBrains+Mono:wght@500;700&amp;display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/css/site.css">
+<link rel="stylesheet" href="/css/footer.css">
 {lds}{extra_head}
 </head>
 <body>
