@@ -12,6 +12,7 @@
   const Q = new URLSearchParams(location.search);
   const RID = (Q.get("r") || "").trim();
   const DEMO = RID === "demo";
+  const PV = Q.get("pv") === "1"; /* the app's live preview (Apparence): opens straight on the menu, the look comes from the link */
   const T0 = (Q.get("t") || "").trim();
   const OID = (Q.get("o") || "").trim(), KEY = (Q.get("k") || "").trim().toLowerCase();
   const LS = "gg-qm-" + RID;
@@ -26,7 +27,7 @@
   const vib = (p) => { try { navigator.vibrate && navigator.vibrate(p); } catch (e) {} };
   const store = { get() { try { return JSON.parse(localStorage.getItem(LS) || "null"); } catch (e) { return null; } }, set(v) { try { localStorage.setItem(LS, JSON.stringify(v)); } catch (e) {} } };
 
-  const AL = [["gluten", "Gluten"], ["crustaces", "Crustacés"], ["oeufs", "Œufs"], ["poissons", "Poissons"], ["arachides", "Arachides"], ["soja", "Soja"], ["lait", "Lait"], ["fruits_coque", "Fruits à coque"], ["celeri", "Céleri"], ["moutarde", "Moutarde"], ["sesame", "Sésame"], ["sulfites", "Sulfites"], ["lupin", "Lupin"], ["mollusques", "Mollusques"]];
+  const AL = [["gluten", "Gluten"], ["crustaces", "Crustacés"], ["oeufs", "Œufs"], ["poissons", "Poissons"], ["arachides", "Arachides"], ["soja", "Soja"], ["lait", "Lait"], ["fruitscoque", "Fruits à coque"], ["celeri", "Céleri"], ["moutarde", "Moutarde"], ["sesame", "Sésame"], ["sulfites", "Sulfites"], ["lupin", "Lupin"], ["mollusques", "Mollusques"]];
   const alName = (id) => (AL.find((a) => a[0] === id) || [id, id])[1];
   const svg = {
     plus: '<svg viewBox="0 0 24 24"><path d="M5 12h14M12 5v14"/></svg>',
@@ -51,7 +52,9 @@
 
   const st = { pub: null, mode: null, table: "", cart: [], al: new Set(), cat: "", view: "menu", sending: false, err: "",
     name: "", phone: "", slot: "", note: "", pay: "", order: null, oid: OID, okey: KEY, pollT: 0, sheet: null };
-  try { const a = JSON.parse(localStorage.getItem("gg-qm-al") || "[]"); if (Array.isArray(a)) a.forEach((x) => st.al.add(x)); } catch (e) {}
+  /* "fruits_coque" is the old spelling of "fruitscoque" (js/notes.js noteAlId): read both */
+  const alId = (k) => (k === "fruits_coque" ? "fruitscoque" : String(k || ""));
+  try { const a = JSON.parse(localStorage.getItem("gg-qm-al") || "[]"); if (Array.isArray(a)) a.forEach((x) => st.al.add(alId(x))); } catch (e) {}
   const app = $("#app"), sheet = $("#sheet");
 
   /* ───────── sound: one soft « pop », no file to load ───────── */
@@ -92,13 +95,13 @@
   /* ───────── demo restaurant ───────── */
   const DEMO_PH = (h1, h2, e) => `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120"><defs><radialGradient id="g" cx=".35" cy=".3" r=".9"><stop offset="0" stop-color="${h1}"/><stop offset="1" stop-color="${h2}"/></radialGradient></defs><rect width="120" height="120" fill="url(#g)"/><text x="60" y="76" font-size="46" text-anchor="middle">${e}</text></svg>`)}`;
   function demoPub() {
-    return { name: "Le Bistrot Démo", address: "8 place du Marché, Lyon 2e", phone: "04 78 42 18 90", logo: "", msg: "Produits frais du marché, cuisinés sur place.",
+    return { name: "Le Bistrot Démo", address: "8 place du Marché, Lyon 2e", phone: "04 78 42 18 90", logo: "", msg: "Produits frais du marché, cuisinés sur place.", look: { style: "moderne", acc: "violet", photos: true, cover: "" },
       cfg: { on: true, table: true, takeaway: true, payOnline: true, payPlace: true, prepMin: 20, tables: 18, pickup: { days: [0, 1, 2, 3, 4, 5, 6], windows: [{ from: "11:30", to: "14:00" }, { from: "18:30", to: "22:00" }], step: 15 }, tipNote: "" },
       cats: [{ id: "partage", t: "À partager" }, { id: "entree", t: "Entrées" }, { id: "plat", t: "Plats" }, { id: "dessert", t: "Desserts" }, { id: "boisson", t: "Boissons" }],
       items: [
         { id: "d1", t: "Croquettes de jambon", d: "Béchamel crémeuse, jambon ibérique, chapelure maison. Par six.", p: 9, c: "partage", al: ["gluten", "lait", "oeufs"], ph: DEMO_PH("#F6C97A", "#C9822E", "🥘") },
         { id: "d2", t: "Planche de charcuterie", d: "Rosette, jambon cru, terrine du chef, cornichons.", p: 18, c: "partage", al: ["sulfites", "lait", "gluten"], ph: DEMO_PH("#F3A29A", "#B8473C", "🥓"), pop: true },
-        { id: "d3", t: "Œuf parfait, crème de champignons", d: "Œuf cuit à 64 °C, champignons de Paris, noisettes torréfiées.", p: 11, c: "entree", al: ["oeufs", "lait", "fruits_coque"], ph: DEMO_PH("#FBE7A8", "#D9A23A", "🍳") },
+        { id: "d3", t: "Œuf parfait, crème de champignons", d: "Œuf cuit à 64 °C, champignons de Paris, noisettes torréfiées.", p: 11, c: "entree", al: ["oeufs", "lait", "fruitscoque"], ph: DEMO_PH("#FBE7A8", "#D9A23A", "🍳") },
         { id: "d4", t: "Velouté de potimarron", d: "Crème fouettée au cumin, graines de courge.", p: 8.5, c: "entree", al: ["lait"], ph: DEMO_PH("#FFC37A", "#E07B22", "🎃"), veg: true },
         { id: "d5", t: "Bœuf bourguignon", d: "Mijoté sept heures, carottes fondantes, purée de pommes de terre.", p: 22, c: "plat", al: ["sulfites", "lait", "celeri"], ph: DEMO_PH("#C98A6B", "#6E2E1E", "🍲"), pop: true },
         { id: "d6", t: "Filet de bar, beurre blanc", d: "Poisson de ligne, poireaux crayon, beurre blanc au citron.", p: 24, c: "plat", al: ["poissons", "lait"], ph: DEMO_PH("#BFE3F0", "#4E8FB0", "🐟") },
@@ -160,6 +163,24 @@
   const takeawayOpen = () => !!cfg().takeaway && pickupSlots().length > 0;
   const payModes = () => { const c = cfg(); const m = []; if (c.payOnline) m.push("stripe"); if (c.payPlace !== false || !c.payOnline) m.push("place"); return m; };
 
+  /* ───────── the restaurant's look: style, colour, photos, cover (cmPubDoc look) ───────── */
+  const LOOKS = ["moderne", "bistrot", "elegant"], ACCS = ["violet", "tomate", "safran", "sauge", "ocean", "encre"];
+  let lookOver = null;
+  function look() {
+    const l = Object.assign({ style: "moderne", acc: "violet", photos: true, cover: "" }, (st.pub && st.pub.look) || {});
+    if (DEMO || PV) { if (LOOKS.includes(Q.get("look"))) l.style = Q.get("look"); if (ACCS.includes(Q.get("acc"))) l.acc = Q.get("acc"); if (Q.get("ph") === "0") l.photos = false; }
+    if (lookOver) Object.assign(l, lookOver);
+    if (!LOOKS.includes(l.style)) l.style = "moderne"; if (!ACCS.includes(l.acc)) l.acc = "violet";
+    if (!(typeof l.cover === "string" && /^(https:\/\/|data:image\/)/.test(l.cover))) l.cover = "";
+    return l;
+  }
+  function applyLook() {
+    const l = look(), h = document.documentElement; h.dataset.look = l.style; h.dataset.acc = l.acc; h.classList.toggle("noph", l.photos === false);
+    const tc = { violet: "#4C1FEA", tomate: "#D63F22", safran: "#B36F00", sauge: "#2A7F51", ocean: "#1B62BC", encre: "#1B1530" }[l.acc]; const m = $('meta[name="theme-color"]'); if (m) m.setAttribute("content", l.style === "elegant" ? "#1B1530" : tc);
+  }
+  /* the app's preview frame sends a new look without reloading */
+  window.addEventListener("message", (e) => { const d = e.data && e.data.ggLook; if (!d || !(DEMO || PV) || e.source !== window.parent) return; lookOver = { style: d.style, acc: d.acc, photos: d.photos !== false, cover: typeof d.cover === "string" ? d.cover : "" }; applyLook(); if (st.pub && st.view === "menu") { const y = window.scrollY; paintMenu(); window.scrollTo(0, y); } });
+
   /* ───────── views ───────── */
   const logoOf = (p) => (p && typeof p.logo === "string" && /^(data:image\/|https:\/\/)/.test(p.logo) ? p.logo : "");
   function brandIcon(p) {
@@ -170,7 +191,8 @@
     const p = st.pub || {}, lg = logoOf(p); brandIcon(p);
     const where = st.mode === "table" ? `<button class="qm-where" data-a="mode">${svg.table}<span>Table <b>${esc(st.table)}</b></span></button>`
       : st.mode === "emporter" ? `<button class="qm-where" data-a="mode">${svg.bag}<span>À emporter</span></button>` : "";
-    return `<header class="qm-hero"><div class="qm-hero-in">
+    const cv = look().cover;
+    return `<header class="qm-hero${cv ? " cover" : ""}"${cv ? ` style="--cover:url('${esc(cv.replace(/'/g, "%27"))}')"` : ""}><div class="qm-hero-in">
       <div class="qm-ph${lg ? " logo" : ""}">${lg ? `<img src="${esc(lg)}" alt="${esc(p.name || "")}" referrerpolicy="no-referrer">` : `<span>${esc(initials(p.name))}</span>`}</div>
       <div class="qm-hn"><span class="qm-k">${esc(kicker || "La carte")}</span><h1>${esc(p.name || "Restaurant")}</h1>${p.address ? `<p>${svg.pin}${esc(p.address)}</p>` : ""}</div>
     </div>${where ? `<div class="qm-hero-bar">${where}${st.al.size ? `<button class="qm-where al" data-a="allergies">${svg.leaf}<span>${st.al.size} allergie${st.al.size > 1 ? "s" : ""}</span></button>` : `<button class="qm-where ghost" data-a="allergies">${svg.leaf}<span>Allergies</span></button>`}</div>` : ""}</header>`;
@@ -199,10 +221,10 @@
     const q = qtyOf(it.id), h = hits(it), can = !!st.mode && !it.out;
     return `<article class="qm-it st${it.out ? " out" : ""}${h.length ? " hit" : ""}${q ? " has" : ""}" style="--i:${Math.min(i, 14)}" data-a="open" data-id="${esc(it.id)}" tabindex="0" role="button" aria-label="${esc(it.t)}, ${eur(it.p)}">
       <div class="qm-it-tx">
-        <b>${esc(it.t)}</b>
+        <div class="qm-it-h"><b>${esc(it.t)}</b><i class="qm-lead" aria-hidden="true"></i><span class="qm-pr2" aria-hidden="true">${eur(it.p).replace(",00", "")}</span></div>
         ${it.d ? `<p>${esc(it.d)}</p>` : ""}
         <div class="qm-it-meta"><span class="qm-pr">${eur(it.p)}</span>${it.pop ? `<span class="qm-tag pop">Le plus commandé</span>` : ""}${it.veg ? `<span class="qm-tag veg">${svg.leaf}Végétarien</span>` : ""}${it.out ? `<span class="qm-tag out">Épuisé</span>` : ""}</div>
-        ${h.length ? `<div class="qm-it-al">${svg.alert}Contient : ${esc(h.map(alName).join(", ").toLowerCase())}</div>` : ""}
+        ${h.length ? `<div class="qm-it-al">${svg.alert}Contient : ${esc(h.map(alName).join(", ").toLowerCase())}</div>` : it.alu && st.al.size ? `<div class="qm-it-al">${svg.alert}Allergènes : demandez au personnel</div>` : ""}
       </div>
       <div class="qm-it-ph">${it.ph ? `<img src="${esc(it.ph)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : `<span>${esc(initials(it.t))}</span>`}
         ${can ? (q ? `<div class="qm-step" data-stop="1"><button data-a="dec" data-id="${esc(it.id)}" aria-label="Retirer un">${svg.minus}</button><b>${q}</b><button data-a="inc" data-id="${esc(it.id)}" aria-label="Ajouter un">${svg.plus}</button></div>`
@@ -288,7 +310,7 @@
         <h3>${esc(it.t)}</h3>
         <div class="qm-it-meta"><span class="qm-pr big">${eur(it.p)}</span>${it.veg ? `<span class="qm-tag veg">${svg.leaf}Végétarien</span>` : ""}${it.out ? `<span class="qm-tag out">Épuisé</span>` : ""}</div>
         ${it.d ? `<p>${esc(it.d)}</p>` : ""}
-        <div class="qm-dt-al"><b>Allergènes</b>${(it.al || []).length ? `<div class="qm-alc">${it.al.map((a) => `<span class="${st.al.has(a) ? "hit" : ""}">${esc(alName(a))}</span>`).join("")}</div>` : `<em>Aucun des 14 allergènes réglementaires.</em>`}
+        <div class="qm-dt-al"><b>Allergènes</b>${it.alu ? `<em>Le restaurant vérifie encore les allergènes de ce plat. Demandez au personnel avant de commander.</em>` : (it.al || []).length ? `<div class="qm-alc">${it.al.map((a) => `<span class="${st.al.has(a) ? "hit" : ""}">${esc(alName(a))}</span>`).join("")}</div>` : `<em>Aucun des 14 allergènes réglementaires.</em>`}
           ${h.length ? `<div class="qm-warn">${svg.alert}<span>Ce plat contient ${esc(h.map(alName).join(", ").toLowerCase())}. Parlez-en au personnel avant de commander.</span></div>` : ""}</div>
         ${can ? `<label class="qm-f"><span>Une précision pour la cuisine <i>(facultatif)</i></span><input id="qmDn" maxlength="140" placeholder="Sans oignons, bien cuit…" value="${esc(detail.note)}"></label>` : ""}
       </div></div>
@@ -426,6 +448,9 @@
       else { const db = await fb(); const snap = await db.doc(`restos/${RID}/public/menu`).get(); st.pub = snap.exists ? snap.data() : null; }
     } catch (e) { console.warn(e); return paintMsg("Connexion impossible", "Vérifiez votre connexion internet, puis réessayez.", true); }
     if (!st.pub || !(st.pub.items || []).length) return paintMsg("Carte introuvable", "Ce restaurant n'a pas (encore) de carte en ligne.");
+    st.pub.items.forEach((it) => { if (Array.isArray(it.al)) it.al = [...new Set(it.al.map(alId))]; });
+    applyLook();
+    if (PV) { const c0 = cfg(); st.mode = DEMO && /^\d{1,4}$/.test(T0) && c0.on && c0.table ? "table" : null; /* a real menu is only browsed in the preview: no order can leave it */ st.table = st.mode ? T0 : ""; st.view = "menu"; paintMenu(); return; }
     if (st.oid && st.okey) { poll(true); return; }
     const c = cfg(), saved = store.get();
     if (saved && Date.now() - (saved.at || 0) < 3 * 3600e3 && Array.isArray(saved.cart)) st.cart = saved.cart.filter((l) => itemOf(l.id) && !itemOf(l.id).out && l.q > 0);
