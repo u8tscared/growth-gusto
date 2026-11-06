@@ -1,10 +1,10 @@
 /* Growth Gusto service worker: offline shell. Network-first, no-store, for pages/js/css/json (updates arrive at once), cache fallback offline. Bump VERSION to drop old caches. */
-const VERSION = "gg-v5v";
+const VERSION = "gg-v5w";
 const SHELL = [
   "./", "./index.html", "./manifest.webmanifest",
   "./css/base.css", "./css/compte.css", "./css/abo.css", "./css/onboard.css", "./css/home.css", "./css/releve.css", "./css/labels.css", "./css/reception.css", "./css/stock.css", "./css/tickets.css", "./css/registre.css", "./css/notes.css", "./css/menage.css", "./css/finance.css", "./css/pennylane.css", "./css/oblig.css", "./css/rh.css", "./css/avis.css", "./css/auth.css", "./css/v2.css", "./css/tour.css", "./css/perms.css", "./css/perso.css", "./css/saisie.css", "./css/alertes.css", "./css/sondes.css", "./css/hygiene.css", "./css/caisse.css", "./css/import.css", "./css/resa.css", "./css/plan.css", "./css/resaimport.css", "./css/marge.css", "./css/commande.css", "./css/cmimport.css", "./css/controle.css", "./css/formation.css",
   "./js/config.js", "./js/core.js", "./js/icons.js", "./js/compte.js", "./js/abo.js", "./js/onboard.js", "./js/home.js", "./js/releve.js", "./js/labels.js", "./js/reception.js", "./js/stock.js", "./js/tickets.js", "./js/registre.js", "./js/notes.js", "./js/menage.js", "./js/finance.js", "./js/banque.js", "./js/pennylane.js", "./js/oblig.js", "./js/rh.js", "./js/avis.js", "./js/auth.js", "./js/tour.js", "./js/perms.js", "./js/perso.js", "./js/saisie.js", "./js/alertes.js", "./js/sondes.js", "./js/hygiene.js", "./js/caisse.js", "./js/import.js", "./js/resa.js", "./js/rzparse.js", "./js/resaimport.js", "./js/plan.js", "./js/marge.js", "./js/commande.js", "./js/cmimport.js", "./js/formation.js", "./js/controle.js", "./js/demo.js", "./js/main.js",
-  "./css/achats.css", "./css/gaspi.css", "./js/achats.js", "./js/gaspi.js", "./css/salle.css", "./js/salle.js", "./css/clients.css", "./js/clients.js",
+  "./css/achats.css", "./css/gaspi.css", "./js/achats.js", "./js/gaspi.js", "./css/salle.css", "./js/salle.js", "./css/clients.css", "./js/clients.js", "./css/consignes.css", "./js/consignes.js",
   "./vendor/qrcode.js", "./vendor/jsQR.js",
   "./icons/icon.svg", "./icons/icon-192.png", "./icons/icon-512.png", "./icons/apple-touch-icon.png", "./icons/favicon-32.png",
 ];
@@ -54,4 +54,23 @@ self.addEventListener("fetch", (e) => {
   } else if (FONT_HOSTS.includes(url.hostname) || SDK(url)) {
     e.respondWith(staleWhileRevalidate(req, e));
   }
+});
+
+/* push (js/consignes.js, functions/src/equipe.js): Firebase Cloud Messaging delivers a standard Web Push; we show it ourselves.
+   Payload: { data: { title, body, url, tag } } (FCM data message) or { notification: {…} }. */
+self.addEventListener("push", (e) => {
+  let j = {}; try { j = e.data ? e.data.json() : {}; } catch (x) { j = { data: { body: e.data ? e.data.text() : "" } }; }
+  const d = Object.assign({}, j.notification || {}, j.data || {});
+  const title = d.title || "Growth Gusto";
+  const opt = { body: d.body || "", icon: "icons/icon-192.png", badge: "icons/icon-192.png", tag: d.tag || "gg", renotify: true, data: { url: d.url || "./#consignes" } };
+  e.waitUntil(self.registration.showNotification(title, opt));
+});
+self.addEventListener("notificationclick", (e) => {
+  e.notification.close();
+  const url = new URL((e.notification.data && e.notification.data.url) || "./#consignes", self.registration.scope).href;
+  e.waitUntil(self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((cs) => {
+    const c = cs.find((x) => x.url.startsWith(self.registration.scope));
+    if (c) { c.postMessage({ gg: "open", url }); return c.focus(); }
+    return self.clients.openWindow(url);
+  }));
 });

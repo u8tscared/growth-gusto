@@ -161,8 +161,8 @@ service cloud.firestore {
 
       // ── everything else (fridges, readings, lots, stock, tickets, staff, finances…): members only ──
       match /{col}/{doc} {
-        allow read: if !(col in ['members', 'sensorKeys', 'pennylane', 'plSent', 'plInv', 'qrPay', 'bankTx', 'bank']) && isMember(rid);
-        allow create, update, delete: if !(col in ['members', 'sensorKeys', 'pennylane', 'plSent', 'plInv', 'qrPay', 'bankTx', 'bank']) && isMemberAfter(rid);
+        allow read: if !(col in ['members', 'sensorKeys', 'pennylane', 'plSent', 'plInv', 'qrPay', 'bankTx', 'bank', 'push']) && isMember(rid);
+        allow create, update, delete: if !(col in ['members', 'sensorKeys', 'pennylane', 'plSent', 'plInv', 'qrPay', 'bankTx', 'bank', 'push']) && isMemberAfter(rid);
       }
       // Pennylane (js/pennylane.js, functions/src/pennylane.js): accounting, so gérants only; the server writes with admin rights
       match /pennylane/{doc} {
@@ -185,6 +185,10 @@ service cloud.firestore {
       // commande en ligne (js/commande.js, functions/src/commande.js): the restaurant's Stripe account state, written by the server only
       match /qrPay/{doc} {
         allow read: if isMember(rid);
+      }
+      // push tokens (js/consignes.js): each person writes only their own phone tokens; the server (functions/src/equipe.js) reads them with admin rights
+      match /push/{mid} {
+        allow read, write: if mid == me() && isMember(rid);
       }
       // sensor cloud accounts (keys, passwords) and the gateway token: gérants only; the server reads them with admin rights
       match /sensorKeys/{doc} {
