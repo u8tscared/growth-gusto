@@ -480,3 +480,29 @@
 .rs-mpo b{font-size:14.5px;font-weight:700;word-break:break-word}
 .rs-mpf{width:100%;height:min(640px,62vh);border:0;border-radius:18px;background:#FBF6EC;box-shadow:0 0 0 1.5px var(--rim) inset}
 @media (max-width:420px){.rs-vmo{grid-template-columns:1fr}.rs-cfs b{font-size:19px}}
+/* « Votre dîner s'est bien passé ? » (Avis Google) */
+.rs-rev{display:flex;flex-direction:column;gap:14px}
+.rs-revh{display:flex;gap:14px;align-items:center;padding:16px;border-radius:20px;background:linear-gradient(135deg,#FFF6DB,#F4EEFF);box-shadow:0 0 0 1px var(--rim) inset}
+.rs-revh b{display:block;font-size:16px;font-weight:750}
+.rs-revh em{display:block;font-style:normal;font-size:13px;color:var(--ink-2);font-weight:550;margin-top:2px;line-height:1.4}
+.rs-revs{display:flex;flex:none;gap:1px;color:#F5B700}
+.rs-revs .ico{width:16px;height:16px;fill:#F5B700}
+.rs-revs .ico:nth-child(n){animation:rsStar .5s cubic-bezier(.3,1.6,.5,1) both}
+.rs-revs .ico:nth-child(2){animation-delay:.06s}.rs-revs .ico:nth-child(3){animation-delay:.12s}.rs-revs .ico:nth-child(4){animation-delay:.18s}.rs-revs .ico:nth-child(5){animation-delay:.24s}
+@keyframes rsStar{from{transform:scale(.3) rotate(-30deg);opacity:0}to{transform:none;opacity:1}}
+@media (prefers-reduced-motion:reduce){.rs-revs .ico{animation:none!important}}
+.rs-revb{display:flex;gap:8px;flex-wrap:wrap}
+.rs-revb .btn{flex:1;min-width:150px}
+.rs-bad{box-shadow:0 0 0 2px var(--danger, #D64545) inset!important}
+.rs-revbad{display:flex;gap:8px;align-items:flex-start;margin:-6px 0 0;font-size:13px;color:var(--danger, #B42318);font-weight:600}
+.rs-revbad .ico{width:16px;height:16px;flex:none;margin-top:1px}
+.rs-revhelp{margin:0;padding:12px 14px 12px 34px;border-radius:16px;background:#F7F0E3;font-size:14px;line-height:1.5;color:var(--ink-2)}
+.rs-revhelp li+li{margin-top:4px}
+.rs-revrules{margin:0;padding:0 0 0 18px;font-size:13px;line-height:1.5;color:var(--muted);font-weight:550}
+.rs-revrules li+li{margin-top:3px}
+.rs-revn{display:flex;align-items:baseline;gap:8px;padding:12px 14px;border-radius:16px;background:#F4EEFF}
+.rs-revn b{font-size:24px;font-weight:800;color:var(--accent);font-variant-numeric:tabular-nums}
+.rs-revn span{font-size:14px;color:var(--ink-2);font-weight:600}
+.rs-revl>.ico{color:#E0A400}
+.rs-revl .btn{flex:none}
+@media (min-width:960px){.rs-revrules{font-size:13.5px}}
