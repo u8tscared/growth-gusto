@@ -24,7 +24,7 @@ window.GG_DEMO = {
       ["demo-sarah", "Sarah Lemoine", "equipe", "#1F7AE0", "Serveur", "CDI", 35, 12.6, "salle"],
       ["demo-hugo", "Hugo Martin", "equipe", "#0E8C9E", "Plongeur", "Extra", 20, 12.1, "plonge"],
     ];
-    team.forEach(([mid, name, role, color], i) => put("members", { name, role, color, joinedAt: now - (400 - i * 40) * 864e5, email: mid === "demo-camille" ? "camille@bistrot-demo.fr" : "" }, mid));
+    team.forEach(([mid, name, role, color, , , , , poste], i) => put("members", { name, role, color, poste, joinedAt: now - (400 - i * 40) * 864e5, email: mid === "demo-camille" ? "camille@bistrot-demo.fr" : "" }, mid));
     const staffIds = {};
     team.forEach(([mid, name, , color, jobRole, contract, weeklyHours, hourlyGross, post], i) => {
       staffIds[mid] = put("staff", { memberId: mid, name, role: jobRole, color, contract, weeklyHours, hourlyGross: hourlyGross || 24, chargesPct: contract === "Extra" ? 30 : 42, active: true, start: addDays(today, -(400 - i * 40)), post }, "s_" + mid);
@@ -262,6 +262,27 @@ window.GG_DEMO = {
     if (typeof bqDemoData === "function") { const B = bqDemoData(); put("bank", B.link, "eb_demo"); B.tx.forEach(([k, t]) => put("bankTx", t, k)); }
     /* ── multi-restaurant (js/multi.js): two sister restaurants of the same owner, reshaped from this one, and transfers between them ── */
     if (typeof mrDemoSisters === "function") { try { mrDemoSisters(D, RID, rnd); } catch (e) { console.warn("demo sites", e); } }
+    /* ── discussion groups (js/consignes.js): Cuisine and Salle talk apart, a custom group, and one group shared by the three restaurants ── */
+    {
+      const mn = (k) => now - k * 60000;
+      [["demo-thomas", "Thomas Girard", "Mise en place du soir : 40 croquettes, 2 bacs de purée, le jus de joue est au frigo 2.", 180], ["demo-lucas", "Lucas Petit", "C'est parti, je fais les croquettes en premier.", 172], ["demo-ines", "Inès Benali", "Je prends la purée. Il reste de la crème pour demain ?", 90], ["demo-thomas", "Thomas Girard", "Oui, 2 L dans la chambre froide.", 84]]
+        .forEach(([uid, by, text, k]) => put("chat", { text, at: mn(k), uid, by, g: "cuisine" }));
+      [["demo-sarah", "Sarah Lemoine", "La 8 a demandé du pain sans gluten, on en a encore ?", 50], ["demo-camille", "Camille Laurent", "Oui, dans le tiroir du bas au bar.", 46], ["demo-sarah", "Sarah Lemoine", "Ce soir je fais l'ouverture de la terrasse à 18 h 30.", 22]]
+        .forEach(([uid, by, text, k]) => put("chat", { text, at: mn(k), uid, by, g: "salle" }));
+      put("chatGroups", { name: "Ouverture du matin", kind: "custom", add: ["demo-camille", "demo-lucas", "demo-hugo"], remove: [], c: "#0B9B6A", ic: "csChat", at: now - 30 * 864e5, by: "Camille Laurent", uid: "demo-camille" }, "g-matin");
+      put("chat", { text: "Demain j'ouvre à 7 h 30, Hugo tu passes la plonge du petit-déj ?", at: mn(300), uid: "demo-camille", by: "Camille Laurent", g: "g-matin" });
+      put("chat", { text: "Ça marche, je serai là.", at: mn(290), uid: "demo-hugo", by: "Hugo Martin", g: "g-matin" });
+      const SIS = [[RID, "Le Bistrot Démo"], ["demo2", "Le Comptoir Démo"], ["demo3", "La Cantine du Port"]].filter(([r]) => D.restos[r]);
+      if (SIS.length > 1) {
+        const sites = SIS.map(([rid, name]) => ({ rid, name }));
+        const G = { name: "Les 3 restaurants", kind: "multi", add: [], remove: [], sites, c: "#7A4DFF", ic: "mrShare", at: now - 60 * 864e5, by: "Camille Laurent", uid: "demo-camille" };
+        const MS = [["m3r1", "demo-camille", "Camille Laurent", RID, "Réunion des responsables lundi 15 h à La Cantine du Port. Venez avec vos chiffres de la semaine.", 240], ["m3r2", "demo-karim", "Karim Haddad", "demo3", "Parfait, je prépare la salle du fond.", 200], ["m3r3", "demo-julien", "Julien Morel", "demo2", "Le Comptoir a 3 kg de frites en trop, quelqu'un en veut ?", 65]];
+        SIS.forEach(([rid]) => {
+          (D[`restos/${rid}/chatGroups`] ||= {})["g-3restos"] = JSON.parse(JSON.stringify(G));
+          MS.forEach(([mid, uid, by, from, text, k]) => { (D[`restos/${rid}/chat`] ||= {})[mid] = { text, at: mn(k), uid, by, g: "g-3restos", ...(from !== rid ? { from: { rid: from, name: SIS.find((x) => x[0] === from)[1] } } : {}) }; });
+        });
+      }
+    }
     return { rid: RID, data: D, me: { id: "demo-camille", name: "Camille Laurent", color: "#4A1FE6" } };
   },
 };
