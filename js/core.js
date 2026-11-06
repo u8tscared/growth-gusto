@@ -438,7 +438,7 @@ const NAV = [
   ["sep", "", "Cuisine"], ["notes", "book", "Recettes & allergènes"], ["menage", "spray", "Planning ménage"], ["hygiene", "hygPot", "Hygiène"],
   ["sep", "", "Gestion"], ["dashboard", "dash", "Tableau de bord"], ["finance", "euro", "Finances"], ["stock", "box", "Stock & inventaire"], ["tickets", "receipt", "Tickets de caisse"], ["caisse", "cxPlug", "Caisse connectée"], ["pennylane", "pnyBook", "Comptabilité"], ["registre", "shield", "Registre HACCP"], ["documents", "hygVault", "Coffre-fort documents"], ["controle", "ctBadge", "Contrôle sanitaire"], ["rappel", "ctRecall", "Rappel de lot"], ["obligations", "calcheck", "Obligations & contrôles"],
   ["sep", "", "Équipe"], ["pointeuse", "clock", "Pointeuse"], ["planning", "cal", "Planning"], ["formation", "book", "Formation HACCP"], ["equipe", "users", "Équipe & salaires"], ["avis", "star", "Votre avis"],
-  ["sep", "", "Restaurant"], ["resa", "resa", "Réservations"], ["alertes", "alBell", "Alertes"], ["sites", "store", "Mes établissements"], ["import", "upload", "Importer"], ["imprimante", "printer", "Imprimante"], ["reglages", "sliders", "Réglages"],
+  ["sep", "", "Restaurant"], ["resa", "resa", "Réservations"], ["plan", "plZone", "Plan de salle"], ["alertes", "alBell", "Alertes"], ["sites", "store", "Mes établissements"], ["import", "upload", "Importer"], ["imprimante", "printer", "Imprimante"], ["reglages", "sliders", "Réglages"],
 ];
 const TABS = [["home", "home", "Accueil"], ["frigos", "snow", "Frigos"], ["scan", "scan", ""], ["stock", "box", "Stock"], ["more", "grid", "Plus"]];
 const TAB_OF = { home: "home", frigos: "frigos", frigo: "frigos", releve: "home", scan: "scan", stock: "stock", reception: "more", tickets: "more", registre: "more", notes: "more", note: "more", menage: "more", equipe: "more", imprimante: "more", reglages: "more", more: "more", dashboard: "more", finance: "more", obligations: "more", pointeuse: "more", planning: "more", avis: "more", import: "more" };
@@ -854,7 +854,7 @@ function registerSW() {
    to the foreground. A new v means the code running here is old: with nothing in progress the app reloads silently (caches dropped,
    so the reload is guaranteed fresh); otherwise a toast offers « Mettre à jour ». sessionStorage guards against reload loops:
    one reload attempt per version per session, after which the version is simply adopted. */
-const APP_V = "2026-11-06.14";
+const APP_V = "2026-11-06.15";
 /* logos of the tools Growth Gusto connects to (img/logos/<id>.svg|png): caisses, réservations, comptabilité, banque, paiement */
 const BRAND_LOGOS = { sumup: "svg", zelty: "png", lightspeed: "svg", tiller: "svg", square: "svg", innovorder: "svg", popina: "png", zenchef: "svg", thefork: "png", sevenrooms: "png", guestonline: "png", resy: "svg", opentable: "svg", formitable: "svg", google: "svg", pennylane: "svg", qonto: "svg", quickbooks: "svg", sage: "svg", odoo: "svg", stripe: "svg", zebra: "svg" };
 const brandLogo = (id) => BRAND_LOGOS[id] ? `<img class="brand-logo" src="img/logos/${id}.${BRAND_LOGOS[id]}" alt="" loading="lazy" decoding="async" draggable="false">` : "";
@@ -865,7 +865,7 @@ const UPD = {
   async fetchV() { try { const r = await fetch("version.json?ts=" + Date.now(), { cache: "no-store" }); if (!r.ok) return null; const j = await r.json(); return j && j.v ? String(j.v) : null; } catch (e) { return null; } },
   quiet() {
     const a = document.activeElement;
-    return !(a && /INPUT|TEXTAREA|SELECT/.test(a.tagName)) && !$("#sheet").classList.contains("open") && ["home", "onboarding"].includes(S.route) && !(S.rec && (S.rec.lines || []).length && !S.rec.done);
+    return !(a && /INPUT|TEXTAREA|SELECT/.test(a.tagName)) && !$("#sheet").classList.contains("open") && ["home", "onboarding", "more", "cuisine"].includes(S.route) && !(S.rec && (S.rec.lines || []).length && !S.rec.done);
   },
   async check() {
     const v = await this.fetchV(); if (!v) return;
@@ -878,6 +878,8 @@ const UPD = {
     if (v === this.running) return;
     if (this.get("gg-upd", sessionStorage) === v) { this.running = v; this.set("gg-v", v, localStorage); return; } /* already reloaded once for v: adopt it, never loop */
     if (this.quiet()) return this.apply(v);
+    /* busy right now: offer the update, and apply it by itself at the next calm moment (back on Accueil, menu Plus, no sheet open) */
+    if (!this.wait) this.wait = setInterval(() => { if (this.quiet() && document.visibilityState === "visible") { clearInterval(this.wait); this.apply(v); } }, 3000);
     if (this.offered === v) return; this.offered = v;
     toast("Nouvelle version disponible", "info"); const t = $("#toast");
     $("#toastTx").innerHTML = `<span class="tx">Nouvelle version disponible</span><button data-act="appUpdate" data-v="${esc(v)}">Mettre à jour</button>`; toastPlace(t);
@@ -894,6 +896,9 @@ function freshness() {
   if (location.protocol === "file:") return;
   UPD.check();
   document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") UPD.check(); });
+  /* an app left open all service (kitchen tablet, phone in a pocket) still picks up a deploy within 5 minutes */
+  setInterval(() => { if (document.visibilityState === "visible") UPD.check(); }, 5 * 60000);
+  window.addEventListener("online", () => UPD.check());
 }
 
 function toastUndo(msg) { toast(msg); const t = $("#toast"); $("#toastTx").innerHTML = `<span class="tx">${esc(msg)}</span><button data-act="undo">Annuler</button>`; toastPlace(t); t.style.pointerEvents = "auto"; clearTimeout(t._h); t._h = setTimeout(() => { t.classList.remove("on"); t.style.pointerEvents = ""; S.ui.undo = null; }, 4000); }

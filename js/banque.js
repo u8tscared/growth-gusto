@@ -422,9 +422,10 @@ async function bqAccExport() {
 }
 
 /* ───────── demo ───────── */
-function bqDemoSeed(bank) {
+/* the demo restaurant starts with its bank already linked (js/demo.js); « Relier ma banque » in the demo re-seeds it */
+function bqDemoData(bank) {
   const now = Date.now(); const day = (n) => dayKey(new Date(now - n * 864e5));
-  DB.set("bank", "eb_demo", { kind: "api", bank: bank || "Crédit Agricole", accounts: [{ uid: "d1", name: "Compte pro", iban: "4821", currency: "EUR", balance: 18452.3 }], status: "connected", lastSync: now - 2 * 36e5, connectedAt: now, validUntil: new Date(now + 178 * 864e5).toISOString() });
+  const link = { kind: "api", bank: bank || "Crédit Agricole", accounts: [{ uid: "d1", name: "Compte pro", iban: "4821", currency: "EUR", balance: 18452.3 }], status: "connected", lastSync: now - 2 * 36e5, connectedAt: now, validUntil: new Date(now + 178 * 864e5).toISOString() };
   const T = []; const add = (n, amount, label, who = "", dir = "out") => T.push({ day: day(n), amount, label, who, dir });
   for (let w = 0; w < 10; w++) { add(2 + w * 7, 380 + ((w * 137) % 340), "PAIEMENT CB METRO NANTERRE", "METRO"); add(4 + w * 7, 160 + ((w * 71) % 120), "PRLV SEPA POMONA TERREAZUR", "POMONA"); }
   for (let w = 0; w < 5; w++) add(6 + w * 14, 520 + w * 35, "PRLV SEPA FRANCE BOISSONS FACT " + (4410 + w), "FRANCE BOISSONS");
@@ -437,8 +438,9 @@ function bqDemoSeed(bank) {
   }
   add(11, 200, "RETRAIT DAB 05/11 PARIS"); add(16, 87.3, "PAIEMENT CB LEROY MERLIN"); add(23, 23.4, "PAIEMENT CB LA FOURNEE DU MARCHE"); add(27, 64.9, "PAIEMENT CB AMZN MKTP FR");
   for (let d = 1; d < 70; d++) if (d % 7 !== 0) add(d, 900 + ((d * 211) % 1400), "REMISE CB " + shortDate(day(d)), "", "in");
-  T.forEach((t, i) => DB.set("bankTx", "eb_demo" + i, { src: "banque", link: "eb_demo", account: "d1", ...t, ref: "", at: now }));
+  return { link, tx: T.map((t, i) => ["eb_demo" + i, { src: "banque", link: "eb_demo", account: "d1", ...t, ref: "", at: now }]) };
 }
+function bqDemoSeed(bank) { const d = bqDemoData(bank); DB.set("bank", "eb_demo", d.link); d.tx.forEach(([k, t]) => DB.set("bankTx", k, t)); }
 
 /* ───────── actions ───────── */
 Object.assign(ACT, {
