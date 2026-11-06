@@ -470,7 +470,7 @@ function rsOpenSheet(id) {
   const sts = [["avenir", "Confirmée", "check"], ["arrive", "Arrivée", "rsSeat"], ["noshow", "No-show", "x"], ["annule", "Annulée", "trash"]];
   const cur = rsConf(b) ? "avenir" : b.status || "avenir";
   const svc = rsSvcOf(cfg, b.date, b.time);
-  const busyT = new Set(rsOfDay(b.date).filter((x) => rsLive(x) && x.id !== b.id && x.table && rsSvcOf(cfg, b.date, x.time).id === svc.id).map((x) => x.table));
+  const busyT = new Set(rsOfDay(b.date).filter((x) => rsLive(x) && x.id !== b.id && x.table && rsSvcOf(cfg, b.date, x.time).id === svc.id).flatMap((x) => (typeof plTblOf === "function" ? plTblOf(x) : [x.table])));
   const tabs = cfg.tables.slice().sort((a, c) => String(a.n).localeCompare(String(c.n), "fr", { numeric: true }));
   const srv = rsSrv(), log = Array.isArray(b.mailLog) ? b.mailLog : [], lastMail = log[log.length - 1];
   const KN = { demande: "demande reçue", confirme: "confirmation", modifie: "modification", rappel: "rappel", refuse: "refus", annule: "annulation", annule_client: "annulation", avis: "demande d'avis" };
@@ -487,7 +487,12 @@ function rsOpenSheet(id) {
     ${b.notes ? `<div class="rs-note big ${nk}">${nk ? ico("alert") : ico("rsNote")}<span>${esc(b.notes)}</span></div>` : ""}
     ${b.resaMsg && (b.status === "refuse" || b.status === "annule") ? `<div class="rs-note big">${ico("rsMail")}<span>Votre message : « ${esc(b.resaMsg)} »</span></div>` : ""}
     ${main}
-    ${tabs.length && rsLive(b) ? `<div class="rs-etab"><span>Table</span><div>${["", ...tabs.map((t) => t.id)].map((tid) => { const t = tabs.find((x) => x.id === tid); return `<button class="${(b.table || "") === tid ? "on" : ""}${t && busyT.has(tid) ? " busy" : ""}" data-act="rsSetTable" data-id="${esc(b.id)}" data-v="${esc(tid)}">${t ? `${esc(t.n)}<i>${+t.seats || 0}</i>` : "Aucune"}</button>`; }).join("")}</div></div>` : ""}
+    ${tabs.length && rsLive(b) ? (() => {
+      /* one table, or several pushed together (« Assembler »: each tap adds or removes a table) */
+      const mine = typeof plTblOf === "function" ? plTblOf(b) : [b.table].filter(Boolean), join = R.join === b.id, cap = mine.reduce((n, id) => n + (+(tabs.find((t) => t.id === id) || {}).seats || 0), 0), cv = +b.covers || 0;
+      return `<div class="rs-etab${join ? " join" : ""}"><span>${mine.length > 1 ? "Tables assemblées" : "Table"}</span><div>${(join ? tabs.map((t) => t.id) : ["", ...tabs.map((t) => t.id)]).map((tid) => { const t = tabs.find((x) => x.id === tid); return `<button class="${(tid ? mine.includes(tid) : !mine.length) ? "on" : ""}${t && busyT.has(tid) ? " busy" : ""}" data-act="${join ? "rsJoinT" : "rsSetTable"}" data-id="${esc(b.id)}" data-v="${esc(tid)}">${t ? `${esc(t.n)}<i>${+t.seats || 0}</i>` : "Aucune"}</button>`; }).join("")}</div>
+        <div class="rs-ejoin"><em>${mine.length ? `${cap} place${cap > 1 ? "s" : ""} pour ${cv} pers.${cap < cv ? " : il manque des places" : ""}` : "Pas de table"}</em><button class="btn ${join ? "acc" : "soft"} sm" data-act="rsJoinTog" data-id="${esc(b.id)}">${join ? `${ico("check")}Terminé` : `${ico("plus")}Assembler des tables`}</button></div></div>`;
+    })() : ""}
     ${b.email ? `<div class="rs-mailr">${ico("rsMail")}<span><b>${esc(b.email)}</b><em>${lastMail ? `E-mail de ${KN[lastMail.k] || "réservation"} envoyé ${when(lastMail.at)}` : srv ? "Le client reçoit les e-mails de sa réservation" : "E-mails au client : bientôt actif"}</em></span>${srv && (rsConf(b) || b.status === "avalider") ? `<button class="btn soft sm" data-act="rsResend" data-id="${esc(b.id)}">Renvoyer</button>` : ""}</div>` : ""}
     ${rsRevLine(b)}
     <div class="rs-bkf">${b.phone ? `<a class="btn soft" href="tel:${esc(String(b.phone).replace(/[^\d+]/g, ""))}">${ico("rsPhone")}Appeler</a>` : ""}<button class="btn ${b.phone ? "soft" : "soft block"}" data-act="rsEdit" data-id="${esc(b.id)}">${ico("edit")}Modifier</button></div>
@@ -767,6 +772,13 @@ Object.assign(ACT, {
     if (await rsSave(id, { status: st, ...(v === "arrive" ? { arrivedAt: Date.now() } : {}) })) toast(v === "arrive" ? `${firstName(b.name) || "Client"} est arrivé` : v === "noshow" ? "Noté : no-show" : v === "annule" ? "Réservation annulée" : "Remis à venir");
   },
   rsSetTable: async (a, id, v) => { SFX.tick(); buzz(4); const ok = await rsSave(id, { table: v || "", tableWith: "", tableAuto: false }); if (ok) rsOpenSheet(id); },
+  rsJoinTog: (a, id) => { SFX.tick(); buzz(4); R.join = R.join === id ? null : id; rsOpenSheet(id); },
+  /* « Assembler »: tap a table to add it to the booking or take it off; the first one stays the main table */
+  rsJoinT: async (a, id, v) => {
+    const b = rsRows().find((x) => x.id === id); if (!b || !v) return; const L = typeof plTblOf === "function" ? plTblOf(b) : [b.table].filter(Boolean);
+    const next = L.includes(v) ? L.filter((x) => x !== v) : [...L, v].slice(0, 4); SFX.tick(); buzz(4);
+    const ok = await rsSave(id, { table: next[0] || "", tableWith: next.slice(1).join(","), tableAuto: false }); if (ok) rsOpenSheet(id);
+  },
   rsPick: (a, id) => { SFX.tick(); buzz(4); R.pick = R.pick === id ? null : id; rerender(); },
   rsTable: async (a, id) => {
     const cfg = rsCfg(); const t = cfg.tables.find((x) => x.id === id); if (!t) return;

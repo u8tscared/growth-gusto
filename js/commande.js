@@ -80,7 +80,7 @@ function cmWatch() {
   const rid = S.rid;
   if (DB.mode === "demo") cmSeedDemo();
   DB.watch("clientOrders", { order: "at", dir: "desc", limit: 400 }, (rows) => { if (S.rid !== rid) return; cmOnRows(rows); });
-  DB.watch("qrMenu", {}, (rows) => { if (S.rid !== rid) return; CM.cfgDoc = (rows.find((r) => r.id === "cfg") || null); CM.cfgSeen = true; cmSyncSoon(); onData(); });
+  DB.watch("qrMenu", {}, (rows) => { if (S.rid !== rid) return; CM.cfgDoc = (rows.find((r) => r.id === "cfg") || null); CM.cfgSeen = true; cmSyncSoon(); try { if (typeof slStockSeen === "function") slStockSeen(); } catch (e) {} onData(); });
   DB.watch("qrPay", {}, (rows) => { if (S.rid !== rid) return; CM.link = rows.find((r) => r.id === "link") || null; cmSyncSoon(); onData(); });
   if (DB.mode === "db") DB.watch("public", {}, (rows) => { if (S.rid !== rid) return; CM.pub = rows.find((r) => r.id === "menu") || null; CM.pubSeen = true; cmSyncSoon(); });
 }
@@ -96,8 +96,8 @@ function cmAlert(o) {
   CM.fresh.add(o.id);
   try { SFX.init(); SFX.tone(1319, 0.28, "sine", 0.055); SFX.tone(1568, 0.3, "sine", 0.05, 0.16); SFX.tone(2093, 0.5, "sine", 0.04, 0.32); buzz([22, 50, 22, 50, 40]); } catch (e) {}
   const where = o.mode === "table" ? `Table ${o.table}` : `À emporter ${o.slot || ""}`.trim();
-  if (S.route !== "commandes" || CM.tab !== "live") toast(`Nouvelle commande n° ${o.n} · ${where} · ${cmEur(o.total)}`, "info");
-  try { if (window.ALERTES && typeof window.ALERTES.push === "function") window.ALERTES.push({ type: "commande", key: "cmd_" + o.id, level: "info", text: `Nouvelle commande en ligne n° ${o.n}`, sub: `${where} · ${cmEur(o.total)}${o.paid ? " · payée" : ""}`, day: o.day, route: "commandes" }); } catch (e) {}
+  if (S.route !== "commandes" || CM.tab !== "live") toast(`${o.mode === "table" ? "Nouvelle commande QR" : `Nouvelle commande n° ${o.n}`} · ${where} · ${cmEur(o.total)}`, "info");
+  try { if (window.ALERTES && typeof window.ALERTES.push === "function") window.ALERTES.push({ type: "commande", key: "cmd_" + o.id, level: "info", text: o.mode === "table" ? `Nouvelle commande QR · Table ${o.table}` : `Nouvelle commande à emporter n° ${o.n}`, sub: `${where} · ${cmEur(o.total)}${o.paid ? " · payée" : ""}`, day: o.day, route: "commandes" }); } catch (e) {}
 }
 window.CMD = { unseen: () => (CM.orders || []).filter((o) => o.status === "nouvelle" && o.src !== "salle").length };
 
@@ -234,7 +234,7 @@ function cmLive() {
       <p class="sub">${c.on ? "Les nouvelles commandes arrivent ici avec un carillon. Gardez cet écran ouvert en cuisine." : "Ouvrez-la quand le service commence : vos clients pourront commander depuis les QR codes."}</p>
       <div class="cm-erow">${c.on ? `<a class="btn soft sm" href="${esc(cmUrl(DB.mode === "demo" ? "12" : ""))}" target="_blank" rel="noopener">${ico("cmEye")}Voir la page client</a>` : `<button class="btn acc sm" data-act="cmOpenNow">Ouvrir maintenant</button>`}</div></div>`;
   const doneL = done.length ? `<button class="cm-donet st" style="--i:4" data-act="cmDoneTog" aria-expanded="${CM.showDone}">${ico("check")}Terminées aujourd'hui<b class="mono">${done.length}</b>${ico("down", CM.showDone ? "rot" : "")}</button>
-    ${CM.showDone ? `<div class="glass cm-done">${done.map((o) => `<div class="cm-dr${o.status === "annulee" ? " off" : ""}"><b class="mono">n° ${o.n}</b><span>${o.mode === "table" ? `Table ${esc(o.table)}` : `À emporter${o.name ? ` · ${esc(o.name)}` : ""}`}</span><em>${(o.items || []).reduce((a, x) => a + x.q, 0)} art.</em><b class="mono">${cmEur(o.total)}</b><span class="pill ${o.status === "annulee" ? "bad" : o.paid ? "ok" : "neu"}">${o.status === "annulee" ? (o.refunded ? "Remboursée" : "Annulée") : o.paid ? "Payée en ligne" : "Sur place"}</span></div>`).join("")}</div>` : ""}` : "";
+    ${CM.showDone ? `<div class="glass cm-done">${done.map((o) => `<div class="cm-dr${o.status === "annulee" ? " off" : ""}"><b class="mono">${o.mode === "table" ? "QR" : `n° ${o.n}`}</b><span>${o.mode === "table" ? `Table ${esc(o.table)}` : `À emporter${o.name ? ` · ${esc(o.name)}` : ""}`}</span><em>${(o.items || []).reduce((a, x) => a + x.q, 0)} art.</em><b class="mono">${cmEur(o.total)}</b><span class="pill ${o.status === "annulee" ? "bad" : o.paid ? "ok" : "neu"}">${o.status === "annulee" ? (o.refunded ? "Remboursée" : "Annulée") : o.paid ? "Payée en ligne" : "Sur place"}</span></div>`).join("")}</div>` : ""}` : "";
   return head + rail + doneL;
 }
 function cmCard(o, k) {
@@ -243,7 +243,7 @@ function cmCard(o, k) {
   const at = o.status === "prep" ? o.prepAt || o.at : o.status === "prete" ? o.readyAt || o.at : o.at;
   const busy = CM.busy[o.id];
   return `<article class="cm-o${CM.fresh.has(o.id) ? " fresh" : ""} m-${o.mode}" style="--i:${Math.min(k, 8)}" data-id="${esc(o.id)}">
-    <div class="cm-o-h"><b class="cm-n mono">${o.n}</b>
+    <div class="cm-o-h">${o.mode === "table" ? "" : `<b class="cm-n mono">${o.n}</b>`}
       ${o.mode === "table" ? `<span class="cm-where t">${ico("rsTable")}Table <b>${esc(o.table)}</b></span>` : `<span class="cm-where e">${ico("cmBag")}${esc(o.slot || "")}</span>`}
       <span class="cm-ago mono${(Date.now() - at) / 6e4 > late ? " late" : ""}" data-at="${at}" data-late="${late}">${cmAgo(at)}</span></div>
     ${o.mode === "emporter" && o.name ? `<div class="cm-who">${esc(o.name)}${o.phone ? ` · <a href="tel:${esc(String(o.phone).replace(/[^\d+]/g, ""))}">${esc(o.phone)}</a>` : ""}</div>` : o.name ? `<div class="cm-who">${esc(o.name)}</div>` : ""}
@@ -540,12 +540,12 @@ Object.assign(ACT, {
     const patch = { status: v, by: S.me.id }; if (v === "prep") patch.prepAt = Date.now(); if (v === "prete") patch.readyAt = Date.now(); if (v === "servie") patch.doneAt = Date.now();
     const card = a.closest(".cm-o"); if (card) card.classList.add("go");
     if (v === "prete") { SFX.done(); buzz([14, 40, 14]); } else if (v === "servie") { SFX.ok(); buzz(8); } else { SFX.ok(); buzz(8); }
-    setTimeout(async () => { try { await safe(DB.update("clientOrders", id, patch)); if (v === "servie") toastUndo(`Commande n° ${o.n} terminée`), S.ui.undo = () => DB.update("clientOrders", id, { status: "prete", doneAt: null }); } catch (e) {} delete CM.busy[id]; onData(); }, card ? 260 : 0);
+    setTimeout(async () => { try { await safe(DB.update("clientOrders", id, patch)); if (v === "servie") toastUndo(o.mode === "table" ? `Commande QR · Table ${o.table} terminée` : `Commande n° ${o.n} terminée`), S.ui.undo = () => DB.update("clientOrders", id, { status: "prete", doneAt: null }); } catch (e) {} delete CM.busy[id]; onData(); }, card ? 260 : 0);
   },
   cmMenu: (a, id) => {
     const o = (CM.orders || []).find((x) => x.id === id); if (!o) return; SFX.tap();
     const back = { prep: ["nouvelle", "Remettre en « nouvelle »"], prete: ["prep", "Remettre en préparation"] }[o.status];
-    openSheet(`<div class="cm-ed"><div class="cm-edh"><span class="h2">Commande n° ${o.n}</span><button class="iconbtn" data-act="sheetClose" aria-label="Fermer">${ico("x")}</button></div>
+    openSheet(`<div class="cm-ed"><div class="cm-edh"><span class="h2">${o.mode === "table" ? `Commande QR · Table ${esc(o.table)}` : `Commande n° ${o.n}`}</span><button class="iconbtn" data-act="sheetClose" aria-label="Fermer">${ico("x")}</button></div>
       <p class="sub">${o.mode === "table" ? `Table ${esc(o.table)}` : `À emporter ${esc(o.slot || "")}${o.name ? ` · ${esc(o.name)}` : ""}`} · ${cmEur(o.total)} · ${o.paid ? "payée en ligne" : "à encaisser"}</p>
       ${o.phone ? `<a class="btn soft block" href="tel:${esc(String(o.phone).replace(/[^\d+]/g, ""))}">${ico("rsPhone")}Appeler ${esc(o.name || "le client")}</a>` : ""}
       ${back ? `<button class="btn soft block" data-act="cmBack" data-id="${esc(o.id)}" data-v="${back[0]}">${ico("back")}${back[1]}</button>` : ""}

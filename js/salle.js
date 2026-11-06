@@ -58,6 +58,9 @@ const SL = { rid: null, tabs: null, st: new Map(), stInit: false, mine: new Set(
 const slEur = (v) => (typeof cmEur === "function" ? cmEur(v) : (Math.round((+v || 0) * 100) / 100).toLocaleString("fr-FR", { minimumFractionDigits: 2 }) + " €");
 const slAgo = (at) => { const m = Math.max(0, Math.floor((Date.now() - (at || Date.now())) / 6e4)); return m < 1 ? "à l'instant" : m < 60 ? `${m} min` : `${Math.floor(m / 60)} h ${pad(m % 60)}`; };
 const slMin = (at) => Math.max(0, Math.floor((Date.now() - (at || Date.now())) / 6e4));
+/* what a kitchen ticket is called: the table, and where it comes from. A QR order at a table has no number (the table says it all);
+   a takeaway keeps its number, the one the customer shows at the counter. */
+const slWho = (o) => (o.src === "salle" ? `Table ${o.table}` : o.mode === "table" ? `Commande QR · Table ${o.table}` : `À emporter n° ${o.n}${o.name ? ` · ${o.name}` : ""}`);
 const slId = (p) => p + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 const slAl = (id) => (typeof allergenOf === "function" && allergenOf(id)) || { t: id };
 const slDishAl = (id, x) => { const n = (S.notes || []).find((y) => y.id === id); if (!n) return (x && x.dishAl) || []; try { return typeof recipeAllergens === "function" ? recipeAllergens(n) : n.allergens || []; } catch (e) { return n.allergens || []; } };
@@ -67,16 +70,21 @@ function slWatch() {
   if (!S.rid) return;
   if (typeof cmWatch === "function") cmWatch(); /* the kitchen tickets (clientOrders) and the carte config */
   if (typeof rsWatch === "function") rsWatch(); /* today's bookings (names on the tables) and, in the demo, the floor plan */
-  if (SL.rid === S.rid) return; SL.rid = S.rid; SL.tabs = null; SL.st = new Map(); SL.stInit = false; SL.mine = new Set();
+  if (SL.rid === S.rid) return; SL.rid = S.rid; SL.tabs = null; SL.stockSeen = null; SL.st = new Map(); SL.stInit = false; SL.mine = new Set();
   const rid = S.rid;
   if (DB.mode === "demo") slSeedDemo();
-  DB.watch("salleTabs", { order: "openedAt", dir: "desc", limit: 300 }, (rows) => { if (S.rid !== rid) return; SL.tabs = rows; onData(); });
+  DB.watch("salleTabs", { order: "openedAt", dir: "desc", limit: 300 }, (rows) => { if (S.rid !== rid) return; SL.tabs = rows; slStockSync(); onData(); });
   try { localStorage.setItem("gg-sl-on-" + rid, "1"); } catch (e) {}
 }
 /* a waiter who already uses this screen keeps getting « c'est prêt » on any screen after a restart */
 window.addEventListener("gg:ready", () => { setTimeout(() => { try { if (S.rid && DB.mode === "db" && localStorage.getItem("gg-sl-on-" + S.rid) === "1" && (typeof abHas !== "function" || abHas("salle"))) slWatch(); } catch (e) {} }, 1500); });
 
 const slOpenTabs = () => (SL.tabs || []).filter((t) => t.status === "open");
+/* the tables of an open tab: its own, and the ones pushed against it (« Accoler une table », a booking on joined tables, « Réunir ») */
+const slTabTables = (t) => [t.tableId, ...(Array.isArray(t.joined) ? t.joined : [])].filter(Boolean);
+const slTabAt = (tid) => slOpenTabs().find((x) => slTabTables(x).includes(tid)) || null;
+const slTabMap = () => { const m = new Map(); slOpenTabs().forEach((t) => slTabTables(t).forEach((id) => m.set(id, t))); return m; };
+const slJoinLbl = (ids) => ids.map((id) => (slTableBy(id) || {}).n).filter(Boolean).join("+");
 const slTabOf = (id) => (SL.tabs || []).find((t) => t.id === id) || null;
 const slTickets = (tabId) => (CM.orders || []).filter((o) => o.src === "salle" && o.tabId === tabId && o.status !== "annulee");
 const slLive = (o) => ["attente", "nouvelle", "prep", "prete"].includes(o.status) && Date.now() - (o.at || 0) < 20 * 3600e3;
@@ -98,7 +106,7 @@ const slTableBy = (id) => slTables().T.find((t) => t.id === id) || null;
 function slBookingAt(tid) {
   try {
     if (typeof rsOfDay !== "function") return null; const now = new Date().getHours() * 60 + new Date().getMinutes();
-    return rsOfDay(dayKey()).filter((b) => (typeof rsLive !== "function" || rsLive(b)) && [b.table, b.tableWith].includes(tid)).map((b) => ({ b, d: rsMin(b.time) - now })).filter((x) => x.d > -100 && x.d < 60).sort((a, b) => Math.abs(a.d) - Math.abs(b.d))[0]?.b || null;
+    return rsOfDay(dayKey()).filter((b) => (typeof rsLive !== "function" || rsLive(b)) && (typeof plTblOf === "function" ? plTblOf(b) : [b.table, b.tableWith]).includes(tid)).map((b) => ({ b, d: rsMin(b.time) - now })).filter((x) => x.d > -100 && x.d < 60).sort((a, b) => Math.abs(a.d) - Math.abs(b.d))[0]?.b || null;
   } catch (e) { return null; }
 }
 /* the state of an open table, from its kitchen tickets */
@@ -133,6 +141,7 @@ const slCovers = (tab) => `${+tab.covers || 0} couv.`;
 /* a kitchen screen is on: the écran cuisine, or the « coup de feu » mode in its Cuisine role (js/rush.js); qr = the Commandes en ligne screen counts too */
 const slKRoute = (qr) => S.route === "cuisine" || (qr && S.route === "commandes") || (S.route === "coupdefeu" && typeof cfRole === "function" && cfRole() === "cuisine");
 function slOnRows(rows) {
+  slStockSync();
   rows.forEach((o) => {
     if (o.src !== "salle") return; const k = o.status + "|" + (o.call || 0) + "|" + (o.mod || 0) + "|" + (o.push || 0), p = SL.st.get(o.id); SL.st.set(o.id, k);
     if (!SL.stInit || !p || p === k) return;
@@ -148,6 +157,8 @@ function slReady(o, recall) {
   if (o.waiter !== S.me.id && S.route !== "salle" && !(S.route === "coupdefeu" && typeof cfRole === "function" && cfRole() !== "cuisine")) return;
   try { SFX.init(); SFX.tone(784, 0.18, "triangle", 0.06); SFX.tone(1175, 0.2, "triangle", 0.055, 0.12); SFX.tone(1568, 0.5, "sine", 0.05, 0.24); buzz(recall ? [80, 60, 80, 60, 160] : [60, 40, 60, 40, 120]); } catch (e) {}
   toast(`Table ${o.table} · ${o.courseT || "commande"} ${recall ? ": la cuisine vous appelle" : "prêt à servir"}`, "info");
+  /* a recall also lands in the bell (Alertes) of the waiter who sent the ticket, so it is still there when the phone comes out of the pocket */
+  if (recall && o.waiter === S.me.id) try { if (window.ALERTES && typeof window.ALERTES.push === "function") window.ALERTES.push({ type: "service", key: "slcall_" + o.id + "_" + o.call, level: "warn", text: `Table ${o.table} · ${o.courseT || "commande"} : la cuisine vous appelle`, sub: "Les assiettes attendent au passe", day: o.day, route: "salle" }); } catch (e) {}
   if (S.route === "salle") onData();
 }
 
@@ -172,7 +183,7 @@ function slGone() {
 
 /* ── the floor ── */
 function slFloor() {
-  const { plan, cfg, T } = slTables(), open = slOpenTabs(), by = new Map(open.map((t) => [t.tableId, t]));
+  const { plan, cfg, T } = slTables(), open = slOpenTabs(), by = slTabMap();
   const ready = slKitchen().filter((o) => o.src === "salle" && o.status === "prete").sort((a, b) => (a.waiter === S.me.id ? -1 : 0) - (b.waiter === S.me.id ? -1 : 0) || (a.readyAt || 0) - (b.readyAt || 0));
   const covers = open.reduce((a, t) => a + (+t.covers || 0), 0), cook = open.filter((t) => slTabState(t).k === "cook").length;
   const st = (t) => {
@@ -191,11 +202,12 @@ function slFloor() {
     floor = `<div class="glass sl-grid st" style="--i:3">${T.map((t, i) => { const s = st(t); return `<button class="sl-gt ${s.cls}" style="--j:${i}" data-act="slTable" data-id="${esc(t.id)}"><b class="mono">${esc(t.n)}</b><span>${esc(s.a || "Libre")}</span>${s.b ? `<em>${esc(s.b)}</em>` : ""}</button>`; }).join("")}</div>
       <p class="note sl-pnote">${ico("plZone")}<span>Dessinez votre salle dans <button class="sl-lnk" data-go="plan">Plan de salle</button> : les tables s'affichent à leur place.</span></p>`;
   }
-  const readyHtml = ready.length ? `<div class="sl-ready-l st" style="--i:2">${ready.map((o) => `<div class="sl-rd"><span class="sl-rdi">${ico("cmBell")}</span><div><b>Table ${esc(o.table)} · ${esc(o.courseT || "")}</b><em>${(o.items || []).filter((x) => !x.off).reduce((a, x) => a + (+x.q || 0), 0)} assiette${(o.items || []).filter((x) => !x.off).reduce((a, x) => a + (+x.q || 0), 0) > 1 ? "s" : ""} · prêt depuis <span class="sl-ago" data-at="${o.readyAt || o.at}">${slAgo(o.readyAt || o.at)}</span>${o.waiter && o.waiter !== S.me.id && o.waiterName ? ` · ${esc(firstName(o.waiterName))}` : ""}</em></div><button class="btn sm sl-servb" data-act="slServed" data-id="${esc(o.id)}">${ico("check")}Servi</button></div>`).join("")}</div>` : "";
+  const readyHtml = ready.length ? `<div class="sl-ready-l st" style="--i:2">${ready.map((o) => `<div class="sl-rd${o.call ? " call" : ""}"><span class="sl-rdi">${ico(o.call ? "slCall" : "cmBell")}</span><div><b>Table ${esc(o.table)} · ${esc(o.courseT || "")}</b>${o.call ? `<strong class="sl-rdc">La cuisine vous appelle · ${slAgo(o.call)}</strong>` : ""}<em>${(o.items || []).filter((x) => !x.off).reduce((a, x) => a + (+x.q || 0), 0)} assiette${(o.items || []).filter((x) => !x.off).reduce((a, x) => a + (+x.q || 0), 0) > 1 ? "s" : ""} · prêt depuis <span class="sl-ago" data-at="${o.readyAt || o.at}">${slAgo(o.readyAt || o.at)}</span>${o.waiter && o.waiter !== S.me.id && o.waiterName ? ` · ${esc(firstName(o.waiterName))}` : ""}</em></div><button class="btn sm sl-servb" data-act="slServed" data-id="${esc(o.id)}">${ico("check")}Servi</button></div>`).join("")}</div>` : "";
   const list = open.slice().sort((a, b) => ["ready", "draft", "hold", "cook", "open"].indexOf(slTabState(a).k) - ["ready", "draft", "hold", "cook", "open"].indexOf(slTabState(b).k) || (a.openedAt || 0) - (b.openedAt || 0));
   const right = `<button class="iconbtn" data-go="cuisine" aria-label="Écran cuisine" title="Écran cuisine">${ico("slHat")}</button>`;
   return `<div class="inner wide sl">${topBar("Prise de commande", { right })}
     <div class="sl-kpi st" style="--i:1"><div><b class="mono">${open.length}</b><span>table${open.length > 1 ? "s" : ""}</span></div><div><b class="mono">${covers}</b><span>couvert${covers > 1 ? "s" : ""}</span></div><div><b class="mono">${cook}</b><span>en cuisine</span></div>${ready.length ? `<div class="hot"><b class="mono">${ready.length}</b><span>prêt${ready.length > 1 ? "s" : ""}</span></div>` : ""}</div>
+    ${slStockBar()}
     ${readyHtml}
     ${floor}
     ${list.length ? `<div class="lbl st" style="--i:4">Tables ouvertes</div><div class="glass sl-open st" style="--i:4">${list.map((t) => { const s = slTabState(t); return `<button class="sl-or k-${s.k}" data-go="salle" data-id="${esc(t.id)}"><b class="sl-ort mono">${esc(t.table)}</b><span class="sl-ortx"><b>${esc(s.t)}</b><em>${slCovers(t)} · ${slItemsOk(t).reduce((a, x) => a + (+x.q || 0), 0)} articles · <span class="sl-ago" data-at="${t.openedAt}">${slAgo(t.openedAt)}</span>${t.byName && t.by !== S.me.id ? ` · ${esc(firstName(t.byName))}` : ""}</em></span><b class="mono sl-ortot">${slEur(slTotal(t.items || []))}</b>${ico("chev")}</button>`; }).join("")}</div>` : `<p class="note sl-pnote st" style="--i:4">${ico("slPad")}<span>Touchez une table pour prendre la commande. Elle part en cuisine d'un geste, et vous êtes prévenu quand c'est prêt.</span></p>`}
@@ -217,6 +229,7 @@ function slTabView(tab) {
   const carte = slCarte(tab), cmd = slOrder(tab, T);
   return `<div class="inner wide sl sl-t">${topBar(`Table ${esc(tab.table)}`, { right })}
     <div class="sl-tsub st" style="--i:1">${tab.zone && tab.zone !== "salle" ? `<span>${esc((typeof plZones === "function" ? plZones(slTables().cfg) : []).find((z) => z.id === tab.zone)?.name || tab.zone)}</span>` : ""}<span>Ouverte <span class="sl-ago" data-at="${tab.openedAt}">${slAgo(tab.openedAt)}</span></span>${tab.byName ? `<span>${esc(firstName(tab.byName))}</span>` : ""}${tab.note ? `<span class="sl-tnote">${ico("rsNote")}${esc(tab.note)}</span>` : ""}</div>
+    ${slStockBar()}
     ${seg}
     <div class="sl-cols">${wide || SL.pane === "carte" ? `<div class="sl-c1">${carte}</div>` : ""}${wide || SL.pane === "cmd" ? `<div class="sl-c2">${cmd}${wide && cta ? `<div class="sl-wcta">${cta}</div>` : ""}</div>` : ""}</div>
     ${!wide && cta ? `<div class="ctabar sl-cta">${cta}</div>` : ""}
@@ -231,10 +244,10 @@ function slCarte(tab) {
   const L = SL.cat === "tout" ? D : D.filter((n) => (n.carteCat || "plat") === SL.cat);
   if (!D.length) return `<div class="glass sl-empty"><div class="sl-ill">${ico("book")}</div><b class="h3">La carte est vide</b><p class="sub">Les plats viennent des fiches de Recettes & allergènes cochées « à la carte », avec leur prix. En attendant, ajoutez ce que vous voulez à la main.</p><div class="hstack" style="justify-content:center;flex-wrap:wrap"><button class="btn acc sm" data-act="slFree">${ico("plus")}Article hors carte</button><button class="btn soft sm" data-act="slGoCarte">${ico("book")}Remplir la carte</button></div></div>`;
   const tile = (n, i) => {
-    const o = slOut(n.id), left = slLeft(n.id), al = slDishAl(n.id), q = qty[n.id] || 0, hay = slNorm(n.title || "");
+    const left0 = slAvail(n.id), o = slOut(n.id) || left0 === 0, left = left0, al = slDishAl(n.id), q = qty[n.id] || 0, hay = slNorm(n.title || "");
     return `<button class="sl-d${o ? " out" : ""}${q ? " has" : ""}${left != null && left <= 3 && !o ? " low" : ""}" style="--i:${Math.min(i, 18)}" data-act="slAdd" data-id="${esc(n.id)}" data-hay="${esc(hay)}" ${o ? "disabled" : ""}>
       <b>${esc(n.title || "Sans nom")}</b><span class="sl-dp mono">${num(n.price) > 0 ? slEur(num(n.price)) : "—"}</span>
-      ${o ? `<em class="sl-dout">Épuisé</em>` : left != null ? `<em class="sl-dleft">Plus que ${left}</em>` : al.length ? `<em class="sl-dal">${ico("slWarn")}${al.length}</em>` : ""}${q ? `<i class="sl-dq mono">${q}</i>` : ""}</button>`;
+      ${o ? `<em class="sl-dout">${slOut(n.id) ? "Épuisé" : "Plus rien à vendre"}</em>` : left != null ? `<em class="sl-dleft">Plus que ${left}</em>` : al.length ? `<em class="sl-dal">${ico("slWarn")}${al.length}</em>` : ""}${q ? `<i class="sl-dq mono">${q}</i>` : ""}</button>`;
   };
   void today;
   return `<div class="sl-carte">
@@ -250,11 +263,79 @@ function slFilter() {
   const qa = $(".sl-dg .qadd"); if (qa) { qa.hidden = !q; const t = qa.querySelector(".sl-qt"); if (t) t.textContent = `« ${raw.slice(0, 40)} »`; qa.classList.toggle("solo", !n); }
   const fr = $(".sl-dg .sl-d.free"); if (fr && q) fr.style.display = "none";
 }
-/* stock of the day: « épuisé » and « il en reste N » live in qrMenu/cfg (js/commande.js), so the QR menu follows too */
+/* ───────── stock of the day (ruptures) ─────────
+   Lives in qrMenu/cfg (js/commande.js), so the QR menu follows too:
+     out[dishId]  = dayKey            « Épuisé » : nobody can sell it today (waiters' pads and the QR menu)
+     left[dishId] = { d, n, at, by }  « Limité » : the kitchen counted n portions at time `at`
+     stockWhen    = "commande" | "envoi" | "pret" | "paye"   when a portion comes off the count (the restaurant chooses)
+   The count is never decremented by hand: what is left is n minus what was sold since `at`, recomputed from the tables (salleTabs)
+   and the QR orders on every device, so two phones can't count the same plate twice. What is ordered but not yet counted
+   (still on a pad, not sent, not paid…) is « en cours » and is already kept aside for the waiters. Everything comes back tomorrow. */
+const SL_WHEN = [["commande", "Dès que c'est commandé", "Le serveur l'ajoute sur son téléphone ou le client commande au QR code"], ["envoi", "À l'envoi en cuisine", "Le serveur touche « Envoyer en cuisine » (une commande QR part tout de suite)"], ["pret", "Quand la cuisine dit « Prêt »", "L'assiette est faite"], ["paye", "À l'encaissement", "La table est réglée et libérée, la commande QR est payée ou remise"]];
 const slCfg = () => (typeof cmCfg === "function" ? cmCfg() : { out: {}, left: {} });
-const slOut = (id) => !!id && (slCfg().out || {})[id] === dayKey();
-const slLeft = (id) => { const e = id && (slCfg().left || {})[id]; return e && e.d === dayKey() && isFinite(+e.n) ? Math.max(0, +e.n) : null; };
+const slWhen = () => { const w = slCfg().stockWhen; return SL_WHEN.some((x) => x[0] === w) ? w : "envoi"; };
+const slLeftE = (id) => { const e = id && (slCfg().left || {})[id]; return e && e.d === dayKey() && isFinite(+e.n) ? e : null; };
+/* when the moment chosen in stockWhen happened for a line, or null if not yet */
+function slStockCount(id, since) {
+  const mode = slWhen(), today = dayKey(); let used = 0, pend = 0;
+  const tk = new Map((CM.orders || []).map((o) => [o.id, o]));
+  (SL.tabs || []).forEach((t) => {
+    if (t.day !== today || t.mergedInto) return; const open = t.status === "open";
+    (t.items || []).forEach((x) => {
+      if (x.off || x.id !== id) return; const q = +x.q || 0, o = x.sent ? tk.get(x.sent) : null;
+      const ev = mode === "commande" ? x.at || t.openedAt || 0
+        : mode === "envoi" ? (x.sent ? x.sentAt || (o && o.at) || 0 : null)
+        : mode === "pret" ? (o && ["prete", "servie"].includes(o.status) ? o.readyAt || o.at || 0 : null)
+        : !open ? t.closedAt || 0 : null;
+      if (ev == null) { if (open && !(o && o.status === "annulee")) pend += q; } else if (ev >= since) used += q;
+    });
+  });
+  (CM.orders || []).forEach((o) => {
+    if (o.src === "salle" || o.day !== today || ["annulee", "abandonnee"].includes(o.status)) return;
+    const q = (o.items || []).filter((x) => x.id === id).reduce((a, x) => a + (+x.q || 0), 0); if (!q) return;
+    const ev = mode === "commande" || mode === "envoi" ? o.at || 0 : mode === "pret" ? (["prete", "servie"].includes(o.status) ? o.readyAt || o.at || 0 : null) : o.paid ? o.paidAt || o.at || 0 : o.status === "servie" ? o.doneAt || o.at || 0 : null;
+    if (ev == null) pend += q; else if (ev >= since) used += q;
+  });
+  return { used, pend };
+}
+/* portions left on the count (kitchen view), or null when the dish isn't counted */
+const slLeft = (id) => { const e = slLeftE(id); if (!e) return null; const c = slStockCount(id, +e.at || Infinity); return Math.max(0, +e.n - c.used); };
+/* what a waiter may still sell: left minus what is already ordered and not yet counted */
+const slAvail = (id) => { const e = slLeftE(id); if (!e) return null; const c = slStockCount(id, +e.at || Infinity); return Math.max(0, +e.n - c.used - c.pend); };
+const slPend = (id) => { const e = slLeftE(id); return e ? slStockCount(id, +e.at || Infinity).pend : 0; };
+const slOut = (id) => !!id && ((slCfg().out || {})[id] === dayKey() || slLeft(id) === 0);
 async function slStockSave(patch) { if (typeof cmSaveCfg === "function") await cmSaveCfg(patch); }
+/* a counted dish reaching zero is written « épuisé » so the public QR menu (published from the cfg) hides it too; idempotent */
+const slStockSync = debounce(async () => {
+  try {
+    if (!S.rid || typeof cmCfg !== "function" || !CM.cfgSeen || !SL.tabs) return; const c = slCfg(), today = dayKey(), out = { ...(c.out || {}) }; let ch = false;
+    Object.keys(c.left || {}).forEach((id) => { if (out[id] !== today && slLeft(id) === 0) { out[id] = today; ch = true; } });
+    if (ch) await slStockSave({ out });
+  } catch (e) { console.warn("stock", e); }
+}, 1200);
+/* the kitchen declares a rupture or a limit: every waiter's phone rings and the pad shows it (see slStockBar) */
+function slStockSeen() {
+  try {
+    const c = slCfg(), today = dayKey(), cur = {};
+    Object.entries(c.out || {}).forEach(([id, d]) => { if (d === today) cur[id] = "out"; });
+    Object.entries(c.left || {}).forEach(([id, e]) => { if (e && e.d === today && !cur[id]) cur[id] = "n" + (+e.n) + "@" + (+e.at || 0); });
+    const prev = SL.stockSeen; SL.stockSeen = cur; if (!prev) return;
+    const news = Object.keys(cur).filter((id) => cur[id] !== prev[id]).map((id) => ({ id, out: cur[id] === "out", e: (c.left || {})[id] })).filter((x) => x.out || (x.e && x.e.by !== S.me.id));
+    if (!news.length) return;
+    const waiter = S.route === "salle" || (S.route === "coupdefeu" && typeof cfRole === "function" && cfRole() !== "cuisine") || (!slKRoute(true) && SL.rid === S.rid && typeof cfRole === "function" && cfRole() === "salle");
+    if (!waiter) return;
+    const name = (id) => ((slDishes().find((n) => n.id === id) || {}).title || "Un plat");
+    const txt = news.map((x) => (x.out ? `${name(x.id)} : épuisé` : `${name(x.id)} : plus que ${slAvail(x.id)}`)).join(" · ");
+    SFX.init(); SFX.tone(880, 0.16, "triangle", 0.05); SFX.tone(660, 0.3, "triangle", 0.05, 0.14); buzz([40, 40, 40]);
+    toast(`Cuisine · ${txt}`, "info");
+  } catch (e) {}
+}
+/* the strip on top of the waiter's pad: what is limited or gone today, so the floor stops selling it */
+function slStockBar() {
+  const D = slDishes(), outs = D.filter((n) => slOut(n.id)), lim = D.filter((n) => !slOut(n.id) && slLeftE(n.id));
+  if (!outs.length && !lim.length) return "";
+  return `<div class="sl-stk st" style="--i:1" role="status"><span class="sl-stki">${ico("slBan")}</span><div class="sl-stkl"><em class="sl-stkt">${lim.length ? "Il reste" : "Épuisé"}</em>${lim.map((n) => { const v = slAvail(n.id); return `<span class="lim${v <= 3 ? " low" : ""}"><b class="mono">${v}</b>${esc(n.title || "")}</span>`; }).join("")}${outs.map((n) => `<span class="out">${esc(n.title || "")}</span>`).join("")}</div><button class="sl-stkb" data-act="slOuts">Voir</button></div>`;
+}
 
 function slOrder(tab, T) {
   const all = tab.items || [], items = all.filter((x) => !x.off);
@@ -341,7 +422,7 @@ function slItemPaint(first) {
       <div class="sl-bk">${ico("slBolt")}<span>Part tout de suite en cuisine, en priorité. Le plat refait n'est pas compté deux fois sur l'addition.</span></div>
       <div class="grid2"><button class="btn soft" data-act="slEdMode" data-v="edit">Retour</button><button class="btn acc" data-act="slEdRefire">${ico("slRedo")}Refaire</button></div>`;
   } else if (e.mode === "move") {
-    const others = slOpenTabs().filter((t) => t.id !== tab.id), used = new Set(slOpenTabs().map((t) => t.tableId)), freeT = slTables().T.filter((t) => !used.has(t.id));
+    const others = slOpenTabs().filter((t) => t.id !== tab.id), used = new Set(slTabMap().keys()), freeT = slTables().T.filter((t) => !used.has(t.id));
     body = `<div class="sl-mh">${ico("slMove")}<b>Déplacer vers une autre table</b></div>${qn(+x.q)}
       ${others.length ? `<div class="lbl">Tables ouvertes</div><div class="sl-tchips">${others.map((t) => `<button data-act="slEdMoveTo" data-id="${esc(t.id)}"><b class="mono">${esc(t.table)}</b><em>${slCovers(t)}</em></button>`).join("")}</div>` : ""}
       ${freeT.length ? `<div class="lbl">Tables libres</div><div class="sl-tchips">${freeT.map((t) => `<button class="free" data-act="slEdMoveNew" data-id="${esc(t.id)}"><b class="mono">${esc(t.n)}</b><em>libre</em></button>`).join("")}</div>` : ""}
@@ -424,7 +505,7 @@ async function slSend(tab) {
     if (held) {
       const items = [...(held.items || []), ...lines];
       await safe(DB.update("clientOrders", held.id, { items, total: slTotal(items), ...(rush ? { rush: true } : {}) }));
-      L.forEach((x) => { x.sent = held.id; });
+      L.forEach((x) => { x.sent = held.id; x.sentAt = now; });
       continue;
     }
     const id = slId("sl"); SL.mine.add(id);
@@ -432,14 +513,12 @@ async function slSend(tab) {
       items: lines, total: slTotal(lines), n: n++, day: dayKey(), at: now, waiter: S.me.id, waiterName: S.me.name || "", status: fire ? "nouvelle" : "attente", pay: "place", paid: false, name: "", phone: "", slot: "", note: tab.note || "",
       ...(fire ? { firedAt: now } : {}), ...(T.some((o) => o.course === c) ? { add: true } : {}), ...(rush ? { rush: true } : {}) };
     await safe(DB.set("clientOrders", id, doc));
-    L.forEach((x) => { x.sent = id; });
+    L.forEach((x) => { x.sent = id; x.sentAt = now; });
     if (DB.mode === "demo" && fire) slDemoCook(id);
   }
   await slSaveTab(tab);
-  /* « il en reste N » : what was just sent comes off the count, and the dish is « épuisé » at zero */
-  const cfg = slCfg(), left = { ...(cfg.left || {}) }, out = { ...(cfg.out || {}) }; let ch = false; const zero = [];
-  un.forEach((x) => { const l = slLeft(x.id); if (l == null) return; const v = Math.max(0, l - (+x.q || 0)); left[x.id] = { d: dayKey(), n: v }; ch = true; if (!v) { out[x.id] = dayKey(); zero.push(x.name); } });
-  if (ch) await slStockSave({ left, out });
+  /* counted dishes: the count follows by itself (slStockCount); tell the waiter when that was the last one */
+  const zero = [...new Set(un.filter((x) => x.id && slAvail(x.id) === 0).map((x) => x.name))]; slStockSync();
   SFX.done(); buzz([16, 40, 16]); if (typeof burst === "function") try { burst(); } catch (e) {}
   const heldNow = slTickets(tab.id).some((o) => o.status === "attente");
   toast(zero.length ? `Envoyé · ${zero.join(", ")} : plus rien, épuisé` : heldNow ? "Envoyé en cuisine · la suite attend votre signal" : "Envoyé en cuisine");
@@ -504,10 +583,10 @@ VIEWS.cuisine = {
         <div class="sl-kgrid">${live.map((o, i) => slKCard(o, i)).join("") || `<div class="glass sl-empty sl-kempty st" style="--i:2"><div class="cm-rail-ill" aria-hidden="true"><i></i><i></i><i></i></div><b class="h3">Rien sur le feu</b><p class="sub">Les bons de la salle et du menu QR arrivent ici, le plus ancien en premier, les prioritaires devant.</p></div>`}</div>
         <aside class="sl-kside">
           ${dayRows.length ? `<div class="glass sl-ks day"><header>${ico("slList")}<b>Total par plat</b></header>${dayRows.map(([k, a, b]) => `<div class="sl-kd"><b class="mono">${a || "–"}</b><span>${esc(k)}</span>${b ? `<em class="mono">+${b} à suivre</em>` : ""}</div>`).join("")}</div>` : ""}
-          <div class="glass sl-ks"><header>${ico("cmBell")}<b>Prêts</b><span class="mono">${ready.length}</span></header>${ready.map((o) => `<div class="sl-kr${o.call ? " call" : ""}"><div><b>${o.src === "salle" ? `Table ${esc(o.table)}` : o.mode === "table" ? `n° ${o.n} · Table ${esc(o.table)}` : `n° ${o.n} · ${esc(o.name || "À emporter")}`}</b><em>${esc(o.courseT || "Commande QR")} · ${pas(o)} · <span class="cm-ago" data-at="${o.readyAt || o.at}">${slAgo(o.readyAt || o.at)}</span></em></div>
-            ${o.src === "salle" ? `<button class="iconbtn sm" data-act="slCall" data-id="${esc(o.id)}" aria-label="Rappeler le serveur" title="Rappeler le serveur">${ico("slCall")}</button>` : ""}<button class="btn sm sl-servb" data-act="slServed" data-id="${esc(o.id)}">${ico("check")}${o.src === "salle" ? "Parti" : "Remis"}</button></div>`).join("") || `<p class="sl-ksn">Rien en attente au passe.</p>`}</div>
+          <div class="glass sl-ks"><header>${ico("cmBell")}<b>Prêts</b><span class="mono">${ready.length}</span></header>${ready.map((o) => `<div class="sl-kr${o.call ? " call" : ""}"><div><b>${esc(slWho(o))}</b><em>${o.src === "salle" ? `${esc(o.courseT || "")} · ` : ""}${pas(o)} · <span class="cm-ago" data-at="${o.readyAt || o.at}">${slAgo(o.readyAt || o.at)}</span>${o.call ? ` · serveur rappelé ${slAgo(o.call)}` : ""}</em></div>
+            ${o.src === "salle" ? `<button class="btn ghost sm sl-callb${o.call ? " on" : ""}" data-act="slCall" data-id="${esc(o.id)}" title="Fait sonner le téléphone du serveur et l'écran Prise de commande">${ico("slCall")}${o.call ? "Rappelé" : "Rappeler"}</button>` : ""}<button class="btn sm sl-servb" data-act="slServed" data-id="${esc(o.id)}">${ico("check")}${o.src === "salle" ? "Parti" : "Remis"}</button></div>`).join("") || `<p class="sl-ksn">Rien en attente au passe.</p>`}</div>
           <div class="glass sl-ks hold"><header>${ico("clock")}<b>À suivre</b><span class="mono">${held.length}</span></header>${held.map((o) => `<div class="sl-kh"><b>Table ${esc(o.table)} · ${esc(o.courseT)}${o.rush ? ` <i class="sl-tag rush">${ico("slBolt")}</i>` : ""}</b><em>${(o.items || []).filter((x) => !x.off).map((x) => `${x.q} ${esc(x.name)}`).join(", ")}</em>${(o.items || []).some((x) => (x.allergy || []).length) ? `<i class="sl-ial clash">${ico("slWarn")}Allergie</i>` : ""}</div>`).join("") || `<p class="sl-ksn">Les suites annoncées par la salle s'affichent ici avant d'être lancées.</p>`}</div>
-          ${hist.length ? `<div class="glass sl-ks hist"><header>${ico("slRedo")}<b>Envoyés</b></header>${hist.map((o) => `<div class="sl-kr"><div><b>${o.src === "salle" ? `Table ${esc(o.table)} · ${esc(o.courseT || "")}` : `QR n° ${o.n}`}</b><em>${pas(o)} · parti ${slAgo(o.doneAt || o.readyAt)}</em></div><button class="btn ghost sm" data-act="slRecall" data-id="${esc(o.id)}">Rappeler</button></div>`).join("")}</div>` : ""}
+          ${hist.length ? `<div class="glass sl-ks hist"><header>${ico("slRedo")}<b>Envoyés</b></header>${hist.map((o) => `<div class="sl-kr"><div><b>${esc(slWho(o))}${o.src === "salle" ? ` · ${esc(o.courseT || "")}` : ""}</b><em>${pas(o)} · parti ${slAgo(o.doneAt || o.readyAt)}</em></div><button class="btn ghost sm" data-act="slRecall" data-id="${esc(o.id)}">Rappeler</button></div>`).join("")}</div>` : ""}
         </aside>
       </div>
     </div>`;
@@ -528,7 +607,7 @@ function slKCard(o, i) {
   const t0 = o.firedAt || o.at, m = slMin(t0), salle = o.src === "salle", modNew = o.mod && Date.now() - o.mod < 5 * 6e4;
   const later = salle ? slTickets(o.tabId).filter((x) => x.status === "attente" && x.id !== o.id) : [];
   const head = salle ? `<b class="sl-ktab">Table <span class="mono">${esc(o.table)}</span></b><span class="sl-kcrs">${esc(o.courseT || "")}</span>`
-    : `<b class="sl-ktab">${o.mode === "table" ? `Table <span class="mono">${esc(o.table)}</span>` : `${ico("cmBag")}<span class="mono">${esc(o.slot || "")}</span>`}</b><span class="sl-kcrs qr">QR n° ${o.n}</span>`;
+    : `<b class="sl-ktab">${o.mode === "table" ? `Table <span class="mono">${esc(o.table)}</span>` : `${ico("cmBag")}<span class="mono">${esc(o.slot || "")}</span>`}</b><span class="sl-kcrs qr">${o.mode === "table" ? "Commande QR" : `À emporter n° ${o.n}`}</span>`;
   const meta = [salle && o.waiterName ? firstName(o.waiterName) : "", salle && o.covers ? `${o.covers} couv.` : "", !salle && o.name ? o.name : "", !salle ? (o.paid ? "payée" : "à encaisser") : ""].filter(Boolean);
   const flags = [o.rush ? `<span class="sl-flag rush">${ico("slBolt")}Prioritaire</span>` : "", o.items && o.items.some((x) => x.refire) ? `<span class="sl-flag refire">${ico("slRedo")}À refaire</span>` : "", modNew ? `<span class="sl-flag mod">${ico("slWarn")}Modifié</span>` : "", o.add ? `<span class="sl-add">Ajout</span>` : "", o.status === "prep" ? `<span class="sl-fire">${ico("slFire")}Sur le feu</span>` : ""].join("");
   return `<article class="sl-kcard s-${o.status}${m >= 20 ? " late" : m >= 10 ? " warm" : ""}${CM.fresh.has(o.id) ? " fresh" : ""}${o.station === "bar" ? " bar" : ""}${o.rush ? " rush" : ""}" style="--i:${Math.min(i, 10)}" data-id="${esc(o.id)}">
@@ -540,16 +619,28 @@ function slKCard(o, i) {
     <footer>${o.status === "nouvelle" ? `<button class="btn soft sl-kgo" data-act="slKNext" data-id="${esc(o.id)}" data-v="prep">${ico("slFire")}Lancer</button>` : ""}<button class="btn acc sl-kgo rdy" data-act="slKNext" data-id="${esc(o.id)}" data-v="prete">${ico("cmBell")}Prêt</button><button class="iconbtn sm" data-act="slPrintOne" data-id="${esc(o.id)}" aria-label="Imprimer le bon">${ico("printer")}</button></footer>
   </article>`;
 }
-/* ruptures: « épuisé » and « il en reste » per dish, for today */
+/* ruptures: per dish, for today: Disponible · Limité (N portions) · Épuisé; and when the count goes down */
 function slOutsSheet(first) {
-  const D = slDishes(), q = slNorm(SL.oq || "");
-  const L = D.filter((n) => !q || slNorm(n.title || "").includes(q)).sort((a, b) => (slOut(b.id) ? 2 : slLeft(b.id) != null ? 1 : 0) - (slOut(a.id) ? 2 : slLeft(a.id) != null ? 1 : 0));
+  const D = slDishes(), q = slNorm(SL.oq || ""), w = slWhen();
+  const rank = (n) => (slOut(n.id) ? 2 : slLeftE(n.id) ? 1 : 0);
+  const L = D.filter((n) => !q || slNorm(n.title || "").includes(q)).sort((a, b) => rank(b) - rank(a));
+  const row = (n) => {
+    const man = (slCfg().out || {})[n.id] === dayKey(), e = slLeftE(n.id), st = man ? "out" : e ? "lim" : "dispo", l = e ? slLeft(n.id) : null, pend = e ? slPend(n.id) : 0, av = e ? slAvail(n.id) : null;
+    return `<div class="sl-or3 s-${st}${l === 0 ? " zero" : ""}"><div class="sl-or3h"><b>${esc(n.title || "")}</b>
+      <div class="sl-st3" role="radiogroup" aria-label="${esc(n.title || "")}">${[["dispo", "Disponible"], ["lim", "Limité"], ["out", "Épuisé"]].map(([k, t]) => `<button class="${st === k ? "on" : ""}" role="radio" aria-checked="${st === k}" data-act="slStk" data-id="${esc(n.id)}" data-v="${k}">${t}</button>`).join("")}</div></div>
+      ${st === "lim" ? `<div class="sl-or3c"><div class="cm-step sm"><button data-act="slLeftStep" data-id="${esc(n.id)}" data-v="-1" aria-label="Une portion de moins">${ico("minus")}</button><b class="mono">${l}</b><button data-act="slLeftStep" data-id="${esc(n.id)}" data-v="1" aria-label="Une portion de plus">${ico("plus")}</button></div>
+        <span>${l === 0 ? "Plus aucune portion : épuisé pour les serveurs et le QR" : `portion${l > 1 ? "s" : ""} en cuisine${pend ? ` · <b>${pend}</b> déjà commandée${pend > 1 ? "s" : ""}, pas encore décomptée${pend > 1 ? "s" : ""}` : ""} · <b>${av}</b> encore à vendre`}</span>
+        <div class="sl-or3q">${[5, 10, 15, 20].map((v) => `<button data-act="slLeftSet" data-id="${esc(n.id)}" data-v="${v}">${v}</button>`).join("")}</div></div>` : ""}
+    </div>`;
+  };
   const html = `<div class="sl-sh outs"><div class="sl-shh"><span class="h2">Ruptures du jour</span><button class="iconbtn" data-act="sheetClose" aria-label="Fermer">${ico("x")}</button></div>
-    <p class="sub sl-shs">Un plat épuisé est grisé chez les serveurs et sur le menu QR. « Il en reste » se décompte à chaque envoi. Tout revient demain.</p>
-    <div class="sl-ol">${L.map((n) => { const o = slOut(n.id), l = slLeft(n.id); return `<div class="sl-or2${o ? " out" : ""}"><b>${esc(n.title || "")}</b>
-      <div class="sl-lft">${l == null ? `<button class="btn ghost sm" data-act="slLeftSet" data-id="${esc(n.id)}" data-v="10">Compter</button>` : `<div class="cm-step sm"><button data-act="slLeftStep" data-id="${esc(n.id)}" data-v="-1" aria-label="Moins">${ico("minus")}</button><b class="mono">${l}</b><button data-act="slLeftStep" data-id="${esc(n.id)}" data-v="1" aria-label="Plus">${ico("plus")}</button></div><button class="iconbtn sm" data-act="slLeftSet" data-id="${esc(n.id)}" data-v="" aria-label="Ne plus compter">${ico("x")}</button>`}</div>
-      <button class="sl-86${o ? " on" : ""}" data-act="slOutTog" data-id="${esc(n.id)}" aria-pressed="${o}">${o ? "Épuisé" : "Dispo"}</button></div>`; }).join("") || `<p class="sl-ksn">La carte est vide.</p>`}</div></div>`;
-  const cur = $(".sl-sh.outs"); if (cur && !first) cur.outerHTML = html; else openSheet(html);
+    <div class="sl-oexp"><div><b>Disponible</b><span>On vend sans compter.</span></div><div><b>Limité</b><span>Il reste N portions : les serveurs voient « Plus que N » en haut de leur prise de commande, leur téléphone sonne, et on ne peut plus vendre au-delà.</span></div><div><b>Épuisé</b><span>Grisé chez les serveurs et retiré du menu QR.</span></div><p>Tout redevient disponible demain matin.</p></div>
+    <div class="sl-when"><b>Le compteur baisse…</b><div class="sl-whl">${SL_WHEN.map(([k, t, d]) => `<button class="${w === k ? "on" : ""}" role="radio" aria-checked="${w === k}" data-act="slWhen" data-v="${k}"><b>${t}</b><em>${d}</em></button>`).join("")}</div>
+      <p class="sub">Quel que soit votre choix, ce qui est déjà commandé et pas encore décompté est mis de côté : un serveur ne peut jamais vendre la portion qui n'existe plus.</p></div>
+    ${D.length > 8 ? `<label class="sl-search sm">${ico("search")}<input class="input" id="slOq" type="search" placeholder="Chercher un plat" value="${esc(SL.oq || "")}" autocomplete="off"></label>` : ""}
+    <div class="sl-ol">${L.map(row).join("") || `<p class="sl-ksn">La carte est vide.</p>`}</div></div>`;
+  const cur = $(".sl-sh.outs"); if (cur && !first) { cur.outerHTML = html; } else openSheet(html);
+  const qi = document.getElementById("slOq"); if (qi && !qi._b) { qi._b = 1; qi.addEventListener("input", () => { SL.oq = qi.value; const p = qi.selectionStart; slOutsSheet(); const n = document.getElementById("slOq"); if (n) { n.focus(); try { n.setSelectionRange(p, p); } catch (e) {} } }); }
 }
 
 /* kitchen ticket on the label printer (62 mm roll, AirPrint / print dialog) */
@@ -559,8 +650,8 @@ function slPrint(o) {
   h1{font-size:22pt;margin:0 0 1mm;letter-spacing:-.02em}.c{font-size:13pt;font-weight:800;text-transform:uppercase;margin-bottom:1mm}.m{font-size:9pt;margin-bottom:2mm;border-bottom:1px dashed #000;padding-bottom:2mm}
   .i{display:flex;gap:2mm;font-size:13pt;font-weight:700;margin:1.5mm 0}.i b{min-width:7mm}.n{display:block;font-size:10pt;font-weight:600;font-style:italic}.a{display:block;font-size:10pt;font-weight:900;border:1.5px solid #000;padding:.5mm 1mm;margin-top:.5mm}
   .o{text-decoration:line-through}.r{font-size:12pt;font-weight:900;border:2px solid #000;padding:.5mm 1.5mm;display:inline-block;margin-bottom:1mm}.f{border-top:1px dashed #000;margin-top:2mm;padding-top:1.5mm;font-size:9pt}`;
-  const html = `<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>Bon ${esc(o.table || o.n)}</title><style>${css}</style></head><body>
-    <h1>${salle || o.mode === "table" ? `Table ${esc(o.table)}` : `À emporter ${esc(o.slot || "")}`}</h1><div class="c">${esc(salle ? o.courseT || "" : `QR n° ${o.n}`)}${o.add ? " · ajout" : ""}</div>
+  const html = `<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>Bon ${esc(o.table || o.slot || "")}</title><style>${css}</style></head><body>
+    <h1>${salle || o.mode === "table" ? `Table ${esc(o.table)}` : `À emporter ${esc(o.slot || "")}`}</h1><div class="c">${esc(salle ? o.courseT || "" : o.mode === "table" ? "Commande QR" : `n° ${o.n}`)}${o.add ? " · ajout" : ""}</div>
     ${o.rush ? `<div class="r">PRIORITAIRE</div>` : ""}
     <div class="m">${hm(o.firedAt || o.at)} · ${esc([o.waiterName && firstName(o.waiterName), o.covers ? `${o.covers} couverts` : "", o.name].filter(Boolean).join(" · "))}</div>
     ${(o.items || []).map((x) => `<div class="i${x.off ? " o" : ""}"><b>${x.q}</b><span>${esc(x.name)}${x.seat ? ` (P${x.seat})` : ""}${x.off ? `<span class="n">ANNULÉ</span>` : ""}${x.refire ? `<span class="a">À REFAIRE : ${esc(x.refire)}</span>` : ""}${(x.without || []).map((w) => `<span class="n">SANS ${esc(String(w).toUpperCase())}</span>`).join("")}${(x.extras || []).map((e) => `<span class="n">+ ${esc(e.t)}</span>`).join("")}${x.note ? `<span class="n">${esc(x.note)}</span>` : ""}${(x.allergy || []).length ? `<span class="a">ALLERGIE ${esc(x.allergy.map((a) => slAl(a).t).join(", ").toUpperCase())}</span>` : ""}</span></div>`).join("")}
@@ -603,6 +694,8 @@ function slSeedDemo() {
   tab("dst21", "dt10", "21", "terrasse", 2, 5, mine, [it(drink, 2, 0), it(ent, 1, 1), it(p2, 1, 2)], [[0, "prete", 4, { readyAt: now - 2 * 6e4 }], [1, "nouvelle", 3], [2, "attente", 3]]);
   tab("dst5", "dt4", "5", "salle", 2, 58, sarah, [it(p1, 1, 2), it(p2, 1, 2), it(ds, 2, 3)], [[2, "servie", 50], [3, "servie", 9]]);
   DB.local[tp] = tabs;
+  /* a dish counted by the kitchen (12 croquettes at the start, 2 already sent: « plus que 10 » on every pad) */
+  try { const qp = `restos/${S.rid}/qrMenu`, c = DB.local[qp] && DB.local[qp].cfg; if (c && sh.id && !(c.left || {})[sh.id]) c.left = { ...(c.left || {}), [sh.id]: { d: day, n: 12, at: now - 30 * 6e4, by: "demo-chef" } }; DB.emit(qp); } catch (e) {}
   try { DB.emit(op); } catch (e) {}
 }
 /* demo: the kitchen launches and finishes what the visitor sends (so the « prêt » alert can be felt) */
@@ -630,15 +723,18 @@ async function slAfterEd(tab, msg) { closeSheet(); await slSaveTab(tab); if (msg
 
 Object.assign(ACT, {
   slTable: (a, id) => {
-    const t = slTableBy(id); if (!t) return; const tab = slOpenTabs().find((x) => x.tableId === id);
+    const t = slTableBy(id); if (!t) return; const tab = slTabAt(id);
+    if (SL.join) { const j = slTabOf(SL.join); SL.join = null; if (!j) return; if (tab) { SFX.err(); toast(tab.id === j.id ? "Cette table fait déjà partie de la tablée." : "Cette table est occupée. Pour réunir deux tablées, passez par « Réunir ».", "err"); return; } return ACT.slJoinTo(a, j.id, id); }
     if (SL.move) { const m = SL.move; SL.move = null; if (tab) { SFX.err(); toast("Cette table est déjà occupée. Pour réunir deux tables, passez par « Réunir ».", "err"); return; } return ACT.slMoveTo(a, m, id); }
     if (SL.merge) { const m = SL.merge; SL.merge = null; if (!tab) return ACT.slMoveTo(a, m, id); if (tab.id === m) return; return ACT.slMergeTo(a, m, tab.id); }
     SFX.tap(); buzz(5); if (tab) go("salle", { id: tab.id }); else slOpenSheet(t);
   },
   slOpen: async (a, id, v) => {
-    const t = slTableBy(SL.pickT); if (!t) return; const ex = slOpenTabs().find((x) => x.tableId === t.id); if (ex) { closeSheet(); go("salle", { id: ex.id }); return; }
+    const t = slTableBy(SL.pickT); if (!t) return; const ex = slTabAt(t.id); if (ex) { closeSheet(); go("salle", { id: ex.id }); return; }
     const b = slBookingAt(t.id), tid = slId("st");
-    const doc = { table: String(t.n), tableId: t.id, zone: t.zone || "", covers: +v, status: "open", day: dayKey(), openedAt: Date.now(), by: S.me.id, byName: S.me.name || "", items: [], total: 0, note: b && b.notes ? String(b.notes).slice(0, 140) : "", ...(b ? { booking: b.id } : {}) };
+    /* a booking on joined tables opens on all of them */
+    const bt = b && typeof plTblOf === "function" ? plTblOf(b).filter((id) => slTableBy(id) && !slTabAt(id)) : [], ids = bt.includes(t.id) && bt.length > 1 ? [t.id, ...bt.filter((x) => x !== t.id)] : [t.id];
+    const doc = { table: ids.length > 1 ? slJoinLbl(ids) : String(t.n), tableId: t.id, ...(ids.length > 1 ? { joined: ids.slice(1) } : {}), zone: t.zone || "", covers: +v, status: "open", day: dayKey(), openedAt: Date.now(), by: S.me.id, byName: S.me.name || "", items: [], total: 0, note: b && b.notes ? String(b.notes).slice(0, 140) : "", ...(b ? { booking: b.id } : {}) };
     SFX.ok(); buzz(8); closeSheet(); SL.paneTab = null; SL.q = "";
     try { await safe(DB.set("salleTabs", tid, doc)); if (b && b.status !== "arrive" && typeof rsSave === "function") rsSave(b.id, { status: "arrive" }); } catch (e) { return; }
     go("salle", { id: tid });
@@ -649,11 +745,12 @@ Object.assign(ACT, {
   slAdd: (a, id) => {
     const tab = slCurTab(), n = (S.notes || []).find((x) => x.id === id); if (!tab || !n) return;
     if (slOut(id)) { SFX.err(); toast(`${n.title} : épuisé aujourd'hui`, "err"); return; }
-    const inOrder = (tab.items || []).filter((x) => !x.sent && !x.off && x.id === id).reduce((s, x) => s + (+x.q || 0), 0), left = slLeft(id);
-    if (left != null && inOrder + 1 > left) { SFX.err(); buzz([20, 40, 20]); toast(`Il n'en reste que ${left}`, "err"); return; }
+    const inOrder = (tab.items || []).filter((x) => !x.sent && !x.off && x.id === id).reduce((s, x) => s + (+x.q || 0), 0), av = slAvail(id), le = slLeftE(id);
+    if (av != null && av < 1) { SFX.err(); buzz([20, 40, 20]); toast(`${n.title} : plus rien à vendre (${slPend(id)} déjà commandé${slPend(id) > 1 ? "s" : ""})`, "err"); return; }
     const c = slCourseOf(n.carteCat || "plat"); tab.items = tab.items || [];
-    const ex = tab.items.find((x) => !x.sent && !x.off && x.id === id && +x.course === c && !x.note && !(x.allergy || []).length && !(x.without || []).length && !(x.extras || []).length && !x.seat && !x.free && !x.rush);
-    if (ex) ex.q = (+ex.q || 0) + 1; else tab.items.push({ k: slId("i"), id, name: n.title || "Article", price: num(n.price), q: 1, note: "", allergy: [], course: c, cat: n.carteCat || "plat", sent: null });
+    const ex = tab.items.find((x) => !x.sent && !x.off && x.id === id && +x.course === c && !x.note && !(x.allergy || []).length && !(x.without || []).length && !(x.extras || []).length && !x.seat && !x.free && !x.rush && (!le || (x.at || 0) >= (+le.at || 0)));
+    if (ex) ex.q = (+ex.q || 0) + 1; else tab.items.push({ k: slId("i"), id, name: n.title || "Article", price: num(n.price), q: 1, note: "", allergy: [], course: c, cat: n.carteCat || "plat", sent: null, at: Date.now() });
+    if (av != null && av - 1 <= 3) setTimeout(() => toast(av - 1 ? `${n.title} : plus que ${av - 1} à vendre` : `${n.title} : c'était le dernier`, av - 1 ? "info" : "warn"), 60);
     SFX.tick(); buzz(6);
     let badge = a.querySelector(".sl-dq"); if (!badge) { badge = document.createElement("i"); badge.className = "sl-dq mono"; a.appendChild(badge); } badge.textContent = inOrder + 1; a.classList.add("has"); badge.classList.remove("pop"); void badge.offsetWidth; badge.classList.add("pop");
     if (SL.q) { SL.q = ""; const q = document.getElementById("slQ"); if (q) q.value = ""; slFilter(); }
@@ -668,13 +765,13 @@ Object.assign(ACT, {
     if (name.length < 2) { SFX.err(); toast("Donnez un nom au plat.", "err"); return; }
     let id = "";
     if (f.keep) { const t = Date.now(); try { id = await safe(DB.add("notes", { title: name.slice(0, 60), cat: "Recettes", body: "", ingredients: [], steps: [], portions: 1, allergens: f.al.slice(), alNo: [], carte: true, carteCat: slCatOfCourse(f.c), price, photo: "", uid: S.me.id, at: t, updatedAt: t, src: "salle" })); } catch (e) { id = ""; } }
-    tab.items = tab.items || []; tab.items.push({ k: slId("i"), id: id || "", name: name.slice(0, 60), price, q: 1, note: "", allergy: [], dishAl: f.al.slice(), course: f.c, cat: id ? slCatOfCourse(f.c) : "libre", sent: null });
+    tab.items = tab.items || []; tab.items.push({ k: slId("i"), id: id || "", name: name.slice(0, 60), price, q: 1, note: "", allergy: [], dishAl: f.al.slice(), course: f.c, cat: id ? slCatOfCourse(f.c) : "libre", sent: null, at: Date.now() });
     SL.q = ""; closeSheet(); SFX.ok(); buzz(8); await slSaveTab(tab); toast(f.keep ? `${name} ajouté, et gardé dans la carte` : `${name} ajouté`);
   },
   slItem: (a, id) => { const tab = slCurTab(); const x = tab && (tab.items || []).find((y) => y.k === id); if (!x) return; SFX.tap(); slItemOpen(tab, x); },
   slQ: async (a, id, v) => {
     const tab = slCurTab(); const x = tab && (tab.items || []).find((y) => y.k === id); if (!x || x.sent) return;
-    if (+v > 0) { const l = slLeft(x.id), inOrder = tab.items.filter((y) => !y.sent && !y.off && y.id === x.id && x.id).reduce((s, y) => s + (+y.q || 0), 0); if (l != null && inOrder + 1 > l) { SFX.err(); toast(`Il n'en reste que ${l}`, "err"); return; } }
+    if (+v > 0 && x.id) { const av = slAvail(x.id); if (av != null && av < 1) { SFX.err(); buzz([20, 40, 20]); toast(`${x.name} : plus rien à vendre`, "err"); return; } }
     x.q = (+x.q || 0) + +v; SFX.tick(); buzz(4);
     if (x.q <= 0) { const i = tab.items.indexOf(x), keep = { ...x, q: 1 }; tab.items.splice(i, 1); S.ui.undo = () => { tab.items.splice(i, 0, keep); slSaveTab(tab); }; toastUndo(`${x.name} retiré`); }
     await slSaveTab(tab);
@@ -742,7 +839,7 @@ Object.assign(ACT, {
     const o = (CM.orders || []).find((x) => x.id === id); if (!o) return; SFX.ok(); buzz(8);
     const row = a.closest(".sl-rd,.sl-kr,.sl-cb"); if (row) row.classList.add("go");
     await safe(DB.update("clientOrders", id, { status: "servie", doneAt: Date.now(), by: S.me.id }));
-    S.ui.undo = () => DB.update("clientOrders", id, { status: "prete", doneAt: null }); toastUndo(o.src === "salle" ? `Table ${o.table} · ${o.courseT} servi` : `Commande n° ${o.n} remise`);
+    S.ui.undo = () => DB.update("clientOrders", id, { status: "prete", doneAt: null }); toastUndo(o.src === "salle" ? `Table ${o.table} · ${o.courseT} servi` : `${slWho(o)} remise`);
   },
   slBill: () => { const tab = slCurTab(); if (!tab) return; SFX.sheet ? SFX.sheet() : SFX.tap(); SL.bill = null; slBillSheet(tab); },
   slBillMode: (a, id, v) => { SL.bill.mode = v; SFX.tick(); slBillPaint(); },
@@ -767,25 +864,44 @@ Object.assign(ACT, {
       <div class="sl-acts">
         <button data-act="slMove">${ico("slMove")}<b>Changer de table</b><em>Les clients se déplacent</em></button>
         <button data-act="slMerge">${ico("slMerge")}<b>Réunir</b><em>Avec une autre table</em></button>
+        <button data-act="slJoin">${ico("plus")}<b>Accoler une table</b><em>${(tab.joined || []).length ? `Tables ${esc(tab.table)}` : "Une table libre à côté"}</em></button>
+        ${(tab.joined || []).length ? `<button data-act="slUnjoin">${ico("x")}<b>Séparer</b><em>Garder la table ${esc((slTableBy(tab.tableId) || {}).n || tab.table)}</em></button>` : ""}
         <button data-act="slCovers">${ico("users")}<b>Couverts</b><em>${slCovers(tab)}</em></button>
         <button data-act="slBill">${ico("slBill")}<b>Addition</b><em>Partager, libérer</em></button></div>
       ${slItemsOk(tab).length ? "" : `<button class="btn ghost block" data-act="slDrop">${ico("x")}Annuler l'ouverture</button>`}</div>`);
   },
   slTNoteOk: async () => { const tab = slCurTab(); if (!tab) return; const v = ((document.getElementById("slTNote") || {}).value || "").trim().slice(0, 140); closeSheet(); SFX.ok(); await safe(DB.update("salleTabs", tab.id, { note: v })); },
   slDrop: async () => { const tab = slCurTab(); if (!tab) return; closeSheet(); await safe(DB.update("salleTabs", tab.id, { status: "closed", closedAt: Date.now(), closedBy: S.me.id, total: 0 })); SFX.close(); go("salle", {}, { replace: true }); },
-  slMove: () => { const tab = slCurTab(); if (!tab) return; closeSheet(); SL.move = tab.id; SL.merge = null; go("salle", {}); setTimeout(() => toast("Touchez la nouvelle table", "info"), 300); },
-  slMerge: () => { const tab = slCurTab(); if (!tab) return; closeSheet(); SL.merge = tab.id; SL.move = null; go("salle", {}); setTimeout(() => toast(`Touchez la table qui accueille la table ${tab.table}`, "info"), 300); },
+  slMove: () => { const tab = slCurTab(); if (!tab) return; closeSheet(); SL.move = tab.id; SL.merge = null; SL.join = null; go("salle", {}); setTimeout(() => toast("Touchez la nouvelle table", "info"), 300); },
+  slMerge: () => { const tab = slCurTab(); if (!tab) return; closeSheet(); SL.merge = tab.id; SL.move = null; SL.join = null; go("salle", {}); setTimeout(() => toast(`Touchez la table qui accueille la table ${tab.table}`, "info"), 300); },
+  slJoin: () => { const tab = slCurTab(); if (!tab) return; closeSheet(); SL.join = tab.id; SL.move = null; SL.merge = null; go("salle", {}); setTimeout(() => toast(`Touchez la table libre à accoler à la table ${tab.table}`, "info"), 300); },
+  slJoinTo: async (a, tabId, tid) => {
+    const tab = slTabOf(tabId), t = slTableBy(tid); if (!tab || !t) return; SFX.ok(); buzz(8);
+    const ids = [...slTabTables(tab), tid], lbl = slJoinLbl(ids);
+    await safe(DB.update("salleTabs", tabId, { joined: ids.slice(1), table: lbl }));
+    for (const o of slTickets(tabId)) if (slLive(o)) await safe(DB.update("clientOrders", o.id, { table: lbl }));
+    toast(`Tables ${lbl} assemblées`); go("salle", { id: tabId }, { replace: true });
+  },
+  slUnjoin: async () => {
+    const tab = slCurTab(); if (!tab) return; closeSheet(); SFX.tap(); const lbl = String((slTableBy(tab.tableId) || {}).n || tab.table).split("+")[0];
+    await safe(DB.update("salleTabs", tab.id, { joined: [], table: lbl }));
+    for (const o of slTickets(tab.id)) if (slLive(o)) await safe(DB.update("clientOrders", o.id, { table: lbl }));
+    toast(`Table ${lbl} seule, les autres sont libres`);
+  },
   slMoveTo: async (a, tabId, tid) => {
     const tab = slTabOf(tabId), t = slTableBy(tid); if (!tab || !t) return; SFX.ok(); buzz(8);
-    await safe(DB.update("salleTabs", tabId, { table: String(t.n), tableId: t.id, zone: t.zone || "" }));
+    await safe(DB.update("salleTabs", tabId, { table: String(t.n), tableId: t.id, zone: t.zone || "", joined: [] }));
     for (const o of slTickets(tabId)) if (slLive(o)) await safe(DB.update("clientOrders", o.id, { table: String(t.n), tableId: t.id, mod: Date.now() }));
     toast(`Table ${tab.table} → table ${t.n}`); go("salle", { id: tabId }, { replace: true });
   },
   slMergeTo: async (a, fromId, toId) => {
     const from = slTabOf(fromId), to = slTabOf(toId); if (!from || !to) return; SFX.ok(); buzz(8);
     to.items = [...(to.items || []), ...(from.items || []).map((x) => ({ ...x, movedFrom: from.table }))];
-    await safe(DB.update("salleTabs", toId, { items: to.items, total: slTotal(to.items), covers: (+to.covers || 0) + (+from.covers || 0), updatedAt: Date.now() }));
-    for (const o of slTickets(fromId)) if (slLive(o)) await safe(DB.update("clientOrders", o.id, { tabId: toId, table: String(to.table), tableId: to.tableId || "", mod: Date.now() }));
+    /* the two tables stay together on the floor: the guests were moved next to each other */
+    const ids = [...new Set([...slTabTables(to), ...slTabTables(from)])], lbl = slJoinLbl(ids) || String(to.table);
+    await safe(DB.update("salleTabs", toId, { items: to.items, total: slTotal(to.items), covers: (+to.covers || 0) + (+from.covers || 0), joined: ids.slice(1), table: lbl, updatedAt: Date.now() }));
+    for (const o of slTickets(toId)) if (slLive(o)) await safe(DB.update("clientOrders", o.id, { table: lbl }));
+    for (const o of slTickets(fromId)) if (slLive(o)) await safe(DB.update("clientOrders", o.id, { tabId: toId, table: lbl, tableId: to.tableId || "", mod: Date.now() }));
     await safe(DB.update("salleTabs", fromId, { status: "closed", closedAt: Date.now(), closedBy: S.me.id, mergedInto: toId, total: 0 }));
     toast(`Tables ${from.table} et ${to.table} réunies`); go("salle", { id: toId }, { replace: true });
   },
@@ -804,28 +920,43 @@ Object.assign(ACT, {
     const card = a.closest(".sl-kcard"); if (v === "prete" && card) card.classList.add("go");
     v === "prete" ? (SFX.done(), buzz([14, 40, 14])) : (SFX.ok(), buzz(8));
     setTimeout(async () => {
-      try { await safe(DB.update("clientOrders", id, patch)); if (v === "prete") { S.ui.undo = () => DB.update("clientOrders", id, { status: o.status, readyAt: null }); toastUndo(o.src === "salle" ? `Table ${o.table} · ${o.courseT} : le serveur est prévenu` : `Commande n° ${o.n} prête`); } } catch (e) {}
+      try { await safe(DB.update("clientOrders", id, patch)); if (v === "prete") { S.ui.undo = () => DB.update("clientOrders", id, { status: o.status, readyAt: null }); toastUndo(o.src === "salle" ? `Table ${o.table} · ${o.courseT} : ${o.waiterName ? firstName(o.waiterName) + " est prévenu sur son téléphone" : "le serveur est prévenu"}` : `${slWho(o)} prête`); } } catch (e) {}
       delete SL.busy[id]; onData();
     }, v === "prete" && card ? 280 : 0);
   },
-  slCall: async (a, id) => { SFX.tap(); buzz(8); await safe(DB.update("clientOrders", id, { call: Date.now() })); toast("Le serveur est rappelé"); },
+  slCall: async (a, id) => {
+    const o = (CM.orders || []).find((x) => x.id === id); SFX.tap(); buzz(8); await safe(DB.update("clientOrders", id, { call: Date.now() }));
+    toast(`Rappel envoyé${o && o.waiterName ? ` à ${firstName(o.waiterName)}` : " au serveur"} : son téléphone sonne`);
+  },
   slRecall: async (a, id) => { SFX.tap(); buzz(8); await safe(DB.update("clientOrders", id, { status: "prep", readyAt: null, doneAt: null })); toast("Bon remis sur le feu"); },
   slOuts: () => { SFX.tap(); SL.oq = ""; slOutsSheet(true); },
-  slOutTog: async (a, id) => {
+  /* one dish, three states: Disponible (no count) · Limité (N portions) · Épuisé */
+  slStk: async (a, id, v) => {
     const c = slCfg(), out = { ...(c.out || {}) }, left = { ...(c.left || {}) }, today = dayKey();
-    if (out[id] === today) { delete out[id]; if (left[id] && left[id].d === today && !+left[id].n) delete left[id]; SFX.ok(); } else { out[id] = today; SFX.tap(); }
-    Object.keys(out).forEach((k) => { if (out[k] !== today) delete out[k]; }); buzz(5);
+    delete out[id]; if (v !== "lim") delete left[id];
+    if (v === "out") out[id] = today;
+    if (v === "lim" && !slLeftE(id)) left[id] = { d: today, n: 10, at: Date.now(), by: S.me.id };
+    Object.keys(out).forEach((k) => { if (out[k] !== today) delete out[k]; }); Object.keys(left).forEach((k) => { if (!left[k] || left[k].d !== today) delete left[k]; });
+    v === "out" ? SFX.tap() : SFX.ok(); buzz(5);
     await slStockSave({ out, left }); slOutsSheet();
   },
   slLeftSet: async (a, id, v) => {
     const c = slCfg(), left = { ...(c.left || {}) }, out = { ...(c.out || {}) }, today = dayKey();
-    if (v === "") delete left[id]; else { left[id] = { d: today, n: +v }; if (+v > 0 && out[id] === today) delete out[id]; }
+    if (v === "") delete left[id]; else { left[id] = { d: today, n: +v, at: Date.now(), by: S.me.id }; if (+v > 0 && out[id] === today) delete out[id]; }
     Object.keys(left).forEach((k) => { if (!left[k] || left[k].d !== today) delete left[k]; }); SFX.tick();
     await slStockSave({ left, out }); slOutsSheet();
   },
+  /* +/- : a new count from what is left now (n = left, at = now), so nothing sold before is counted twice */
   slLeftStep: async (a, id, v) => {
     const c = slCfg(), left = { ...(c.left || {}) }, out = { ...(c.out || {}) }, today = dayKey(), n = Math.max(0, (slLeft(id) || 0) + +v);
-    left[id] = { d: today, n }; if (!n) out[id] = today; else if (out[id] === today) delete out[id]; SFX.tick(); buzz(3);
+    left[id] = { d: today, n, at: Date.now(), by: S.me.id }; if (!n) out[id] = today; else if (out[id] === today) delete out[id]; SFX.tick(); buzz(3);
     await slStockSave({ left, out }); slOutsSheet();
+  },
+  slWhen: async (a, id, v) => {
+    if (slWhen() === v) return; SFX.tick(); buzz(4);
+    /* changing the moment restarts every count from what is left now, so the switch doesn't move any number */
+    const c = slCfg(), left = { ...(c.left || {}) }, now = Date.now(), cur = {}; Object.keys(left).forEach((k) => { const l = slLeft(k); if (l != null) cur[k] = l; });
+    Object.keys(cur).forEach((k) => { left[k] = { ...left[k], n: cur[k], at: now }; });
+    await slStockSave({ stockWhen: v, left }); slOutsSheet(); toast(`Le compteur baisse désormais ${({ commande: "dès que c'est commandé", envoi: "à l'envoi en cuisine", pret: "quand la cuisine dit « Prêt »", paye: "à l'encaissement" })[v]}`);
   },
 });
