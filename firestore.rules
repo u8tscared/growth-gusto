@@ -28,7 +28,7 @@ service cloud.firestore {
     function resaPubPath(rid) { return /databases/$(database)/documents/restos/$(rid)/public/resa; }
     function resaBookingPath(rid, bid) { return /databases/$(database)/documents/restos/$(rid)/bookings/$(bid); }
     function resaFieldsOk(b) {
-      return b.keys().hasOnly(['date', 'time', 'covers', 'name', 'phone', 'email', 'notes', 'status', 'source', 'createdAt', 'at'])
+      return b.keys().hasOnly(['date', 'time', 'covers', 'name', 'phone', 'email', 'notes', 'optin', 'status', 'source', 'createdAt', 'at'])
         && b.keys().hasAll(['date', 'time', 'covers', 'name', 'phone', 'status', 'source', 'createdAt', 'at'])
         && b.status in ['en ligne', 'avalider', 'attente'] && b.source == 'web'
         && b.date is string && b.date.matches('^20[0-9]{2}-[01][0-9]-[0-3][0-9]$')
@@ -38,6 +38,8 @@ service cloud.firestore {
         && b.phone is string && b.phone.size() >= 6 && b.phone.size() <= 25
         && (!('email' in b) || (b.email is string && b.email.size() <= 100))
         && (!('notes' in b) || (b.notes is string && b.notes.size() <= 300))
+        // « Recevoir les nouvelles du restaurant » (js/clients.js): an unticked box by default, only « true » is ever sent
+        && (!('optin' in b) || b.optin == true)
         && b.createdAt is int && b.createdAt > request.time.toMillis() - 600000 && b.createdAt < request.time.toMillis() + 600000
         && b.at is int && b.at < request.time.toMillis() + 400 * 86400000;
     }
