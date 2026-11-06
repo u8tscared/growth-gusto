@@ -12,6 +12,9 @@
  *     op "connect"  gérant → { url } Stripe onboarding link for the restaurant's own Stripe account (created once, type Standard)
  *     op "check"    gérant → refreshes restos/{rid}/qrPay/link from Stripe → { link }
  *     op "cancel"   member { oid } → cancels an order; a paid one is refunded on the restaurant's Stripe account
+ *     op "site"     member { url } → reads the restaurant's own website to import its menu (js/cmimport.js parses it on the device):
+ *                   { kind:"ld", items } (schema.org Menu), { kind:"text", text, imgs }, { kind:"pdf", b64 } (a PDF menu linked from the site)
+ *                   or { kind:"img", b64 } (a menu posted as a picture, read by OCR on the device). Public http(s) only, 25 reads a day.
  *
  * Stripe: one shared module, functions/src/stripe.js (Growth Gusto's Stripe account, key stored encrypted by the admin). Restaurants are
  *   connected accounts; Growth Gusto takes no commission (COMMANDE_FEE_BPS in functions/.env, default 0). Webhook events from connected
@@ -26,6 +29,7 @@
  *   orderSeq/{rid}                  { day, n, min, cnt }           order numbers of the day + a per-minute flood cap
  *   qrAccts/{acct}                  { rid, at }                    connected accounts we created (filters the shared webhook)
  *   payPending/{rid_id}             { rid, oid, acct, sid, at }    online payments not confirmed yet: the 15-min tick asks Stripe
+ *   siteSeq/{rid}                   { day, n }                     website reads for the menu import (25 a day)
  * Cost: Stripe's fee per payment, paid by the restaurant on its own account. A few function calls per order. */
 "use strict";
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
@@ -212,6 +216,110 @@ async function connect(req, rid) {
   return { url: al.url };
 }
 
+/* ───────── restaurant: read its own website to import the menu (free: plain fetch, parsing happens on the device) ───────── */
+const dns = require("dns").promises;
+const net = require("net");
+const SITE_MAX = 6 * 1024 * 1024;
+function privIp(ip) {
+  if (net.isIPv4(ip)) { const [a, b] = ip.split(".").map(Number); return a === 10 || a === 127 || a === 0 || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || (a === 100 && b >= 64 && b <= 127) || a >= 224; }
+  const x = ip.toLowerCase(); return x === "::1" || x === "::" || x.startsWith("fc") || x.startsWith("fd") || x.startsWith("fe80") || x.startsWith("::ffff:") && privIp(x.slice(7));
+}
+async function safeUrl(u) {
+  let url; try { url = new URL(u); } catch (e) { throw err("invalid-argument", "url"); }
+  if (!/^https?:$/.test(url.protocol) || url.username || url.password || (url.port && !["80", "443"].includes(url.port))) throw err("invalid-argument", "url");
+  if (/^(localhost|.*\.local|.*\.internal|metadata\.google\.internal)$/i.test(url.hostname)) throw err("invalid-argument", "url");
+  const ips = await dns.lookup(url.hostname, { all: true }).catch(() => []); if (!ips.length) throw err("not-found", "site");
+  if (ips.some((x) => privIp(x.address))) throw err("invalid-argument", "url");
+  return url;
+}
+/* GET with manual redirects (each hop re-checked), a 12 s budget and a size cap */
+async function grab(u, accept) {
+  let url = await safeUrl(u);
+  for (let hop = 0; hop < 5; hop++) {
+    const ac = new AbortController(); const t = setTimeout(() => ac.abort(), 12000);
+    let r; try { r = await fetch(url.href, { redirect: "manual", signal: ac.signal, headers: { "user-agent": "Mozilla/5.0 (compatible; GrowthGustoMenu/1.0; +https://growthgusto.fr)", accept: accept || "text/html,application/pdf,*/*;q=0.8", "accept-language": "fr-FR,fr;q=0.9" } }); }
+    catch (e) { clearTimeout(t); throw err("unavailable", "site"); }
+    if (r.status >= 300 && r.status < 400 && r.headers.get("location")) { clearTimeout(t); url = await safeUrl(new URL(r.headers.get("location"), url).href); continue; }
+    if (!r.ok) { clearTimeout(t); throw err("not-found", "site"); }
+    const len = +r.headers.get("content-length") || 0; if (len > SITE_MAX) { clearTimeout(t); ac.abort(); throw err("out-of-range", "lourd"); }
+    const chunks = []; let n = 0; const rd = r.body.getReader();
+    try { for (;;) { const { done, value } = await rd.read(); if (done) break; n += value.length; if (n > SITE_MAX) { ac.abort(); throw err("out-of-range", "lourd"); } chunks.push(value); } } finally { clearTimeout(t); }
+    return { url: url.href, type: String(r.headers.get("content-type") || "").toLowerCase(), buf: Buffer.concat(chunks.map((c) => Buffer.from(c))) };
+  }
+  throw err("not-found", "site");
+}
+const ENT = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " ", eacute: "é", egrave: "è", ecirc: "ê", agrave: "à", acirc: "â", ccedil: "ç", ocirc: "ô", ucirc: "û", ugrave: "ù", icirc: "î", iuml: "ï", euml: "ë", oelig: "œ", euro: "€", rsquo: "’", lsquo: "‘", hellip: "…", ndash: "–", mdash: "—", laquo: "«", raquo: "»", deg: "°", Eacute: "É", Egrave: "È", Agrave: "À", Ccedil: "Ç" };
+const unent = (s) => s.replace(/&(#x?[0-9a-f]+|\w+);/gi, (m, e) => e[0] === "#" ? String.fromCodePoint(e[1] === "x" || e[1] === "X" ? parseInt(e.slice(2), 16) : +e.slice(1)) : ENT[e] != null ? ENT[e] : m);
+function htmlText(h) {
+  let s = h.replace(/<!--[\s\S]*?-->/g, " ").replace(/<(script|style|noscript|svg|head|iframe|template|form|nav|footer)\b[\s\S]*?<\/\1\s*>/gi, " ");
+  s = s.replace(/<\/(td|th)\s*>/gi, "   ").replace(/<(br|hr)\b[^>]*>/gi, "\n").replace(/<\/(p|div|li|tr|h[1-6]|section|article|header|dt|dd|table|ul|ol|figcaption|blockquote)\s*>/gi, "\n").replace(/<(p|div|li|tr|h[1-6]|section|article|dt|dd)\b[^>]*>/gi, "\n");
+  s = unent(s.replace(/<[^>]+>/g, " ")).replace(/[ \t\u00a0]{4,}/g, "   ").replace(/[ \t\u00a0]{1,3}(?=\S)/g, (m) => (m.length >= 3 ? "   " : " "));
+  return s.split(/\n/).map((l) => l.trim()).filter((l, i, a) => l || (a[i - 1] || "").trim()).join("\n").replace(/\n{3,}/g, "\n\n").slice(0, 120000);
+}
+/* schema.org Menu in JSON-LD (Wix, Squarespace, TheFork pages, many themes) */
+function ldItems(h) {
+  const out = []; const blocks = h.match(/<script[^>]+application\/ld\+json[^>]*>[\s\S]*?<\/script>/gi) || [];
+  const walk = (o, sec) => {
+    if (!o || typeof o !== "object" || out.length > 400) return; if (Array.isArray(o)) return o.forEach((x) => walk(x, sec));
+    const ty = [].concat(o["@type"] || []).join(" ");
+    if (/MenuItem/.test(ty)) { const of = [].concat(o.offers || [])[0] || {}; const p = parseFloat(String(of.price || o.price || "").replace(",", ".")); out.push({ s: sec || "", t: clean(o.name, 80), d: clean(o.description, 220), p: p > 0 && p < 1000 ? p : 0, img: typeof o.image === "string" && /^https:\/\//.test(o.image) ? o.image : "" }); return; }
+    const nsec = /MenuSection/.test(ty) ? clean(o.name, 40) : sec;
+    for (const k of Object.keys(o)) if (k !== "@context") walk(o[k], nsec);
+  };
+  blocks.forEach((b) => { try { walk(JSON.parse(unent(b.replace(/^<script[^>]*>|<\/script>$/gi, "").trim())), ""); } catch (e) {} });
+  return out.filter((x) => x.t);
+}
+const priceLines = (t) => (t.match(/(?<![\d.,])\d{1,3}(?:[.,]\d{1,2})?\s*(?:€|eur)?\s*$/gim) || []).length;
+function links(h, base) {
+  const L = []; const re = /<a\b[^>]*href\s*=\s*["']([^"'#]+)["'][^>]*>([\s\S]*?)<\/a>/gi; let m;
+  while ((m = re.exec(h)) && L.length < 400) { let u; try { u = new URL(unent(m[1]), base); } catch (e) { continue; } if (!/^https?:$/.test(u.protocol)) continue; const tx = unent(m[2].replace(/<[^>]+>/g, " ")).replace(/\s+/g, " ").trim().toLowerCase(); L.push({ u: u.href, tx, pdf: /\.pdf($|\?)/i.test(u.pathname) }); }
+  const host = new URL(base).hostname.replace(/^www\./, "");
+  const score = (l) => { const s = (l.u.toLowerCase() + " " + l.tx); let v = 0; if (/carte|menu|ardoise|plats|nos-plats|la-carte|food|boissons|vins/.test(s)) v += 3; if (l.pdf) v += 2; if (new URL(l.u).hostname.replace(/^www\./, "") === host) v += 1; else if (!l.pdf) v -= 3; if (/facebook|instagram|tripadvisor|google|thefork|lafourchette|ubereats|deliveroo|mailto|tel:|reserv|booking|privacy|mentions|cgv|cookies|login|panier|\/cart\b|checkout/.test(s)) v -= 5; return v; };
+  const seen = new Set(); return L.filter((l) => { if (seen.has(l.u) || l.u === base) return false; seen.add(l.u); return true; }).map((l) => ({ ...l, v: score(l) })).filter((l) => l.v >= 3).sort((a, b) => b.v - a.v).slice(0, 4);
+}
+function imgs(h, base) {
+  const out = []; const re = /<img\b[^>]*>/gi; let m;
+  while ((m = re.exec(h)) && out.length < 80) {
+    const tag = m[0]; const src = (/\s(?:data-src|data-lazy-src|src)\s*=\s*["']([^"']+)["']/i.exec(tag) || [])[1]; if (!src || /^data:/.test(src)) continue;
+    let u; try { u = new URL(unent(src), base); } catch (e) { continue; } if (u.protocol !== "https:" || /\.svg($|\?)/i.test(u.pathname) || /logo|icon|sprite|pixel|avatar|badge/i.test(u.pathname)) continue;
+    out.push({ u: u.href.slice(0, 1500), alt: clean(unent((/\salt\s*=\s*["']([^"']*)["']/i.exec(tag) || [])[1] || ""), 120) });
+  }
+  return out;
+}
+async function readSite(req, d) {
+  const rid = String(d.rid || ""); await member(req, rid, false);
+  const day = parisNow().day; const qref = db.doc(`siteSeq/${rid}`);
+  await db.runTransaction(async (tx) => { const s = await tx.get(qref); const v = s.exists ? s.data() : {}; const n = v.day === day ? v.n || 0 : 0; if (n >= 25) throw err("resource-exhausted", "trop"); tx.set(qref, { day, n: n + 1 }); });
+  let u = clean(d.url, 500); if (!/^https?:\/\//i.test(u)) u = "https://" + u;
+  const page = await grab(u);
+  const asPdf = (g) => ({ kind: "pdf", b64: g.buf.toString("base64"), src: g.url });
+  const asImg = (g) => ({ kind: "img", b64: g.buf.toString("base64"), mime: g.type.split(";")[0], src: g.url });
+  if (/pdf/.test(page.type) || page.buf.slice(0, 5).toString() === "%PDF-") return asPdf(page);
+  if (/^image\/(jpeg|png|webp)/.test(page.type)) return asImg(page);
+  const h = page.buf.toString("utf8"); const title = clean(unent((/<title[^>]*>([^<]*)/i.exec(h) || [])[1] || ""), 80);
+  const og = (/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i.exec(h) || /<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i.exec(h) || [])[1] || "";
+  const cover = /^https:\/\//.test(og) ? og.slice(0, 1500) : "";
+  let best = { kind: "text", text: htmlText(h), imgs: imgs(h, page.url), src: page.url };
+  const ld = ldItems(h); if (ld.filter((x) => x.p > 0).length >= 3) return { kind: "ld", items: ld.slice(0, 300), src: page.url, title, cover };
+  let score = priceLines(best.text);
+  if (score < 8) {
+    for (const l of links(h, page.url)) {
+      let g; try { g = await grab(l.u); } catch (e) { continue; }
+      if (/pdf/.test(g.type) || g.buf.slice(0, 5).toString() === "%PDF-") return { ...asPdf(g), title, cover };
+      if (/^image\//.test(g.type)) continue;
+      const hh = g.buf.toString("utf8"); const ld2 = ldItems(hh); if (ld2.filter((x) => x.p > 0).length >= 3) return { kind: "ld", items: ld2.slice(0, 300), src: g.url, title, cover };
+      const tx = htmlText(hh); const sc = priceLines(tx); if (sc > score) { score = sc; best = { kind: "text", text: tx, imgs: imgs(hh, g.url), src: g.url }; }
+      if (score >= 8) break;
+    }
+  }
+  /* no prices in the text: the menu is often a picture on the page */
+  if (score < 4) {
+    const pic = (best.imgs || []).find((i) => /carte|menu|ardoise/i.test(i.u + " " + i.alt));
+    if (pic) { try { const g = await grab(pic.u, "image/*"); if (/^image\/(jpeg|png|webp)/.test(g.type)) return { ...asImg(g), title, cover }; } catch (e) {} }
+  }
+  return { ...best, title, cover };
+}
+
 /* ───────── callable ───────── */
 const orderApi = onCall({ region: REGION, cors: true, secrets: S.STRIPE_SECRETS, timeoutSeconds: 60, maxInstances: 10, memory: "256MiB" }, async (req) => {
   const d = req.data || {}; const op = String(d.op || "");
@@ -232,6 +340,7 @@ const orderApi = onCall({ region: REGION, cors: true, secrets: S.STRIPE_SECRETS,
       return { order: pubView(oid, o) };
     }
     if (op === "connect") return await connect(req, String(d.rid || ""));
+    if (op === "site") return await readSite(req, d);
     if (op === "check") {
       const rid = String(d.rid || ""); await member(req, rid, false); const l = await linkOf(rid); if (!l || !l.acct) return { link: null };
       return { link: await saveLink(rid, await S._stripeCall("/accounts/" + encodeURIComponent(l.acct))) };
@@ -267,4 +376,4 @@ async function commandeTick() {
   if (old && !old.empty) { const b = db.batch(); old.docs.forEach((x) => b.delete(x.ref)); await b.commit().catch(() => {}); }
 }
 
-module.exports = { orderApi, commandeTick, _pubView: pubView, _onOrderEvent: onOrderEvent };
+module.exports = { orderApi, commandeTick, _pubView: pubView, _onOrderEvent: onOrderEvent, _site: { htmlText, ldItems, links, imgs, priceLines, privIp } };

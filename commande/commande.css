@@ -342,3 +342,98 @@ button.qm-mc:active{transform:translateY(3px)}
 @keyframes qmPulse{0%,100%{transform:scale(.7)}50%{transform:scale(1.1)}}
 @keyframes qmGlow{from{transform:translate(0,0) scale(1)}to{transform:translate(-40px,30px) scale(1.2)}}
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-delay:0s!important;transition-duration:.01ms!important}}
+
+/* ───────── the restaurant's look (set in the app: Commandes › La carte › Apparence) ───────── */
+.qm-it-h{display:flex;align-items:baseline;gap:8px;min-width:0}
+.qm-it-h b{min-width:0}
+.qm-lead,.qm-pr2{display:none}
+/* colours: accent, its ink, the violet wall of the hero */
+[data-acc="tomate"]{--accent:#E5482A;--accent-ink:#B3321A;--accent-edge:#8E2412;--wall:#D63F22;--tint:#FFE9DE}
+[data-acc="safran"]{--accent:#C47A00;--accent-ink:#8A5600;--accent-edge:#8F5A00;--wall:#B36F00;--tint:#FFF3D6}
+[data-acc="sauge"]{--accent:#2F8F5B;--accent-ink:#1E6B42;--accent-edge:#1B5A37;--wall:#2A7F51;--tint:#E2F5EC}
+[data-acc="ocean"]{--accent:#1F6FD1;--accent-ink:#1556A6;--accent-edge:#10428A;--wall:#1B62BC;--tint:#E3EEFC}
+[data-acc="encre"]{--accent:#1B1530;--accent-ink:#1B1530;--accent-edge:#000;--wall:#1B1530;--tint:#ECE9F3}
+html:not([data-acc="violet"]) .qm-ph{box-shadow:0 4px 0 var(--accent-edge)}
+html:not([data-acc="violet"]) .qm-k,html:not([data-acc="violet"]) .qm-hn p{color:rgba(255,255,255,.82)}
+/* cover photo behind the hero */
+.qm-hero.cover{background-image:linear-gradient(180deg,rgba(18,12,34,.25),rgba(18,12,34,.72)),var(--cover);background-size:cover;background-position:center;padding-top:calc(env(safe-area-inset-top,0px) + 92px)}
+.qm-hero.cover::after{display:none}
+/* no photos: a compact list, the + button sits on the right */
+.noph .qm-it-ph{width:44px;height:auto;background:none;align-self:center}
+.noph .qm-it-ph img,.noph .qm-it-ph>span{display:none}
+.noph .qm-add,.noph .qm-step{position:relative;right:auto;bottom:auto;box-shadow:0 3px 0 var(--accent-edge)}
+.noph .qm-step{box-shadow:0 3px 0 #000;position:absolute;right:0;top:50%;transform:translateY(-50%)}
+.noph .qm-it{padding:13px 14px}
+.noph .qm-dt-ph{display:none}
+.noph .qm-sh.detail .qm-sh-sc{padding-top:46px}
+
+/* Bistrot: an ardoise — slate hero, chalk title, menu lines with dotted leaders */
+[data-look="bistrot"] body{background:#F6F0E4}
+[data-look="bistrot"] .qm-hero{background-color:#26302B;background-image:radial-gradient(ellipse at 30% 0%,rgba(255,255,255,.08),transparent 60%),radial-gradient(ellipse at 80% 100%,rgba(255,255,255,.05),transparent 55%)}
+[data-look="bistrot"] .qm-hero.cover{background-image:linear-gradient(180deg,rgba(20,26,23,.35),rgba(20,26,23,.82)),var(--cover)}
+[data-look="bistrot"] .qm-hero::after{background:radial-gradient(circle,rgba(255,255,255,.08),transparent 65%)}
+[data-look="bistrot"] .qm-hn h1{font-family:"Fraunces",Georgia,serif;font-variation-settings:"opsz" 96;font-weight:650;font-style:italic;letter-spacing:-.02em;font-size:31px}
+[data-look="bistrot"] .qm-k{color:#E9E2CF;letter-spacing:.14em;text-transform:uppercase;font-size:11.5px}
+[data-look="bistrot"] .qm-ph{box-shadow:0 0 0 3px rgba(255,255,255,.18)}
+[data-look="bistrot"] .qm-cats{background:rgba(246,240,228,.9)}
+[data-look="bistrot"] .qm-cat-ind{background:var(--accent);box-shadow:0 3px 0 var(--accent-edge)}
+[data-look="bistrot"] .qm-list{gap:26px}
+[data-look="bistrot"] .qm-sec{gap:0}
+[data-look="bistrot"] .qm-sec h2{font-family:"Fraunces",Georgia,serif;font-style:italic;font-weight:650;font-size:26px;margin-bottom:6px;padding-bottom:8px;border-bottom:2px solid var(--ink)}
+[data-look="bistrot"] .qm-it{background:none;border:0;border-bottom:1.5px dotted #CDBFAA;border-radius:0;box-shadow:none;padding:14px 2px;gap:12px}
+[data-look="bistrot"] .qm-it.has{box-shadow:none;background:linear-gradient(90deg,var(--tint),transparent 80%)}
+[data-look="bistrot"] .qm-it.has::before{left:-8px;top:12px;bottom:12px}
+[data-look="bistrot"] .qm-it.hit{background:repeating-linear-gradient(135deg,#FFF3D6 0 8px,#FFFAEE 8px 16px)}
+[data-look="bistrot"] .qm-it-tx b{font-family:"Fraunces",Georgia,serif;font-size:18px;font-weight:600;letter-spacing:-.01em}
+[data-look="bistrot"] .qm-lead{display:block;flex:1;min-width:14px;border-bottom:2px dotted #B8AE9C;transform:translateY(-4px)}
+[data-look="bistrot"] .qm-pr2{display:block;flex:none;font-family:var(--m);font-weight:700;font-size:15.5px}
+[data-look="bistrot"] .qm-it-meta .qm-pr{display:none}
+[data-look="bistrot"] .qm-it-meta:not(:has(.qm-tag)){display:none}
+[data-look="bistrot"] .qm-it-ph{width:70px;height:70px;border-radius:50%}
+[data-look="bistrot"] .qm-it-ph img{border-radius:50%}
+[data-look="bistrot"].noph .qm-it-ph{width:44px;height:auto}
+
+/* Élégant: dark hero, centred sections, fine serif, prices in the accent */
+[data-look="elegant"] body{background:#FFFDF8}
+[data-look="elegant"] .qm-hero{background:#1B1530;border-radius:0;text-align:center;padding-bottom:30px}
+[data-look="elegant"] .qm-hero.cover{background-image:linear-gradient(180deg,rgba(27,21,48,.4),rgba(27,21,48,.86)),var(--cover);background-size:cover;background-position:center}
+[data-look="elegant"] .qm-hero::after{display:none}
+[data-look="elegant"] .qm-hero-in{flex-direction:column;gap:12px}
+[data-look="elegant"] .qm-hn{align-items:center}
+[data-look="elegant"] .qm-hn p{justify-content:center}
+[data-look="elegant"] .qm-hn h1{font-family:"Fraunces",Georgia,serif;font-variation-settings:"opsz" 144;font-weight:400;font-size:36px;letter-spacing:-.01em}
+[data-look="elegant"] .qm-k{letter-spacing:.3em;text-transform:uppercase;font-size:11px;color:#CFC9DE}
+[data-look="elegant"] .qm-ph{border-radius:50%;box-shadow:0 0 0 1px rgba(255,255,255,.3)}
+[data-look="elegant"] .qm-ph.logo img{padding:10px}
+[data-look="elegant"] .qm-hero-bar{justify-content:center}
+[data-look="elegant"] .qm-cats{background:rgba(255,253,248,.92)}
+[data-look="elegant"] .qm-cat{font-size:12px;letter-spacing:.14em;text-transform:uppercase;font-weight:650}
+[data-look="elegant"] .qm-cat-ind{background:none;box-shadow:inset 0 -2px 0 var(--accent);border-radius:0}
+[data-look="elegant"] .qm-cat.on{color:var(--accent-ink)}
+[data-look="elegant"] .qm-list{gap:34px;padding-top:10px}
+[data-look="elegant"] .qm-sec{gap:0}
+[data-look="elegant"] .qm-sec h2{justify-content:center;font-family:var(--f);font-size:13px;font-weight:650;letter-spacing:.3em;text-transform:uppercase;color:var(--accent-ink);margin:6px 0 10px}
+[data-look="elegant"] .qm-sec h2 span{display:none}
+[data-look="elegant"] .qm-sec h2::before,[data-look="elegant"] .qm-sec h2::after{content:"";width:36px;height:1px;background:currentColor;opacity:.5;align-self:center}
+[data-look="elegant"] .qm-it{background:none;border:0;border-radius:0;box-shadow:none;padding:16px 4px;border-bottom:1px solid #EFE6D6;text-align:center;flex-direction:column;align-items:center}
+[data-look="elegant"] .qm-it:last-child{border-bottom:0}
+[data-look="elegant"] .qm-it.has{background:var(--tint);border-radius:18px}
+[data-look="elegant"] .qm-it.has::before{display:none}
+[data-look="elegant"] .qm-it.hit{background:#FFF8E6;border-radius:18px}
+[data-look="elegant"] .qm-it-tx{align-items:center}
+[data-look="elegant"] .qm-it-h{flex-direction:column;align-items:center;gap:4px}
+[data-look="elegant"] .qm-it-tx b{font-family:"Fraunces",Georgia,serif;font-weight:500;font-size:19.5px;letter-spacing:-.005em}
+[data-look="elegant"] .qm-it-tx p{-webkit-line-clamp:3;font-style:italic;max-width:440px}
+[data-look="elegant"] .qm-pr2{display:block;order:3;font-family:var(--m);font-weight:700;font-size:14.5px;color:var(--accent-ink)}
+[data-look="elegant"] .qm-it-meta{justify-content:center}
+[data-look="elegant"] .qm-it-meta .qm-pr{display:none}
+[data-look="elegant"] .qm-it-meta:not(:has(.qm-tag)){display:none}
+[data-look="elegant"] .qm-it-ph{order:-1;width:100%;max-width:340px;height:150px;border-radius:16px}
+[data-look="elegant"] .qm-it-ph img{position:absolute;inset:0;border-radius:16px}
+[data-look="elegant"] .qm-it-ph>span{display:none}
+[data-look="elegant"] .qm-it-ph:not(:has(img)){height:0;width:0}
+[data-look="elegant"] .qm-it-ph:not(:has(img)) .qm-add,[data-look="elegant"] .qm-it-ph:not(:has(img)) .qm-step{position:static;margin-top:0}
+[data-look="elegant"] .qm-it:has(.qm-it-ph:not(:has(img))){padding-bottom:16px}
+[data-look="elegant"] .qm-it-ph:not(:has(img)){order:5;width:auto;height:auto;background:none}
+[data-look="elegant"].noph .qm-it-ph{order:5;width:auto;height:auto;margin-top:2px}
+[data-look="elegant"].noph .qm-add,[data-look="elegant"].noph .qm-step{position:static;transform:none}
