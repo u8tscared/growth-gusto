@@ -198,7 +198,7 @@ function abBillCard(p, sx) {
   return `<div class="glass pad ab-act st" style="--i:5"><div class="ab-acth"><span class="ic">${ico("abKey")}</span><div><b>${head[0]}</b><em>${head[1]}</em></div></div>
     ${L.join("")}
     ${sx.customer ? `<button class="btn soft block" data-act="abPortal" ${AB.busy === "portal" ? "disabled" : ""}>${AB.busy === "portal" ? `<span class="spin"></span>Ouverture…` : `${ico("abPack")}Gérer mon abonnement`}</button>` : ""}
-    <p class="note ab-addr">Paiement traité par Stripe : Growth Gusto ne voit jamais votre numéro de carte.</p></div>`;
+    <p class="note ab-addr">Paiement traité par Stripe : Growth Gusto ne voit jamais votre numéro de carte. <a href="https://growthgusto.fr/cgv" target="_blank" rel="noopener">Conditions générales</a></p></div>`;
 }
 const AB_ERR = { stripe_off: "Le paiement en ligne n'est pas encore ouvert. Écrivez-nous : on active votre pack dans la journée.", suspendu: "L'accès à ce restaurant est suspendu : contactez-nous.", "permission-denied": "Seul le gérant peut gérer l'abonnement.", no_customer: "Aucun paiement enregistré pour ce restaurant." };
 const abErrTx = (e) => { const m = String((e && e.message) || ""); return AB_ERR[m] || AB_ERR[String((e && e.code) || "").replace(/^functions\//, "")] || "Impossible de joindre le paiement pour l'instant. Vérifiez la connexion et réessayez."; };
