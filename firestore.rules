@@ -21,6 +21,11 @@ service cloud.firestore {
     function isMemberAfter(rid) { return signedIn() && existsAfter(memberPath(rid)); }
     function isGerant(rid) { return isMember(rid) && get(memberPath(rid)).data.role == 'gerant'; }
     function ownerOf(rid) { return get(restoPath(rid)).data.owner; }
+    // consignes (js/consignes.js): a gérant always; then the people listed in restos/{rid}.csCfg.writers, or (no list yet) the chefs
+    function canPostConsigne(rid) {
+      let w = get(restoPath(rid)).data.get('csCfg', {}).get('writers', null);
+      return isGerant(rid) || (w == null ? get(memberPath(rid)).data.role == 'chef' : me() in w);
+    }
     function validRole(r) { return r in ['gerant', 'chef', 'equipe']; }
     // perms is optional; when present it must be a map
     function validPerms(d) { return !('perms' in d) || d.perms is map; }
@@ -114,7 +119,7 @@ service cloud.firestore {
                     && !request.resource.data.keys().hasAny(billKeys());
       allow update: if isGerant(rid) && unchanged(['owner', 'createdAt', 'server', 'alertMail', 'alertState']) && unchanged(billKeys())
                        && (unchanged(['plan', 'trialEnds']) || trialStamp())
-                    || isMember(rid) && unchanged(['owner', 'createdAt', 'server', 'alertMail', 'alertState', 'alertCfg', 'resaCfg', 'trainingRequired', 'chorePhotoStaff', 'uiDefault', 'name', 'plan', 'pack', 'trialEnds']) && unchanged(billKeys())
+                    || isMember(rid) && unchanged(['owner', 'createdAt', 'server', 'alertMail', 'alertState', 'alertCfg', 'resaCfg', 'csCfg', 'trainingRequired', 'chorePhotoStaff', 'uiDefault', 'name', 'plan', 'pack', 'trialEnds']) && unchanged(billKeys())
                     || isAdmin() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(adminKeys());
       allow delete: if signedIn() && resource.data.owner == me();
 
@@ -161,8 +166,8 @@ service cloud.firestore {
 
       // ── everything else (fridges, readings, lots, stock, tickets, staff, finances…): members only ──
       match /{col}/{doc} {
-        allow read: if !(col in ['members', 'sensorKeys', 'pennylane', 'plSent', 'plInv', 'qrPay', 'bankTx', 'bank', 'push']) && isMember(rid);
-        allow create, update, delete: if !(col in ['members', 'sensorKeys', 'pennylane', 'plSent', 'plInv', 'qrPay', 'bankTx', 'bank', 'push']) && isMemberAfter(rid);
+        allow read: if !(col in ['members', 'sensorKeys', 'pennylane', 'plSent', 'plInv', 'qrPay', 'bankTx', 'bank', 'push', 'consignes', 'chatGroups']) && isMember(rid);
+        allow create, update, delete: if !(col in ['members', 'sensorKeys', 'pennylane', 'plSent', 'plInv', 'qrPay', 'bankTx', 'bank', 'push', 'consignes', 'chatGroups']) && isMemberAfter(rid);
       }
       // Pennylane (js/pennylane.js, functions/src/pennylane.js): accounting, so gérants only; the server writes with admin rights
       match /pennylane/{doc} {
@@ -185,6 +190,17 @@ service cloud.firestore {
       // commande en ligne (js/commande.js, functions/src/commande.js): the restaurant's Stripe account state, written by the server only
       match /qrPay/{doc} {
         allow read: if isMember(rid);
+      }
+      // consignes (js/consignes.js): everyone reads; only the people allowed publish; the writer or a publisher changes or removes one
+      match /consignes/{id} {
+        allow read: if isMember(rid);
+        allow create: if isMemberAfter(rid) && canPostConsigne(rid);
+        allow update, delete: if isMember(rid) && (canPostConsigne(rid) || resource.data.uid == me());
+      }
+      // discussion groups (js/consignes.js): everyone reads, only a gérant creates, edits or deletes a group
+      match /chatGroups/{gid} {
+        allow read: if isMember(rid);
+        allow write: if isGerant(rid);
       }
       // push tokens (js/consignes.js): each person writes only their own phone tokens; the server (functions/src/equipe.js) reads them with admin rights
       match /push/{mid} {
