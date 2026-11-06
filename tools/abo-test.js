@@ -36,10 +36,9 @@ module.exports = async (page, shot) => {
   // resto writes still allowed (rename)
   const ren = await page.evaluate(async () => { try { await DB.update("restos", S.rid, { name: "Chemin des Sarments" }); return "ok"; } catch (e) { return e.code; } }); ok(ren === "ok", "restos write allowed while expired");
   // bad code then good code
-  await set("abCode", "GG-NOPE"); await page.evaluate(() => document.querySelector("form[data-ab=code]").requestSubmit()); await page.waitForTimeout(500);
-  ok(await page.evaluate(() => /Code inconnu/.test(document.querySelector("#abCodeErr").textContent) && S.resto.plan === "expire" || S.resto.plan === "essai"), "wrong code refused");
-  await set("abCode", "gg-complet-2026"); await page.evaluate(() => document.querySelector("form[data-ab=code]").requestSubmit()); await page.waitForTimeout(1200);
-  ok(await page.evaluate(() => S.resto.plan === "complet" && S.resto.paidAt && S.resto.activatedBy && abPlan().plan === "complet"), "activation code flips the plan to complet"); await shot("23-abonnement-complet");
+  ok(await page.evaluate(() => !document.querySelector("form[data-ab=code]") && /Nous écrire/.test(document.querySelector(".ab-act").textContent)), "no activation code field; offline payment = « Nous écrire »");
+  await page.evaluate(async () => { await DB.update("restos", S.rid, { plan: "complet", pack: "complet", paidAt: Date.now(), paidUntil: null }); rerender(); }); await page.waitForTimeout(700);
+  ok(await page.evaluate(() => S.resto.plan === "complet" && abPlan().plan === "complet"), "plan complet (granted)"); await shot("23-abonnement-complet");
   const w = await page.evaluate(async () => { try { await DB.add("readings", { value: 3, at: Date.now() }); return "ok"; } catch (e) { return e.code; } }); ok(w === "ok", "writes work again");
   // pack gating: essentiel → stock shows the upgrade card
   await page.evaluate(async () => { await DB.update("restos", S.rid, { plan: "essentiel", pack: "essentiel" }); }); await page.waitForTimeout(300);
@@ -57,8 +56,10 @@ module.exports = async (page, shot) => {
   // paidUntil in the past → expire ; suspendu → blocked
   ok(await page.evaluate(() => { S.resto.paidUntil = Date.now() - 5; const a = abPlan().plan; S.resto.paidUntil = null; S.resto.plan = "suspendu"; const b = abPlan(); S.resto.plan = "complet"; return a === "expire" && b.plan === "suspendu" && !b.open; }), "paidUntil past = expire, suspendu = blocked");
   // Stripe link appended params (stub window.open)
-  const url = await page.evaluate(() => { window.GG_STRIPE.complet = "https://buy.stripe.com/test_x"; let u = null; const o = window.open; window.open = (x) => { u = x; }; ACT.abChoose(null, null, "complet"); window.open = o; window.GG_STRIPE.complet = null; return u; });
-  ok(/client_reference_id=r/.test(url) && /buy\.stripe\.com/.test(url), "Stripe link gets client_reference_id: " + url);
+  // online payment (stubbed server): billing card, in-place pack change, portal
+  ok(await page.evaluate(() => { const h = abBillCard({ plan: "complet" }, { customer: "cus_1", sub: "sub_1", status: "active", pack: "complet", periodEnd: Date.now() + 20 * 864e5, lastInvoice: { number: "F-1", url: "https://x", ttc: 202.8 } }); return /Prochain prélèvement/.test(h) && /202,80/.test(h) && /Gérer mon abonnement/.test(h); }), "billing card: next charge, last invoice, portal");
+  ok(await page.evaluate(() => { const h = abBillCard({ plan: "essai" }, { customer: "cus_1", sub: "sub_1", status: "trialing", pack: "pro", trialEnd: Date.now() + 5 * 864e5 }); return /Premier prélèvement/.test(h) && /Second/.test(h); }), "billing card during the trial");
+  ok(await page.evaluate(async () => { const o = abCall; let got = null; abCall = async (op, d) => { got = [op, d.pack]; return { changed: true, pack: d.pack }; }; await abCheckout("pro"); abCall = o; return got && got[0] === "checkout" && got[1] === "pro" && !AB.busy; }), "abCheckout calls the server and handles an in-place change");
   await page.evaluate(() => ACT.abChoose(null, null, "complet")); await page.waitForTimeout(700); ok(await page.evaluate(() => /contactez|écrivez-nous|Nous écrire/i.test(document.querySelector("#sheetBody").textContent)), "no Stripe link → contact sheet"); await shot("32-contact-sheet"); await page.evaluate(() => closeSheet(true));
   // admin: denied, then as admin (local fallback data)
   await page.evaluate(() => go("admin")); await page.waitForTimeout(700); ok(await page.evaluate(() => /Accès réservé/.test(document.querySelector("#viewport .view").textContent)), "admin denied for a non-admin"); await shot("40-admin-denied");

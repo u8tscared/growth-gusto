@@ -903,8 +903,8 @@ const AUTH = {
       const plan = []; /* [{rid, first:[ops], rest:[ops]}] */
       for (const [old, r] of restos) {
         const rid = "r" + Date.now().toString(36) + auCode(4).toLowerCase(); const now = Date.now();
-        const R = fs.collection("restos").doc(rid); const { by, ...rest } = r || {};
-        const first = [[R, { ...DB.clean(rest), name: String((r && r.name) || "Mon restaurant").slice(0, 80), owner: u.uid, createdAt: (r && r.createdAt) || now, plan: (r && r.plan) || "essai", pack: (r && r.pack) || "complet", trialEnds: (r && r.trialEnds) || now + 14 * 864e5, importedAt: now }],
+        const R = fs.collection("restos").doc(rid); const { by, paidUntil, paidAt, grantedBy, grantedAt, suspended, stripe, activatedBy, activationCode, ...rest } = r || {};
+        const first = [[R, { ...DB.clean(rest), name: String((r && r.name) || "Mon restaurant").slice(0, 80), owner: u.uid, createdAt: (r && r.createdAt) || now, plan: "essai", pack: (r && r.pack) || "complet", trialEnds: Math.min(+(r && r.trialEnds) || Infinity, now + 14 * 864e5), importedAt: now }],
           [R.collection("members").doc(u.uid), { name: u.displayName || S.me.name || "", email: u.email || "", photo: u.photoURL || "", role: "gerant", joinedAt: now }],
           [fs.collection("users").doc(u.uid), { restos: FV.arrayUnion(rid) }, { merge: true }]];
         const ops = [];
