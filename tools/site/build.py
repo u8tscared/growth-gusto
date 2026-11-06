@@ -8,7 +8,7 @@ breadcrumbs, structured data (BreadcrumbList + the page's own type) and internal
 Pages are written as site/<path>.html (Firebase Hosting serves them without .html: cleanUrls).
 The home page's footer is replaced between <!--sf:start--> and <!--sf:end--> so it matches every page.
 """
-import html, json, pathlib, re, sys, datetime
+import html, json, pathlib, re, sys, datetime, hashlib
 
 HERE = pathlib.Path(__file__).resolve().parent
 SITE = HERE.parent.parent / "site"
@@ -16,6 +16,10 @@ sys.path.insert(0, str(HERE))
 BASE = "https://growthgusto.fr"
 APP = "https://app.growthgusto.fr"
 TODAY = datetime.date(2026, 11, 6).isoformat()
+
+def ver(rel):
+    """Short content hash so browsers never mix a new page with an old stylesheet."""
+    return hashlib.md5((SITE / rel.lstrip("/")).read_bytes()).hexdigest()[:8]
 
 def e(s):
     return html.escape(s, quote=True)
@@ -114,10 +118,10 @@ def footer():
 <div class="sf-mq" aria-hidden="true"><div class="sf-mq-t">{mq}</div></div>
 <nav class="sf-mid" aria-label="Plan du site">
 {col("Fonctionnalités", feats, ("/fonctionnalites", "Toutes les fonctions"))}{col("Restaurants", types, ("/restaurants", "Tous les restaurants"))}{col("Guides", guides, ("/guides", "Tous les guides"))}{col("Growth Gusto", co)}
-<a class="sf-badge" href="{APP}/?signup=1" target="_blank" rel="noopener" aria-label="Essayer Growth Gusto 14 jours gratuits"><svg viewBox="0 0 200 200" aria-hidden="true"><defs><path id="sf-c" d="M100,100 m-78,0 a78,78 0 1,1 156,0 a78,78 0 1,1 -156,0"/></defs><text font-family="Instrument Sans, system-ui, sans-serif" font-weight="700" font-size="15" letter-spacing="3.4" fill="#fff"><textPath href="#sf-c">14 JOURS GRATUITS · SANS ENGAGEMENT · </textPath></text></svg><b>Essayer{ARROW}</b></a>
+<a class="sf-badge" href="{APP}/?signup=1" target="_blank" rel="noopener" aria-label="Essayer Growth Gusto 14 jours gratuits"><svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true"><defs><path id="sf-c" d="M100,100 m-78,0 a78,78 0 1,1 156,0 a78,78 0 1,1 -156,0"/></defs><text font-family="Instrument Sans, system-ui, sans-serif" font-weight="700" font-size="15" letter-spacing="3.4" fill="#fff"><textPath href="#sf-c" xlink:href="#sf-c">14 JOURS GRATUITS · SANS ENGAGEMENT · </textPath></text></svg><b>Essayer{ARROW}</b></a>
 </nav>
 <div class="sf-end">
-<a class="sf-word" href="/" aria-label="Growth Gusto, accueil"><span>Growth</span> <span class="hl">Gusto</span></a>
+<a class="sf-word" href="/" aria-label="Growth Gusto, accueil"><span>Growth</span> <span class="sf-hl">Gusto</span></a>
 <div class="sf-legal"><nav aria-label="Informations légales"><a href="/mentions-legales">Mentions légales</a><a href="/cgv">CGV</a><a href="/confidentialite">Confidentialité</a><a href="{APP}/?login=1">Se connecter</a></nav>
 <span><a href="mailto:contact@growthgusto.fr">contact@growthgusto.fr</a> · © 2026 EI Ruis Global, Lyon</span></div>
 </div>
@@ -191,8 +195,8 @@ def page(path, title, desc, body, trail, ld=(), og=None, cur=None, extra_head=""
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wdth,wght@12..96,75..100,400..800&amp;family=Instrument+Sans:wght@400..700&amp;family=JetBrains+Mono:wght@500;700&amp;display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/css/site.css">
-<link rel="stylesheet" href="/css/footer.css">
+<link rel="stylesheet" href="/css/site.css?v={ver("/css/site.css")}">
+<link rel="stylesheet" href="/css/footer.css?v={ver("/css/footer.css")}">
 {lds}{extra_head}
 </head>
 <body>
@@ -201,7 +205,7 @@ def page(path, title, desc, body, trail, ld=(), og=None, cur=None, extra_head=""
 {body}
 </main>
 {footer()}
-<script src="/js/site.js" defer></script>
+<script src="/js/site.js?v={ver("/js/site.js")}" defer></script>
 </body>
 </html>
 '''
@@ -226,6 +230,7 @@ def main():
     if "<!--sf:start-->" in h:
         a, b = h.index("<!--sf:start-->"), h.index("<!--sf:end-->") + len("<!--sf:end-->")
         h = h[:a] + footer() + h[b:]
+    h = re.sub(r'href="/css/footer\.css(\?v=[0-9a-f]+)?"', f'href="/css/footer.css?v={ver("/css/footer.css")}"', h)
     links, menu = home_nav()
     for k, v in (("nav", links), ("menu", menu)):
         a, b = h.index(f"<!--{k}:start-->"), h.index(f"<!--{k}:end-->")
