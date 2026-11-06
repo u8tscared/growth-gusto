@@ -91,7 +91,7 @@ function cmOnRows(rows) {
   onData();
 }
 const cmLiveSt = (o) => ["nouvelle", "prep", "prete"].includes(o.status);
-function cmOrdersToday() { const k = dayKey(); return (CM.orders || []).filter((o) => o.day === k || (cmLiveSt(o) && Date.now() - (o.at || 0) < 36 * 3600e3)); }
+function cmOrdersToday() { const k = dayKey(); return (CM.orders || []).filter((o) => o.src !== "salle").filter((o) => o.day === k || (cmLiveSt(o) && Date.now() - (o.at || 0) < 36 * 3600e3)); }
 function cmAlert(o) {
   CM.fresh.add(o.id);
   try { SFX.init(); SFX.tone(1319, 0.28, "sine", 0.055); SFX.tone(1568, 0.3, "sine", 0.05, 0.16); SFX.tone(2093, 0.5, "sine", 0.04, 0.32); buzz([22, 50, 22, 50, 40]); } catch (e) {}
@@ -99,7 +99,7 @@ function cmAlert(o) {
   if (S.route !== "commandes" || CM.tab !== "live") toast(`Nouvelle commande n° ${o.n} · ${where} · ${cmEur(o.total)}`, "info");
   try { if (window.ALERTES && typeof window.ALERTES.push === "function") window.ALERTES.push({ type: "commande", key: "cmd_" + o.id, level: "info", text: `Nouvelle commande en ligne n° ${o.n}`, sub: `${where} · ${cmEur(o.total)}${o.paid ? " · payée" : ""}`, day: o.day, route: "commandes" }); } catch (e) {}
 }
-window.CMD = { unseen: () => (CM.orders || []).filter((o) => o.status === "nouvelle").length };
+window.CMD = { unseen: () => (CM.orders || []).filter((o) => o.status === "nouvelle" && o.src !== "salle").length };
 
 /* ───────── public projection (restos/{rid}/public/menu), written by any member's app ───────── */
 const cmLogo = () => { const l = typeof restoLogo === "function" ? restoLogo(S.resto) : (S.resto && S.resto.logo) || ""; return typeof l === "string" && /^(data:image\/|https:\/\/)/.test(l) && l.length <= 200000 ? l : ""; };
@@ -224,6 +224,7 @@ function cmLive() {
     <div><em>Payées en ligne</em><b class="mono">${online}</b><span>sur ${ok.length}</span></div>
     ${pay.length ? `<div class="pay"><em>Paiement en cours</em><b class="mono">${pay.length}</b><span>pas encore en cuisine</span></div>` : ""}
     ${!c.on ? `<button class="cm-closed" data-act="cmOpenNow">${ico("cmOff")}<span><b>Commande en ligne fermée</b><em>Touchez pour ouvrir</em></span></button>` : ""}
+    ${VIEWS.cuisine ? `<button class="cm-kds" data-go="cuisine">${ico("slHat")}<span><b>Écran cuisine</b><em>Salle et QR ensemble</em></span></button>` : ""}
   </div>`;
   const nLive = cols.reduce((a, [s]) => a + by(s).length, 0);
   const rail = nLive ? `<div class="cm-colnav st" style="--i:3">${cols.map(([s, t]) => `<button class="${CM.col === s ? "on" : ""}" data-act="cmCol" data-v="${s}">${t}<b class="mono">${by(s).length}</b></button>`).join("")}</div>

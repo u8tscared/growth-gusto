@@ -11,7 +11,7 @@
 const AB_DAY = 864e5, AB_TRIAL = 14;
 const AB_PACKS = {
   essentiel: { t: "Commis", price: 59, tag: "L'hygiène carrée, sans y penser", feats: ["Relevés et sondes", "Étiquettes & DLC", "Réception des livraisons", "Plan de nettoyage", "Fiches recettes & allergènes", "Mode contrôle & PMS", "Registre & rappel de lot", "Équipe illimitée"] },
-  pro: { t: "Second", price: 109, tag: "La salle et la caisse en plus", feats: ["Tout Commis", "Réservations", "Plan de salle", "Caisse connectée & tickets Z", "Stock & inventaire", "Tableau de bord"] },
+  pro: { t: "Second", price: 109, tag: "La salle et la caisse en plus", feats: ["Tout Commis", "Réservations", "Plan de salle", "Prise de commande & écran cuisine", "Caisse connectée & tickets Z", "Stock & inventaire", "Tableau de bord"] },
   complet: { t: "Chef", price: 169, tag: "Toute la maison tourne", feats: ["Tout Second", "Pointeuse", "Planning", "Employés & salaires", "Finances & banque", "Pennylane", "Plusieurs restaurants"] },
 };
 const AB_ORDER = ["essentiel", "pro", "complet"], AB_LVL = { essentiel: 1, pro: 2, complet: 3 };
