@@ -186,7 +186,7 @@ function cfSalle() {
     : `<div class="cf-calm st" style="--i:2"><span class="cf-ci">${ico("cmBell")}</span><div><b>Rien à servir</b><em>Dès qu'un plat est prêt, il s'affiche ici en grand, avec un son.</em></div></div>`;
   const tile = (t, i) => { const s = slTabState(t); return `<button class="cf-tb k-${s.k}${t.by === me ? " mine" : ""} st" style="--i:${3 + Math.min(i, 8)}" data-go="salle" data-id="${esc(t.id)}"><b class="mono">${esc(t.table)}</b><span>${esc(s.t)}</span><em>${slCovers(t)} · <span data-at="${t.openedAt}">${slAgo(t.openedAt)}</span></em></button>`; };
   const soon = cfSoon();
-  return `${readyH}
+  return `${typeof slStockBar === "function" ? slStockBar() : ""}${readyH}
     <div class="cf-lbl st" style="--i:3"><span>Tables ouvertes</span><b class="mono">${open.length}</b></div>
     <div class="cf-tables">${open.map(tile).join("")}<button class="cf-tb cf-new st" style="--i:${3 + Math.min(open.length, 8)}" data-act="cfNewTable">${ico("plus")}<span>Ouvrir une table</span></button></div>
     ${soon.length ? `<div class="cf-lbl st" style="--i:6"><span>Arrivent bientôt</span><b class="mono">${soon.reduce((a, b) => a + (+b.covers || 0), 0)} couv.</b></div>
@@ -239,7 +239,7 @@ function cfCuisine() {
 /* ── Pilotage: the whole service, live ── */
 function cfPilote() {
   const s = cfSvc() || CF.cur, t0 = s ? s.t0 : Date.now() - 4 * 36e5, K = cfKitchenData(), F = cfFridges(), money = cfMoney();
-  const open = slOpenTabs(), { T } = slTables(), byT = new Map(open.map((t) => [t.tableId, t]));
+  const open = slOpenTabs(), { T } = slTables(), byT = typeof slTabMap === "function" ? slTabMap() : new Map(open.map((t) => [t.tableId, t]));
   const closed = ((SL.tabs || []).filter((t) => t.status === "closed" && (t.openedAt || 0) >= t0 && !t.mergedInto && (+t.total || 0) > 0));
   const cvNow = open.reduce((a, t) => a + (+t.covers || 0), 0), cvDone = closed.reduce((a, t) => a + (+t.covers || 0), 0);
   let toCome = 0; try { const now = new Date().getHours() * 60 + new Date().getMinutes(), seated = new Set(open.map((t) => t.booking).filter(Boolean)); toCome = rsOfDay(dayKey()).filter((b) => rsLive(b) && b.status !== "arrive" && !seated.has(b.id) && rsMin(b.time) >= now - 20 && (!s || rsMin(b.time) <= cfMin(s.to) + 15)).reduce((a, b) => a + (+b.covers || 0), 0); } catch (e) {}
@@ -255,8 +255,8 @@ function cfPilote() {
     ${money ? tile(`${Math.round(taken).toLocaleString("fr-FR")}<small> €</small>`, "Pris ce service", `dont ${Math.round(inRoom).toLocaleString("fr-FR")} € en salle`, "", 4, "") : ""}
   </div>`;
   const alerts = [];
-  K.late.forEach((o) => alerts.push([1, "bad", "slFire", `${o.src === "salle" ? `Table ${o.table}` : `QR n° ${o.n}`} · ${o.courseT || "commande"}`, `${slMin(o.firedAt || o.at)} min en cuisine${o.rush ? " · réclamé" : ""}`, `<button class="btn sm soft" data-go="cuisine">Voir</button>`]));
-  waiting.forEach((o) => alerts.push([2, "warn", "cmBell", `${o.src === "salle" ? `Table ${o.table}` : `QR n° ${o.n}`} · ${o.courseT || "prêt"}`, `Prêt depuis ${slMin(o.readyAt || o.at)} min, personne ne l'a pris`, `<button class="btn sm cf-serv" data-act="slServed" data-id="${esc(o.id)}">${ico("check")}${o.src === "salle" ? "Servi" : "Remis"}</button>`]));
+  K.late.forEach((o) => alerts.push([1, "bad", "slFire", `${slWho(o)}${o.courseT ? ` · ${o.courseT}` : ""}`, `${slMin(o.firedAt || o.at)} min en cuisine${o.rush ? " · réclamé" : ""}`, `<button class="btn sm soft" data-go="cuisine">Voir</button>`]));
+  waiting.forEach((o) => alerts.push([2, "warn", "cmBell", `${slWho(o)}${o.courseT ? ` · ${o.courseT}` : ""}`, `Prêt depuis ${slMin(o.readyAt || o.at)} min, personne ne l'a pris`, `<button class="btn sm cf-serv" data-act="slServed" data-id="${esc(o.id)}">${ico("check")}${o.src === "salle" ? "Servi" : "Remis"}</button>`]));
   const outs = slDishes().filter((n) => slOut(n.id)); if (outs.length) alerts.push([3, "", "slBan", `${cfPl(outs.length, "plat épuisé", "plats épuisés")}`, outs.map((n) => n.title).slice(0, 4).join(", "), `<button class="btn sm soft" data-act="slOuts">Gérer</button>`]);
   if (F.pend.length) alerts.push([4, "", "therm", `${cfPl(F.pend.length, "frigo à relever", "frigos à relever")}`, F.pend.slice(0, 3).map((f) => f.name).join(", "), `<button class="btn sm soft" data-act="homeFridge" data-id="${esc(F.pend[0].id)}">Relever</button>`]);
   if (F.bad.length) alerts.push([2, "bad", "slWarn", `${cfPl(F.bad.length, "relevé hors limite", "relevés hors limite")}`, "Aujourd'hui, à vérifier", `<button class="btn sm soft" data-go="releve">Voir</button>`]);
@@ -285,7 +285,7 @@ function cfHomeCard() {
 
 /* ───────── sheets ───────── */
 function cfNewTableSheet() {
-  const open = new Set(slOpenTabs().map((t) => t.tableId)), { T } = slTables(), free = T.filter((t) => !open.has(t.id));
+  const open = new Set(typeof slTabMap === "function" ? slTabMap().keys() : slOpenTabs().map((t) => t.tableId)), { T } = slTables(), free = T.filter((t) => !open.has(t.id));
   openSheet(`<div class="cf-sh"><div class="sl-shh"><span class="h2">Quelle table ?</span><button class="iconbtn" data-act="sheetClose" aria-label="Fermer">${ico("x")}</button></div>
     ${free.length ? `<div class="cf-free">${free.map((t, i) => { const b = slBookingAt(t.id); return `<button class="${b ? "bk" : ""}" style="--i:${Math.min(i, 20)}" data-act="slTable" data-id="${esc(t.id)}"><b class="mono">${esc(t.n)}</b>${b ? `<em>${esc(b.time)} · ${esc(firstName(b.name) || "")}</em>` : `<em>${+t.seats || 2} places</em>`}</button>`; }).join("")}</div>`
       : `<p class="sub">Toutes les tables sont occupées.</p>`}</div>`);

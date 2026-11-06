@@ -106,18 +106,24 @@ const plDurBase = (cfg, svc) => plDur(cfg, svc, 2);
 const plHmLong = (m) => (m % 60 ? `${Math.floor(m / 60)} h ${pad(m % 60)}` : `${m / 60} h`);
 
 /* ───────── the engine ───────── */
-/* units a booking can take: every table, and pairs of neighbouring tables of a zone (joined for a group) */
+/* units a booking can take: every table, and two or three neighbouring tables of a zone pushed together for a group
+   (two tables of 2 make a table of 4, three make a table of 6). A joined unit costs more than a single table, so the
+   engine only joins when no single table fits. bookings.tableWith holds the other table(s), comma separated. */
+const plAdj = (a, b) => { if (a.zone !== b.zone) return false; const ga = plGeo(a), gb = plGeo(b), dx = Math.abs(a.x - b.x) - (ga.w + gb.w) / 2, dy = Math.abs(a.y - b.y) - (ga.h + gb.h) / 2; return Math.max(dx, dy) <= 2.6 && Math.min(dx, dy) <= 0.2; };
 function plUnits(cfg, T) {
-  const U = T.map((t) => ({ key: t.id, ids: [t.id], cap: t.seats, zone: t.zone, pair: false }));
+  const U = T.map((t) => ({ key: t.id, ids: [t.id], cap: t.seats, zone: t.zone, pair: false, n: 1 }));
   if (cfg.joinTables === false) return U;
+  const adj = T.map((a, i) => T.map((b, j) => i !== j && plAdj(a, b)));
   for (let i = 0; i < T.length; i++) for (let j = i + 1; j < T.length; j++) {
-    const a = T[i], b = T[j]; if (a.zone !== b.zone) continue;
-    const ga = plGeo(a), gb = plGeo(b), dx = Math.abs(a.x - b.x) - (ga.w + gb.w) / 2, dy = Math.abs(a.y - b.y) - (ga.h + gb.h) / 2;
-    if (Math.max(dx, dy) <= 1.6 && Math.min(dx, dy) <= 0.2) U.push({ key: a.id + "+" + b.id, ids: [a.id, b.id], cap: a.seats + b.seats, zone: a.zone, pair: true });
+    if (!adj[i][j]) continue; const a = T[i], b = T[j];
+    U.push({ key: a.id + "+" + b.id, ids: [a.id, b.id], cap: a.seats + b.seats, zone: a.zone, pair: true, n: 2 });
+    for (let k = j + 1; k < T.length; k++) if (adj[i][k] || adj[j][k]) { const c = T[k]; U.push({ key: [a.id, b.id, c.id].join("+"), ids: [a.id, b.id, c.id], cap: a.seats + b.seats + c.seats, zone: a.zone, pair: true, n: 3 }); }
   }
-  return U;
+  /* the same three tables can be reached from two pairs: keep one */
+  const seen = new Set(); return U.filter((u) => { const k = u.ids.slice().sort().join("+"); if (seen.has(k)) return false; seen.add(k); return true; });
 }
-const plTblOf = (b) => [b.table, b.tableWith].filter(Boolean);
+const plWith = (b) => String(b.tableWith || "").split(",").map((x) => x.trim()).filter(Boolean);
+const plTblOf = (b) => [b.table, ...plWith(b)].filter(Boolean);
 /* the table a note asks for: « table 7 », « aime la table 12 » (booking note, then the client file) */
 function plWish(b, T) {
   const txt = [b.notes || "", (typeof rsClientOf === "function" && b.phone && (rsClientOf(b.phone) || {}).notes) || ""].join(" ");
@@ -132,7 +138,7 @@ function plSolve(cfg, day, svc, opt = {}) {
   const now = day === dayKey() ? new Date().getHours() * 60 + new Date().getMinutes() : day < dayKey() ? 1e9 : -1;
   let list = (opt.books || rsOfDay(day).filter((b) => rsLive(b) && svc && rsSvcOf(cfg, day, b.time).id === svc.id)).map((b) => ({ b, s: rsMin(b.time), e: rsMin(b.time) + plDur(cfg, svc, b.covers), c: +b.covers || 1 }));
   if (opt.extra) list.push({ b: opt.extra, s: rsMin(opt.extra.time), e: rsMin(opt.extra.time) + plDur(cfg, svc, opt.extra.covers), c: +opt.extra.covers || 1, x: true });
-  const valid = (b) => b.table && byId.has(b.table) && (!b.tableWith || byId.has(b.tableWith));
+  const valid = (b) => b.table && byId.has(b.table) && plWith(b).every((id) => byId.has(id));
   const fixed = [], free = [];
   list.forEach((r) => {
     const b = r.b, started = now >= 0 && r.s <= now + 20;
@@ -147,7 +153,7 @@ function plSolve(cfg, day, svc, opt = {}) {
   const fits = (occ, u, s, e) => u.ids.every((id) => (occ.get(id) || []).every(([a, z]) => e <= a || s >= z));
   const wishes = new Map(free.map((r) => [r.b.id, r.x ? { table: "", out: 0 } : plWish(r.b, T)]));
   const cost = (occ, r, u) => {
-    const waste = u.cap - r.c; let k = waste * 3 + (u.pair ? 7 + waste : 0);
+    const waste = u.cap - r.c; let k = waste * 3 + (u.pair ? 7 + waste + (u.n > 2 ? 9 : 0) : 0);
     if (waste >= 4) k += waste * 2; /* a couple on a table of 8: keeps the big tables for groups */
     u.ids.forEach((id) => {
       const L = occ.get(id) || []; let prev = -1, next = -1;
@@ -158,7 +164,7 @@ function plSolve(cfg, day, svc, opt = {}) {
     const w = wishes.get(r.b.id) || {};
     if (w.table && u.ids.includes(w.table)) k -= 6;
     if (w.out === 1) k += outZ.has(u.zone) ? -3 : 1.5; else if (w.out === -1) k += outZ.has(u.zone) ? 4 : 0;
-    if (!r.x && r.b.table && u.ids[0] === r.b.table && (u.ids[1] || "") === (r.b.tableWith || "")) k -= 1.6; /* stays where it was: no reshuffle */
+    if (!r.x && r.b.table && u.ids[0] === r.b.table && u.ids.slice(1).join(",") === plWith(r.b).join(",")) k -= 1.6; /* stays where it was: no reshuffle */
     return k;
   };
   const place = (occ, r, avoid) => {
@@ -196,7 +202,7 @@ function plSolve(cfg, day, svc, opt = {}) {
   let best = null;
   const better = (x, y) => { for (let i = 0; i < x.length; i++) { if (x[i] < y[i] - 1e-9) return true; if (x[i] > y[i] + 1e-9) return false; } return false; };
   tries.forEach((o) => { const r = run(o); if (!best || better(r.sc, best.sc)) best = r; });
-  const assign = {}; best.got.forEach((u, bid) => { assign[bid] = { table: u.ids[0], with: u.ids[1] || "" }; });
+  const assign = {}; best.got.forEach((u, bid) => { assign[bid] = { table: u.ids[0], with: u.ids.slice(1).join(",") }; });
   return { assign, unplaced: best.miss.map((r) => r.b.id), free: free.map((r) => r.b.id), fixed: fixed.map((r) => r.b.id), occ: best.occ, T, list };
 }
 /* write the engine's choice (only what changed) */
@@ -221,7 +227,7 @@ const plAuto = debounce(async () => {
   const T = plTables(cfg), ids = new Set(T.map((t) => t.id)), today = dayKey(), end = addDays(today, 120), groups = new Map();
   rsRows().forEach((b) => {
     if (!rsLive(b) || !b.date || b.date < today || b.date > end) return;
-    const need = (!b.table && b.tableAuto !== false) || (b.table && !ids.has(b.table)) || (b.tableWith && !ids.has(b.tableWith));
+    const need = (!b.table && b.tableAuto !== false) || (b.table && !ids.has(b.table)) || plWith(b).some((id) => !ids.has(id));
     const svc = rsSvcOf(cfg, b.date, b.time); if (!svc || !svc.id) return;
     const k = b.date + "|" + svc.id; if (!groups.has(k)) groups.set(k, { day: b.date, svc: svc.id, need: false, list: [] }); const g = groups.get(k); g.list.push(b); if (need) g.need = true;
   });
@@ -318,7 +324,7 @@ function plAt(cfg, day, svc) {
 }
 function plLabel(b, cfg) {
   const T = (cfg || rsCfg()).tables || [], n = (id) => (T.find((t) => t.id === id) || {}).n;
-  const a = b.table && n(b.table); if (!a) return ""; const w = b.tableWith && n(b.tableWith); return w ? `${a}+${w}` : String(a);
+  const a = b.table && n(b.table); if (!a) return ""; return [a, ...plWith(b).map(n).filter(Boolean)].join("+");
 }
 function plLive(cfg, day, svc, mine) {
   const T = plTables(cfg), Z = plZones(cfg), D = (cfg.decor || []).filter((d) => d && PL_DECOR[d.kind]), mgr = rsMgr();
@@ -450,7 +456,7 @@ function plEdInner() {
         ${mgr ? `<button class="btn soft sm block" data-act="plQuickOpen">${ico("sparkle")}${e.tables.length ? "Refaire le plan en 30 secondes" : "Créer mon plan en 30 secondes"}</button>` : ""}</div>
       ${mgr ? `<div class="glass pl-set st" style="--i:4"><div class="pl-sh2"><b>Placement automatique</b><span>Les réservations prennent la meilleure table toutes seules : une table qui se libère à 13:30 resservie à 13:30, les grandes tables gardées pour les groupes.</span></div>
         <button class="rs-tog${e.autoTables ? " on" : ""}" data-act="plTg" data-v="autoTables" aria-pressed="${e.autoTables}"><span><b>Placer les réservations</b><em>Une table choisie à la main ne bouge jamais.</em></span><i></i></button>
-        <button class="rs-tog${e.joinTables ? " on" : ""}" data-act="plTg" data-v="joinTables" aria-pressed="${e.joinTables}"><span><b>Assembler deux tables voisines</b><em>Pour un groupe plus grand que vos tables.</em></span><i></i></button>
+        <button class="rs-tog${e.joinTables ? " on" : ""}" data-act="plTg" data-v="joinTables" aria-pressed="${e.joinTables}"><span><b>Assembler les tables voisines</b><em>Deux ou trois tables côte à côte pour un groupe : deux tables de 2 font une table de 4. Seulement si aucune table seule ne suffit.</em></span><i></i></button>
         <button class="rs-tog${e.planOnline ? " on" : ""}" data-act="plTg" data-v="planOnline" aria-pressed="${e.planOnline}"><span><b>Le plan règle la réservation en ligne</b><em>Un créneau n'est proposé que s'il reste une table à la bonne taille.</em></span><i></i></button>
         <div class="pl-turns"><b>Une table est prise</b>${svcs.map((s) => { const m = plDurBase({ turn: e.turn }, s); return `<div class="rs-row"><div><b>${esc(s.name)}</b><em>${m >= 120 ? "repas long" : "puis resservie"}</em></div><div class="rs-stp2 sm"><button data-act="plTurn" data-id="${esc(s.id)}" data-v="-15" aria-label="Quinze minutes de moins" ${m <= 30 ? "disabled" : ""}>${ico("minus")}</button><b class="pl-tm">${plHmLong(m)}</b><button data-act="plTurn" data-id="${esc(s.id)}" data-v="15" aria-label="Quinze minutes de plus" ${m >= 300 ? "disabled" : ""}>${ico("plus")}</button></div></div>`; }).join("")}<p class="sub">+15 min à partir de 6 personnes.</p></div>
       </div>` : ""}
