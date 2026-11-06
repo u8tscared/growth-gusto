@@ -264,7 +264,7 @@ async function safe(p, msg = "Impossible d'enregistrer. Vérifiez la connexion e
 const S = {
   me: { id: "local", name: "" }, isOwner: true, cap: {}, rid: null, restos: [], resto: null, ready: false,
   fridges: [], readings: [], lots: [], products: [], counts: [], receptions: [], events: [], notes: [], chores: [], choreLogs: [], tickets: [], members: [],
-  moves: [], staff: [], shifts: [], punches: [], obligations: [], oblLogs: [], feedback: [], expenses: [],
+  moves: [], staff: [], shifts: [], punches: [], obligations: [], oblLogs: [], feedback: [], expenses: [], invoices: [], prices: [],
   profiles: {}, route: "home", params: {}, history: [], slot: slotNow(), open: null, temp: {}, ui: {},
   rec: null, tz: null, zone: null, stockTab: "inv", noteCat: "Toutes", noteQ: "", regFilter: "all", slow: false, dbErr: null,
 };
@@ -404,6 +404,9 @@ function attachResto() {
   w("oblLogs", { order: "at", dir: "desc", limit: 1000 }, "oblLogs");
   w("feedback", { order: "at", dir: "desc", limit: 1000 }, "feedback");
   w("expenses", { order: "at", dir: "desc", limit: 3000 }, "expenses");
+  /* js/marge.js: supplier invoices + purchase price history */
+  w("invoices", { order: "at", dir: "desc", limit: 500 }, "invoices");
+  w("prices", { order: "at", dir: "desc", limit: 4000 }, "prices");
 }
 let memberChecked = false;
 /* accounts: role and profile come from restos/{rid}/members/{uid}; names and photos of the team from their member docs */
@@ -849,7 +852,7 @@ function registerSW() {
    to the foreground. A new v means the code running here is old: with nothing in progress the app reloads silently (caches dropped,
    so the reload is guaranteed fresh); otherwise a toast offers « Mettre à jour ». sessionStorage guards against reload loops:
    one reload attempt per version per session, after which the version is simply adopted. */
-const APP_V = "2026-11-06.1";
+const APP_V = "2026-11-06.2";
 /* logos of the tools Growth Gusto connects to (img/logos/<id>.svg|png): caisses, réservations, comptabilité, banque, paiement */
 const BRAND_LOGOS = { sumup: "svg", zelty: "png", lightspeed: "svg", tiller: "svg", square: "svg", innovorder: "svg", popina: "png", zenchef: "svg", thefork: "png", sevenrooms: "png", guestonline: "png", resy: "svg", opentable: "svg", formitable: "svg", google: "svg", pennylane: "svg", qonto: "svg", quickbooks: "svg", sage: "svg", odoo: "svg", stripe: "svg", zebra: "svg" };
 const brandLogo = (id) => BRAND_LOGOS[id] ? `<img class="brand-logo" src="img/logos/${id}.${BRAND_LOGOS[id]}" alt="" loading="lazy" decoding="async" draggable="false">` : "";

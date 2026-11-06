@@ -110,7 +110,7 @@ const pmModuleOf = (route) => { route = String(route || ""); return PM_MOD[route
 function pmRouteAllowed(route) {
   if (pmIsAdminMe()) return true;
   const r = String(route || ""); const p = pmMe();
-  if (["marges", "expenses", "couts"].includes(r)) return !!p.caps.seeMoney;
+  if (["marges", "margeFiche", "factures", "facture", "factureScan", "expenses", "couts"].includes(r)) return !!p.caps.seeMoney;
   const k = pmModuleOf(r); if (!k) return r !== "abonnementAdmin";
   return !!p.modules[k] && (!PM_MONEY.has(k) || !!p.caps.seeMoney);
 }
