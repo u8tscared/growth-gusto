@@ -157,7 +157,7 @@ function mrKpiCard(k, L, i) {
   return `<div class="glass mr-kpi st" style="--i:${i}"><div class="mr-kh"><span class="mr-ki">${ico(ic)}</span><b>${label}</b></div>${bars}</div>`;
 }
 function mrSpark(byDay, from, to) {
-  const days = []; for (let d = from; d <= to; d = addDays(d, 1)) days.push(byDay[d] || 0); if (days.length < 2) return "";
+  const days = []; for (let d = from; d <= to; d = addDays(d, 1)) days.push(byDay[d] || 0); if (days.length < 2 || !days.some((v) => v > 0)) return "";
   const W = 120, H = 30, mx = Math.max(...days, 1), pts = days.map((v, i) => `${((i / (days.length - 1)) * W).toFixed(1)},${(H - 2 - (v / mx) * (H - 6)).toFixed(1)}`).join(" ");
   return `<svg class="mr-spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true"><polyline points="0,${H} ${pts} ${W},${H}" class="ar"/><polyline points="${pts}" class="ln"/></svg>`;
 }
