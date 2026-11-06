@@ -247,3 +247,6 @@
 @keyframes cmSwing{0%,100%{transform:rotate(-3deg)}50%{transform:rotate(3deg)}}
 @keyframes cmTilt{0%,100%{transform:rotateY(-10deg) rotateX(4deg)}50%{transform:rotateY(10deg) rotateX(2deg)}}
 @media (prefers-reduced-motion:reduce){.cm *{animation-duration:.01ms!important;animation-delay:0s!important}}
+.cm-kds{all:unset;cursor:pointer;flex:none;display:flex;align-items:center;gap:10px;padding:0 16px;border-radius:18px;background:var(--tint);color:var(--accent-ink);box-shadow:0 0 0 1.5px #DCD0FF inset}
+.cm-kds .ico{width:22px;height:22px}
+.cm-kds span{display:flex;flex-direction:column}.cm-kds b{font-size:14px}.cm-kds em{font-style:normal;font-size:12px;color:var(--muted)}

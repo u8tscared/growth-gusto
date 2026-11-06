@@ -87,6 +87,14 @@ svg{width:18px;height:18px;flex:none;fill:none;stroke:currentColor;stroke-width:
 .rv-f input::placeholder,.rv-f textarea::placeholder{color:#9A93A8}
 .rv-f input:focus,.rv-f textarea:focus{border-color:var(--accent);box-shadow:0 0 0 4px rgba(91,43,255,.14)}
 .rv-err{display:flex;gap:9px;align-items:center;font-size:14px;font-weight:650;color:var(--bad);background:var(--tomato-tint);border-radius:14px;padding:11px 13px;animation:rvShake .4s}
+.rv-opt{all:unset;box-sizing:border-box;cursor:pointer;display:flex;align-items:flex-start;gap:12px;padding:13px 14px;border-radius:16px;background:#F7F0E3;font-size:14.5px;font-weight:620;line-height:1.35;color:var(--ink);transition:background .25s}
+.rv-opt>i{flex:none;width:24px;height:24px;border-radius:8px;background:#fff;box-shadow:inset 0 0 0 1.5px var(--rim-2);display:grid;place-items:center;transition:background .25s,box-shadow .25s,transform .35s var(--spring)}
+.rv-opt>i svg{width:16px;height:16px;fill:none;stroke:#fff;stroke-width:3;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:22;stroke-dashoffset:22;transition:stroke-dashoffset .35s var(--ease) .05s}
+.rv-opt em{display:block;font-style:normal;font-size:12.5px;font-weight:550;color:var(--faint);margin-top:2px}
+.rv-opt.on{background:var(--tint)}
+.rv-opt.on>i{background:var(--accent);box-shadow:0 2px 0 var(--accent-edge);transform:scale(1.06)}
+.rv-opt.on>i svg{stroke-dashoffset:0}
+.rv-opt:focus-visible{outline:2.5px solid var(--accent);outline-offset:2px}
 .rv-legal{margin:0;text-align:center;font-size:12px;color:var(--faint)}
 
 /* buttons */

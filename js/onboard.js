@@ -121,9 +121,9 @@ const OB_FEATS = [
   { t: "Cuisine & stock", ic: "book", tone: "sf", items: [["frigos", "snow", "Frigos et DLC"], ["sondes", "sdProbe", "Sondes connectées"], ["scan", "scan", "Étiquettes et scanner"], ["reception", "truck", "Réceptions"], ["notes", "book", "Recettes et allergènes"], ["stock", "box", "Stock et inventaire"], ["gaspillage", "hygBin", "Gaspillage"]] },
   { t: "Équipe", ic: "users", tone: "sky", items: [["pointeuse", "clock", "Pointeuse"], ["planning", "cal", "Planning et paie"], ["formation", "fmHand", "Formation HACCP"], ["equipe", "users", "Équipe et accès"]] },
   { t: "Gestion & ventes", ic: "euro", tone: "ok", items: [["dashboard", "dash", "Tableau de bord"], ["finance", "euro", "Finances"], ["caisse", "cxPlug", "Caisse connectée"], ["tickets", "receipt", "Tickets de caisse"], ["alertes", "alBell", "Alertes"], ["sites", "store", "Plusieurs établissements"], ["import", "imUp", "Import d'un autre logiciel"]] },
-  { t: "Clients", ic: "resa", tone: "tm", items: [["resa", "resa", "Réservations en ligne"]] },
+  { t: "Clients", ic: "resa", tone: "tm", items: [["resa", "resa", "Réservations en ligne"], ["clients", "fdUsers", "Fichier clients et fidélité"]] },
 ];
-const OB_FB = { hygPot: "spray", ctBadge: "shield", ctDoc: "list", ctRecall: "alert", sdProbe: "therm", hygBin: "trash", fmHand: "book", cxPlug: "receipt", alBell: "alert", imUp: "upload", resa: "cal" };
+const OB_FB = { hygPot: "spray", ctBadge: "shield", ctDoc: "list", ctRecall: "alert", sdProbe: "therm", hygBin: "trash", fmHand: "book", cxPlug: "receipt", alBell: "alert", imUp: "upload", resa: "cal", fdUsers: "users" };
 
 const OB = {
   st: null,
