@@ -444,6 +444,12 @@ const AUTH = {
     return `<div class="au-pack st" style="--i:${i}"><span class="au-pack-ic" aria-hidden="true">${ico("sparkle")}</span><div><b>Essai gratuit 14 jours · Pack ${t}</b><span>Sans engagement, sans carte bancaire. Ensuite ${price} € HT par mois, si vous continuez.</span></div></div>`;
   },
   backBtn() { return this.ui.back.length ? `<button class="au-back" data-act="auBack" aria-label="Retour">${AU_SVG.back}</button>` : this.inApp ? `<button class="au-back" data-act="auClose" aria-label="Fermer">${AU_SVG.x}</button>` : ""; },
+  /* every sign-in / sign-up screen offers Google and the demo (inside the demo: « Revenir à la démo » closes the overlay) */
+  googleHTML(last) { const busy = this.ui.busy === "google" ? " au-busy" : ""; return `<button class="au-tac au-btn au-google${busy}" data-act="auGoogle"><span class="au-bl">${AU_G}Continuer avec Google</span>${last === "google" ? `<em class="au-last">Dernière fois</em>` : ""}${AU_DOTS}</button>`; },
+  demoHTML(i = 4) {
+    const d = DB.mode === "demo";
+    return `<button class="au-demo st" style="--i:${i}" data-act="${d ? "auDemoBack" : "auDemo"}"><span class="au-demo-ic" aria-hidden="true">${AU_SVG.cloche}</span><span class="au-demo-l"><b>${d ? "Revenir à la démo" : "Essayer la démo"}</b><span>${d ? "Vous reprenez là où vous en étiez." : "Un restaurant déjà rempli. Rien n'est enregistré."}</span></span><span class="au-arr" aria-hidden="true">${AU_SVG.arrow}</span></button>`;
+  },
   errHTML() { return this.ui.err ? `<div class="au-err" role="alert">${ico("alert")}<span>${esc(this.ui.err)}</span></div>` : ""; },
 
   screenHTML() {
@@ -462,18 +468,18 @@ const AUTH = {
         <p class="au-lede st" style="--i:2">${lede}</p>
         ${this.errHTML()}
         <div class="au-stack st" style="--i:3">
-          <button class="au-tac au-btn au-google${busy("google")}" data-act="auGoogle"><span class="au-bl">${AU_G}Continuer avec Google</span>${last === "google" ? lastTag : ""}${dots}</button>
+          ${this.googleHTML(last)}
           <button class="au-tac au-btn au-primary au-mailb" data-act="auEmail"><span class="au-bl">${AU_SVG.mail}Continuer avec un e-mail</span>${last === "email" ? lastTag : ""}</button>
         </div>
         ${inv ? `<button class="au-ghost au-joincode st" style="--i:4" data-act="auInvForget">Ce n'est pas mon invitation${AU_SVG.arrowS}</button>` : `<button class="au-ghost au-joincode st" style="--i:4" data-act="auJoinOpen">${ico("users")}Rejoindre une équipe avec un code${AU_SVG.arrowS}</button>`}
-        ${DB.mode === "demo" ? "" : `<button class="au-demo st" style="--i:4" data-act="auDemo"><span class="au-demo-ic" aria-hidden="true">${AU_SVG.cloche}</span><span class="au-demo-l"><b>Essayer la démo</b><span>Un restaurant déjà rempli. Rien n'est enregistré.</span></span><span class="au-arr" aria-hidden="true">${AU_SVG.arrow}</span></button>`}
+        ${this.demoHTML(4)}
         ${this.inApp ? "" : `<button class="au-ghost st" style="--i:5" data-act="auLocal">${this.hasLocal() ? "Continuer avec les données de ce téléphone" : "Continuer sans compte"}${AU_SVG.arrowS}</button>`}
         <p class="au-fine au-fine-m st" style="--i:6">Données hébergées en France et chiffrées.</p>`;
     }
     if (s === "soon") {
       return `${top()}${head("Les comptes arrivent.", "Nous finalisons la connexion sécurisée.")}
         <div class="au-note st" style="--i:3"><p>Très bientôt : un compte pour votre restaurant, sur tous vos appareils, et l'équipe invitée en un lien.</p><p class="au-note-s">En attendant, essayez la démo ou utilisez l'app sur cet appareil. Vous pourrez tout importer ensuite.</p></div>
-        <div class="au-stack st" style="--i:4"><button class="au-tac au-primary" data-act="auDemo"><span class="au-bl">${AU_SVG.play}Essayer la démo</span></button>${this.inApp ? "" : `<button class="au-tac" data-act="auLocal"><span class="au-bl">${AU_SVG.phone}Continuer sur cet appareil</span></button>`}</div>`;
+        <div class="au-stack st" style="--i:4"><button class="au-tac au-primary" data-act="${DB.mode === "demo" ? "auDemoBack" : "auDemo"}"><span class="au-bl">${AU_SVG.play}${DB.mode === "demo" ? "Revenir à la démo" : "Essayer la démo"}</span></button>${this.inApp ? "" : `<button class="au-tac" data-act="auLocal"><span class="au-bl">${AU_SVG.phone}Continuer sur cet appareil</span></button>`}</div>`;
     }
     if (s === "email") {
       const up = U.tab === "up", back = !!auLS.get("gg-last-email");
@@ -481,7 +487,9 @@ const AUTH = {
         ${head(up ? "Ouvrons votre cuisine." : back ? "Bon retour en cuisine." : "Entrez en cuisine.", up ? "30 secondes, et votre cahier HACCP tient tout seul." : back ? "Vos relevés du jour vous attendent." : "Avec l'e-mail de votre compte.")}
         ${up ? this.packHTML(3) : ""}
         ${this.errHTML()}
-        <form class="au-form st" style="--i:${up ? 4 : 3}" data-au="email" novalidate>
+        <div class="au-stack au-alt st" style="--i:3">${this.googleHTML(auLS.get("gg-last"))}</div>
+        <div class="au-or st" style="--i:4" aria-hidden="true"><span>ou avec un e-mail</span></div>
+        <form class="au-form au-form-alt st" style="--i:${up ? 5 : 4}" data-au="email" novalidate>
           ${up ? `<label class="au-f${this._seg === "in" ? " au-grow" : ""}"><span class="au-lbl">Prénom</span><div class="au-in"><input class="au-input" id="auName" autocomplete="given-name" maxlength="40" placeholder="Marceau" value="${esc(U.name)}" enterkeyhint="next">${okI}</div></label>` : ""}
           <label class="au-f"><span class="au-lbl">E-mail</span><div class="au-in"><input class="au-input" id="auEmail" type="email" inputmode="email" autocomplete="${up ? "email" : "username"}" autocapitalize="off" spellcheck="false" placeholder="chef@votre-restaurant.fr" value="${esc(U.email || auLS.get("gg-last-email") || "")}" enterkeyhint="next">${okI}</div><em class="au-hint" id="auEmailH" aria-live="polite"></em></label>
           <div class="au-f"><div class="au-lrow"><label class="au-lbl" for="auPw">Mot de passe</label>${up ? "" : `<button type="button" class="au-forgot" data-act="auForgot">Mot de passe oublié ?</button>`}</div>
@@ -489,7 +497,8 @@ const AUTH = {
             ${up ? `<div class="au-meter" id="auMeter" data-s="0" aria-hidden="true"><i></i><i></i><i></i><i></i></div><div class="au-mrow"><span>Solidité</span><em class="au-hint" id="auPwH">${AU_PW_TX[0]}</em></div>` : ""}</div>
           <button class="au-tac au-primary au-submit${busy("email")}" type="submit" id="auGo"><span class="au-bl">${up ? "Créer mon compte" : "Se connecter"}</span>${dots}</button>
           <p class="au-legal">${auLS.get("gg-invite") ? `Votre compte rejoindra ${esc((U.preInv && U.preInv.restoName) || "l'équipe")} automatiquement.` : up ? "En créant un compte, vous devenez gérant de votre restaurant. Vous inviterez votre équipe ensuite." : "Protégé par chiffrement. Vos données restent en France."}</p>
-        </form>`;
+        </form>
+        ${this.demoHTML(6)}`;
     }
     if (s === "reset") {
       if (U.sent) return `${top()}<div class="au-seal st" style="--i:1">${AU_SEAL}</div>${head("Vérifiez vos e-mails.", `Un lien vient de partir vers <b>${esc(U.email)}</b>. Choisissez-y un nouveau mot de passe, et pensez aux courriers indésirables.`, 2)}
@@ -1479,6 +1488,7 @@ Object.assign(ACT, {
   auSignOutOk: () => { closeSheet(true); AUTH.signOut(); },
   auDemoSignup: () => { SFX.tap(); AUTH.openWelcome({ screen: AUTH.cfg ? "email" : "soon", tab: "up" }); },
   auDemoLeave: () => AUTH.leaveDemo(),
+  auDemoBack: () => { SFX.close(); AUTH.hide(); },
   auMailPrev: () => { SFX.tap(); openSheet(auMailPrev()); },
   auMailPrevK: (a, id, v) => { SFX.tick(); buzz(4); $("#sheetBody").innerHTML = auMailPrev(v); },
   /* « Vérifiez votre e-mail » */
