@@ -14,8 +14,8 @@ PLANS = [
    ("Achats et marges", ["Marge de chaque plat, fiches techniques chiffrées", "Factures fournisseurs scannées", "Commandes fournisseurs préparées", "Gaspillage en euros"]),
    ("Et aussi", ["Consignes et messagerie d'équipe", "Import depuis votre ancien logiciel", "Comptes équipe illimités"])]),
  ("pro", "Second", "109", "La salle et la caisse en plus : tout le service, du frigo à l'addition.", "Tout Commis, plus :", [
-   ("Salle", ["Carnet de réservations, sans commission", "Lien de réservation pour vos clients", "Plan de salle et placement automatique", "Prise de commande, écran cuisine", "Menu QR et commande en ligne, carte importée", "Réservations Zenchef et TheFork, par import", "Fichier clients et fidélité"]),
-   ("Caisse et stock", ["Caisse reliée en direct : SumUp, Square", "Autres caisses : import des ventes ou photo du ticket Z", "Uber Eats, Deliveroo, Just Eat : import des relevés", "Stock déduit des ventes, selon vos recettes", "Inventaire mensuel guidé", "Tableau de bord"])]),
+   ("Salle", ["Carnet de réservations, sans commission", "Lien de réservation pour vos clients", "Plan de salle et placement automatique", "Prise de commande, écran cuisine, ruptures en direct", "Coup de feu calé sur les réservations", "Avis Google demandé après le repas", "Menu QR et commande en ligne, carte importée", "Réservations Zenchef et TheFork, par import", "Fichier clients et fidélité"]),
+   ("Caisse et stock", ["Caisse reliée en direct : SumUp, Square", "Autres caisses : import des ventes ou photo du ticket Z", "Uber Eats, Deliveroo, Just Eat : import des relevés", "Stock déduit des ventes, selon vos recettes", "Inventaire mensuel guidé", "Notes de frais avec TVA ventilée", "Tableau de bord"])]),
  ("complet", "Chef", "169", "Toute la maison tourne : HACCP, salle, caisse, stock, équipe et chiffres.", "Tout Second, plus :", [
    ("Équipe", ["Pointeuse", "Planning, heures et repères HCR", "Export paie pour le comptable", "Employés et salaires"]),
    ("Finances", ["Finances et marges", "Banque : import du relevé (connexion directe bientôt)", "Lien direct avec Pennylane"]),
@@ -26,9 +26,9 @@ PLANS = [
 MATRIX = [
  ("Relevés de températures, sondes, alertes", 1, 1, 1), ("Étiquettes DLC, réception, mise en place", 1, 1, 1), ("Nettoyage, refroidissement, friture", 1, 1, 1),
  ("Recettes, 14 allergènes, process HACCP", 1, 1, 1), ("Mode contrôle, dossier PDF, PMS rédigé", 1, 1, 1), ("Formation HACCP", 1, 1, 1),
- ("Marges, factures, commandes fournisseurs, gaspillage", 1, 1, 1), ("Consignes et messagerie d'équipe", 1, 1, 1),
+ ("Marges, factures, commandes fournisseurs, gaspillage", 1, 1, 1), ("Consignes et messagerie d'équipe, par groupes", 1, 1, 1),
  ("Réservations et plan de salle", 0, 1, 1), ("Prise de commande et écran cuisine", 0, 1, 1), ("Menu QR et commande en ligne", 0, 1, 1),
- ("Caisse, stock, inventaire, tableau de bord", 0, 1, 1), ("Relevés Uber Eats, Deliveroo, Just Eat", 0, 1, 1), ("Fichier clients et fidélité", 0, 1, 1),
+ ("Caisse, stock, inventaire, tableau de bord", 0, 1, 1), ("Relevés Uber Eats, Deliveroo, Just Eat", 0, 1, 1), ("Fichier clients, fidélité, avis Google", 0, 1, 1), ("Notes de frais avec TVA", 0, 1, 1),
  ("Pointeuse, planning, export paie", 0, 0, 1), ("Finances, relevé bancaire, Pennylane", 0, 0, 1), ("Plusieurs restaurants", 0, 0, 1),
 ]
 
