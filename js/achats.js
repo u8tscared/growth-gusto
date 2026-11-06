@@ -1,4 +1,4 @@
-/* Growth Gusto — area: commandes fournisseurs (routes « commandes », « commande »). Prefix « ac ».
+/* Growth Gusto — area: commandes fournisseurs (routes « achats », « achat »). Prefix « ac ».
    The app prepares one purchase order per supplier, on its own: for every product it estimates what the kitchen will use until the
    delivery AFTER the next one (so the stock never runs dry between two deliveries), from:
      · the covers expected each day: bookings (js/resa.js) × the usual share of walk-ins, never below the usual covers of that weekday
@@ -16,7 +16,7 @@
    Exposed: acPlan() → [{ key, name, cfg, next, lines, total }], acPending(productId) → qty already ordered and not delivered yet. */
 "use strict";
 
-TAB_OF.commandes = "stock"; TAB_OF.commande = "stock";
+TAB_OF.achats = "stock"; TAB_OF.achat = "stock";
 Object.assign(IC, {
   acCart: ["M3 4h2.2l2.3 11.2a1.6 1.6 0 0 0 1.6 1.3h8.3a1.6 1.6 0 0 0 1.6-1.2L21 8H6.1", "f:M6.1 8H21l-1.9 7.3a1.6 1.6 0 0 1-1.6 1.2H9.1a1.6 1.6 0 0 1-1.6-1.3z", "c:9.5,20.5,1.3", "c:17.5,20.5,1.3"],
   acSend: ["M21.5 2.5 10.5 13.5", "M21.5 2.5 15 21l-4.5-7.5L3 9z", "f:M21.5 2.5 15 21l-4.5-7.5L3 9z"],
@@ -33,12 +33,12 @@ Object.assign(IC, {
 
 /* side nav: right after « Stock & inventaire » (no core edit) */
 (function acNav() {
-  if (NAV.some((n) => n[0] === "commandes")) return;
-  const i = NAV.findIndex((n) => n[0] === "stock"); NAV.splice(i >= 0 ? i + 1 : NAV.length, 0, ["commandes", "acCart", "Commandes"]);
+  if (NAV.some((n) => n[0] === "achats")) return;
+  const i = NAV.findIndex((n) => n[0] === "stock"); NAV.splice(i >= 0 ? i + 1 : NAV.length, 0, ["achats", "acCart", "Achats"]);
 })();
-try { if (typeof PM_ROUTE !== "undefined") Object.assign(PM_ROUTE, { commandes: "stock", commande: "stock" }); } catch (e) {}
+try { if (typeof PM_ROUTE !== "undefined") Object.assign(PM_ROUTE, { achats: "stock", achat: "stock" }); } catch (e) {}
 /* pack Second and up, like the stock (js/abo.js; open to everyone during the trial) */
-try { if (typeof AB_GATE !== "undefined") Object.assign(AB_GATE, { commandes: ["pro", "Commandes fournisseurs"], commande: ["pro", "Commandes fournisseurs"] }); } catch (e) {}
+try { if (typeof AB_GATE !== "undefined") Object.assign(AB_GATE, { achats: ["pro", "Commandes fournisseurs"], achat: ["pro", "Commandes fournisseurs"] }); } catch (e) {}
 
 /* ───────── state + own subscriptions (suppliers, orders), guarded per restaurant ───────── */
 const AC = { rid: null, sup: null, ord: null, subs: {}, tick: null, now: Date.now() };
@@ -280,7 +280,7 @@ function acForecast(n = 7) {
   return { D, mx, tot, bk, html: `<div class="ac-fc">${D.map((d, i) => `<div class="ac-fcd${d.open ? "" : " off"}${i === 0 ? " now" : ""}" style="--j:${i}" title="${d.booked} réservés · ${d.n} attendus"><span class="ac-fcv mono">${d.open ? d.n : ""}</span><div class="ac-fcb"><i class="est" style="height:${(d.n / mx) * 100}%"></i><i class="bk" style="height:${(Math.min(d.booked, d.n || d.booked) / mx) * 100}%"></i></div><em>${i === 0 ? "auj." : AC_DOW[parseDay(d.k).getDay()].replace(".", "")}</em></div>`).join("")}</div>` };
 }
 
-VIEWS.commandes = {
+VIEWS.achats = {
   render() {
     acWatch(); const plan = acPlan(); const todo = plan.filter((p) => p.on.length); const calm = plan.filter((p) => !p.on.length && p.sup.products.length);
     const money = acMoney(); const total = todo.reduce((a, p) => a + p.total, 0); const fc = acForecast(7);
@@ -317,7 +317,7 @@ VIEWS.commandes = {
       <li><span>2</span><div><b>Ce que consomme un couvert</b><em>D'après vos tickets Z, vos recettes et vos livraisons des 4 dernières semaines.</em></div></li>
       <li><span>3</span><div><b>Jusqu'à la livraison suivante</b><em>Moins votre stock et ce qui est déjà commandé, arrondi au colis. Les produits souvent jetés sont commandés au plus juste.</em></div></li></ol></div>`;
     const nsH = noSup.length && plan.length ? `<button class="glass pad st ac-nosup" style="--i:6" data-act="acNoSupGo"><span class="ic warn">${ico("alert")}</span><span class="tx"><b>${noSup.length} produit${noSup.length > 1 ? "s" : ""} sans fournisseur</b><em>${esc(noSup.slice(0, 3).map((p) => p.name).join(", "))}${noSup.length > 3 ? "…" : ""} : ils ne sont dans aucune commande.</em></span>${ico("chev")}</button>` : "";
-    return `<div class="inner ac">${topBar("Commandes", { right: `<button class="iconbtn" data-act="acSupList" aria-label="Fournisseurs">${ico("truck")}</button>` })}
+    return `<div class="inner ac">${topBar("Commandes fournisseurs", { right: `<button class="iconbtn" data-act="acSupList" aria-label="Fournisseurs">${ico("truck")}</button>` })}
       <div class="cols"><div>${hero}${empty}${todo.length ? `<div class="lbl st ac-sec" style="--i:2">À envoyer</div>` : ""}${cards}${calmH}${nsH}</div>
       <div>${waitH}${histH}${how}</div></div></div>`;
   },
@@ -331,11 +331,11 @@ function acMissing(o, rec) {
 }
 
 /* one supplier: the proposed order, line by line */
-VIEWS.commande = {
-  nav: "commandes",
+VIEWS.achat = {
+  nav: "achats",
   render(P) {
     acWatch(); const sup = acSupOf(P.k);
-    if (!sup) return `<div class="inner narrow">${topBar("Commande")}<div class="glass empty st" style="--i:1"><div class="ic">${ico("truck")}</div><b>Fournisseur introuvable</b><div style="margin-top:14px"><button class="btn acc" data-go="commandes">Retour aux commandes</button></div></div></div>`;
+    if (!sup) return `<div class="inner narrow">${topBar("Commande")}<div class="glass empty st" style="--i:1"><div class="ic">${ico("truck")}</div><b>Fournisseur introuvable</b><div style="margin-top:14px"><button class="btn acc" data-go="achats">Retour aux commandes</button></div></div></div>`;
     const pl = acPlanFor(sup); const money = acMoney(); const lines = pl.lines.filter((L) => L.qty > 0 || L.edited || L.removed || L.extra || L.low).sort((a, b) => (b.qty > 0) - (a.qty > 0) || a.name.localeCompare(b.name, "fr"));
     const rest = pl.lines.filter((L) => !lines.includes(L)); const open = S.ui.acLine;
     const row = (L, i) => {
@@ -449,7 +449,7 @@ async function acDraftPatch(k, fn) {
 
 /* ───────── actions ───────── */
 Object.assign(ACT, {
-  acOpen: (a, id, v) => { SFX.tap(); S.ui.acLine = null; go("commande", { k: v }); },
+  acOpen: (a, id, v) => { SFX.tap(); S.ui.acLine = null; go("achat", { k: v }); },
   acLine: (a, id, v) => { SFX.tick(); S.ui.acLine = S.ui.acLine === v ? null : v; refresh(true); },
   acQty: async (a, id, v) => {
     const k = S.params.k; const pl = acPlanFor(acSupOf(k)); const d = +a.dataset.d;
@@ -510,19 +510,19 @@ Object.assign(ACT, {
     if (pl.draft) DB.del("orders", "br-" + pl.key).catch(() => {});
     logEvent("order", `a commandé chez ${pl.name} (${pl.on.length} produit${pl.on.length > 1 ? "s" : ""}${acMoney() ? `, ${acEur(pl.total, 0)} HT` : ""})`, { ref: oid });
     S.ui.acNote = null; closeSheet(true); SFX.done(); buzz([8, 40, 12]); burst();
-    toast(ch === "copie" ? "Texte copié, commande notée" : "Commande envoyée"); setTimeout(() => go("commandes", {}, { replace: true }), 500);
+    toast(ch === "copie" ? "Texte copié, commande notée" : "Commande envoyée"); setTimeout(() => go("achats", {}, { replace: true }), 500);
   },
   acOrd: (a, id) => { const o = acOrders().find((x) => x.id === id); if (!o) return; SFX.tap(); openSheet(acOrderSheet(o)); },
   acRecv: (a, id) => {
     const o = acOrders().find((x) => x.id === id); if (!o) return; closeSheet(true); SFX.tap();
     go("reception", { fresh: true }); try { if (S.rec && !(S.rec.lines || []).length) { S.rec.supplier = o.supplier; S.rec.orderId = o.id; refresh(true); } } catch (e) {}
   },
-  acResend: (a, id) => { const o = acOrders().find((x) => x.id === id); if (!o) return; closeSheet(true); go("commande", { k: o.supKey || acKey(o.supplier) }); },
+  acResend: (a, id) => { const o = acOrders().find((x) => x.id === id); if (!o) return; closeSheet(true); go("achat", { k: o.supKey || acKey(o.supplier) }); },
   acCancel: async (a, id) => { if (!a.dataset.sure) { a.dataset.sure = "1"; a.lastChild.textContent = "Confirmer"; SFX.tap(); return; } await safe(DB.update("orders", id, { status: "annulee", cancelledAt: Date.now() })).catch(() => {}); closeSheet(); toast("Commande annulée"); },
   acAgain: async (a, id) => {
     const o = acOrders().find((x) => x.id === id); if (!o) return; const k = o.supKey || acKey(o.supplier); closeSheet(true);
     await acDraftPatch(k, (D) => { D.edits = {}; D.extra = []; (o.lines || []).forEach((L) => { if (L.productId && S.products.some((p) => p.id === L.productId && acKey(p.supplier) === k)) D.edits[L.productId] = +L.qty; else D.extra.push({ ...L }); }); D.removed = []; });
-    go("commande", { k });
+    go("achat", { k });
   },
   acMore: () => { S.ui.acHist = (S.ui.acHist || 6) + 10; refresh(true); },
   acNoSupGo: () => { SFX.tap(); S.stockTab = "cat"; go("stock"); },
@@ -550,7 +550,7 @@ Object.assign(ACT, {
 
 /* Stock › « À commander » opens the prepared orders (stock.js keeps its own sheet for products under their threshold) */
 (function acHook() {
-  const old = ACT.stkLowOpen; ACT.stkLowOpen = (...x) => { if (S.products.some((p) => (p.supplier || "").trim())) { SFX.tap(); go("commandes"); } else if (old) old(...x); };
+  const old = ACT.stkLowOpen; ACT.stkLowOpen = (...x) => { if (S.products.some((p) => (p.supplier || "").trim())) { SFX.tap(); go("achats"); } else if (old) old(...x); };
 })();
 
 /* the reception linked to an order: once saved, the order is « reçue » (the reception flow is js/reception.js; we only listen) */
@@ -585,7 +585,7 @@ function acPrintOrder(pl, note) {
 
 /* menu Plus (compte.js): add « Commandes » next to Stock, without touching compte.js */
 (function acMore() {
-  const inject = (groups) => groups.map(([g, its, ...r]) => { if (!its.some((x) => x[0] === "stock") || its.some((x) => x[0] === "commandes")) return [g, its, ...r]; const i = its.findIndex((x) => x[0] === "stock"); const o = its.slice(); o.splice(i + 1, 0, ["commandes", "acCart", "Commandes", 0]); return [g, o, ...r]; });
+  const inject = (groups) => groups.map(([g, its, ...r]) => { if (!its.some((x) => x[0] === "stock") || its.some((x) => x[0] === "achats")) return [g, its, ...r]; const i = its.findIndex((x) => x[0] === "stock"); const o = its.slice(); o.splice(i + 1, 0, ["achats", "acCart", "Achats", 0]); return [g, o, ...r]; });
   const prev = typeof pzMoreGroups === "function" ? pzMoreGroups : null;
   window.pzMoreGroups = function (groups) { const g = inject(groups); return prev ? prev(g) : g; };
 })();
