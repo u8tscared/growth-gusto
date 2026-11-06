@@ -101,13 +101,14 @@ function finStaff(from, to) {
 }
 
 /* ───────── data: achats + charges ───────── */
-function finProrate(e, from, to) {
+function finProrate(e, from, to, skip) {
   const a = finMax(from, e.day || from), b = finMin(to, e.endDay || "9999-12-31"); if (a > b) return 0;
   let sum = 0;
   for (let k = a; k <= b;) {
     const d = parseDay(k); const dim = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
     const me = dayKey(new Date(d.getFullYear(), d.getMonth(), dim)); const end = finMin(me, b);
-    sum += (+e.amountHT || 0) * (finDays(k, end) + 1) / dim; k = addDays(end, 1);
+    /* skip(month): the bank already shows this charge that month (js/banque.js) */
+    if (!(skip && skip(k.slice(0, 7)))) sum += (+e.amountHT || 0) * (finDays(k, end) + 1) / dim; k = addDays(end, 1);
   }
   return sum;
 }
@@ -115,7 +116,18 @@ function finExp(from, to) {
   const out = { achats: 0, fixed: 0, byCat: {}, items: [] };
   const add = (it, amt) => { if (!amt) return; out.items.push({ ...it, amt }); out.byCat[it.cat] = (out.byCat[it.cat] || 0) + amt; if (it.cat === "achats") out.achats += amt; else out.fixed += amt; };
   const E = finAll("expenses");
-  E.forEach((e) => { const a = +e.amountHT || 0; if (!a) return; if (e.recurring) add(e, finProrate(e, from, to)); else if (e.day >= from && e.day <= to) add(e, a); });
+  /* bank operations (js/banque.js): each outgoing one is a charge; a monthly charge is replaced in the months the bank shows it,
+     reception amounts are replaced by the bank purchases over the period the bank covers (unless the gérant chose the receptions) */
+  const B = typeof bqExp === "function" ? finTry(bqExp, from, to) : null;
+  const bankHas = B ? (cat) => (m) => B.cover.has(m + "|" + cat) : null;
+  E.forEach((e) => {
+    const a = +e.amountHT || 0; if (!a) return;
+    if (e.recurring) { add(e, finProrate(e, from, to, bankHas && bankHas(e.cat))); return; }
+    if (e.day < from || e.day > to) return;
+    if (B && e.receptionId && e.cat === "achats" && B.achatsBank && e.day >= B.from && e.day <= B.to) return;
+    add(e, a);
+  });
+  if (B) B.items.forEach((it) => { if (it.cat === "achats" && !B.achatsBank) return; add(it, it.ht); });
   /* a paid intervention (extincteurs, nuisibles, hotte…) is a charge too, unless it was already entered as an expense */
   const linked = new Set(E.map((e) => e.oblLogId).filter(Boolean)); const obl = finAll("obligations");
   finAll("oblLogs").forEach((l) => { const c = finNum(l.cost); if (!c || !l.day || l.day < from || l.day > to || linked.has(l.id)) return; const o = obl.find((x) => x.id === l.oblId); add({ id: "obl-" + l.id, cat: "entretien", label: o ? o.name : "Contrôle obligatoire", day: l.day, supplier: l.provider || "", auto: "obl" }, c); });
@@ -242,9 +254,10 @@ VIEWS.finance = {
       <div class="seg fin-seg" role="tablist">${[["semaine", "Semaine"], ["mois", "Mois"], ["annee", "Année"]].map(([k, t]) => `<button class="${U.kind === k ? "on" : ""}" data-act="finKind" data-v="${k}" role="tab" aria-selected="${U.kind === k}">${t}</button>`).join("")}<span class="knob" style="width:calc(33.33% - 2.67px);transform:translateX(${["semaine", "mois", "annee"].indexOf(U.kind) * 100}%)"></span></div>
       <div class="fin-nav"><button class="iconbtn" data-act="finStep" data-v="-1" aria-label="Période précédente">${ico("back")}</button><b>${esc(P.lab)}</b><button class="iconbtn" data-act="finStep" data-v="1" aria-label="Période suivante" ${U.off >= 0 ? "disabled" : ""}>${ico("chev")}</button></div>
       <div class="chips fin-cmp"><button class="chip ${U.cmp === "prev" ? "on" : ""}" data-act="finCmp" data-v="prev">vs période précédente</button><button class="chip ${U.cmp === "n1" ? "on" : ""}" data-act="finCmp" data-v="n1">vs N-1</button></div></div>`;
-    if (C.empty && !finAll("expenses").length && !finAll("tickets").length) return `<div class="inner wide fin">${topBar("Finances")}${finTeach()}</div>`;
+    const bq = typeof bqCard === "function" ? finTry(bqCard, { ...P, to: finEffTo(P) }) || "" : "";
+    if (C.empty && !finAll("expenses").length && !finAll("tickets").length && !(typeof bqOn === "function" && bqOn())) return `<div class="inner wide fin">${topBar("Finances")}${finTeach()}${bq}</div>`;
     const cmpTx = D ? `vs ${esc(Q.lab)}${Q.partial ? " à date" : ""}` : "";
-    const left = `${finHero(C, D, cmpTx)}${finRatios(C, D)}${finChart(P, Q, U)}${finSplit(C)}`;
+    const left = `${finHero(C, D, cmpTx)}${bq}${finRatios(C, D)}${finChart(P, Q, U)}${finSplit(C)}`;
     const side = `${finPnl(C, D, Q)}${finCharges(C, P)}${typeof pnyCard === "function" ? finTry(pnyCard) || "" : ""}`;
     return `<div class="inner wide fin">${topBar("Finances", { right })}${ctl}<div class="cols fin-cols"><div>${left}</div><div>${side}</div></div></div>`;
   },
@@ -382,7 +395,7 @@ const finXGrab = () => { const x = S.ui.finX; if (!x) return; const g = (id) => 
 function finCatSheet(k, P) {
   const C = finCompute(P.from, finEffTo(P)); const items = C.exp.items.filter((i) => i.cat === k).sort((a, b) => (b.day || "").localeCompare(a.day || "")); const c = finCat(k);
   openSheet(`<div class="fin-sh"><div class="hstack"><span class="ic">${ico(c.ic)}</span><div><div class="h2">${c.t}</div><div class="sub">${esc(P.lab)} · ${finEur(C.exp.byCat[k] || 0, 2)} HT</div></div></div>
-    <div class="fin-items">${items.map((i) => `<button class="li tap" ${i.auto ? `data-go="obligations"` : `data-act="finEdit" data-id="${i.id}"`}><span class="tx"><b>${esc(i.label || c.t)}</b><em>${i.recurring ? "chaque mois · part de la période" : esc(shortDate(i.day))}${i.supplier ? ` · ${esc(i.supplier)}` : ""}${i.receptionId ? " · réception" : ""}${i.auto ? " · contrôle obligatoire" : ""}</em></span><span class="mono fin-amt">${finEur(i.amt, 2)}</span></button>`).join("")}</div>
+    <div class="fin-items">${items.map((i) => `<button class="li tap" ${i.auto ? `data-go="obligations"` : i.bank ? `data-act="bqTx" data-id="${esc(i.id)}"` : `data-act="finEdit" data-id="${i.id}"`}><span class="tx"><b>${esc(i.label || c.t)}</b><em>${i.recurring ? "chaque mois · part de la période" : esc(shortDate(i.day))}${i.supplier ? ` · ${esc(i.supplier)}` : ""}${i.receptionId ? " · réception" : ""}${i.bank ? " · banque, HT estimé" : ""}${i.auto ? " · contrôle obligatoire" : ""}</em></span><span class="mono fin-amt">${finEur(i.amt, 2)}</span></button>`).join("")}</div>
     <button class="btn soft block" data-act="finAdd" data-v="${k}">${ico("plus")}Ajouter</button></div>`);
 }
 

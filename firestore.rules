@@ -159,8 +159,8 @@ service cloud.firestore {
 
       // ── everything else (fridges, readings, lots, stock, tickets, staff, finances…): members only ──
       match /{col}/{doc} {
-        allow read: if !(col in ['members', 'sensorKeys', 'pennylane', 'plSent', 'plInv', 'qrPay']) && isMember(rid);
-        allow create, update, delete: if !(col in ['members', 'sensorKeys', 'pennylane', 'plSent', 'plInv', 'qrPay']) && isMemberAfter(rid);
+        allow read: if !(col in ['members', 'sensorKeys', 'pennylane', 'plSent', 'plInv', 'qrPay', 'bankTx', 'bank']) && isMember(rid);
+        allow create, update, delete: if !(col in ['members', 'sensorKeys', 'pennylane', 'plSent', 'plInv', 'qrPay', 'bankTx', 'bank']) && isMemberAfter(rid);
       }
       // Pennylane (js/pennylane.js, functions/src/pennylane.js): accounting, so gérants only; the server writes with admin rights
       match /pennylane/{doc} {
@@ -172,6 +172,13 @@ service cloud.firestore {
       }
       match /plInv/{doc} {
         allow read: if isGerant(rid);
+      }
+      // bank operations and bank links (js/banque.js, functions/src/banque.js): money, so gérants only; the server writes with admin rights
+      match /bankTx/{doc} {
+        allow read, write: if isGerant(rid);
+      }
+      match /bank/{doc} {
+        allow read, write: if isGerant(rid);
       }
       // commande en ligne (js/commande.js, functions/src/commande.js): the restaurant's Stripe account state, written by the server only
       match /qrPay/{doc} {

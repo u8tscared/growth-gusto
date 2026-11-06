@@ -8,7 +8,7 @@ const mods = {};
 for (const m of String(process.env.GG_MODULES || "sondes,alertes,resa,mails,admin").split(",").map((x) => x.trim()).filter(Boolean)) {
   try { mods[m] = require("./src/" + m); } catch (e) { if (e.code !== "MODULE_NOT_FOUND") throw e; }
 }
-const TICKS = ["sondesTick", "caisseTick", "pennylaneTick", "alertesTick", "resaTick", "mailsTick", "commandeTick"];
+const TICKS = ["sondesTick", "caisseTick", "pennylaneTick", "banqueTick", "alertesTick", "resaTick", "mailsTick", "commandeTick"];
 const SECRETS = [];
 const isSecret = (v) => v && typeof v === "object" && typeof v.name === "string" && /Secret/.test((v.constructor && v.constructor.name) || "");
 for (const m of Object.values(mods)) for (const [k, v] of Object.entries(m)) { if (Array.isArray(v) && v.every(isSecret)) { v.forEach((x) => { if (!SECRETS.some((y) => y.name === x.name)) SECRETS.push(x); }); } else if (isSecret(v)) { if (!SECRETS.some((y) => y.name === v.name)) SECRETS.push(v); } else if (!TICKS.includes(k) && k !== "alertesWeekly" && k[0] !== "_") exports[k] = v; }
