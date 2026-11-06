@@ -58,6 +58,18 @@ NEW = {
     "carte": dict(img="carte-import", t="Votre carte importée",
         p="Donnez le PDF, une photo ou l'adresse de votre site{0}: l'app lit la carte, devine les allergènes et vous laisse tout vérifier avant de publier.".format(N),
         ul=["Rubriques, prix, descriptions", "Allergènes devinés, à confirmer", "3 styles, 6 couleurs, photos", "Impression A4 de la carte"]),
+    "releve": dict(img="releve", t="Relevés de températures",
+        p="Midi et soir, l'app vous dit quel frigo relever. Un chiffre, un tap, c'est noté, avec le prénom et l'heure.",
+        ul=[f"Seuil par équipement{N}: 0 à 4 °C, -18 °C", f"Hors seuil{N}: l'action corrective est demandée", "Photo du thermomètre, si vous voulez", "Relevés du midi et du soir, jour par jour"]),
+    "clients": dict(img="clients", t="Fichier clients et fidélité",
+        p="Chaque client qui réserve ou commande a sa fiche{0}: visites, allergies, anniversaire. Une carte à tampons récompense les habitués, et vous les relancez par e-mail ou SMS, s'ils l'ont accepté.".format(N),
+        ul=["Visites, notes, allergies, VIP", "Carte à tampons", "Campagnes e-mail et SMS avec consentement", "Clients à fêter et à relancer"]),
+    "consignes": dict(img="consignes", t="Consignes et messagerie d'équipe",
+        p="Plat du jour, rupture, info du service{0}: la consigne arrive sur le téléphone de chacun et vous voyez qui l'a lue. La discussion d'équipe est au même endroit, sans groupe WhatsApp perso.".format(N),
+        ul=["Lu, et qui a lu", "Rupture signalée en un tap", "Dictée vocale", "Notifications sur le téléphone"]),
+    "livraison": dict(img="livraison", t="Uber Eats, Deliveroo, Just Eat",
+        p="Déposez le relevé de ventes de chaque plateforme{0}: le chiffre, les commissions et ce qui vous est versé arrivent dans vos finances, le stock est déduit selon vos recettes et vous voyez la vraie marge de chaque plat.".format(N),
+        ul=["Relevé de ventes, par import", "Commissions dans les finances", "Vraie marge par plat, livraison comprise", f"Commandes en direct sur l'écran cuisine{N}: bientôt"]),
 }
 
 # integration labels (Marceau: be honest about what is really linked)
@@ -75,13 +87,13 @@ GROUPS = [
     ("g-controle", "k", "Le jour du contrôle", "Contrôle sanitaire", "Tout est enregistré. Le dossier sort en un tap.", True,
         [("controle", None, None), ("pms", None, None), ("rappel", None, None), ("registre", None, None), ("regReport", None, None), ("obligations", None, None)]),
     ("g-salle", "r", "En salle", "Réservations, commandes et cuisine", "De la réservation au bon en cuisine, sans commission par couvert.", False,
-        [("resa", SECOND, None), ("reserver", SECOND, None), ("zenchef", SECOND, IMPORT), ("salle", SECOND, None), ("cuisine", SECOND, None), ("menuqr", SECOND, None), ("carte", SECOND, None)]),
+        [("resa", SECOND, None), ("reserver", SECOND, None), ("zenchef", SECOND, IMPORT), ("salle", SECOND, None), ("cuisine", SECOND, None), ("menuqr", SECOND, None), ("carte", SECOND, None), ("clients", SECOND, None)]),
     ("g-achats", "t", "Chaque semaine", "Achats, marges et gaspillage", "Acheter juste, connaître sa marge, jeter moins.", True,
         [("marges", None, None), ("factures", None, None), ("achats", None, None), ("gaspillage", None, None)]),
     ("g-gestion", "s", "Au bureau", "Caisse, stock et chiffres", "Savoir ce que vous avez, ce que vous vendez, ce que vous gagnez.", False,
-        [("caisse", SECOND, None), ("tickets", SECOND, None), ("stock", SECOND, None), ("dashboard", SECOND, None), ("finance", CHEF, None), ("banque", CHEF, IMPORT), ("sites", CHEF, None)]),
+        [("caisse", SECOND, None), ("livraison", SECOND, IMPORT), ("tickets", SECOND, None), ("stock", SECOND, None), ("dashboard", SECOND, None), ("finance", CHEF, None), ("banque", CHEF, IMPORT), ("sites", CHEF, None)]),
     ("g-equipe", "v", "L'équipe", "Équipe, pointeuse et planning", "Chacun son compte, ses horaires, son planning.", True,
-        [("equipe", None, None), ("pointeuse", CHEF, None), ("planning", CHEF, None), ("staff", CHEF, None)]),
+        [("equipe", None, None), ("consignes", None, None), ("pointeuse", CHEF, None), ("planning", CHEF, None), ("staff", CHEF, None)]),
 ]
 
 PLUS = '<svg class="fi-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>'
@@ -135,3 +147,31 @@ put("feat", "\n".join(out))
 put("chips", f'<p class="chips-h"><b>{n} fonctions</b>, une seule app</p>\n<div class="chips">' + "".join(chips) + "</div>")
 P.write_text(h)
 print(n, "features in", len(GROUPS), "groups")
+
+# ── structured data (SEO): organisation, the app with its three packs, and the FAQ read back from the page
+import json
+def text(x):
+    return re.sub(r"\s+", " ", html.unescape(re.sub(r"<[^>]+>", "", x))).strip()
+faq = [{"@type": "Question", "name": text(q), "acceptedAnswer": {"@type": "Answer", "text": text(a)}}
+       for q, a in re.findall(r'<details><summary>(.*?)<i aria-hidden="true"></i></summary><div class="ans">(.*?)</div></details>', h, re.S)]
+packs = [("Commis", "59", "essentiel", "Hygiène et HACCP"), ("Second", "109", "pro", "Salle, commandes, caisse et stock en plus"), ("Chef", "169", "complet", "Équipe, finances et plusieurs restaurants en plus")]
+ld = [
+    {"@context": "https://schema.org", "@type": "Organization", "name": "Growth Gusto", "url": "https://growthgusto.fr/",
+     "logo": "https://growthgusto.fr/apple-touch-icon.png", "email": "contact@growthgusto.fr",
+     "address": {"@type": "PostalAddress", "addressLocality": "Lyon", "addressCountry": "FR"}},
+    {"@context": "https://schema.org", "@type": "SoftwareApplication", "name": "Growth Gusto", "url": "https://growthgusto.fr/",
+     "applicationCategory": "BusinessApplication", "applicationSubCategory": "Logiciel de gestion de restaurant",
+     "operatingSystem": "Web, iOS, Android, Windows, macOS", "inLanguage": "fr", "image": "https://growthgusto.fr/og.jpg",
+     "description": "L'app de gestion pour restaurants : HACCP et relevés de températures, étiquettes DLC, contrôle sanitaire, réservations, prise de commande, menu QR, stock, marges, caisse, équipe et finances.",
+     "featureList": [html.unescape(re.sub(r"<[^>]+>", "", c)) for c in re.findall(r'<a class="chip" href="#f-[^"]+" data-feat="[^"]+">(.*?)</a>', h)],
+     "offers": [{"@type": "Offer", "name": f"Pack {n}", "description": d, "price": p, "priceCurrency": "EUR",
+                 "url": f"https://app.growthgusto.fr/?signup=1&plan={k}",
+                 "priceSpecification": {"@type": "UnitPriceSpecification", "price": p, "priceCurrency": "EUR", "unitText": "MONTH", "valueAddedTaxIncluded": False}}
+                for n, p, k, d in packs]},
+]
+if faq:
+    ld.append({"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": faq})
+body = "\n".join('<script type="application/ld+json">' + json.dumps(x, ensure_ascii=False, separators=(",", ":")).replace("</", "<\\/") + "</script>" for x in ld)
+put("ld", body)
+P.write_text(h)
+print(len(faq), "FAQ entries in structured data")
