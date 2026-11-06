@@ -1,0 +1,95 @@
+/* Growth Gusto — notes de frais (js/frais.js). Prefix nf- */
+.nf .ico{width:20px;height:20px}
+.nf-hero{padding:18px;display:flex;flex-direction:column;gap:14px}
+.nf-hl{display:flex;gap:12px;align-items:flex-start}
+.nf-hl b{display:block;font-size:16.5px;letter-spacing:-.02em}
+.nf-hl p{margin:3px 0 0;font-size:13.5px;color:var(--muted);line-height:1.45}
+.nf-hk,.nf-ic{flex:none;width:44px;height:44px;border-radius:14px;display:grid;place-items:center;color:var(--accent);background:color-mix(in srgb,var(--accent) 12%,transparent)}
+.nf-hk .ico{width:23px;height:23px}
+.nf-hs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.nf-hs>div{padding:10px 12px;border-radius:14px;background:var(--well);min-width:0}
+.nf-hs b{display:block;font-size:15.5px;letter-spacing:-.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nf-hs span{font-size:11.5px;font-weight:700;color:var(--muted)}
+.nf-set{all:unset;cursor:pointer;box-sizing:border-box;display:flex;align-items:center;gap:12px;padding:14px 16px;border-radius:20px;border:1.5px dashed color-mix(in srgb,var(--warn) 45%,transparent)}
+.nf-set>.ico:first-child{color:var(--warn);flex:none}
+.nf-set span{flex:1;min-width:0}.nf-set b{display:block;font-size:14.5px}.nf-set em{font-style:normal;font-size:12.5px;color:var(--muted)}
+.nf-search{position:relative}
+.nf-search>span{position:absolute;left:13px;top:50%;transform:translateY(-50%);color:var(--faint);display:grid}
+.nf-search>span .ico{width:17px;height:17px}
+.nf-search .input{padding-left:38px}
+.nf-list{display:flex;flex-direction:column;gap:8px}
+.nf-row{all:unset;cursor:pointer;box-sizing:border-box;display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:18px;transition:transform .25s var(--spring)}
+.nf-row:active{transform:scale(.985)}
+.nf-row:focus-visible{outline:2.5px solid var(--accent)}
+.nf-ic{width:40px;height:40px;border-radius:13px}
+.nf-rt{flex:1;min-width:0}
+.nf-rt b{display:block;font-size:14.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nf-rt em{font-style:normal;font-size:12.5px;color:var(--muted)}
+.nf-rv{display:flex;flex-direction:column;align-items:flex-end;gap:2px}
+.nf-rv b{font-size:15px}
+.nf-rv i{font-style:normal;font-size:11px;font-weight:800;color:var(--bad)}
+.nf-row.void .nf-rt b,.nf-row.void .nf-rv b{text-decoration:line-through;color:var(--faint)}
+.nf-row.void .nf-ic{color:var(--faint);background:var(--well)}
+.nf-legal{padding:0 4px}
+@media (min-width:960px){.nf-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.nf-list>.empty{grid-column:1/-1}}
+
+/* editor */
+.nf-form{display:flex;flex-direction:column;gap:12px;min-width:0}
+.nf-seg button{display:inline-flex;align-items:center;justify-content:center;gap:7px}
+.nf-seg .ico{width:17px;height:17px}
+.nf-card{padding:16px;display:flex;flex-direction:column;gap:14px}
+.nf-chips{display:flex;flex-wrap:wrap;gap:7px}
+.nf-chips.col{flex-direction:column}.nf-chips.col .chip{justify-content:center}
+.nf-chips .chip{min-height:40px;padding:8px 13px}
+.nf-amt{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:end}
+.nf-eur{position:relative}
+.nf-eur i{position:absolute;right:14px;top:50%;transform:translateY(-50%);font-style:normal;font-weight:800;color:var(--muted)}
+.nf-eur .input{padding-right:34px;font-size:18px;font-weight:700}
+.nf-alc .input{font-size:15.5px}
+.nf-step{height:50px}
+.nf-step b{min-width:28px;text-align:center;font-size:17px}
+.nf-step .ico{width:18px;height:18px}
+.nf-tabs{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.nf-tab{all:unset;cursor:pointer;box-sizing:border-box;display:flex;flex-direction:column;gap:2px;padding:12px 14px;border-radius:16px;background:var(--glass);border:1.5px solid var(--edge);transition:all .25s var(--spring)}
+.nf-tab b{font-size:15px}.nf-tab em{font-style:normal;font-size:12px;color:var(--muted)}.nf-tab span{font-weight:800;font-size:14.5px;margin-top:4px}
+.nf-tab.on{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 9%,var(--glass));box-shadow:0 8px 20px -12px color-mix(in srgb,var(--accent) 60%,transparent)}
+.nf-tab:active{transform:scale(.97)}
+.nf-none{display:flex;gap:10px;align-items:flex-start;padding:14px;border-radius:16px;background:var(--well);font-size:13.5px;color:var(--muted);line-height:1.45}
+.nf-none .ico{flex:none;width:20px;height:20px;margin-top:1px}
+.nf-side{display:flex;flex-direction:column;gap:12px;min-width:0}
+.nf-prev{display:flex;flex-direction:column;gap:8px}
+.nf-cta{margin-top:2px}
+@media (min-width:960px){.nf-side{position:sticky;top:20px}.nf-cols{grid-template-columns:minmax(0,1fr) minmax(0,.9fr)}}
+
+/* the paper note (in the app; the print uses its own CSS in js/frais.js) */
+.nf-paper{position:relative;background:#FFFEFB;color:#1A1A22;border-radius:6px;padding:22px 20px 18px;font-size:13px;line-height:1.45;box-shadow:0 1px 0 rgba(0,0,0,.04),0 18px 40px -22px rgba(30,20,90,.45);overflow:hidden}
+.nf-paper::after{content:"";position:absolute;left:0;right:0;bottom:0;height:8px;background:radial-gradient(circle at 6px 8px,transparent 5px,#FFFEFB 5.5px) 0 0/12px 8px repeat-x;transform:translateY(4px);opacity:0}
+.nf-paper header{display:flex;flex-direction:column;align-items:center;text-align:center;gap:1px;padding-bottom:12px;border-bottom:1px dashed #BDB8C8}
+.nf-paper header b{font-size:16px;letter-spacing:-.02em}
+.nf-paper header span{font-size:11.5px;color:#5B5668}
+.nf-pt{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin:14px 0 2px}
+.nf-pt b{font-size:15px;letter-spacing:-.01em}.nf-pt span{font-size:12px;color:#5B5668;font-family:"JetBrains Mono",ui-monospace,monospace}
+.nf-meta{display:flex;flex-direction:column;font-size:12px;color:#5B5668;margin-bottom:10px}
+.nf-paper table{width:100%;border-collapse:collapse;font-size:12.5px}
+.nf-paper th{font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:#6E6880;text-align:left;font-weight:800;border-bottom:1px solid #2A2633;padding:5px 3px}
+.nf-paper td{padding:6px 3px;border-bottom:1px solid #EEEAF2;vertical-align:top}
+.nf-paper .m{text-align:right;white-space:nowrap;font-family:"JetBrains Mono",ui-monospace,monospace;font-size:12px}
+.nf-paper .q{width:28px;font-family:"JetBrains Mono",ui-monospace,monospace}
+.nf-paper .nf-0{text-align:center;color:#8A8498;padding:14px 0}
+.nf-tot{display:flex;justify-content:space-between;align-items:baseline;margin:12px 0 2px;font-weight:700}
+.nf-tot b{font-size:20px;letter-spacing:-.02em;font-family:"JetBrains Mono",ui-monospace,monospace}
+.nf-paper .pp{margin:0 0 8px;text-align:right;font-size:12px;color:#5B5668}
+.nf-r{margin-top:8px}
+.nf-r tfoot td{font-weight:800;border-bottom:0}
+.nf-foot{display:flex;flex-direction:column;align-items:center;text-align:center;gap:1px;margin-top:14px;padding-top:12px;border-top:1px dashed #BDB8C8;font-size:11.5px;color:#5B5668}
+.nf-void{position:absolute;top:44%;left:50%;transform:translate(-50%,-50%) rotate(-16deg);font-size:40px;font-weight:900;letter-spacing:.02em;color:rgba(212,42,72,.3);border:4px solid rgba(212,42,72,.3);padding:2px 16px;border-radius:12px;pointer-events:none}
+.nf-paper.void td,.nf-paper.void .nf-tot{color:#9A95A8}
+
+/* sheets */
+.nf-sh{display:flex;flex-direction:column;gap:14px}
+.nf-sh .nf-paper{max-height:56vh;overflow:auto}
+.nf-acts{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px}
+.nf-acts .btn{display:inline-flex;align-items:center;justify-content:center;gap:7px}
+.nf-acts .ico,.nf-cxb .ico,.nf-billbtn .ico{width:18px;height:18px}
+.nf-cx{text-align:center;color:var(--bad);font-weight:700}
+.nf-billbtn{display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:8px}
