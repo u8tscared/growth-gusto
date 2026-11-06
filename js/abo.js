@@ -308,7 +308,7 @@ function abAdminUsers() {
   return `<div class="glass pad ab-ul">${L.slice(0, 500).map((u) => { const n = (u.restos || []).length; const me = u.id === S.me.id || u.id === DB.uid; return `<div class="li"><span class="ab-mono" style="--s:40px">${esc(initials(u.name || u.email || "?"))}</span><div class="tx"><b>${esc(u.name || firstName(String(u.email || "").split("@")[0]) || "Sans nom")}</b><em>${esc(u.email || u.id)}</em></div><span class="pill ${n ? "acc" : "neu"}">${n} resto${n > 1 ? "s" : ""}</span>${me ? "" : `<button class="iconbtn ab-udel" data-act="abUserDel" data-id="${esc(u.id)}" aria-label="Supprimer ${esc(u.email || u.name || "ce compte")}" title="Supprimer ce compte">${ico("trash")}</button>`}</div>`; }).join("")}</div>`;
 }
 VIEWS.admin = {
-  noResto: true, nav: "more",
+  noResto: true, nav: "admin",
   render() {
     const signed = !!DB.uid;
     if (!abAdmin()) return `<div class="inner narrow">${topBar("Admin Growth Gusto")}<div class="glass empty ab-denied st" style="--i:1"><div class="ic">${ico("shield")}</div><b>Accès réservé à l'équipe Growth Gusto</b>${signed ? `Connecté avec <b class="ab-em">${esc(abEmail())}</b>, qui n'est pas un compte administrateur.` : "Connectez-vous avec un compte administrateur."}
