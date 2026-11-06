@@ -42,7 +42,7 @@ const CX_POS = [
 ];
 const cxPos = (id) => CX_POS.find((p) => p.id === id) || CX_POS[CX_POS.length - 1];
 const cxMono = (p) => (p.id === "laddition" ? "LA" : p.id === "autre" ? "" : p.name.charAt(0));
-const cxWell = (p, cls = "") => `<span class="cx-mono ${p.well} ${cls}">${p.id === "autre" ? ico("receipt") : esc(cxMono(p))}</span>`;
+const cxWell = (p, cls = "") => { const lg = brandLogo(p.id); return lg ? `<span class="cx-mono logo ${cls}">${lg}</span>` : `<span class="cx-mono ${p.well} ${cls}">${p.id === "autre" ? ico("receipt") : esc(cxMono(p))}</span>`; };
 const CX_API = "https://europe-west9-growth-gusto.cloudfunctions.net/caisseApi";
 
 /* ───────── helpers ───────── */
