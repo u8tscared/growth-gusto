@@ -1,0 +1,81 @@
+# Vérification et mise en ligne automatique des PR.
+# Chaque PR vers main est vérifiée (tools/ci.js : syntaxe + l'app s'ouvre et enregistre un relevé sans erreur).
+# Si c'est une PR de Claude (branche claude/…), qu'elle n'est pas en brouillon, sans le label « attendre »,
+# et que la vérification passe, elle est fusionnée toute seule puis la mise en ligne (deploy.yml) est lancée.
+# En cas de conflit avec main ou de vérification ratée : rien n'est fusionné, un commentaire le signale sur la PR.
+name: Vérification des PR
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review, labeled, unlabeled]
+
+concurrency:
+  group: pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Vérification
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Navigateur de test
+        run: |
+          npm i --no-save --no-package-lock playwright@1.56.1
+          npx playwright install --with-deps chromium
+      - name: Vérifier l'app
+        run: node tools/ci.js
+
+  merge:
+    name: Fusion et mise en ligne
+    needs: check
+    if: >-
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      startsWith(github.event.pull_request.head.ref, 'claude/') &&
+      !github.event.pull_request.draft &&
+      !contains(github.event.pull_request.labels.*.name, 'attendre')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      actions: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      PR: ${{ github.event.pull_request.number }}
+      SHA: ${{ github.event.pull_request.head.sha }}
+    steps:
+      - name: Fusionner
+        run: |
+          say() { gh pr comment "$PR" --body "$1"$'\n\n---\n_Vérification automatique des PR_' >/dev/null || true; }
+          state=UNKNOWN
+          for i in 1 2 3 4 5 6; do
+            state=$(gh pr view "$PR" --json state,mergeable --jq '.state + " " + .mergeable')
+            case "$state" in *UNKNOWN) sleep 5 ;; *) break ;; esac
+          done
+          echo "État : $state"
+          case "$state" in
+            MERGED*|CLOSED*) echo "Déjà fusionnée ou fermée."; exit 0 ;;
+            *CONFLICTING) say "Pas fusionnée automatiquement : cette PR est en conflit avec main. Il faut d'abord y intégrer main."; exit 0 ;;
+          esac
+          if gh pr diff "$PR" --name-only | grep -q '^\.github/workflows/'; then
+            say "Pas fusionnée automatiquement : elle modifie les workflows GitHub, ce que l'automate n'a pas le droit de faire. À fusionner à la main."
+            exit 0
+          fi
+          if ! gh pr merge "$PR" --merge --match-head-commit "$SHA"; then
+            [ "$(gh pr view "$PR" --json state --jq .state)" = MERGED ] && exit 0
+            say "La vérification passe mais la fusion automatique a échoué. À regarder."
+            exit 1
+          fi
+      - name: Lancer la mise en ligne
+        # Une fusion faite par l'automate ne déclenche pas deploy.yml d'elle-même (règle GitHub) : on la lance ici.
+        run: |
+          [ "$(gh pr view "$PR" --json state --jq .state)" = MERGED ] || exit 0
+          gh workflow run deploy.yml --ref main
