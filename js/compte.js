@@ -499,19 +499,38 @@ const ccTry = (fn, d) => { try { const v = fn(); return v == null ? d : v; } cat
 function ccOblDueN() { return typeof oblDue === "function" ? ccTry(() => (oblDue(30) || []).length, 0) : 0; }
 function ccOnShiftN() { return typeof homeOnShift === "function" ? ccTry(() => homeOnShift().filter((x) => x.st === "in").length, 0) : 0; }
 /* V2: one pastel well per module, same colours as the Accueil shortcuts */
-const CC_WELL = { releve: "w-vi", frigos: "w-sk", scan: "w-in", reception: "w-sa", notes: "w-to", menage: "w-sk", dashboard: "w-vi", finance: "w-mi", stock: "w-to", marges: "w-mi", factures: "w-sa", tickets: "w-sa", registre: "w-sk", obligations: "w-nd", pointeuse: "w-sk", planning: "w-vi", staff: "w-mi", equipe: "w-mi", avis: "w-sa", imprimante: "w-nd", reglages: "w-nd", abonnement: "w-vi", avisAdmin: "w-sa", admin: "w-in", clients: "w-to" };
+const CC_WELL = { releve: "w-vi", frigos: "w-sk", scan: "w-in", reception: "w-sa", notes: "w-to", menage: "w-sk", dashboard: "w-vi", finance: "w-mi", stock: "w-to", marges: "w-mi", factures: "w-sa", tickets: "w-sa", registre: "w-sk", obligations: "w-nd", pointeuse: "w-sk", planning: "w-vi", staff: "w-mi", equipe: "w-mi", avis: "w-sa", imprimante: "w-nd", reglages: "w-nd", abonnement: "w-vi", avisAdmin: "w-sa", admin: "w-in", clients: "w-to", salle: "w-to", cuisine: "w-sa", livraison: "w-mi", service: "w-sk", commandes: "w-vi", consignes: "w-in", achats: "w-sa", gaspillage: "w-mi", resa: "w-vi", alertes: "w-sa", sites: "w-nd", import: "w-nd" };
+/* One menu for every screen: NAV (core.js, plus the modules that splice themselves in) is the source. Any NAV entry the Plus groups
+   above don't list yet is added to the group of the NAV section it sits in, right after its NAV neighbour, so a new module never
+   exists on desktop only. tools/ci.js checks this on every PR. */
+function ccMoreFill(groups) {
+  const have = new Set(groups.flatMap(([, its]) => its.map((it) => it[0])));
+  const gOf = (t) => groups.find(([g]) => g === t) || groups[groups.length - 1];
+  let sec = groups[0][0], prev = null;
+  NAV.forEach(([r, i, t]) => {
+    if (r === "sep") { sec = t; prev = null; return; }
+    if (r !== "home" && !have.has(r)) {
+      const near = prev && groups.find(([, x]) => x.some((it) => it[0] === prev)); /* next to its NAV neighbour, wherever Plus put it */
+      const its = (near || gOf(sec))[1]; const at = prev ? its.findIndex((it) => it[0] === prev) : -1;
+      its.splice(at >= 0 ? at + 1 : its.length, 0, [r, i, t, 0]); have.add(r);
+    }
+    prev = r;
+  });
+  return groups;
+}
 VIEWS.more = {
   render() {
     const ts = todayStats(S.slot || slotNow()); const pend = ts.exp - ts.done; const urg = urgentCount();
     const staffR = VIEWS.staff && canSee("staff"); const fbNew = typeof avisUnread === "function" ? (avisUnread() || 0) : 0;
     /* [route, icon, title, badge, badge tone] */
     const groups = [
-      ["Au quotidien", [["releve", "therm", "Relevés", pend > 0 && S.fridges.length ? pend : 0], ["frigos", "snow", "Frigos", 0], ["scan", "scan", "Scanner", urg], ["reception", "truck", "Réception", 0], ["alertes", "alBell", "Alertes", typeof ALERTES !== "undefined" ? ALERTES.count() : 0], ["resa", "resa", "Réservations", typeof RESA !== "undefined" && RESA.unseen ? (RESA.unseen() || 0) : 0, "acc"], ["commandes", "cmQr", "Commandes en ligne", typeof CMD !== "undefined" ? CMD.unseen() : 0, "acc"], ["clients", "fdUsers", "Clients & fidélité", typeof fdGiveN === "function" ? ccTry(fdGiveN, 0) : 0, "warn"]]],
+      ["Au quotidien", [["releve", "therm", "Relevés", pend > 0 && S.fridges.length ? pend : 0], ["frigos", "snow", "Frigos", 0], ["scan", "scan", "Scanner", urg], ["reception", "truck", "Réception", 0], ["alertes", "alBell", "Alertes", typeof ALERTES !== "undefined" ? ALERTES.count() : 0]]],
       ["Cuisine", [["notes", "book", "Recettes & allergènes", 0], ["menage", "spray", "Ménage", 0], ["hygiene", "hygPot", "Hygiène", 0], ["sondes", "sdProbe", "Sondes", 0]]],
       ["Gestion", [["dashboard", "dash", "Tableau de bord", 0], ["finance", "euro", "Finances", 0], ["stock", "box", "Stock", 0], ["marges", "mgCoin", "Marges", typeof mgRises === "function" ? ccTry(() => mgRises().length, 0) : 0, "warn"], ["factures", "mgInvoice", "Factures", 0], ["tickets", "receipt", "Tickets Z", 0], ["caisse", "cxPlug", "Caisse connectée", 0], ["pennylane", "pnyBook", "Comptabilité", 0], ["registre", "shield", "Registre", 0], ["documents", "hygVault", "Coffre-fort", 0], ["controle", "ctBadge", "Contrôle sanitaire", 0], ["rappel", "ctRecall", "Rappel de lot", 0], ["obligations", "calcheck", "Obligations", ccOblDueN()]]],
       ["Équipe", [["consignes", "csMega", "Consignes", typeof csUnread === "function" ? csUnread() : 0, "acc"], ["pointeuse", "clock", "Pointeuse", ccOnShiftN(), "ok"], ["planning", "cal", "Planning", 0], ["formation", "book", "Formation HACCP", 0], staffR ? ["staff", "users", "Équipe & salaires", 0] : ["equipe", "users", "Équipe", 0], ["avis", "star", "Votre avis sur l'app", fbNew, "acc"]]],
-      ["Restaurant", [["sites", "store", "Mes établissements", 0], ["import", "upload", "Importer", 0], ...(staffR ? [["equipe", "lock", "Profils & codes", 0]] : []), ["imprimante", "printer", "Imprimante", 0], ["reglages", "sliders", "Réglages", 0], ...(typeof abTile === "function" ? [abTile()] : [])]],
+      ["Restaurant", [["resa", "resa", "Réservations", typeof RESA !== "undefined" && RESA.unseen ? (RESA.unseen() || 0) : 0, "acc"], ["commandes", "cmQr", "Commandes en ligne", typeof CMD !== "undefined" ? CMD.unseen() : 0, "acc"], ["clients", "fdUsers", "Clients & fidélité", typeof fdGiveN === "function" ? ccTry(fdGiveN, 0) : 0, "warn"], ["sites", "store", "Mes établissements", 0], ["import", "upload", "Importer", 0], ...(staffR ? [["equipe", "lock", "Profils & codes", 0]] : []), ["imprimante", "printer", "Imprimante", 0], ["reglages", "sliders", "Réglages", 0], ...(typeof abTile === "function" ? [abTile()] : [])]],
     ];
+    ccMoreFill(groups); /* every module of the side nav shows here too (phone and tablet), even one added later */
     /* Growth Gusto admins: their own group, first, so /admin is one tap away */
     if (typeof avisIsAdmin === "function" && avisIsAdmin()) groups.unshift(["Admin", [...(VIEWS.admin ? [["admin", "shield", "Admin · clients", 0]] : []), ["avisAdmin", "star", "Retours reçus", 0]]]);
     const grp = typeof pzMoreGroups === "function" ? pzMoreGroups(groups) : groups; /* js/perso.js: the person's order, icons, colours, names */

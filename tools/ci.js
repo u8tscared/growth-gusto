@@ -1,7 +1,8 @@
 // Vérification lancée sur chaque PR (.github/workflows/pr.yml) avant la mise en ligne automatique.
 // 1) chaque fichier .js du dépôt (hors vendor/) se lit sans erreur de syntaxe ;
 // 2) chaque .json / .webmanifest se lit ;
-// 3) l'app s'ouvre dans un vrai navigateur, crée un restaurant, enregistre un relevé (tools/smoke.js) sans aucune erreur.
+// 3) l'app s'ouvre dans un vrai navigateur, crée un restaurant, enregistre un relevé (tools/smoke.js) sans aucune erreur ;
+// 4) sur téléphone et tablette, chaque écran du menu ordinateur est aussi dans le menu « Plus » (tools/nav-test.js).
 // Usage : node tools/ci.js  (code de sortie 1 au moindre problème)
 const {execFileSync,spawnSync}=require('child_process');const fs=require('fs');const path=require('path');
 const ROOT=path.resolve(__dirname,'..');process.chdir(ROOT);
@@ -17,3 +18,10 @@ const out=(r.stdout||'')+(r.stderr||'');console.log(out.trim());
 const m=out.match(/ERRORS: (\[[\s\S]*\])/);const errs=m?JSON.parse(m[1]):null;
 if(r.status!==0||/SCRIPT ERROR/.test(out)||!errs||errs.length){console.log("\nL'app ne s'ouvre pas proprement : voir ci-dessus.");process.exit(1);}
 console.log("App OK : ouverture, création d'un restaurant et relevé sans erreur.");
+// 4) téléphone et tablette : chaque écran du menu ordinateur est aussi dans le menu « Plus » (tools/nav-test.js)
+for(const [nom,env] of [['téléphone',{}],['tablette',{TABLET:'1'}]]){
+  const n=spawnSync(process.execPath,['tools/run.js','tools/nav-test.js'],{encoding:'utf8',env:{...process.env,...env,OUT:path.join(ROOT,'tools/out/ci')},timeout:180000});
+  const o=(n.stdout||'')+(n.stderr||'');console.log(nom+' : '+o.trim());
+  const mm=o.match(/ERRORS: (\[[\s\S]*\])/);const ee=mm?JSON.parse(mm[1]):null;
+  if(n.status!==0||/SCRIPT ERROR/.test(o)||!/NAV OK/.test(o)||!ee||ee.length){console.log("\nUn écran n'est pas accessible sur "+nom+" : voir ci-dessus.");process.exit(1);}
+}

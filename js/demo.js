@@ -258,6 +258,8 @@ window.GG_DEMO = {
         ["demo-thomas", "Thomas Girard", "Le lave-vaisselle fuit encore un peu côté gauche, j'ai mis un seau.", 140], ["demo-camille", "Camille Laurent", "Le technicien passe demain à 9 h.", 125], ["demo-sarah", "Sarah Lemoine", "Table de 12 ce soir à 20 h, anniversaire : prévoir une bougie 🎂", 30]]
         .forEach(([uid, by, text, k]) => put("chat", { text, at: mn(k), uid, by }));
     }
+    /* ── bank already linked (js/banque.js), so Finances shows real bank lines from the first tap ── */
+    if (typeof bqDemoData === "function") { const B = bqDemoData(); put("bank", B.link, "eb_demo"); B.tx.forEach(([k, t]) => put("bankTx", t, k)); }
     return { rid: RID, data: D, me: { id: "demo-camille", name: "Camille Laurent", color: "#4A1FE6" } };
   },
 };
