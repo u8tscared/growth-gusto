@@ -82,6 +82,23 @@ window.GG_DEMO = {
       ["p-frites", "Frites surgelées", "kg", "Congélateur", 2.3, "Metro", [], 10],
     ];
     PR.forEach(([k, name, unit, zone, price, supplier, allergens, minQty], i) => put("products", { name, unit, zone, price, supplier, allergens, alChecked: true, minQty, step: unit === "kg" || unit === "L" ? 0.5 : 1, createdAt: now - 300 * 864e5 + i }, k));
+    /* ── purchase price history + scanned supplier invoices (js/marge.js) ── */
+    const PH = [ /* product, days ago, previous price, new price, supplier, invoice key */
+      ["p-paleron", 75, 15.6, 16.2, "Boucherie Durand", "f-d1"], ["p-lardons", 75, 9.1, 9.4, "Boucherie Durand", "f-d1"],
+      ["p-huitre", 62, 38, 39.5, "Marée Atlantique", "f-m1"], ["p-beurre", 48, 9.6, 10, "Metro", "f-x1"], ["p-creme", 48, 4.6, 4.8, "Metro", "f-x1"],
+      ["p-vin", 34, 8.9, 8.9, "Domaine Rion", "f-v1"], ["p-huitre", 20, 39.5, 42, "Marée Atlantique", "f-m2"],
+      ["p-paleron", 12, 16.2, 17.5, "Boucherie Durand", "f-d2"], ["p-lardons", 12, 9.4, 9.9, "Boucherie Durand", "f-d2"],
+      ["p-vin", 9, 8.9, 8.5, "Domaine Rion", "f-v2"], ["p-beurre", 6, 10, 11.2, "Metro", "f-x2"], ["p-creme", 6, 4.8, 4.8, "Metro", "f-x2"], ["p-comte", 6, 22.9, 22.9, "Metro", "f-x2"], ["p-farine", 6, 1.1, 1.1, "Metro", "f-x2"],
+    ];
+    const INV = {};
+    PH.forEach(([pid, ago, prev, price, supplier, fk], i) => {
+      const p = PR.find((x) => x[0] === pid); const day = addDays(today, -ago); const q = { "p-paleron": 8, "p-lardons": 2, "p-huitre": 6, "p-beurre": 3, "p-creme": 4, "p-vin": 12, "p-comte": 1.5, "p-farine": 10 }[pid] || 1;
+      const f = (INV[fk] ||= { supplier, day, number: { "f-d1": "D-20418", "f-d2": "D-20977", "f-m1": "MA-8812", "f-m2": "MA-9140", "f-x1": "FA-2026-109412", "f-x2": "FA-2026-118734", "f-v1": "R-311", "f-v2": "R-342" }[fk], lines: [] });
+      f.lines.push({ name: p[1].toUpperCase(), qty: q, unit: p[2], price, total: r2(q * price), productId: pid, per: 1, unitPrice: price });
+      put("prices", { productId: pid, name: p[1], supplier, unit: p[2], price, prev, pct: Math.round(((price - prev) / prev) * 1000) / 10, day, at: at(day, 9, 30 + i), src: "facture", invoiceId: fk, by: "demo-thomas" });
+    });
+    Object.entries(INV).forEach(([fk, f]) => { const ht = r2(f.lines.reduce((s, l) => s + l.total, 0)); put("invoices", { ...f, totalHT: ht, totalTTC: r2(ht * (f.supplier === "Domaine Rion" ? 1.2 : 1.055)), photoId: "", src: "photo", status: "validee", at: at(f.day, 9, 40), by: "demo-thomas" }, fk); });
+
     const month = monthKey();
     const QTY = { "p-huitre": 6, "p-jambon": 3.5, "p-jambonc": 2, "p-saucisson": 1.5, "p-terrine": 1, "p-rillettes": 1.5, "p-paleron": 8, "p-lardons": 2, "p-beurre": 3, "p-lait": 8, "p-creme": 4, "p-comte": 1.5, "p-oeufs": 90, "p-farine": 12, "p-chapelure": 2, "p-pain": 4, "p-vin": 9, "p-fond": 3, "p-carotte": 6, "p-oignon": 7, "p-champi": 1.5, "p-citron": 2, "p-echalote": 1, "p-cornich": 1, "p-glace": 3, "p-frites": 14 };
     const pm = prevMonthKey(), pmEnd = addDays(today, -parseDay(today).getDate());
@@ -118,18 +135,21 @@ window.GG_DEMO = {
     /* ── recipes (ingredients linked to products, allergens) + a procedure ── */
     const ing = (pid, qty, unit) => ({ name: PR.find((p) => p[0] === pid)[1], qty: String(qty), unit, productId: pid });
     const NOTES = [
-      ["n-croq", { title: "Croquettes de jambon", cat: "Recettes", portions: 30, allergens: ["gluten", "lait", "oeufs"], body: "Servies par 5 avec une mayonnaise fumée. Se congèlent panées, crues.",
+      ["n-croq", { title: "Croquettes de jambon", cat: "Recettes", portions: 6, carte: true, carteCat: "partage", price: 9, allergens: ["gluten", "lait", "oeufs"], body: "Servies par 5 avec une mayonnaise fumée. Se congèlent panées, crues.",
         ingredients: [ing("p-jambon", "0,6", "kg"), ing("p-lait", "1", "L"), ing("p-beurre", "0,1", "kg"), ing("p-farine", "0,12", "kg"), ing("p-oeufs", "4", "pièce"), ing("p-chapelure", "0,3", "kg")],
         steps: ["Hacher finement le jambon.", "Roux blanc : beurre et farine, mouiller au lait chaud, cuire 10 min.", "Ajouter le jambon, refroidir 4 h filmé au contact.", "Façonner des boules de 35 g.", "Paner à l'anglaise : farine, œuf, panko.", "Frire 3 min à 175 °C."] }],
-      ["n-planche", { title: "Planche de charcuterie", cat: "Recettes", portions: 1, allergens: ["gluten", "lait", "oeufs", "sulfites", "moutarde", "sesame"], body: "Pour 2 personnes. Indiquer les allergènes au client : terrine (œufs, lait), cornichons (moutarde, sulfites), pain (gluten, sésame).",
+      ["n-planche", { title: "Planche de charcuterie", cat: "Recettes", portions: 1, carte: true, carteCat: "partage", price: 19, allergens: ["gluten", "lait", "oeufs", "sulfites", "moutarde", "sesame"], body: "Pour 2 personnes. Indiquer les allergènes au client : terrine (œufs, lait), cornichons (moutarde, sulfites), pain (gluten, sésame).",
         ingredients: [ing("p-jambonc", "0,06", "kg"), ing("p-saucisson", "0,05", "kg"), ing("p-terrine", "0,08", "kg"), ing("p-rillettes", "0,05", "kg"), ing("p-cornich", "0,03", "kg"), ing("p-pain", "0,25", "pièce")],
         steps: ["Sortir la charcuterie 15 min avant.", "Trancher le jambon et le saucisson à la minute.", "Dresser sur planche avec cornichons et pain grillé."] }],
-      ["n-bourgui", { title: "Bœuf bourguignon", cat: "Recettes", portions: 10, allergens: ["gluten", "lait", "sulfites", "celeri"], body: "Meilleur réchauffé le lendemain. Servir avec des pommes vapeur.",
+      ["n-bourgui", { title: "Bœuf bourguignon", cat: "Recettes", portions: 10, carte: true, carteCat: "plat", price: 22, allergens: ["gluten", "lait", "sulfites", "celeri"], body: "Meilleur réchauffé le lendemain. Servir avec des pommes vapeur.",
         ingredients: [ing("p-paleron", "2", "kg"), ing("p-vin", "1", "L"), ing("p-carotte", "0,6", "kg"), ing("p-oignon", "0,4", "kg"), ing("p-lardons", "0,25", "kg"), ing("p-champi", "0,4", "kg"), ing("p-farine", "0,04", "kg"), ing("p-fond", "0,5", "L"), ing("p-beurre", "0,05", "kg")],
         steps: ["Couper le bœuf en cubes de 5 cm.", "Mariner 12 h au froid avec le vin et la garniture.", "Saisir, singer à la farine.", "Mouiller avec la marinade et le fond, cuire 3 h à frémissement.", "Rissoler lardons et champignons, ajouter en fin de cuisson."] }],
-      ["n-huitres", { title: "Huîtres fines de claire (la douzaine)", cat: "Recettes", portions: 1, allergens: ["mollusques", "sulfites"], body: "Ouvrir à la minute. Servir sur glace pilée avec citron et mignonnette. Stocker les huîtres À PART, loin des œufs et du lait.",
+      ["n-huitres", { title: "Huîtres fines de claire (la douzaine)", cat: "Recettes", portions: 1, carte: true, carteCat: "entree", price: 24, allergens: ["mollusques", "sulfites"], body: "Ouvrir à la minute. Servir sur glace pilée avec citron et mignonnette. Stocker les huîtres À PART, loin des œufs et du lait.",
         ingredients: [ing("p-huitre", "0,25", "bourriche"), ing("p-citron", "0,05", "kg"), ing("p-echalote", "0,01", "kg")],
         steps: ["Sortir de la chambre froide au début du service : frigo de service.", "Ouvrir à la minute, retirer la première eau.", "Dresser sur glace pilée.", "En fin de service, remettre les bourriches en chambre froide."] }],
+      ["n-cafe", { title: "Café gourmand", cat: "Recettes", portions: 10, carte: true, carteCat: "dessert", price: 9.5, allergens: ["lait", "oeufs", "gluten"], body: "Un café, une boule de glace vanille, un mini financier et une crème brûlée.",
+        ingredients: [ing("p-glace", "0,5", "L"), ing("p-creme", "0,6", "L"), ing("p-oeufs", "8", "pièce"), ing("p-beurre", "0,2", "kg"), ing("p-farine", "0,1", "kg"), { name: "Café en grains", qty: "0,08", unit: "kg" }],
+        steps: ["Crème brûlée : crème, jaunes, sucre, cuire 1 h à 95 °C.", "Financiers : beurre noisette, farine, blancs, cuire 9 min à 180 °C.", "Dresser à la minute avec le café."] }],
       ["n-proc", { title: "Ouverture de la cuisine", cat: "Procédures", body: "À faire chaque matin avant la mise en place.", steps: ["Relevé de température de tous les frigos.", "Vérifier les DLC du jour.", "Lavage des mains, tenue propre.", "Désinfecter les plans de travail."], ingredients: [], allergens: [], portions: 1 }],
     ];
     try { if (typeof noteBourguignon === "function") { const nb = noteBourguignon(); if (nb && nb.process) Object.assign(NOTES[2][1], { process: nb.process, processV: 1, processAt: now - 30 * 864e5, processBy: "demo-thomas", seed: "bourguignon" }); } } catch (e) {}
@@ -145,7 +165,7 @@ window.GG_DEMO = {
     days(14).slice(1).forEach((day) => CH.forEach(([k, , , freq]) => { if (freq === "semaine" && rnd() > 0.2) return; if (rnd() < 0.12) return; const u = pick(who.slice(1)); put("choreLogs", { choreId: k, at: at(day, freq === "service" ? 15 : 22, Math.floor(rnd() * 50)), day, uid: u, by: team.find((t) => t[0] === u)[1] }); }));
 
     /* ── 30 days of Z tickets (closed on Mondays) + matching sales moves ── */
-    const MENU = [["Fines de claire n°3 (douzaine)", 24, "n-huitres", 6, 14], ["Croquettes de jambon", 9, "n-croq", 8, 22], ["Planche de charcuterie", 19, "n-planche", 6, 16], ["Bœuf bourguignon", 22, "n-bourgui", 10, 26], ["Café gourmand", 9.5, "", 6, 18], ["Verre de vin", 6.5, "", 20, 60], ["Formule midi", 18.5, "", 12, 30]];
+    const MENU = [["Fines de claire n°3 (douzaine)", 24, "n-huitres", 6, 14], ["Croquettes de jambon", 9, "n-croq", 8, 22], ["Planche de charcuterie", 19, "n-planche", 6, 16], ["Bœuf bourguignon", 22, "n-bourgui", 10, 26], ["Café gourmand", 9.5, "n-cafe", 6, 18], ["Verre de vin", 6.5, "", 20, 60], ["Formule midi", 18.5, "", 12, 30]];
     days(30).slice(1).forEach((day) => {
       if (parseDay(day).getDay() === 1) return;
       const wk = [0, 6].includes(parseDay(day).getDay()) || parseDay(day).getDay() === 5 ? 1.3 : 1;
