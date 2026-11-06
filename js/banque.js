@@ -167,7 +167,7 @@ window.addEventListener("gg:ready", () => setTimeout(() => { try { bqWatch(); bq
 const bqEur = (v, d) => finEur(v, d);
 function bqAgo(ts) { if (!ts) return "pas encore"; const m = Math.round((Date.now() - ts) / 6e4); if (m < 1) return "à l'instant"; if (m < 60) return `il y a ${m} min`; if (m < 24 * 60) return `il y a ${Math.round(m / 60)} h`; return `le ${shortDate(dayKey(new Date(ts)))}`; }
 function bqMono(name) { const w = String(name || "B").replace(/[^\p{L}\s]/gu, " ").trim().split(/\s+/); return (w.length > 1 ? w[0][0] + w[1][0] : w[0].slice(0, 2)).toUpperCase(); }
-function bqLogo(name, logo, cls = "") { return `<span class="bq-logo ${cls}">${logo ? `<img src="${esc(logo)}" alt="" loading="lazy" onerror="this.remove()">` : ""}<b>${esc(bqMono(name))}</b></span>`; }
+function bqLogo(name, logo, cls = "") { const k = bqNorm(name).split(" ")[0]; if (!logo && typeof BRAND_LOGOS !== "undefined" && BRAND_LOGOS[k]) logo = `img/logos/${k}.${BRAND_LOGOS[k]}`; return `<span class="bq-logo ${cls}">${logo ? `<img src="${esc(logo)}" alt="" loading="lazy" onerror="this.remove()">` : ""}<b>${esc(bqMono(name))}</b></span>`; }
 function bqCard(P) {
   if (!finIsGerant()) return "";
   const links = bqLinks(); const file = bqFile();
@@ -186,7 +186,7 @@ function bqCard(P) {
     return (L.accounts || []).map((a) => `<div class="bq-acc ${err ? "bad" : ""}">${bqLogo(L.bank, L.logo)}<span class="tx"><b>${esc(L.bank)}${a.name ? ` · ${esc(a.name)}` : ""}</b><em>${a.iban ? `•• ${esc(a.iban)} · ` : ""}${err ? esc(L.lastError || "À reconnecter") : `synchro ${bqAgo(L.lastSync || L.connectedAt)}`}</em></span>${err ? `<button class="btn soft sm" data-act="bqConnect">Reconnecter</button>` : a.balance != null ? `<span class="mono bq-bal">${bqEur(a.balance, 0)}</span>` : ""}</div>`).join("");
   }).join("");
   const pl = BQ.tx.filter((t) => t.src === "pennylane");
-  const plRow = pl.length ? `<div class="bq-acc"><span class="bq-logo"><b>PL</b></span><span class="tx"><b>Banque via Pennylane</b><em>${pl.length} opération${pl.length > 1 ? "s" : ""} · dernière le ${esc(shortDate(pl.reduce((m, t) => (t.day > m ? t.day : m), "")))}</em></span></div>` : "";
+  const plRow = pl.length ? `<div class="bq-acc">${bqLogo("Pennylane", "")}<span class="tx"><b>Banque via Pennylane</b><em>${pl.length} opération${pl.length > 1 ? "s" : ""} · dernière le ${esc(shortDate(pl.reduce((m, t) => (t.day > m ? t.day : m), "")))}</em></span></div>` : "";
   const fileRow = file ? `<div class="bq-acc">${`<span class="bq-logo">${ico("bqUp")}</span>`}<span class="tx"><b>Relevé importé</b><em>${esc(file.name || "fichier")} · ${bqAgo(file.lastImport)}</em></span></div>` : "";
   return `<div class="glass pad bq-card st" style="--i:2"><div class="row"><span class="lbl">${ico("bqBank")}Banque</span>
       <span class="bq-tools">${links.length ? `<button class="iconbtn sm ${BQ.busy ? "spin" : ""}" data-act="bqSync" aria-label="Synchroniser maintenant" title="Synchroniser">${ico("bqSync")}</button>` : ""}<button class="iconbtn sm" data-act="bqSettings" aria-label="Réglages de la banque" title="Réglages">${ico("sliders")}</button></span></div>

@@ -7,13 +7,10 @@ window.GG_FIREBASE = { apiKey: "AIzaSyDHXVawSF20v0orKpr7CpazVkOFQ9F58o0", authDo
 /* accounts that may read every in-app feedback (appFeedback, see firestore.rules: keep both lists in sync) */
 window.GG_ADMINS = ["marceau.ruis@gmail.com"];
 /* ── Commercial layer (js/abo.js) ──
-   Stripe Payment Links, one per pack (Stripe dashboard → Payment Links → « Créer »). null = no online payment yet: the app
-   shows « Pour activer votre abonnement, contactez-nous » with the address below and the activation-code field. */
-window.GG_STRIPE = { essentiel: null, complet: null };
-/* Activation codes typed by a gérant in Abonnement → « J'ai un code d'activation ». CHANGE THESE before giving any out. */
-window.GG_ACTIVATION = { "GG-ESSENTIEL-2026": "essentiel", "GG-COMPLET-2026": "complet" };
+   Online payment is Stripe, server side (functions/src/stripe.js): the admin pastes the Stripe secret key once in
+   Espace admin › Paiement en ligne. No key, price or activation code lives in this public file any more. */
 /* where « contactez-nous » writes */
 window.GG_CONTACT = "contact@growthgusto.fr";
 
 /* server modules deployed with functions/ (tools/SERVER.md): the app shows them as active */
-window.GG_SERVER = { sondes: true, alertes: true, resa: true, mails: true };
+window.GG_SERVER = { sondes: true, alertes: true, resa: true, mails: true, caisse: true };

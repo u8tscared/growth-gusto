@@ -88,6 +88,7 @@
 .ab-kpi>b{font-size:28px;font-weight:800;letter-spacing:-.05em;line-height:1.05}
 .ab-kpi>b.ok{color:var(--ok)}.ab-kpi>b.acc{color:var(--accent-ink)}.ab-kpi>b.bad{color:var(--bad)}
 .ab-seg .knob{width:calc(50% - 4px)}
+.ab-seg3 .knob{width:calc(33.333% - 2.67px)}
 .ab-search{display:flex;align-items:center;gap:10px;position:relative}
 .ab-search>.ico{position:absolute;left:15px;width:18px;height:18px;color:var(--muted);pointer-events:none}
 .ab-search .input{padding-left:42px;height:48px}
@@ -116,8 +117,10 @@
 .ab-dur{padding:2px 0}
 
 /* ── desktop / tablet ── */
+@media (min-width:900px){
+  .ab-packs{grid-template-columns:repeat(3,1fr)}
+}
 @media (min-width:600px){
-  .ab-packs{grid-template-columns:1fr 1fr}
   .ab-kpis{grid-template-columns:repeat(4,1fr)}
 }
 @media (min-width:960px){
@@ -216,3 +219,24 @@
 .ab-delic .ico{width:26px;height:26px}
 .ab-delw{font-weight:700;color:#C8432A}
 .ab-delsh .btn.danger{background:#C8432A;color:#fff;border-color:#9E2F1B}
+/* paiement en ligne (Stripe) */
+.ab-wrap .spin{width:15px;height:15px;border-radius:50%;border:2.5px solid currentColor;border-right-color:transparent;display:inline-block;margin-right:8px;animation:abSpin .8s linear infinite;vertical-align:-3px}
+@keyframes abSpin{to{transform:rotate(360deg)}}
+.ab-bl{display:flex;align-items:flex-start;gap:10px;padding:11px 12px;border-radius:14px;background:var(--glass-2);font-size:13px;line-height:1.45;color:var(--ink);text-decoration:none}
+.ab-bl .ico{width:18px;height:18px;flex:none;margin-top:1px;color:var(--acc)}
+.ab-bl span{flex:1;min-width:0}
+.ab-bl.warn .ico{color:var(--warn)}
+.ab-bl.bad{background:color-mix(in srgb,var(--bad) 10%,transparent)}
+.ab-bl.bad .ico{color:var(--bad)}
+.ab-bl.tap{cursor:pointer}
+.ab-bl.tap>.ico:last-child{color:var(--muted);margin-left:auto}
+.ab-sadm .ab-acth>div{flex:1;min-width:0}
+.ab-sadm .note a{color:var(--bad);font-weight:700}
+@media (prefers-reduced-motion:reduce){.ab-wrap .spin{animation:none}}
+.ab-tva{display:flex;gap:9px;align-items:flex-start;font-size:12.5px;line-height:1.45;color:var(--muted)}.ab-tva input{margin-top:2px;accent-color:var(--acc)}
+
+/* admin › caisses connectées */
+.ab-cxadm .ab-cxr{padding:12px 0 0;margin-top:12px;border-top:1px solid var(--line,rgba(0,0,0,.08))}
+.ab-cxadm .ab-cxr .ic .brand-logo{width:22px;height:22px;object-fit:contain}
+.ab-cxf{display:grid;grid-template-columns:1fr 1fr auto;gap:8px;margin-top:10px}
+@media (max-width:640px){.ab-cxf{grid-template-columns:1fr}}

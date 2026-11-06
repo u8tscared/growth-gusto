@@ -93,9 +93,9 @@ const pnyMonth = () => dayKey().slice(0, 7);
 function pnyCard() {
   if (!pnyBoss()) return "";
   const L = pnyLink();
-  if (!pnyOn()) return `<button class="glass pad pny-card st" style="--i:6" data-go="pennylane"><span class="pny-ic">${ico("pnyBook")}</span><span class="tx"><b>Reliez votre comptabilité</b><em>Pennylane : la banque arrive seule, les tickets Z partent chez le comptable.</em></span>${ico("chev")}</button>`;
+  if (!pnyOn()) return `<button class="glass pad pny-card st" style="--i:6" data-go="pennylane"><span class="pny-ic logo">${brandLogo("pennylane")}</span><span class="tx"><b>Reliez votre comptabilité</b><em>Pennylane : la banque arrive seule, les tickets Z partent chez le comptable.</em></span>${ico("chev")}</button>`;
   const err = L.status === "error"; const m = pnyMonth(); const sentM = PNY.sent.filter((s) => s.entryId && (s.day || "").startsWith(m)).length;
-  return `<button class="glass pad pny-card on st" style="--i:6" data-go="pennylane"><span class="pny-ic ${err ? "bad" : "ok"}">${ico(err ? "alert" : "pnyBook")}</span><span class="tx"><b>Pennylane${L.company ? ` · ${esc(L.company)}` : ""}</b><em>${err ? "À reconnecter" : `${sentM} ticket${sentM > 1 ? "s" : ""} Z envoyé${sentM > 1 ? "s" : ""} ce mois · synchro ${pnyAgo(L.lastSync)}`}</em></span>${ico("chev")}</button>`;
+  return `<button class="glass pad pny-card on st" style="--i:6" data-go="pennylane"><span class="pny-ic ${err ? "bad" : "logo"}">${err ? ico("alert") : brandLogo("pennylane")}</span><span class="tx"><b>Pennylane${L.company ? ` · ${esc(L.company)}` : ""}</b><em>${err ? "À reconnecter" : `${sentM} ticket${sentM > 1 ? "s" : ""} Z envoyé${sentM > 1 ? "s" : ""} ce mois · synchro ${pnyAgo(L.lastSync)}`}</em></span>${ico("chev")}</button>`;
 }
 
 /* ═════════ the page ═════════ */
@@ -112,7 +112,7 @@ VIEWS.pennylane = {
 
 function pnyIntro() {
   const pt = (ic, t, s, i) => `<div class="pny-pt st" style="--i:${i}"><span class="pny-ic sm">${ico(ic)}</span><span class="tx"><b>${t}</b><em>${s}</em></span></div>`;
-  return `<div class="glass wall pny-intro st" style="--i:1"><span class="pny-introic">${ico("pnyBook")}</span><b>Votre comptabilité, reliée</b><span>Reliez Pennylane une fois. Ensuite, tout circule seul, toutes les 3 heures.</span></div>
+  return `<div class="glass wall pny-intro st" style="--i:1"><span class="pny-introic logo">${brandLogo("pennylane")}</span><b>Votre comptabilité, reliée</b><span>Reliez Pennylane une fois. Ensuite, tout circule seul, toutes les 3 heures.</span></div>
     <div class="glass pad pny-pts st" style="--i:2">${pt("pnySend", "Les tickets Z partent chez le comptable", "Chaque soir, le chiffre du jour est passé en écriture de ventes, TVA séparée, photo du ticket jointe.", 3)}${pt("pnyBank", "La banque arrive dans Finances", "Les opérations que Pennylane lit déjà sur vos comptes remplissent vos charges, sans abonnement bancaire en plus.", 4)}${pt("pnyDoc", "Les factures fournisseurs à portée de main", "Montant, échéance, payée ou non : visibles ici, sans ouvrir Pennylane.", 5)}</div>`;
 }
 

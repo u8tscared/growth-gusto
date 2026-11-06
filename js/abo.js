@@ -1,20 +1,27 @@
-/* Growth Gusto — abonnement (area prefix « ab »): 14-day trial, the two packs (Essentiel 49 € · Complet 99 € HT/mois), activation
-   codes, gentle gating once the trial is over, and the Growth Gusto admin space (GG_ADMINS: every restaurant, every account).
+/* Growth Gusto — abonnement (area prefix « ab »): 14-day trial, the three packs (Commis 59 € · Second 109 € · Chef 169 € HT/mois; internal keys essentiel / pro / complet), online
+   payment (Stripe, functions/src/stripe.js), gentle gating once the trial is over, and the Growth Gusto admin space (GG_ADMINS: every restaurant, every account).
    State on the restaurant doc (restos/{rid}):
-     plan: "essai" | "essentiel" | "complet" | "suspendu"   pack: "essentiel" | "complet" (the pack chosen on the site, Complet by default)
+     plan: "essai" | "essentiel" | "pro" | "complet" | "suspendu"   pack: "essentiel" | "pro" | "complet" (the pack chosen on the site, Complet by default)
      trialEnds (ms) · paidAt, paidUntil (ms | null = unlimited), activatedBy, activationCode · grantedBy, grantedAt · suspended { at, by, plan, pack }
-   abPlan(resto?) → { plan: "essai" | "essentiel" | "complet" | "expire" | "suspendu" | "demo", pack, feat ("essentiel" | "complet": what is
+   abPlan(resto?) → { plan: "essai" | "essentiel" | "pro" | "complet" | "expire" | "suspendu" | "demo", pack, feat (the pack whose areas are
    open), open (writes allowed), days, ends, until, why }. Hooks for other areas: abBlocked(col), abRefuse(col) (called by DB in core.js),
-   abTile() / abRow() (menu Plus and Réglages, js/compte.js). Config: window.GG_STRIPE, GG_ACTIVATION, GG_CONTACT (js/config.js). */
+   abTile() / abRow() (menu Plus and Réglages, js/compte.js). Config: GG_CONTACT (js/config.js); online payment is switched on from the admin space (ggPublic/billing). */
 "use strict";
 
 const AB_DAY = 864e5, AB_TRIAL = 14;
 const AB_PACKS = {
-  essentiel: { t: "Essentiel", price: 49, tag: "L'hygiène, tenue au propre", feats: ["Relevés HACCP", "Étiquettes & DLC", "Réception des livraisons", "Registre sanitaire", "Planning ménage", "Fiches process", "Équipe illimitée"] },
-  complet: { t: "Complet", price: 99, tag: "Toute la gestion du restaurant", feats: ["Tout Essentiel", "Stock & inventaire", "Tickets de caisse", "Tableau de bord", "Finances", "Pointeuse", "Planning", "Employés & salaires", "Plusieurs restaurants"] },
+  essentiel: { t: "Commis", price: 59, tag: "L'hygiène carrée, sans y penser", feats: ["Relevés et sondes", "Étiquettes & DLC", "Réception des livraisons", "Plan de nettoyage", "Fiches recettes & allergènes", "Mode contrôle & PMS", "Registre & rappel de lot", "Équipe illimitée"] },
+  pro: { t: "Second", price: 109, tag: "La salle et la caisse en plus", feats: ["Tout Commis", "Réservations", "Plan de salle", "Caisse connectée & tickets Z", "Stock & inventaire", "Tableau de bord"] },
+  complet: { t: "Chef", price: 169, tag: "Toute la maison tourne", feats: ["Tout Second", "Pointeuse", "Planning", "Employés & salaires", "Finances & banque", "Pennylane", "Plusieurs restaurants"] },
 };
-/* areas that belong to the pack Complet: with a paid Essentiel they show an upgrade card instead (during the trial everything is open) */
-const AB_COMPLET = { stock: "Stock & inventaire", tickets: "Tickets de caisse", tzEdit: "Tickets de caisse", dashboard: "Tableau de bord", finance: "Finances", pointeuse: "Pointeuse", planning: "Planning", staff: "Employés & salaires", caisse: "Caisse connectée", caisseMap: "Caisse connectée", sites: "Multi-restaurant" };
+const AB_ORDER = ["essentiel", "pro", "complet"], AB_LVL = { essentiel: 1, pro: 2, complet: 3 };
+const abPk = (x) => AB_LVL[x] ? x : "complet";
+/* areas that need a higher pack: with a paid Commis or Second they show an upgrade card instead (during the trial everything is open) */
+const AB_GATE = {
+  resa: ["pro", "Réservations"], commandes: ["pro", "Commande en ligne"], plan: ["pro", "Plan de salle"], stock: ["pro", "Stock & inventaire"], tickets: ["pro", "Tickets de caisse"], tzEdit: ["pro", "Tickets de caisse"], dashboard: ["pro", "Tableau de bord"], caisse: ["pro", "Caisse connectée"], caisseMap: ["pro", "Caisse connectée"],
+  finance: ["complet", "Finances"], pennylane: ["complet", "Pennylane"], pointeuse: ["complet", "Pointeuse"], planning: ["complet", "Planning"], staff: ["complet", "Employés & salaires"], sites: ["complet", "Multi-restaurant"],
+};
+const abHas = (route, p = abPlan()) => !AB_GATE[route] || AB_LVL[p.feat] >= AB_LVL[AB_GATE[route][0]];
 const AB_MONTHS = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"];
 const abDate = (ts) => { const d = new Date(ts); return `${d.getDate()} ${AB_MONTHS[d.getMonth()]}${d.getFullYear() !== new Date().getFullYear() ? " " + d.getFullYear() : ""}`; };
 const abJours = (n) => `${n} jour${n > 1 ? "s" : ""}`;
@@ -40,9 +47,9 @@ function abPlan(r = S.resto) {
   const now = Date.now();
   if (!r) return { plan: "essai", pack: "complet", feat: "complet", open: true, days: AB_TRIAL, ends: now + AB_TRIAL * AB_DAY, pct: 1 };
   if (DB.mode === "demo") return { plan: "demo", pack: "complet", feat: "complet", open: true, days: null };
-  const pack = r.pack === "essentiel" ? "essentiel" : "complet";
+  const pack = abPk(r.pack);
   if (r.plan === "suspendu") return { plan: "suspendu", pack, feat: "complet", open: false, days: 0 };
-  if (r.plan === "essentiel" || r.plan === "complet") {
+  if (AB_LVL[r.plan]) {
     const until = +r.paidUntil || 0;
     if (until && until < now) return { plan: "expire", why: "paid", pack: r.plan, feat: "complet", open: false, days: 0, ends: until };
     return { plan: r.plan, pack: r.plan, feat: r.plan, open: true, until: until || null, days: until ? Math.max(0, Math.ceil((until - now) / AB_DAY)) : null, since: r.paidAt || r.grantedAt || null };
@@ -56,7 +63,7 @@ function abPlan(r = S.resto) {
 function abStamp(r) {
   const ends = Date.now() + AB_TRIAL * AB_DAY;
   if (r === S.resto && r.id && S.rid === r.id && DB.mode !== "demo" && !AB.stamped[r.id] && abGerant()) {
-    AB.stamped[r.id] = true; const patch = { plan: "essai", pack: r.pack === "essentiel" ? "essentiel" : "complet", trialEnds: ends };
+    AB.stamped[r.id] = true; const patch = { plan: "essai", pack: abPk(r.pack), trialEnds: ends };
     Object.assign(r, patch); DB.update("restos", r.id, patch).catch((e) => console.warn("trial stamp", e && e.code));
   }
   return ends;
@@ -88,7 +95,7 @@ function abBlockSheet() {
   const p = abPlan(); const g = abGerant();
   const T = p.plan === "suspendu" ? ["Accès suspendu", "L'accès à ce restaurant a été suspendu par Growth Gusto. Vos données sont conservées et restent consultables : contactez-nous pour le rétablir."]
     : p.why === "paid" ? ["Votre abonnement est arrivé à échéance", "Vos données sont conservées et restent consultables. Renouvelez votre pack pour continuer à enregistrer."]
-    : ["Votre essai est terminé", `Merci d'avoir essayé Growth Gusto. Vos données sont conservées et restent consultables. Pour continuer à enregistrer, choisissez un pack : ${AB_PACKS.essentiel.price} € ou ${AB_PACKS.complet.price} € HT par mois, sans engagement.`];
+    : ["Votre essai est terminé", `Merci d'avoir essayé Growth Gusto. Vos données sont conservées et restent consultables. Pour continuer à enregistrer, choisissez un pack : ${AB_PACKS.essentiel.price} €, ${AB_PACKS.pro.price} € ou ${AB_PACKS.complet.price} € HT par mois, sans engagement.`];
   SFX.err(); buzz([14, 30, 14]);
   openSheet(`<div class="ab-block"><span class="ab-blockic ${p.plan === "suspendu" ? "bad" : ""}">${ico(p.plan === "suspendu" ? "abPause" : "lock")}</span><div class="h2">${T[0]}</div><p class="sub">${T[1]}</p>
     ${S.route === "abonnement" ? "" : `<button class="btn acc block" data-act="abGoAbo">${ico("abPack")}${g ? (p.plan === "suspendu" ? "Voir mon abonnement" : "Choisir mon pack") : "Voir l'abonnement"}</button>`}
@@ -103,20 +110,21 @@ function abStrip() {
   return `<div class="ab-strip ${p.open ? "warn" : "bad"} st" style="--i:0" data-go="abonnement" role="button" tabindex="0">${ico(p.open ? "clock" : "lock")}<span>${tx}</span><em>${cta}${ico("chev")}</em></div>`;
 }
 function abUpgrade(route) {
-  const t = AB_COMPLET[route] || "Cette fonction"; const g = abGerant();
+  const [k, t] = AB_GATE[route] || ["complet", "Cette fonction"]; const g = abGerant(), P = AB_PACKS[k];
+  const list = AB_ORDER.slice(Math.min(AB_LVL[abPlan().feat] || 1, AB_LVL[k] - 1), AB_LVL[k]).flatMap((x) => AB_PACKS[x].feats.slice(1));
   return `<div class="inner narrow">${topBar(t)}
-    <div class="glass ab-up st" style="--i:1"><span class="ab-upic">${ico("abPack")}</span><div class="lbl">Pack Complet</div><h2 class="h2">${esc(t)} fait partie du pack Complet</h2>
-      <p class="sub">Stock & inventaire, tickets de caisse, tableau de bord, finances, pointeuse, planning, employés & salaires, plusieurs restaurants : ${AB_PACKS.complet.price} € HT par mois, sans engagement.</p>
-      <ul class="ab-feats">${AB_PACKS.complet.feats.slice(1).map((f) => `<li>${ico("check")}${f}</li>`).join("")}</ul>
-      ${g ? `<button class="btn acc block" data-go="abonnement">${ico("abPack")}Passer à Complet</button>` : `<p class="note" style="text-align:center">Votre restaurant est au pack Essentiel. Demandez au gérant de passer à Complet.</p>`}</div></div>`;
+    <div class="glass ab-up st" style="--i:1"><span class="ab-upic">${ico("abPack")}</span><div class="lbl">Pack ${P.t}</div><h2 class="h2">${esc(t)} fait partie du pack ${P.t}</h2>
+      <p class="sub">${P.tag} : ${P.price} € HT par mois, sans engagement.</p>
+      <ul class="ab-feats">${list.map((f) => `<li>${ico("check")}${f}</li>`).join("")}</ul>
+      ${g ? `<button class="btn acc block" data-go="abonnement">${ico("abPack")}Passer à ${P.t}</button>` : `<p class="note" style="text-align:center">Votre restaurant est au pack ${AB_PACKS[abPlan().feat].t}. Demandez au gérant de passer à ${P.t}.</p>`}</div></div>`;
 }
 /* wrap the areas once every js/<area>.js has loaded (abo.js comes right after compte.js) */
 function abWrap() {
-  Object.keys(AB_COMPLET).forEach((r) => {
+  Object.keys(AB_GATE).forEach((r) => {
     const V = VIEWS[r]; if (!V || V._ab) return; V._ab = true;
     const r0 = V.render, a0 = V.after;
-    V.render = function (p) { return abPlan().feat === "essentiel" ? abUpgrade(r) : r0.call(this, p); };
-    if (a0) V.after = function (v) { if (abPlan().feat !== "essentiel") return a0.call(this, v); };
+    V.render = function (p) { return abHas(r) ? r0.call(this, p) : abUpgrade(r); };
+    if (a0) V.after = function (v) { if (abHas(r)) return a0.call(this, v); };
   });
   const H = VIEWS.home; if (H && !H._ab) { H._ab = true; const h0 = H.render; H.render = function (p) { const html = h0.call(this, p); const b = abStrip(); return b && html.includes("</header>") ? html.replace("</header>", "</header>" + b) : html; }; }
 }
@@ -127,72 +135,128 @@ window.addEventListener("gg:ready", () => { let f = null; try { f = sessionStora
 /* ───────────────────────── Abonnement ───────────────────────── */
 VIEWS.abonnement = {
   render() {
-    const p = abPlan(), g = abGerant(), stripe = window.GG_STRIPE || {}, online = !!(stripe.essentiel || stripe.complet);
+    const p = abPlan(), g = abGerant(), online = abOnline(), sx = (S.resto && S.resto.stripe) || {}; abBillLoad();
     const C = +(2 * Math.PI * 42).toFixed(2);
     const ring = p.plan === "essai" ? `<div class="ring ab-ring"><svg viewBox="0 0 100 100"><circle class="tr" cx="50" cy="50" r="42" fill="none" stroke-width="8"/><circle class="br" cx="50" cy="50" r="42" fill="none" stroke-width="8" stroke-linecap="round" stroke-dasharray="${C}" stroke-dashoffset="${(C * (1 - p.pct)).toFixed(2)}"/></svg><div class="num"><span><b class="mono">${p.days}</b><small>${p.days > 1 ? "jours" : "jour"}</small></span></div></div>`
       : `<div class="ab-seal ${p.open ? "ok" : "off"}">${ico(p.plan === "suspendu" ? "abPause" : p.open ? "check" : "lock")}</div>`;
-    const H = p.plan === "essai" ? ["Essai gratuit · tout le pack Complet est ouvert", `${abJours(p.days)} restant${p.days > 1 ? "s" : ""}`, p.days <= 3 ? `Jusqu'au ${abDate(p.ends)}. Ensuite, vos données restent lisibles mais plus rien ne s'enregistre : choisissez votre pack dès maintenant.` : `Jusqu'au ${abDate(p.ends)}. Choisissez votre pack quand vous voulez : rien ne s'arrête d'ici là.`]
+    const H = p.plan === "essai" ? ["Essai gratuit · tout le pack Chef est ouvert", `${abJours(p.days)} restant${p.days > 1 ? "s" : ""}`, p.days <= 3 ? `Jusqu'au ${abDate(p.ends)}. Ensuite, vos données restent lisibles mais plus rien ne s'enregistre : choisissez votre pack dès maintenant.` : `Jusqu'au ${abDate(p.ends)}. Choisissez votre pack quand vous voulez : rien ne s'arrête d'ici là.`]
       : p.plan === "expire" ? (p.why === "paid" ? ["Abonnement arrivé à échéance", "Renouvelez votre pack", `Votre pack ${AB_PACKS[p.pack].t} s'est terminé le ${abDate(p.ends)}. Vos données sont conservées : dès le renouvellement, tout repart.`] : ["Essai terminé", "Choisissez votre pack", "Vos données sont conservées et restent consultables. Dès l'activation, tout repart exactement là où vous en étiez."])
       : p.plan === "suspendu" ? ["Accès suspendu", "Contactez-nous", "L'accès à ce restaurant a été suspendu par Growth Gusto. Vos données sont conservées et restent consultables."]
       : p.plan === "demo" ? ["Démo", "Tout est ouvert", "Créez votre compte pour démarrer votre essai gratuit de 14 jours, sans carte bancaire."]
       : ["Abonnement actif", `Pack ${AB_PACKS[p.plan].t}`, `${p.until ? `Jusqu'au ${abDate(p.until)}${p.days != null && p.days <= 7 ? ` · ${abJours(p.days)}` : ""}.` : "Mensuel, sans engagement : résiliable à tout moment."}${p.since ? ` Activé le ${abDate(p.since)}.` : ""} Utilisateurs illimités.`];
     const hero = `<section class="ab-hero ${p.plan} st" style="--i:1">${ring}<div class="ab-ht"><span class="ab-eyebrow">${H[0]}</span><h2>${H[1]}</h2><p>${H[2]}</p></div></section>`;
-    const paid = p.plan === "essentiel" || p.plan === "complet";
+    const paid = !!AB_LVL[p.plan];
     const card = (k, i) => {
-      const P = AB_PACKS[k], cur = paid && p.plan === k, best = k === "complet";
+      const P = AB_PACKS[k], cur = paid ? p.plan === k : abLive(sx) && sx.pack === k, best = k === "complet";
       const cta = !g ? "" : cur ? `<button class="btn soft block" disabled>${ico("check")}Pack actuel</button>`
-        : paid && k === "essentiel" ? `<button class="btn soft block" data-act="abContact" data-v="${k}">${ico("abMail")}Nous écrire</button>`
-        : `<button class="btn ${best ? "acc" : "soft"} block" data-act="abChoose" data-v="${k}">${paid ? "Passer à " : "Choisir "}${P.t}</button>`;
+        : paid && !online && AB_LVL[k] < AB_LVL[p.plan] ? `<button class="btn soft block" data-act="abContact" data-v="${k}">${ico("abMail")}Nous écrire</button>`
+        : `<button class="btn ${best ? "acc" : "soft"} block" data-act="abChoose" data-v="${k}" ${AB.busy === k ? "disabled" : ""}>${AB.busy === k ? `<span class="spin"></span>Ouverture du paiement…` : `${paid || abLive(sx) ? "Passer à " : "Choisir "}${P.t}`}</button>`;
       return `<article class="glass ab-pack ${k} ${cur ? "cur" : ""} st" style="--i:${i}">
         <div class="ab-ph"><div><span class="lbl">Pack</span><h3 class="ab-pn">${P.t}</h3></div>${cur ? `<span class="pill ok">Votre pack</span>` : best ? `<span class="pill acc">Recommandé</span>` : ""}</div>
         <div class="ab-price"><b class="mono">${P.price} €</b><span>HT / mois</span></div>
         <p class="ab-ptag">${P.tag}</p>
-        <ul class="ab-feats">${P.feats.map((f, j) => `<li class="${j === 0 && k === "complet" ? "all" : ""}">${ico("check")}${f}</li>`).join("")}</ul>${cta}</article>`;
+        <ul class="ab-feats">${P.feats.map((f, j) => `<li class="${j === 0 && k !== "essentiel" ? "all" : ""}">${ico("check")}${f}</li>`).join("")}</ul>${cta}</article>`;
     };
-    const packs = `<div class="ab-packs">${card("essentiel", 2)}${card("complet", 3)}</div>
-      <div class="ab-common st" style="--i:4">${["Mensuel, sans engagement", "Essai gratuit 14 jours", "Utilisateurs illimités", "Données hébergées en France"].map((t) => `<span>${ico("check")}${t}</span>`).join("")}</div>`;
-    const act = !g || p.plan === "demo" || paid ? (g ? "" : `<p class="note st ab-ro" style="--i:5">${ico("lock")}Seul le gérant peut choisir le pack ou saisir un code d'activation.</p>`)
-      : `<div class="glass pad ab-act st" style="--i:5"><div class="ab-acth"><span class="ic">${ico("abKey")}</span><div><b>${online ? "J'ai un code d'activation" : "Activer mon abonnement"}</b><em>${online ? "Reçu de Growth Gusto après votre commande" : "Le paiement en ligne arrive. En attendant, contactez-nous : vous recevez un code d'activation."}</em></div></div>
-        ${online ? "" : `<a class="btn soft block ab-mailto" href="${abMailto(p.pack)}">${ico("abMail")}Nous écrire</a><p class="note ab-addr">${esc(window.GG_CONTACT || "")} · réponse dans la journée, du lundi au samedi</p>`}
-        <form class="ab-actf" data-ab="code" novalidate><input class="input mono" id="abCode" placeholder="GG-XXXXXXXX-2026" autocomplete="off" autocapitalize="characters" spellcheck="false" enterkeyhint="go" aria-label="Code d'activation"><button class="btn acc" type="submit">Activer</button></form><em class="ab-acterr" id="abCodeErr" role="alert"></em></div>`;
+    const packs = `<div class="ab-packs">${AB_ORDER.map((k, i) => card(k, 2 + i)).join("")}</div>
+      <div class="ab-common st" style="--i:5">${["Mensuel, sans engagement", "Essai gratuit 14 jours", "Utilisateurs illimités", "Données hébergées en France"].map((t) => `<span>${ico("check")}${t}</span>`).join("")}</div>`;
+    const act = p.plan === "demo" ? "" : !g ? `<p class="note st ab-ro" style="--i:5">${ico("lock")}Seul le gérant peut choisir le pack et gérer le paiement.</p>`
+      : online ? abBillCard(p, sx)
+      : paid ? "" : `<div class="glass pad ab-act st" style="--i:5"><div class="ab-acth"><span class="ic">${ico("abMail")}</span><div><b>Activer mon abonnement</b><em>Le paiement en ligne arrive. En attendant, écrivez-nous : votre pack est activé dans la journée.</em></div></div>
+        <a class="btn soft block ab-mailto" href="${abMailto(p.pack)}">${ico("abMail")}Nous écrire</a><p class="note ab-addr">${esc(window.GG_CONTACT || "")} · réponse dans la journée, du lundi au samedi</p></div>`;
     const adm = abAdmin() ? `<div class="glass pad st ab-admrow" style="--i:6"><div class="li tap" data-go="admin"><span class="ic">${ico("shield")}</span><div class="tx"><b>Espace admin Growth Gusto</b><em>Tous les restaurants, offrir ou suspendre l'accès</em></div>${ico("chev")}</div></div>` : "";
     return `<div class="inner cc-wide ab-wrap">${topBar("Abonnement")}${hero}${packs}${act}${adm}</div>`;
   },
   after() { if (AB.flash) { AB.flash = false; const h = $(".ab-hero"); h && h.classList.add("pop"); } },
 };
 function abMailto(pack) {
-  const r = S.resto || {}; const subj = `Abonnement Growth Gusto · Pack ${AB_PACKS[pack === "essentiel" ? "essentiel" : "complet"].t} · ${r.name || ""}`;
-  const body = `Bonjour,\n\nJe souhaite activer le pack ${AB_PACKS[pack === "essentiel" ? "essentiel" : "complet"].t} pour ${r.name || "mon restaurant"}.\nIdentifiant du restaurant : ${S.rid || ""}\nE-mail du compte : ${abEmail() || "(sans compte)"}\n\nMerci !`;
+  const r = S.resto || {}; const P = AB_PACKS[abPk(pack)]; const subj = `Abonnement Growth Gusto · Pack ${P.t} · ${r.name || ""}`;
+  const body = `Bonjour,\n\nJe souhaite activer le pack ${P.t} pour ${r.name || "mon restaurant"}.\nIdentifiant du restaurant : ${S.rid || ""}\nE-mail du compte : ${abEmail() || "(sans compte)"}\n\nMerci !`;
   return `mailto:${window.GG_CONTACT || ""}?subject=${encodeURIComponent(subj)}&body=${encodeURIComponent(body)}`;
 }
-async function abActivate(raw, errEl, inp) {
-  const code = String(raw || "").trim().toUpperCase().replace(/\s+/g, "");
-  const fail = (m) => { SFX.err(); buzz([30, 50, 30]); if (errEl) errEl.textContent = m; if (inp) { inp.classList.remove("shake"); void inp.offsetWidth; inp.classList.add("shake"); inp.focus(); } };
-  if (!abGerant()) return fail("Seul le gérant peut activer l'abonnement.");
-  if (!code) return fail("Saisissez votre code d'activation.");
-  const plan = (window.GG_ACTIVATION || {})[code]; if (plan !== "essentiel" && plan !== "complet") return fail("Code inconnu. Vérifiez-le, ou écrivez-nous.");
-  if (!S.rid || !S.resto) return fail("Aucun restaurant ouvert.");
-  const patch = { plan, pack: plan, paidAt: Date.now(), paidUntil: null, activatedBy: abEmail() || S.me.name || S.me.id, activationCode: code };
-  try { await DB.update("restos", S.rid, patch); } catch (e) { return fail("Impossible d'enregistrer pour l'instant. Vérifiez la connexion et réessayez."); }
-  Object.assign(S.resto, patch); const r = S.restos.find((x) => x.id === S.rid); if (r) Object.assign(r, patch);
-  try { logEvent("team", `a activé le pack ${AB_PACKS[plan].t}`); } catch (e) {}
-  closeSheet(true); SFX.done(); buzz([12, 40, 12, 40, 30]); burst(); toast(`Pack ${AB_PACKS[plan].t} activé !`);
-  AB.flash = true; if (S.route === "abonnement") { rerender(); const v = $("#viewport .view"); if (v) v.scrollTo({ top: 0, behavior: "smooth" }); } else go("abonnement");
-  renderChrome();
+/* ───────────────────────── paiement en ligne (Stripe, functions/src/stripe.js) ─────────────────────────
+   ggPublic/billing { stripe } says whether it is on. The restaurant doc carries stripe { customer, sub, status, pack, periodEnd, cancelAt,
+   trialEnd, lastInvoice, failedAt }, written by the server only (firestore.rules billKeys). */
+const abLive = (sx) => !!(sx && sx.sub && ["active", "trialing", "past_due"].includes(sx.status));
+const abOnline = () => DB.mode === "db" && !!(AB.bill && AB.bill.stripe);
+function abBillLoad(force) {
+  if (DB.mode !== "db" || !DB.db || (AB.billAt && !force && Date.now() - AB.billAt < 300000)) return;
+  AB.billAt = Date.now();
+  DB.db.doc("ggPublic/billing").get().then((d) => { const b = d.exists ? d.data() : {}; const ch = !AB.bill || !!AB.bill.stripe !== !!b.stripe; AB.bill = b; if (ch && (S.route === "abonnement" || S.route === "admin")) rerender(); }).catch(() => { AB.billAt = 0; });
 }
-document.addEventListener("submit", (e) => { const f = e.target; if (!f.dataset || f.dataset.ab !== "code") return; e.preventDefault(); SFX.init && SFX.init(); const i = $("#abCode", f); abActivate(i && i.value, $("#abCodeErr"), i); });
+async function abCall(op, data) {
+  if (typeof AUTH === "undefined" || !AUTH.call) throw new Error("offline");
+  return AUTH.call("stripeApi", { op, rid: S.rid, ...(data || {}) });
+}
+function abBillCard(p, sx) {
+  const L = [];
+  if (sx.failedAt && sx.status === "past_due") L.push(`<div class="ab-bl bad">${ico("alert")}<span><b>Le dernier paiement n'est pas passé.</b> Stripe réessaie automatiquement. Mettez à jour votre carte pour éviter l'interruption.</span></div>`);
+  if (sx.status === "trialing" && sx.trialEnd) L.push(`<div class="ab-bl">${ico("abPack")}<span>Pack <b>${AB_PACKS[abPk(sx.pack)].t}</b> choisi, carte enregistrée. <b>Premier prélèvement le ${abDate(sx.trialEnd)}</b>, rien avant.</span></div>`);
+  else if (abLive(sx) && sx.cancelAt) L.push(`<div class="ab-bl warn">${ico("clock")}<span>Résiliation demandée : le pack reste actif <b>jusqu'au ${abDate(sx.cancelAt)}</b>. Vous pouvez la retirer depuis « Gérer mon abonnement ».</span></div>`);
+  else if (abLive(sx) && sx.periodEnd) L.push(`<div class="ab-bl">${ico("clock")}<span>Prochain prélèvement le <b>${abDate(sx.periodEnd)}</b> : ${AB_PACKS[abPk(sx.pack)].price} €, ${AB.bill && AB.bill.tva ? `soit ${(AB_PACKS[abPk(sx.pack)].price * 1.2).toFixed(2).replace(".", ",")} € TTC` : "TVA non applicable"}.</span></div>`);
+  if (sx.lastInvoice && sx.lastInvoice.url) L.push(`<a class="ab-bl tap" href="${esc(sx.lastInvoice.url)}" target="_blank" rel="noopener">${ico("receipt")}<span>Dernière facture${sx.lastInvoice.number ? ` <b>${esc(sx.lastInvoice.number)}</b>` : ""} · ${String(sx.lastInvoice.ttc.toFixed(2)).replace(".", ",")} € TTC</span>${ico("chev")}</a>`);
+  const head = sx.customer ? ["Paiement et factures", "Carte bancaire ou prélèvement, factures téléchargeables, résiliation en un geste."] : ["Paiement sécurisé par Stripe", p.plan === "essai" ? "Choisissez votre pack : la carte est enregistrée maintenant, le premier prélèvement a lieu à la fin de l'essai." : "Choisissez votre pack ci-dessus : paiement par carte, facture envoyée chaque mois, sans engagement."];
+  return `<div class="glass pad ab-act st" style="--i:5"><div class="ab-acth"><span class="ic">${ico("abKey")}</span><div><b>${head[0]}</b><em>${head[1]}</em></div></div>
+    ${L.join("")}
+    ${sx.customer ? `<button class="btn soft block" data-act="abPortal" ${AB.busy === "portal" ? "disabled" : ""}>${AB.busy === "portal" ? `<span class="spin"></span>Ouverture…` : `${ico("abPack")}Gérer mon abonnement`}</button>` : ""}
+    <p class="note ab-addr">Paiement traité par Stripe : Growth Gusto ne voit jamais votre numéro de carte. <a href="https://growthgusto.fr/cgv" target="_blank" rel="noopener">Conditions générales</a></p></div>`;
+}
+const AB_ERR = { stripe_off: "Le paiement en ligne n'est pas encore ouvert. Écrivez-nous : on active votre pack dans la journée.", suspendu: "L'accès à ce restaurant est suspendu : contactez-nous.", "permission-denied": "Seul le gérant peut gérer l'abonnement.", no_customer: "Aucun paiement enregistré pour ce restaurant." };
+const abErrTx = (e) => { const m = String((e && e.message) || ""); return AB_ERR[m] || AB_ERR[String((e && e.code) || "").replace(/^functions\//, "")] || "Impossible de joindre le paiement pour l'instant. Vérifiez la connexion et réessayez."; };
+async function abCheckout(k) {
+  AB.busy = k; refresh();
+  try {
+    const r = await abCall("checkout", { pack: k });
+    if (r.url) { location.href = r.url; return; }
+    if (r.changed) { closeSheet(true); SFX.done(); buzz([12, 40, 12, 40, 30]); burst(); toast(`Pack ${AB_PACKS[k].t} activé !`); AB.flash = true; }
+  } catch (e) { SFX.err(); toast(abErrTx(e)); }
+  AB.busy = null; refresh();
+}
+/* back from Stripe: ?abo=ok&session=… | ?abo=annule | ?abo=retour */
+(function abCatchReturn() {
+  try {
+    const u = new URL(location.href); const a = u.searchParams.get("abo"); if (!a) return;
+    sessionStorage.setItem("gg-abo-ret", JSON.stringify({ a, session: u.searchParams.get("session") || "" }));
+    ["abo", "session"].forEach((k) => u.searchParams.delete(k)); history.replaceState(null, "", u.pathname + u.search + u.hash);
+  } catch (e) {}
+})();
+window.addEventListener("gg:ready", () => setTimeout(async () => {
+  let ret = null; try { ret = JSON.parse(sessionStorage.getItem("gg-abo-ret") || "null"); sessionStorage.removeItem("gg-abo-ret"); } catch (e) {}
+  if (!ret || !S.rid) return;
+  if (ret.a === "annule") { go("abonnement"); toast("Paiement annulé : rien n'a été prélevé."); return; }
+  if (ret.a === "retour") { go("abonnement"); return; }
+  if (ret.a === "ok") {
+    go("abonnement"); toast("Paiement validé, activation…");
+    try { const r = await abCall("confirm", { session: ret.session }); if (r.ok) { SFX.done(); buzz([12, 40, 12, 40, 30]); burst(); AB.flash = true; toast(r.status === "trialing" ? `Pack ${AB_PACKS[abPk(r.pack)].t} choisi : premier prélèvement à la fin de l'essai.` : `Pack ${AB_PACKS[abPk(r.pack)].t} activé, merci !`); } }
+    catch (e) { toast("Paiement reçu : l'activation arrive dans une minute."); }
+    refresh();
+  }
+}, 700));
 
 Object.assign(ACT, {
   abGoAbo: () => { closeSheet(true); go("abonnement"); },
   abChoose: (a, id, v) => {
-    const k = v === "essentiel" ? "essentiel" : "complet"; const url = (window.GG_STRIPE || {})[k];
-    SFX.tap(); buzz(6);
-    if (url) { const u = url + (url.includes("?") ? "&" : "?") + "client_reference_id=" + encodeURIComponent(S.rid || "") + (abEmail() ? "&prefilled_email=" + encodeURIComponent(abEmail()) : ""); try { window.open(u, "_blank", "noopener"); } catch (e) { location.href = u; } return; }
+    const k = abPk(v); SFX.tap(); buzz(6); if (AB.busy) return;
+    if (abOnline()) {
+      const sx = (S.resto && S.resto.stripe) || {}; const p = abPlan();
+      if (abLive(sx) && sx.status !== "trialing") { /* already paying: confirm the change first, it is billed today (prorated) */
+        const up = AB_LVL[k] > AB_LVL[abPk(sx.pack)];
+        openSheet(`<div class="ab-block"><span class="ab-blockic">${ico("abPack")}</span><div class="lbl">Pack ${AB_PACKS[k].t} · ${AB_PACKS[k].price} € HT/mois</div><div class="h2">Passer au pack ${AB_PACKS[k].t} ?</div>
+          <p class="sub">${up ? "Le changement est immédiat. La différence, au prorata des jours restants, est prélevée aujourd'hui sur votre carte." : "Le changement est immédiat. Les jours déjà payés du pack actuel sont déduits de la prochaine facture."}</p>
+          <button class="btn acc block" data-act="abChange" data-v="${k}">${ico("check")}Oui, passer à ${AB_PACKS[k].t}</button><button class="btn ghost block" data-act="sheetClose">Annuler</button></div>`);
+        return;
+      }
+      void p; abCheckout(k); return;
+    }
     openSheet(`<div class="ab-block"><span class="ab-blockic">${ico("abPack")}</span><div class="lbl">Pack ${AB_PACKS[k].t} · ${AB_PACKS[k].price} € HT/mois</div><div class="h2">Paiement en ligne bientôt disponible</div><p class="sub">Pour activer votre abonnement, écrivez-nous : nous vous envoyons un code d'activation dans la journée. Sans engagement, résiliable à tout moment.</p>
-      <a class="btn acc block" href="${abMailto(k)}">${ico("abMail")}Nous écrire</a>
-      <form class="ab-actf" data-ab="code" novalidate><input class="input mono" id="abCode" placeholder="Code d'activation" autocomplete="off" autocapitalize="characters" spellcheck="false" enterkeyhint="go" aria-label="Code d'activation"><button class="btn soft" type="submit">Activer</button></form><em class="ab-acterr" id="abCodeErr" role="alert"></em></div>`);
+      <a class="btn acc block" href="${abMailto(k)}">${ico("abMail")}Nous écrire</a></div>`);
   },
   abContact: (a, id, v) => { SFX.tap(); location.href = abMailto(v); },
+  abChange: (a, id, v) => { SFX.tap(); abCheckout(abPk(v)); },
+  abPortal: async () => {
+    SFX.tap(); if (AB.busy) return; AB.busy = "portal"; refresh();
+    try { const r = await abCall("portal"); if (r.url) { location.href = r.url; return; } } catch (e) { SFX.err(); toast(abErrTx(e)); }
+    AB.busy = null; refresh();
+  },
 });
 
 /* ───────────────────────── Admin Growth Gusto ───────────────────────── */
@@ -234,7 +298,7 @@ function abAdminList() {
   return L.slice(0, 300).map((r, i) => { const p = abPlan(r); return `<button class="glass ab-cl st" style="--i:${Math.min(3 + i, 12)}" data-act="abAdmOpen" data-id="${esc(r.id)}">${abMono(r)}
     <span class="ab-clb"><span class="ab-clh"><b>${esc(r.name || "Sans nom")}</b>${abPlanPill(p)}</span>
       <span class="ab-clm">${esc(r.ownerEmail || r.ownerName || r.owner || "—")}${r.ownerName && r.ownerEmail ? ` · ${esc(firstName(r.ownerName))}` : ""}</span>
-      <span class="ab-clm dim">${r.createdAt ? `Créé le ${abDate(r.createdAt)}` : "Date inconnue"} · ${r.nMembers == null ? "équipe ?" : `${r.nMembers} membre${r.nMembers > 1 ? "s" : ""}`} ${p.plan === "essai" || p.plan === "expire" ? `· pack ${AB_PACKS[r.pack === "essentiel" ? "essentiel" : "complet"].t} ` : ""}${r.id === S.rid ? "· ouvert ici" : ""}</span></span>${ico("chev")}</button>`; }).join("");
+      <span class="ab-clm dim">${r.createdAt ? `Créé le ${abDate(r.createdAt)}` : "Date inconnue"} · ${r.nMembers == null ? "équipe ?" : `${r.nMembers} membre${r.nMembers > 1 ? "s" : ""}`} ${p.plan === "essai" || p.plan === "expire" ? `· pack ${AB_PACKS[abPk(r.pack)].t} ` : ""}${r.id === S.rid ? "· ouvert ici" : ""}</span></span>${ico("chev")}</button>`; }).join("");
 }
 function abAdminUsers() {
   const A = AB.admin || {}; const q = AB.q.trim().toLowerCase();
@@ -244,32 +308,87 @@ function abAdminUsers() {
   return `<div class="glass pad ab-ul">${L.slice(0, 500).map((u) => { const n = (u.restos || []).length; const me = u.id === S.me.id || u.id === DB.uid; return `<div class="li"><span class="ab-mono" style="--s:40px">${esc(initials(u.name || u.email || "?"))}</span><div class="tx"><b>${esc(u.name || firstName(String(u.email || "").split("@")[0]) || "Sans nom")}</b><em>${esc(u.email || u.id)}</em></div><span class="pill ${n ? "acc" : "neu"}">${n} resto${n > 1 ? "s" : ""}</span>${me ? "" : `<button class="iconbtn ab-udel" data-act="abUserDel" data-id="${esc(u.id)}" aria-label="Supprimer ${esc(u.email || u.name || "ce compte")}" title="Supprimer ce compte">${ico("trash")}</button>`}</div>`; }).join("")}</div>`;
 }
 VIEWS.admin = {
-  noResto: true, nav: "more",
+  noResto: true, nav: "admin",
   render() {
     const signed = !!DB.uid;
     if (!abAdmin()) return `<div class="inner narrow">${topBar("Admin Growth Gusto")}<div class="glass empty ab-denied st" style="--i:1"><div class="ic">${ico("shield")}</div><b>Accès réservé à l'équipe Growth Gusto</b>${signed ? `Connecté avec <b class="ab-em">${esc(abEmail())}</b>, qui n'est pas un compte administrateur.` : "Connectez-vous avec un compte administrateur."}
       <div class="ab-denied-b">${signed ? `<button class="btn soft" data-act="abAdmSwitch">${ico("swap")}Changer de compte</button>` : `<button class="btn acc" data-act="abAdmLogin">${ico("users")}Se connecter</button>`}${S.resto ? `<button class="btn ghost" data-go="home">Retour à l'app</button>` : ""}</div></div></div>`;
     abAdminFetch();
     const A = AB.admin || {}; const R = A.restos || [];
-    const n = { all: R.length, essai: 0, paye: 0, fin: 0 }; R.forEach((r) => { const p = abPlan(r); if (p.plan === "essai") n.essai++; else if (p.plan === "essentiel" || p.plan === "complet") n.paye++; else n.fin++; });
+    const n = { all: R.length, essai: 0, paye: 0, fin: 0 }; R.forEach((r) => { const p = abPlan(r); if (p.plan === "essai") n.essai++; else if (AB_LVL[p.plan]) n.paye++; else n.fin++; });
     const kpi = `<div class="ab-kpis st" style="--i:1"><div class="glass ab-kpi"><span class="lbl">Restaurants</span><b class="mono">${n.all}</b></div><div class="glass ab-kpi"><span class="lbl">En essai</span><b class="mono acc">${n.essai}</b></div><div class="glass ab-kpi"><span class="lbl">Abonnés</span><b class="mono ok">${n.paye}</b></div><div class="glass ab-kpi"><span class="lbl">Terminés</span><b class="mono ${n.fin ? "bad" : ""}">${n.fin}</b></div></div>`;
     const tabs = `<div class="seg ab-seg st" style="--i:2"><span class="knob" style="width:calc(50% - 4px);transform:translateX(${AB.tab === "comptes" ? "100%" : "0"})"></span><button class="${AB.tab === "restos" ? "on" : ""}" data-act="abAdmTab" data-v="restos">Restaurants</button><button class="${AB.tab === "comptes" ? "on" : ""}" data-act="abAdmTab" data-v="comptes">Comptes${A.users ? ` · ${A.users.length}` : ""}</button></div>
       <label class="ab-search st" style="--i:2">${ico("abSearch")}<input class="input" id="abQ" type="search" placeholder="${AB.tab === "comptes" ? "Nom, e-mail…" : "Restaurant, e-mail du gérant…"}" value="${esc(AB.q)}" autocomplete="off"></label>`;
     return `<div class="inner cc-wide ab-wrap ab-adm">${topBar("Admin Growth Gusto", { right: `${typeof auMailPrev === "function" ? `<button class="iconbtn" data-act="auMailPrev" aria-label="Aperçu des e-mails" title="Aperçu des e-mails">${ico("abMail")}</button>` : ""}<button class="iconbtn" data-act="abAdmReload" aria-label="Actualiser" title="Actualiser">${ico("abRefresh")}</button>` })}
       <p class="sub st" style="--i:0;margin:-6px 0 0">${DB.mode === "db" ? "Tous les restaurants et comptes du projet." : "Cet appareil seulement (sans compte, l'admin ne voit que les restaurants de ce téléphone)."}${A.loading ? " Actualisation…" : ""}</p>
-      ${kpi}${tabs}<div id="abList" class="ab-list">${AB.tab === "comptes" ? abAdminUsers() : abAdminList()}</div></div>`;
+      ${kpi}${abStripeAdm()}${abCxAdm()}${tabs}<div id="abList" class="ab-list">${AB.tab === "comptes" ? abAdminUsers() : abAdminList()}</div></div>`;
   },
 };
+/* Espace admin › Paiement en ligne: paste the Stripe secret key once; the server builds everything on the Stripe account */
+const AB_STATUS = { trialing: "carte enregistrée, essai", active: "payé", past_due: "paiement en retard", canceled: "résilié", unpaid: "impayé", incomplete: "paiement inachevé", incomplete_expired: "paiement abandonné" };
+function abStripeAdm() {
+  if (DB.mode !== "db") return "";
+  const X = (AB.sadm ||= { st: null, busy: false, err: "", edit: false });
+  if (!X.st && !X.busy && !X.err) { X.busy = true; abCall("status").then((r) => { X.st = r; }).catch((e) => { X.err = abErrTx(e); }).finally(() => { X.busy = false; if (S.route === "admin") rerender(); }); }
+  const st = X.st || {};
+  const head = X.busy && !X.st ? "Lecture…" : st.on ? `Actif · ${st.live ? "paiements réels" : "mode test"} · ${st.tva ? "TVA 20 %" : "sans TVA"}${st.account ? ` · ${esc(st.account)}` : ""}` : "Pas encore branché : les gérants voient « Nous écrire »";
+  const form = !st.on || X.edit ? `<form class="ab-actf" data-ab="sk" novalidate><input class="input mono" id="abSk" type="password" placeholder="sk_live_…" autocomplete="off" spellcheck="false" aria-label="Clé secrète Stripe"><button class="btn acc" type="submit" ${X.busy ? "disabled" : ""}>${X.busy ? `<span class="spin"></span>` : ""}Brancher</button></form>
+      <label class="ab-tva"><input type="checkbox" id="abTva" ${st.tva ? "checked" : ""}> Facturer la TVA (20 %). Laissez décoché en micro-entreprise : les factures portent « TVA non applicable, art. 293 B du CGI ».</label>
+      <p class="note">Stripe › Développeurs › Clés API › <b>Clé secrète</b> (Révéler, puis copier). Une clé de test (sk_test_) permet de tout essayer avec la carte 4242 4242 4242 4242. La clé est chiffrée côté serveur et n'est jamais renvoyée à l'appli.</p>` : "";
+  return `<div class="glass pad ab-act ab-sadm st" style="--i:2"><div class="ab-acth"><span class="ic">${ico("abKey")}</span><div><b>Paiement en ligne (Stripe)</b><em>${head}</em></div>
+      ${st.on && !X.edit ? `<button class="btn ghost sm" data-act="abSkEdit">Changer la clé</button>` : ""}</div>
+    ${form}<em class="ab-acterr" id="abSkErr" role="alert">${esc(X.err || "")}</em>
+    ${st.on ? `<p class="note">Les packs (« Growth Gusto · Pack … »), le portail client et un webhook dédié sont créés sur le compte Stripe, sans toucher à ce qui existe déjà. Prix : ${AB_ORDER.map((k) => `${AB_PACKS[k].t} ${AB_PACKS[k].price} €`).join(", ")} HT par mois.${X.edit ? "" : ` <a href="#" data-act="abSkOff">Couper le paiement en ligne</a>`}</p>` : ""}</div>`;
+}
+/* Espace admin › Caisses connectées: client id + secret of the SumUp / Square developer apps, pasted once (encrypted on the server) */
+const AB_CX = [["sumup", "SumUp", "me.sumup.com › Paramètres › Paramètres développeur › Applications OAuth2 › Growth Gusto › Identifiants client"], ["square", "Square", "developer.squareup.com › Growth Gusto › OAuth › Production : Application ID et Application secret"]];
+async function abCxCall(op, body = {}) {
+  const u = typeof firebase !== "undefined" && firebase.auth && firebase.auth().currentUser; if (!u) throw Object.assign(new Error("auth"), { code: "auth" });
+  const r = await fetch(CX_API, { method: "POST", headers: { "content-type": "application/json", authorization: "Bearer " + (await u.getIdToken()) }, body: JSON.stringify({ op, ...body }) });
+  const j = await r.json().catch(() => ({})); if (!r.ok || j.error) throw Object.assign(new Error(j.error || "http " + r.status), { code: j.error || "http" }); return j;
+}
+function abCxAdm() {
+  if (DB.mode !== "db" || typeof CX_API === "undefined") return "";
+  const X = (AB.cxadm ||= { st: null, busy: false, err: "", edit: "" });
+  if (!X.st && !X.busy && !X.err) { X.busy = true; abCxCall("cfgStatus").then((r) => { X.st = r; }).catch((e) => { X.err = e.code === "http" || e.code === "op" ? "Le serveur des caisses n'est pas encore en ligne." : "Lecture impossible."; }).finally(() => { X.busy = false; if (S.route === "admin") rerender(); }); }
+  const on = (X.st && X.st.on) || {};
+  const rows = AB_CX.map(([id, name, where]) => {
+    const edit = X.edit === id || (!on[id] && X.edit === "");
+    return `<div class="ab-cxr"><div class="ab-acth"><span class="ic">${typeof brandLogo === "function" ? brandLogo(id) || ico("abKey") : ico("abKey")}</span><div><b>${name}</b><em>${X.busy && !X.st ? "Lecture…" : on[id] ? `Branché · ${esc((X.st.ids && X.st.ids[id]) || "")}` : "Pas encore branché"}</em></div>${on[id] && !edit ? `<button class="btn ghost sm" data-act="abCxEdit" data-v="${id}">Changer</button>` : ""}</div>
+      ${edit ? `<form class="ab-cxf" data-ab="cx" data-v="${id}" novalidate><input class="input mono" name="id" placeholder="Client ID" autocomplete="off" spellcheck="false" aria-label="Client ID ${name}"><input class="input mono" name="secret" type="password" placeholder="Client secret" autocomplete="off" spellcheck="false" aria-label="Client secret ${name}"><button class="btn acc" type="submit" ${X.busy ? "disabled" : ""}>${X.busy ? `<span class="spin"></span>` : ""}Brancher</button></form><p class="note">${where}</p>` : ""}</div>`;
+  }).join("");
+  return `<div class="glass pad ab-act ab-sadm ab-cxadm st" style="--i:2"><div class="ab-acth"><span class="ic">${ico("abKey")}</span><div><b>Caisses connectées</b><em>Les gérants branchent leur caisse en un clic une fois les clés collées ici. Elles sont chiffrées côté serveur.</em></div></div>
+    ${rows}<em class="ab-acterr" role="alert">${esc(X.err || "")}</em></div>`;
+}
+document.addEventListener("submit", async (e) => {
+  const f = e.target; if (!f.dataset || f.dataset.ab !== "cx") return; e.preventDefault();
+  const X = AB.cxadm; const prov = f.dataset.v; const id = String(f.elements.id.value || "").trim(), secret = String(f.elements.secret.value || "").trim();
+  if (id.length < 6 || secret.length < 8) { SFX.err(); X.err = "Collez le Client ID et le Client secret."; rerender(); return; }
+  X.busy = true; X.err = ""; rerender();
+  try { const r = await abCxCall("config", { [prov]: { id, secret } }); X.st = null; X.edit = ""; SFX.done(); burst(); toast(`${prov === "sumup" ? "SumUp" : "Square"} branché : les gérants peuvent connecter leur caisse.`); }
+  catch (er) { SFX.err(); X.err = er.code === "badkey" ? "Clés incomplètes : vérifiez le Client ID et le secret." : er.code === "forbidden" ? "Réservé aux administrateurs Growth Gusto." : "Enregistrement impossible pour l'instant."; }
+  X.busy = false; rerender();
+});
+document.addEventListener("submit", async (e) => {
+  const f = e.target; if (!f.dataset || f.dataset.ab !== "sk") return; e.preventDefault();
+  const X = AB.sadm; const i = $("#abSk", f); const key = String((i && i.value) || "").trim();
+  if (!/^(sk|rk)_(live|test)_/.test(key)) { SFX.err(); const er = $("#abSkErr"); if (er) er.textContent = "Collez la clé secrète : elle commence par sk_live_ ou sk_test_."; return; }
+  X.busy = true; X.err = ""; rerender();
+  try { const tv = $("#abTva"); const r = await abCall("setup", { key, tva: !!(tv && tv.checked) }); X.st = { on: true, live: r.live, account: r.account, tva: r.tva }; X.edit = false; AB.billAt = 0; abBillLoad(true); SFX.done(); burst(); toast(r.live ? "Stripe branché : les gérants peuvent payer en ligne." : "Stripe branché en mode test."); }
+  catch (er) { SFX.err(); X.err = /badkey/.test(String(er && er.message)) ? "Clé refusée par Stripe : vérifiez-la." : abErrTx(er) + (er && er.message && /stripe:/.test(er.message) ? ` (${er.message})` : ""); }
+  X.busy = false; rerender();
+});
 function abAdmSheet(id) {
   const A = AB.admin || {}; const r = (A.restos || []).find((x) => x.id === id) || S.restos.find((x) => x.id === id); if (!r) return;
   const st = (S.ui.abAdm ||= { pack: "complet", dur: 1 }); st.id = id; const p = abPlan(r);
   const dur = [[1, "1 mois"], [3, "3 mois"], [12, "1 an"], [0, "Illimité"]];
-  const line = p.plan === "essai" ? `Essai jusqu'au ${abDate(p.ends)}` : p.plan === "expire" ? (p.why === "paid" ? `Pack ${AB_PACKS[p.pack].t} échu le ${abDate(p.ends)}` : `Essai terminé le ${abDate(p.ends)}`) : p.plan === "suspendu" ? `Suspendu${r.suspended && r.suspended.at ? ` le ${abDate(r.suspended.at)}` : ""}` : p.plan === "demo" ? "Démo" : `Pack ${AB_PACKS[p.plan].t}${p.until ? ` jusqu'au ${abDate(p.until)}` : " · illimité"}${r.grantedBy ? ` · offert par ${esc(r.grantedBy)}` : r.activationCode ? ` · code ${esc(r.activationCode)}` : ""}`;
+  let line = p.plan === "essai" ? `Essai jusqu'au ${abDate(p.ends)}` : p.plan === "expire" ? (p.why === "paid" ? `Pack ${AB_PACKS[p.pack].t} échu le ${abDate(p.ends)}` : `Essai terminé le ${abDate(p.ends)}`) : p.plan === "suspendu" ? `Suspendu${r.suspended && r.suspended.at ? ` le ${abDate(r.suspended.at)}` : ""}` : p.plan === "demo" ? "Démo" : `Pack ${AB_PACKS[p.plan].t}${p.until ? ` jusqu'au ${abDate(p.until)}` : " · illimité"}${r.grantedBy ? ` · offert par ${esc(r.grantedBy)}` : r.activationCode ? ` · code ${esc(r.activationCode)}` : ""}`;
+  if (r.stripe && r.stripe.status) line += ` · Stripe : ${AB_STATUS[r.stripe.status] || r.stripe.status}`;
   openSheet(`<div class="ab-ash"><div class="ab-ashh">${abMono(r, 52)}<div style="flex:1;min-width:0"><div class="h2" style="font-size:20px">${esc(r.name || "Sans nom")}</div><div class="sub">${esc(r.ownerEmail || r.ownerName || r.owner || "")}${r.createdAt ? ` · créé le ${abDate(r.createdAt)}` : ""}</div></div>${abPlanPill(p)}</div>
     <p class="note ab-line">${line} · ${r.nMembers == null ? "équipe inconnue" : `${r.nMembers} membre${r.nMembers > 1 ? "s" : ""}`} · <span class="mono">${esc(r.id)}</span></p>
     ${p.plan === "suspendu" ? `<button class="btn acc block" data-act="abAdmRestore">${ico("abPlay")}Rétablir l'accès</button>` : `
     <div class="lbl">Offrir l'accès</div>
-    <div class="seg ab-seg"><span class="knob" style="width:calc(50% - 4px);transform:translateX(${st.pack === "complet" ? "100%" : "0"})"></span><button class="${st.pack === "essentiel" ? "on" : ""}" data-act="abAdmPack" data-v="essentiel">Essentiel</button><button class="${st.pack === "complet" ? "on" : ""}" data-act="abAdmPack" data-v="complet">Complet</button></div>
+    <div class="seg ab-seg ab-seg3"><span class="knob" style="width:calc(33.333% - 2.67px);transform:translateX(${AB_ORDER.indexOf(st.pack) * 100}%)"></span>${AB_ORDER.map((k) => `<button class="${st.pack === k ? "on" : ""}" data-act="abAdmPack" data-v="${k}">${AB_PACKS[k].t}</button>`).join("")}</div>
     <div class="chips ab-dur">${dur.map(([m, t]) => `<button class="chip ${st.dur === m ? "on" : ""}" data-act="abAdmDur" data-v="${m}">${t}</button>`).join("")}</div>
     <button class="btn acc block" data-act="abAdmGrant">${ico("abGift")}Offrir ${AB_PACKS[st.pack].t} · ${dur.find(([m]) => m === st.dur)[1].toLowerCase()}</button>
     <div class="lbl">Essai</div>
@@ -284,7 +403,11 @@ async function abAdmWrite(id, patch, msg) {
 Object.assign(ACT, {
   abAdmOpen: (a, id) => { SFX.tap(); abAdmSheet(id); },
   abAdmTab: (a, id, v) => { if (AB.tab === v) return; AB.tab = v; AB.q = ""; SFX.tick(); rerender(); },
-  abAdmReload: () => { SFX.tap(); abAdminFetch(true); },
+  abAdmReload: () => { SFX.tap(); abAdminFetch(true); if (AB.sadm) { AB.sadm.st = null; AB.sadm.err = ""; } },
+  abCxEdit: (a, id, v) => { SFX.tap(); AB.cxadm.edit = v; rerender(); },
+  abSkEdit: () => { SFX.tap(); AB.sadm.edit = true; rerender(); setTimeout(() => { const i = $("#abSk"); i && i.focus(); }, 60); },
+  abSkOff: async () => { SFX.tap(); if (!AB.sadm.confirmOff) { AB.sadm.confirmOff = true; toast("Touchez encore une fois pour couper le paiement en ligne."); setTimeout(() => { AB.sadm.confirmOff = false; }, 4000); return; }
+    try { await abCall("off"); AB.sadm.st = { on: false }; AB.billAt = 0; abBillLoad(true); toast("Paiement en ligne coupé."); } catch (e) { toast(abErrTx(e)); } rerender(); },
   /* delete an account for good (functions/src/admin.js adminDeleteUser): its own restaurants, its memberships, its sign-in */
   abUserDel: (a, id) => {
     const A = AB.admin || {}; const u = (A.users || []).find((x) => x.id === id); if (!u) return;

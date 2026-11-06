@@ -154,7 +154,7 @@ function avMineItem(f, i, seen) {
 
 /* ───────── admin inbox ───────── */
 VIEWS.avisAdmin = {
-  nav: "avis",
+  nav: "avisAdmin",
   render() {
     if (!avisIsAdmin()) return `<div class="inner narrow">${topBar("Boîte admin")}<div class="glass empty st" style="--i:1"><div class="ic">${ico("avLock")}</div><b>Accès réservé</b>Cette boîte est réservée à l'équipe Growth Gusto.</div></div>`;
     avWatchAll();

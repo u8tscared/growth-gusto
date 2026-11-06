@@ -13,7 +13,8 @@
         "avant/**",
         "README.md",
         "firestore.rules",
-        "functions/**"
+        "functions/**",
+        "gha-creds-*.json"
       ],
       "cleanUrls": false,
       "headers": [

@@ -2,7 +2,7 @@ rules_version = '2';
 // Growth Gusto · Firestore security rules (paste in Firebase console → Firestore Database → Règles → Publier).
 // Data model:
 //   users/{uid}                      { name, email, photo, restos: [rid] }       the person's own profile and restaurant list
-//   restos/{rid}                     { name, owner, createdAt, plan: essai|essentiel|complet|suspendu, pack, trialEnds, paidUntil… }   one restaurant
+//   restos/{rid}                     { name, owner, createdAt, plan: essai|essentiel|pro|complet|suspendu, pack, trialEnds, paidUntil… }   one restaurant
 //                                    (the commercial fields are set by the gérant with an activation code, or by a Growth Gusto admin: js/abo.js)
 //   restos/{rid}/members/{memberId}  { name, email, role: gerant|chef|equipe, joinedAt, perms? }  memberId = uid (account) or a kitchen profile id
 //                                    perms (optional map): employee permissions, set only by a gérant (or copied from the invite on join)
@@ -87,6 +87,13 @@ service cloud.firestore {
     }
     // the commercial fields an admin may change on a restaurant, nothing else
     function adminKeys() { return ['plan', 'pack', 'trialEnds', 'paidUntil', 'paidAt', 'grantedBy', 'grantedAt', 'suspended', 'suspendedAt', 'suspendedBy']; }
+    // what only the server (Stripe webhook, admin SDK) or an admin writes on a restaurant: nobody pays by editing their own document
+    function billKeys() { return ['paidUntil', 'paidAt', 'grantedBy', 'grantedAt', 'suspended', 'suspendedAt', 'suspendedBy', 'stripe', 'activatedBy', 'activationCode']; }
+    // the gérant's device stamps the 14-day trial once on a restaurant created before the trial existed
+    function trialStamp() {
+      return !('trialEnds' in resource.data) && request.resource.data.get('plan', 'essai') == 'essai'
+        && request.resource.data.trialEnds is number && request.resource.data.trialEnds <= request.time.toMillis() + 15 * 86400000;
+    }
 
     // ── people ──
     match /users/{uid} {
@@ -98,9 +105,14 @@ service cloud.firestore {
     match /restos/{rid} {
       allow read: if isMember(rid);
       allow get, list: if isAdmin();
-      allow create: if signedIn() && request.resource.data.owner == me() && request.resource.data.name is string;
-      allow update: if isGerant(rid) && unchanged(['owner', 'createdAt', 'server', 'alertMail', 'alertState'])
-                    || isMember(rid) && unchanged(['owner', 'createdAt', 'server', 'alertMail', 'alertState', 'alertCfg', 'resaCfg', 'trainingRequired', 'chorePhotoStaff', 'uiDefault', 'name', 'plan', 'pack', 'trialEnds', 'paidUntil', 'paidAt', 'grantedBy', 'grantedAt', 'suspended'])
+      // a new restaurant starts on the free trial (14 days, one day of slack for clocks); paying fields are the server's (Stripe) or an admin's
+      allow create: if signedIn() && request.resource.data.owner == me() && request.resource.data.name is string
+                    && request.resource.data.get('plan', 'essai') == 'essai'
+                    && request.resource.data.get('trialEnds', 0) <= request.time.toMillis() + 15 * 86400000
+                    && !request.resource.data.keys().hasAny(billKeys());
+      allow update: if isGerant(rid) && unchanged(['owner', 'createdAt', 'server', 'alertMail', 'alertState']) && unchanged(billKeys())
+                       && (unchanged(['plan', 'trialEnds']) || trialStamp())
+                    || isMember(rid) && unchanged(['owner', 'createdAt', 'server', 'alertMail', 'alertState', 'alertCfg', 'resaCfg', 'trainingRequired', 'chorePhotoStaff', 'uiDefault', 'name', 'plan', 'pack', 'trialEnds']) && unchanged(billKeys())
                     || isAdmin() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(adminKeys());
       allow delete: if signedIn() && resource.data.owner == me();
 
@@ -136,7 +148,7 @@ service cloud.firestore {
 
       // ── réservations: public projection, read by the booking page ──
       match /public/{doc} {
-        allow get: if doc == 'resa';
+        allow get: if doc == 'resa' || doc == 'menu';
         // the booking page adds the covers of the booking it creates in the same batch, and nothing else
         allow update: if doc == 'resa' && resaCounterOk(rid);
       }
@@ -147,8 +159,8 @@ service cloud.firestore {
 
       // ── everything else (fridges, readings, lots, stock, tickets, staff, finances…): members only ──
       match /{col}/{doc} {
-        allow read: if !(col in ['members', 'sensorKeys', 'pennylane', 'plSent', 'plInv', 'bankTx', 'bank']) && isMember(rid);
-        allow create, update, delete: if !(col in ['members', 'sensorKeys', 'pennylane', 'plSent', 'plInv', 'bankTx', 'bank']) && isMemberAfter(rid);
+        allow read: if !(col in ['members', 'sensorKeys', 'pennylane', 'plSent', 'plInv', 'qrPay', 'bankTx', 'bank']) && isMember(rid);
+        allow create, update, delete: if !(col in ['members', 'sensorKeys', 'pennylane', 'plSent', 'plInv', 'qrPay', 'bankTx', 'bank']) && isMemberAfter(rid);
       }
       // Pennylane (js/pennylane.js, functions/src/pennylane.js): accounting, so gérants only; the server writes with admin rights
       match /pennylane/{doc} {
@@ -167,6 +179,10 @@ service cloud.firestore {
       }
       match /bank/{doc} {
         allow read, write: if isGerant(rid);
+      }
+      // commande en ligne (js/commande.js, functions/src/commande.js): the restaurant's Stripe account state, written by the server only
+      match /qrPay/{doc} {
+        allow read: if isMember(rid);
       }
       // sensor cloud accounts (keys, passwords) and the gateway token: gérants only; the server reads them with admin rights
       match /sensorKeys/{doc} {
@@ -188,6 +204,10 @@ service cloud.firestore {
     }
 
     // ── invites: readable by whoever has the code, managed by the restaurant's gérants ──
+    // read by every app: is online payment (Stripe) switched on (written by functions/src/stripe.js only)
+    match /ggPublic/{doc} {
+      allow read: if true;
+    }
     match /invites/{code} {
       allow get: if true;
       allow list: if isGerant(resource.data.rid);

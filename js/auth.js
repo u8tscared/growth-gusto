@@ -98,10 +98,10 @@ const AUTH = {
       const u = new URL(location.href), q = u.searchParams; let strip = false;
       const inv = auCleanCode(q.get("invite")); if (inv.length === 8) auLS.set("gg-invite", inv);
       const wantLocal = q.has("local"), wantDemo = q.has("demo");
-      /* links from the marketing site (growthgusto.fr): ?signup=1 (create an account), &plan=essentiel|complet (the pack chosen there,
+      /* links from the marketing site (growthgusto.fr): ?signup=1 (create an account), &plan=essentiel|pro|complet (the pack chosen there,
          remembered until the restaurant is created), ?login=1 (sign in), ?admin=1 (the Growth Gusto admin space, js/abo.js) */
       const wantSignup = q.has("signup"), wantLogin = q.has("login"), wantAdmin = q.has("admin"), plan = String(q.get("plan") || "").toLowerCase();
-      if (plan === "essentiel" || plan === "complet") auLS.set("gg-plan", plan);
+      if (plan === "essentiel" || plan === "pro" || plan === "complet") auLS.set("gg-plan", plan);
       if (wantAdmin) auLS.sset("gg-admin", "1");
       ["invite", "local", "demo", "signup", "login", "plan", "admin"].forEach((k) => { if (q.has(k)) { q.delete(k); strip = true; } });
       if (strip) { try { history.replaceState(null, "", u.pathname + (q.toString() ? "?" + q : "") + u.hash); } catch (e) {} }
@@ -440,10 +440,16 @@ const AUTH = {
   },
   /* the pack chosen on growthgusto.fr (?plan=), shown while the account and the restaurant are created */
   packHTML(i = 3) {
-    const p = auLS.get("gg-plan") === "essentiel" ? "essentiel" : "complet", t = p === "essentiel" ? "Essentiel" : "Complet", price = p === "essentiel" ? 49 : 99;
+    const P = { essentiel: ["Commis", 59], pro: ["Second", 109], complet: ["Chef", 169] }, [t, price] = P[auLS.get("gg-plan")] || P.complet;
     return `<div class="au-pack st" style="--i:${i}"><span class="au-pack-ic" aria-hidden="true">${ico("sparkle")}</span><div><b>Essai gratuit 14 jours · Pack ${t}</b><span>Sans engagement, sans carte bancaire. Ensuite ${price} € HT par mois, si vous continuez.</span></div></div>`;
   },
   backBtn() { return this.ui.back.length ? `<button class="au-back" data-act="auBack" aria-label="Retour">${AU_SVG.back}</button>` : this.inApp ? `<button class="au-back" data-act="auClose" aria-label="Fermer">${AU_SVG.x}</button>` : ""; },
+  /* every sign-in / sign-up screen offers Google and the demo (inside the demo: « Revenir à la démo » closes the overlay) */
+  googleHTML(last) { const busy = this.ui.busy === "google" ? " au-busy" : ""; return `<button class="au-tac au-btn au-google${busy}" data-act="auGoogle"><span class="au-bl">${AU_G}Continuer avec Google</span>${last === "google" ? `<em class="au-last">Dernière fois</em>` : ""}${AU_DOTS}</button>`; },
+  demoHTML(i = 4) {
+    const d = DB.mode === "demo";
+    return `<button class="au-demo st" style="--i:${i}" data-act="${d ? "auDemoBack" : "auDemo"}"><span class="au-demo-ic" aria-hidden="true">${AU_SVG.cloche}</span><span class="au-demo-l"><b>${d ? "Revenir à la démo" : "Essayer la démo"}</b><span>${d ? "Vous reprenez là où vous en étiez." : "Un restaurant déjà rempli. Rien n'est enregistré."}</span></span><span class="au-arr" aria-hidden="true">${AU_SVG.arrow}</span></button>`;
+  },
   errHTML() { return this.ui.err ? `<div class="au-err" role="alert">${ico("alert")}<span>${esc(this.ui.err)}</span></div>` : ""; },
 
   screenHTML() {
@@ -462,18 +468,18 @@ const AUTH = {
         <p class="au-lede st" style="--i:2">${lede}</p>
         ${this.errHTML()}
         <div class="au-stack st" style="--i:3">
-          <button class="au-tac au-btn au-google${busy("google")}" data-act="auGoogle"><span class="au-bl">${AU_G}Continuer avec Google</span>${last === "google" ? lastTag : ""}${dots}</button>
+          ${this.googleHTML(last)}
           <button class="au-tac au-btn au-primary au-mailb" data-act="auEmail"><span class="au-bl">${AU_SVG.mail}Continuer avec un e-mail</span>${last === "email" ? lastTag : ""}</button>
         </div>
         ${inv ? `<button class="au-ghost au-joincode st" style="--i:4" data-act="auInvForget">Ce n'est pas mon invitation${AU_SVG.arrowS}</button>` : `<button class="au-ghost au-joincode st" style="--i:4" data-act="auJoinOpen">${ico("users")}Rejoindre une équipe avec un code${AU_SVG.arrowS}</button>`}
-        ${DB.mode === "demo" ? "" : `<button class="au-demo st" style="--i:4" data-act="auDemo"><span class="au-demo-ic" aria-hidden="true">${AU_SVG.cloche}</span><span class="au-demo-l"><b>Essayer la démo</b><span>Un restaurant déjà rempli. Rien n'est enregistré.</span></span><span class="au-arr" aria-hidden="true">${AU_SVG.arrow}</span></button>`}
+        ${this.demoHTML(4)}
         ${this.inApp ? "" : `<button class="au-ghost st" style="--i:5" data-act="auLocal">${this.hasLocal() ? "Continuer avec les données de ce téléphone" : "Continuer sans compte"}${AU_SVG.arrowS}</button>`}
         <p class="au-fine au-fine-m st" style="--i:6">Données hébergées en France et chiffrées.</p>`;
     }
     if (s === "soon") {
       return `${top()}${head("Les comptes arrivent.", "Nous finalisons la connexion sécurisée.")}
         <div class="au-note st" style="--i:3"><p>Très bientôt : un compte pour votre restaurant, sur tous vos appareils, et l'équipe invitée en un lien.</p><p class="au-note-s">En attendant, essayez la démo ou utilisez l'app sur cet appareil. Vous pourrez tout importer ensuite.</p></div>
-        <div class="au-stack st" style="--i:4"><button class="au-tac au-primary" data-act="auDemo"><span class="au-bl">${AU_SVG.play}Essayer la démo</span></button>${this.inApp ? "" : `<button class="au-tac" data-act="auLocal"><span class="au-bl">${AU_SVG.phone}Continuer sur cet appareil</span></button>`}</div>`;
+        <div class="au-stack st" style="--i:4"><button class="au-tac au-primary" data-act="${DB.mode === "demo" ? "auDemoBack" : "auDemo"}"><span class="au-bl">${AU_SVG.play}${DB.mode === "demo" ? "Revenir à la démo" : "Essayer la démo"}</span></button>${this.inApp ? "" : `<button class="au-tac" data-act="auLocal"><span class="au-bl">${AU_SVG.phone}Continuer sur cet appareil</span></button>`}</div>`;
     }
     if (s === "email") {
       const up = U.tab === "up", back = !!auLS.get("gg-last-email");
@@ -481,7 +487,9 @@ const AUTH = {
         ${head(up ? "Ouvrons votre cuisine." : back ? "Bon retour en cuisine." : "Entrez en cuisine.", up ? "30 secondes, et votre cahier HACCP tient tout seul." : back ? "Vos relevés du jour vous attendent." : "Avec l'e-mail de votre compte.")}
         ${up ? this.packHTML(3) : ""}
         ${this.errHTML()}
-        <form class="au-form st" style="--i:${up ? 4 : 3}" data-au="email" novalidate>
+        <div class="au-stack au-alt st" style="--i:3">${this.googleHTML(auLS.get("gg-last"))}</div>
+        <div class="au-or st" style="--i:4" aria-hidden="true"><span>ou avec un e-mail</span></div>
+        <form class="au-form au-form-alt st" style="--i:${up ? 5 : 4}" data-au="email" novalidate>
           ${up ? `<label class="au-f${this._seg === "in" ? " au-grow" : ""}"><span class="au-lbl">Prénom</span><div class="au-in"><input class="au-input" id="auName" autocomplete="given-name" maxlength="40" placeholder="Marceau" value="${esc(U.name)}" enterkeyhint="next">${okI}</div></label>` : ""}
           <label class="au-f"><span class="au-lbl">E-mail</span><div class="au-in"><input class="au-input" id="auEmail" type="email" inputmode="email" autocomplete="${up ? "email" : "username"}" autocapitalize="off" spellcheck="false" placeholder="chef@votre-restaurant.fr" value="${esc(U.email || auLS.get("gg-last-email") || "")}" enterkeyhint="next">${okI}</div><em class="au-hint" id="auEmailH" aria-live="polite"></em></label>
           <div class="au-f"><div class="au-lrow"><label class="au-lbl" for="auPw">Mot de passe</label>${up ? "" : `<button type="button" class="au-forgot" data-act="auForgot">Mot de passe oublié ?</button>`}</div>
@@ -489,7 +497,8 @@ const AUTH = {
             ${up ? `<div class="au-meter" id="auMeter" data-s="0" aria-hidden="true"><i></i><i></i><i></i><i></i></div><div class="au-mrow"><span>Solidité</span><em class="au-hint" id="auPwH">${AU_PW_TX[0]}</em></div>` : ""}</div>
           <button class="au-tac au-primary au-submit${busy("email")}" type="submit" id="auGo"><span class="au-bl">${up ? "Créer mon compte" : "Se connecter"}</span>${dots}</button>
           <p class="au-legal">${auLS.get("gg-invite") ? `Votre compte rejoindra ${esc((U.preInv && U.preInv.restoName) || "l'équipe")} automatiquement.` : up ? "En créant un compte, vous devenez gérant de votre restaurant. Vous inviterez votre équipe ensuite." : "Protégé par chiffrement. Vos données restent en France."}</p>
-        </form>`;
+        </form>
+        ${this.demoHTML(6)}`;
     }
     if (s === "reset") {
       if (U.sent) return `${top()}<div class="au-seal st" style="--i:1">${AU_SEAL}</div>${head("Vérifiez vos e-mails.", `Un lien vient de partir vers <b>${esc(U.email)}</b>. Choisissez-y un nouveau mot de passe, et pensez aux courriers indésirables.`, 2)}
@@ -828,7 +837,7 @@ const AUTH = {
       if (C.me && !u.displayName) { try { await u.updateProfile({ displayName: C.me }); } catch (x) {} fs.collection("users").doc(u.uid).set({ name: C.me }, { merge: true }).catch(() => {}); }
       const b = fs.batch(), R = fs.collection("restos").doc(rid);
       /* commercial fields (js/abo.js): 14-day trial of the pack chosen on the site (Complet by default) */
-      const pack = auLS.get("gg-plan") === "essentiel" ? "essentiel" : "complet";
+      const pack = ["essentiel", "pro"].includes(auLS.get("gg-plan")) ? auLS.get("gg-plan") : "complet";
       b.set(R, { name: C.name, type: C.type, owner: u.uid, createdAt: now, plan: "essai", pack, trialEnds: now + 14 * 864e5, by: u.uid });
       b.set(R.collection("members").doc(u.uid), { name, email: u.email || "", photo: u.photoURL || "", role: "gerant", joinedAt: now });
       b.set(fs.collection("users").doc(u.uid), { restos: FV.arrayUnion(rid) }, { merge: true });
@@ -903,8 +912,8 @@ const AUTH = {
       const plan = []; /* [{rid, first:[ops], rest:[ops]}] */
       for (const [old, r] of restos) {
         const rid = "r" + Date.now().toString(36) + auCode(4).toLowerCase(); const now = Date.now();
-        const R = fs.collection("restos").doc(rid); const { by, ...rest } = r || {};
-        const first = [[R, { ...DB.clean(rest), name: String((r && r.name) || "Mon restaurant").slice(0, 80), owner: u.uid, createdAt: (r && r.createdAt) || now, plan: (r && r.plan) || "essai", pack: (r && r.pack) || "complet", trialEnds: (r && r.trialEnds) || now + 14 * 864e5, importedAt: now }],
+        const R = fs.collection("restos").doc(rid); const { by, paidUntil, paidAt, grantedBy, grantedAt, suspended, stripe, activatedBy, activationCode, ...rest } = r || {};
+        const first = [[R, { ...DB.clean(rest), name: String((r && r.name) || "Mon restaurant").slice(0, 80), owner: u.uid, createdAt: (r && r.createdAt) || now, plan: "essai", pack: (r && r.pack) || "complet", trialEnds: Math.min(+(r && r.trialEnds) || Infinity, now + 14 * 864e5), importedAt: now }],
           [R.collection("members").doc(u.uid), { name: u.displayName || S.me.name || "", email: u.email || "", photo: u.photoURL || "", role: "gerant", joinedAt: now }],
           [fs.collection("users").doc(u.uid), { restos: FV.arrayUnion(rid) }, { merge: true }]];
         const ops = [];
@@ -1307,7 +1316,7 @@ const step = (n, bg, fg, t, s) => `<tr><td style="padding:0 26px 10px"><table ro
 
 /* kind: "code" | "welcome" | "trial3" | "last" | "ended" · d: { name, code, resto, ends, pack } */
 function mailHTML(kind, d = {}) {
-  const me = firstName(d.name), resto = esc(d.resto || "votre restaurant"), packT = d.pack === "essentiel" ? "Essentiel" : "Complet";
+  const me = firstName(d.name), resto = esc(d.resto || "votre restaurant"), packT = d.pack === "essentiel" ? "Commis" : d.pack === "pro" ? "Second" : "Chef";
   if (kind === "code") {
     const c = String(d.code || "000000").replace(/\D/g, "").padEnd(6, "0").slice(0, 6);
     const box = (x) => `<td width="15%" align="center" style="padding:0 3px"><div style="background:#FFFFFF;border:1.5px solid #DCCFB8;border-bottom:4px solid #E2D6C2;border-radius:14px;font-family:${FM};font-size:30px;font-weight:700;line-height:58px;height:58px;color:#1B1530;text-align:center">${x}</div></td>`;
@@ -1341,13 +1350,14 @@ function mailHTML(kind, d = {}) {
     const ends = d.ends ? longDate(d.ends) : "dans 3 jours";
     return {
       subject: `Plus que 3 jours d'essai · ${d.resto || "Growth Gusto"}`, kind,
-      text: `Votre essai de Growth Gusto (${d.resto || "votre restaurant"}) se termine ${ends}.\nChoisissez votre formule pour continuer sans interruption : Essentiel 49 € HT / mois ou Complet 99 € HT / mois.\n${APP}?go=abonnement\n\nRien n'est effacé à la fin de l'essai.`,
+      text: `Votre essai de Growth Gusto (${d.resto || "votre restaurant"}) se termine ${ends}.\nChoisissez votre formule pour continuer sans interruption : Commis 59 €, Second 109 € ou Chef 169 € HT / mois.\n${APP}?go=abonnement\n\nRien n'est effacé à la fin de l'essai.`,
       html: shell({ title: "Plus que 3 jours", pre: `Votre essai se termine ${ends}. Vos données restent à vous.`,
         hero: band("#FFF3D6", "#F1D9A0", resto, "#7A5A1A", `Plus que <span style="color:#C88A12">3&nbsp;jours</span> d'essai.`, "#1B1530", `Il se termine ${esc(ends)}.`, "#7A5A1A"),
         body: P(`${me ? esc(me) + ", c" : "C"}hoisissez votre formule pour que vos relevés, étiquettes et votre registre continuent sans interruption.`, "22px 26px 16px")
           + `<tr><td style="padding:0 22px 16px"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"><tr>
-<td width="50%" style="padding:0 4px"><div style="background:#FFFFFF;border:1.5px solid ${d.pack === "essentiel" ? "#5B2BFF" : "#E9DFCD"};border-radius:16px;padding:14px"><div style="font-family:${F};font-size:13px;font-weight:700;color:#615B74">Essentiel</div><div style="font-family:${FD};font-size:24px;font-weight:800;letter-spacing:-.5px;color:#1B1530;padding-top:2px">49&nbsp;€&nbsp;<span style="font-family:${F};font-size:12.5px;font-weight:600;color:#6E6880">HT/mois</span></div></div></td>
-<td width="50%" style="padding:0 4px"><div style="background:#FFFFFF;border:1.5px solid ${d.pack === "essentiel" ? "#E9DFCD" : "#5B2BFF"};border-radius:16px;padding:14px"><div style="font-family:${F};font-size:13px;font-weight:700;color:#615B74">Complet</div><div style="font-family:${FD};font-size:24px;font-weight:800;letter-spacing:-.5px;color:#1B1530;padding-top:2px">99&nbsp;€&nbsp;<span style="font-family:${F};font-size:12.5px;font-weight:600;color:#6E6880">HT/mois</span></div></div></td>
+<td width="33%" style="padding:0 4px"><div style="background:#FFFFFF;border:1.5px solid ${(d.pack === "essentiel") ? "#5B2BFF" : "#E9DFCD"};border-radius:16px;padding:14px"><div style="font-family:${F};font-size:13px;font-weight:700;color:#615B74">Commis</div><div style="font-family:${FD};font-size:20px;font-weight:800;letter-spacing:-.5px;color:#1B1530;padding-top:2px">59&nbsp;€&nbsp;<span style="font-family:${F};font-size:12.5px;font-weight:600;color:#6E6880">HT/mois</span></div></div></td>
+<td width="33%" style="padding:0 4px"><div style="background:#FFFFFF;border:1.5px solid ${(d.pack === "pro") ? "#5B2BFF" : "#E9DFCD"};border-radius:16px;padding:14px"><div style="font-family:${F};font-size:13px;font-weight:700;color:#615B74">Second</div><div style="font-family:${FD};font-size:20px;font-weight:800;letter-spacing:-.5px;color:#1B1530;padding-top:2px">109&nbsp;€&nbsp;<span style="font-family:${F};font-size:12.5px;font-weight:600;color:#6E6880">HT/mois</span></div></div></td>
+<td width="33%" style="padding:0 4px"><div style="background:#FFFFFF;border:1.5px solid ${(d.pack !== "essentiel" && d.pack !== "pro") ? "#5B2BFF" : "#E9DFCD"};border-radius:16px;padding:14px"><div style="font-family:${F};font-size:13px;font-weight:700;color:#615B74">Chef</div><div style="font-family:${FD};font-size:20px;font-weight:800;letter-spacing:-.5px;color:#1B1530;padding-top:2px">169&nbsp;€&nbsp;<span style="font-family:${F};font-size:12.5px;font-weight:600;color:#6E6880">HT/mois</span></div></div></td>
 </tr></table></td></tr>`,
         cta: "Choisir ma formule", href: APP + "?go=abonnement",
         foot: `Vous essayez le pack ${packT}. Rien n'est effacé à la fin de l'essai : vos données restent à vous.` }),
@@ -1378,7 +1388,7 @@ function mailHTML(kind, d = {}) {
       hero: band("#FFE9DE", "#F6C9B8", resto, "#C8432A", over ? "Votre essai est terminé." : "Dernier jour d'essai.", "#1B1530", over ? "Tout est gardé, rien n'est effacé." : `L'essai s'arrête ${when}.`, "#C8432A"),
       body: P(over ? `${me ? esc(me) + ", v" : "V"}os relevés et étiquettes restent consultables. Pour en enregistrer de nouveaux, activez votre abonnement : une minute suffit.` : "Ensuite, l'app reste consultable mais n'enregistre plus rien. Activez votre abonnement pour continuer sans coupure.", "22px 26px 18px"),
       cta: "Activer mon abonnement", href: APP + "?go=abonnement",
-      foot: `Pack ${packT} : ${d.pack === "essentiel" ? "49" : "99"} € HT par mois, sans engagement. Une question ? Répondez à cet e&#8209;mail.` }),
+      foot: `Pack ${packT} : ${d.pack === "essentiel" ? "59" : d.pack === "pro" ? "109" : "169"} € HT par mois, sans engagement. Une question ? Répondez à cet e&#8209;mail.` }),
   };
 }
 
@@ -1478,6 +1488,7 @@ Object.assign(ACT, {
   auSignOutOk: () => { closeSheet(true); AUTH.signOut(); },
   auDemoSignup: () => { SFX.tap(); AUTH.openWelcome({ screen: AUTH.cfg ? "email" : "soon", tab: "up" }); },
   auDemoLeave: () => AUTH.leaveDemo(),
+  auDemoBack: () => { SFX.close(); AUTH.hide(); },
   auMailPrev: () => { SFX.tap(); openSheet(auMailPrev()); },
   auMailPrevK: (a, id, v) => { SFX.tick(); buzz(4); $("#sheetBody").innerHTML = auMailPrev(v); },
   /* « Vérifiez votre e-mail » */

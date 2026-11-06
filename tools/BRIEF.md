@@ -85,6 +85,8 @@ Core already subscribes these collections into `S` (arrays, newest first where o
 | `oblLogs` | `S.oblLogs` | one intervention: `{ oblId, day, provider, by, at, notes?, cost?, files:[{id,name,type}] }` |
 | `feedback` | `S.feedback` | `{ source:"client"|"equipe", rating?, dish?, noteId?, channel?, text, at, by, reply?, status? }` |
 | `expenses` | `S.expenses` | purchase or cost: `{ day, cat, supplier?, label, amountHT, vat?, receptionId?, at, by }` |
+| `invoices` | `S.invoices` | supplier invoice (js/marge.js): `{ supplier, number, day, totalHT, totalTTC, vat, lines:[{ name, qty, unit, price, total, productId?, per?, unitPrice? }], photoId?, src:"photo"|"pdf"|"manuel", status, at, by }` |
+| `prices` | `S.prices` | purchase price history (js/marge.js): `{ productId, name, supplier, unit, price, prev, pct, day, at, src:"facture"|"manuel", invoiceId?, by }`. The current price stays `products.price` (€ HT per stock unit). |
 
 Shared globals: `ALLERGENS` (14 regulated allergens `{id,t,s}`) and `allergenOf(id)` live in core. Products and recipes store allergens as `allergens: ["lait","oeufs"]`.
 
@@ -94,5 +96,6 @@ Cross-area helpers (define in your own file; callers guard with `typeof x === "f
 - rh.js: `staffCost(from, to)` → `{ hours, gross, loaded }` from punches (or shifts when no punch).
 - tickets.js: `salesBetween(from, to)` → `{ ttc, ht, covers, days }`.
 - oblig.js: `oblDue(days=30)` → obligations due or late within N days.
+- marge.js: `mgDishCost(noteId)` → `{ portion, batch, margin, fc, coef, ht, ttc, complete }`, `mgPriceOf(productId, day?)` → € HT per stock unit on a day, `mgPriceAlerts(days=30)` → price changes with their effect on each dish. Recipes may carry `vat` (sale VAT, default 10) and `targetFc` (%); products may carry `aliases` and `packs` (invoice unit → stock units).
 
 Routes already in NAV/TAB_OF (core): `dashboard`, `finance` (js/finance.js), `obligations` (js/oblig.js), `pointeuse`, `planning` (js/rh.js; employee files and salaries can live at route `staff` in rh.js too, add `TAB_OF.staff="more"`), `avis` (js/avis.js). Icons `dash`, `euro`, `calcheck`, `clock`, `cal`, `star` exist.
