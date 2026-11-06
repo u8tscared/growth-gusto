@@ -1,0 +1,33 @@
+/* Livraison (js/livraison.js) — prefix lv- · reuses the cx- styles of css/caisse.css */
+.lv .w-sa,.cx-pos .w-sa{--wb:#FFF3D6;--wc:#7A5A1A}
+.lv-hero .lv-kpi{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
+.lv-hero .lv-kpi>div{background:rgba(255,255,255,.12);border-radius:16px;padding:10px 12px;display:flex;flex-direction:column;gap:2px;min-width:0}
+.lv-hero .lv-kpi span{font-size:12px;font-weight:650;color:rgba(255,255,255,.78)}
+.lv-hero .lv-kpi b{font-size:20px;font-weight:760;letter-spacing:-.02em;color:#fff}
+.lv-hero .lv-kpi em{font-style:normal;font-size:12px;color:rgba(255,255,255,.72)}
+.lv-prs{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.lv-pr{display:grid;grid-template-columns:84px 1fr auto;grid-template-areas:"n b v" ". e e";align-items:center;column-gap:10px;row-gap:1px}
+.lv-pn{grid-area:n;font-size:13px;font-weight:700;color:#fff}
+.lv-bar{grid-area:b;height:8px;border-radius:8px;background:rgba(255,255,255,.16);overflow:hidden}
+.lv-bar i{display:block;height:100%;border-radius:8px;background:var(--wb,#fff);transition:width .6s cubic-bezier(.2,.8,.2,1)}
+.lv-pr b{grid-area:v;font-size:13.5px;color:#fff}
+.lv-pr em{grid-area:e;font-style:normal;font-size:11.5px;color:rgba(255,255,255,.7)}
+.lv-pfs .lbl{display:block;margin:0 0 4px}
+.lv-pg{font-size:13px;font-weight:700;color:var(--ink-2);margin-left:auto;padding-right:4px}
+.lv-dish .lv-drows{display:flex;flex-direction:column;margin-top:10px}
+.lv-drow{display:flex;align-items:center;gap:10px;padding:10px 0;border-top:1px solid var(--line,#EFE6D6)}
+.lv-drow:first-child{border-top:0}
+.lv-drow .tx{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
+.lv-drow .tx b{font-weight:700;font-size:14.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lv-drow .tx span{font-size:12.5px;color:var(--ink-2)}
+.lv-dr{display:flex;flex-direction:column;align-items:flex-end;gap:1px;flex:none;text-align:right}
+.lv-dr b{font-size:15px;font-weight:760}
+.lv-dr b.bad{color:var(--bad,#C8432A)}
+.lv-dr em{font-style:normal;font-size:12px;color:var(--ink-2)}
+.lv-dr .lv-miss{max-width:13ch;line-height:1.25}
+.lv-honest{display:flex;flex-direction:column;gap:14px}
+.lv-hrow{display:flex;gap:12px;align-items:flex-start}
+.lv-hrow .ic{flex:none}
+.lv-hrow b{display:block;font-weight:740;font-size:14.5px}
+.lv-hrow em{display:block;font-style:normal;font-size:13px;line-height:1.4;color:var(--ink-2);margin-top:2px}
+.cx-pos .cm-tog{width:100%}

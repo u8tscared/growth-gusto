@@ -304,7 +304,7 @@ function rsReqPanel(cfg) {
   return `<section class="rs-reqs st" style="--i:1"><div class="rs-rqh"><span class="rs-rqn">${L.length}</span><b>${L.length > 1 ? "Demandes à valider" : "Demande à valider"}</b></div>
     ${L.slice(0, 6).map((b) => { const cs = rsStatOf(b.phone), cl = rsClientOf(b.phone), nk = rsNoteKind(b.notes); return `<div class="rs-req" data-card="${esc(b.id)}">
       <button class="rs-rqi" data-act="rsOpen" data-id="${esc(b.id)}"><span class="rs-cv"><b>${+b.covers || 0}</b><i>pers.</i></span>
-        <span class="rs-tx"><b>${esc(b.name || "")}</b><em><span class="rs-rqd">${esc((rsRel(b.date) || rsShort(b.date)))} · ${b.time}</span>${cl && cl.vip ? `<span class="rs-vip">VIP</span>` : ""}${cs && cs.visits ? `<span>${rsPl(cs.visits, "visite")}</span>` : ""}${cs && cs.noshow ? `<span class="rs-nsw">${rsPl(cs.noshow, "no-show")}</span>` : ""}</em>
+        <span class="rs-tx"><b>${esc(b.name || "")}</b><em><span class="rs-rqd">${esc((rsRel(b.date) || rsShort(b.date)))} · ${b.time}</span>${cl && cl.vip ? `<span class="rs-vip">VIP</span>` : ""}${cs && cs.visits ? `<span>${rsPl(cs.visits, "visite")}</span>` : ""}${cs && cs.noshow ? `<span class="rs-nsw">${rsPl(cs.noshow, "no-show")}</span>` : ""}${rsFdTags(b)}</em>
         ${b.notes ? `<span class="rs-note ${nk}">${nk ? ico("alert") : ""}${esc(b.notes)}</span>` : ""}</span></button>
       <div class="rs-rqb"><button class="btn soft" data-act="rsRefuse" data-id="${esc(b.id)}">${ico("x")}Refuser</button><button class="btn acc" data-act="rsAccept" data-id="${esc(b.id)}">${ico("check")}Accepter</button></div>
     </div>`; }).join("")}${L.length > 6 ? `<p class="rs-lp">+ ${L.length - 6} autres demandes</p>` : ""}</section>`;
@@ -479,7 +479,7 @@ function rsOpenSheet(id) {
     : `<div class="rs-sts">${sts.map(([k, t, ic]) => `<button class="rs-sb k-${k}${cur === k ? " on" : ""}" data-act="rsSetSt" data-id="${esc(b.id)}" data-v="${k}" aria-pressed="${cur === k}">${ico(ic)}<span>${b.status === "refuse" && k === "annule" ? "Refusée" : t}</span></button>`).join("")}</div>`;
   openSheet(`<div class="rs-bk">
     <div class="rs-bkh"><span class="rs-cv big"><b>${+b.covers || 0}</b><i>pers.</i></span><div><button class="rs-who" data-act="rsClient" data-id="${esc(b.id)}" ${rsPk(b.phone) ? "" : "disabled"}><span class="h2">${esc(b.name || "Sans nom")}</span>${rsPk(b.phone) ? ico("chev") : ""}</button><em>${esc(rsLong(b.date))} · <b>${b.time}</b>${tb ? ` · table ${esc(typeof plLabel === "function" ? plLabel(b, cfg) || tb.n : tb.n)}` : ""}</em></div></div>
-    ${cs && (cs.visits || cs.noshow || (cl && (cl.vip || cl.notes))) ? `<button class="rs-cline" data-act="rsClient" data-id="${esc(b.id)}">${cl && cl.vip ? `<span class="rs-vip">VIP</span>` : ""}<span>${cs.visits ? rsPl(cs.visits, "visite") : "Première visite"}</span>${cs.noshow ? `<span class="rs-nsw">${rsPl(cs.noshow, "no-show")}</span>` : ""}${cl && cl.notes ? `<span class="rs-cn">${esc(cl.notes)}</span>` : ""}</button>` : ""}
+    ${cs && (cs.visits || cs.noshow || (cl && (cl.vip || cl.notes || (cl.allergens || []).length))) ? `<button class="rs-cline" data-act="rsClient" data-id="${esc(b.id)}">${cl && cl.vip ? `<span class="rs-vip">VIP</span>` : ""}<span>${cs.visits ? rsPl(cs.visits, "visite") : "Première visite"}</span>${cs.noshow ? `<span class="rs-nsw">${rsPl(cs.noshow, "no-show")}</span>` : ""}${rsFdTags(b)}${cl && cl.notes ? `<span class="rs-cn">${esc(cl.notes)}</span>` : ""}</button>` : ""}
     ${rsWeb(b) ? `<div class="rs-from">${ico("rsWeb")}<span>Réservé en ligne${b.createdAt ? ` le ${shortDate(dayKey(new Date(+b.createdAt || Date.now())))} à ${hm(+b.createdAt || Date.now())}` : ""}</span></div>` : ""}
     ${b.clientChange ? `<div class="rs-from cc">${ico("edit")}<span>${b.clientChange.what === "annule" ? "Annulée" : "Modifiée"} par le client ${when(b.clientChange.at)}</span></div>` : ""}
     ${b.notes ? `<div class="rs-note big ${nk}">${nk ? ico("alert") : ico("rsNote")}<span>${esc(b.notes)}</span></div>` : ""}
@@ -504,6 +504,11 @@ function rsMsgSheet(id, kind) {
     <div class="grid2"><button class="btn soft" data-act="rsOpen" data-id="${esc(id)}">Retour</button><button class="btn danger" data-act="rsMsgOk">${ref ? "Refuser" : "Annuler"}</button></div>
   </div>`, (el) => { el.querySelectorAll(".rs-mchips button").forEach((x, i) => { x.dataset.txt = chips[i]; }); });
 }
+/* js/clients.js: allergies from the client file, and the loyalty reward waiting on this table */
+function rsFdTags(b) {
+  try { const p = typeof fdPerson === "function" ? fdPerson(b.phone) : null; if (!p) return ""; const al = (p.allergens || []).map((x) => (allergenOf(x) || {}).t).filter(Boolean);
+    return (al.length ? `<span class="rs-nsw">${ico("alert")}${esc(al.join(", "))}</span>` : "") + (typeof fdReward === "function" && fdReward(p) ? `<span class="rs-vip">${esc(fdCfg().reward)}</span>` : ""); } catch (e) { return ""; }
+}
 function rsClientSheet(b) {
   const k = rsPk(b.phone); if (!k) return; const cs = rsStatOf(b.phone) || { visits: 0, noshow: 0, cancel: 0, list: [] }, cl = rsClientOf(b.phone) || {};
   R.cl = { id: k, name: cl.name || b.name || "", phone: cl.phone || b.phone || "", email: cl.email || cs.email || b.email || "", vip: !!cl.vip, notes: cl.notes || "" };
@@ -516,6 +521,7 @@ function rsClientSheet(b) {
     <div class="rs-cfc">${R.cl.phone ? `<a href="tel:${esc(String(R.cl.phone).replace(/[^\d+]/g, ""))}">${ico("rsPhone")}${esc(R.cl.phone)}</a>` : ""}${R.cl.email ? `<span>${ico("rsMail")}${esc(R.cl.email)}</span>` : ""}</div>
     ${past.length ? `<div class="rs-cfh"><b>Historique</b>${past.map((x) => `<div class="rs-cfr"><span>${shortDate(x.date)} · ${x.time}</span><span>${+x.covers || 0} pers.</span><span class="rs-stp ${(RS_ST[x.status] || RS_ST.avenir).k}">${(RS_ST[x.status] || RS_ST.avenir).t}</span></div>`).join("")}</div>` : ""}
     <button class="btn acc block" data-act="rsClSave">Enregistrer</button>
+    ${typeof fdOpenSheet === "function" && VIEWS.clients ? `<button class="btn soft block" data-act="rsClFull" data-id="${esc(k)}">Fiche complète : allergies, fidélité</button>` : ""}
   </div>`);
 }
 
@@ -808,12 +814,15 @@ Object.assign(ACT, {
       toast(`${m.kind === "refuse" ? "Demande refusée" : "Réservation annulée"}${b.email ? (rsSrv() ? " · le client est prévenu par e-mail" : " · pensez à prévenir le client") : ""}`);
     } else a.disabled = false;
   },
+  rsClFull: (a, id) => { SFX.tap(); R.cl = null; if (typeof fdWatch === "function") fdWatch(); fdOpenSheet(id); },
   rsClient: (a, id) => { const b = rsRows().find((x) => x.id === id); if (!b || !rsPk(b.phone)) return; SFX.tap(); rsClientSheet(b); },
   rsClVip: (a) => { if (!R.cl) return; R.cl.vip = !R.cl.vip; R.cl.vip ? SFX.ok() : SFX.tap(); buzz(4); a.classList.toggle("on", R.cl.vip); a.setAttribute("aria-pressed", R.cl.vip); },
   rsClSave: async (a) => {
     const c = R.cl; if (!c) return; c.notes = String(($("#rsClNotes") || {}).value || "").trim().slice(0, 300);
     a.disabled = true;
-    try { await safe(DB.set("clients", c.id, DB.clean({ name: String(c.name || "").slice(0, 60), phone: String(c.phone || "").slice(0, 25), email: String(c.email || "").slice(0, 120), vip: !!c.vip, notes: c.notes, updatedAt: Date.now() }))); } catch (e) { a.disabled = false; return; }
+    /* keep what js/clients.js keeps in the same file (allergies, birthday, consent, loyalty stamps) */
+    const { id: _cid, ...was } = R.clients.find((x) => x.id === c.id) || {};
+    try { await safe(DB.set("clients", c.id, DB.clean({ ...was, name: String(c.name || "").slice(0, 60), phone: String(c.phone || "").slice(0, 25), email: String(c.email || "").slice(0, 120), vip: !!c.vip, notes: c.notes, updatedAt: Date.now() }))); } catch (e) { a.disabled = false; return; }
     R.cl = null; closeSheet(true); SFX.done(); toast("Fiche client enregistrée");
   },
   rsEdSug: (a, id, v) => {

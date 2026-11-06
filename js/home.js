@@ -243,17 +243,18 @@ VIEWS.home = {
     const inst = typeof installHint === "function" ? installHint() : ""; let bn; { const r = S.route; S.route = "home-noinst"; try { bn = banner(); } finally { S.route = r; } } /* banner() without its install card: it goes under the hero */
     const instCard = inst ? `<div class="hm-inst">${inst}</div>` : "";
     /* js/perso.js: « Modifier l'accueil » (edit mode) and the person's block order / hidden blocks */
+    const csH = typeof csHomeCard === "function" ? csHomeCard() : ""; /* js/consignes.js: « Consignes du jour » */
     const B = { hero, svc: homeSvcCard(), steps: stepsCard, todo: todoCard, qa, shift: homeShiftCard(), stats, dash: homeDashLink(), feed: homeFeed(6) };
     const ed = typeof pzHomeEdit === "function" ? pzHomeEdit() : null; const lay = !ed && typeof pzHome === "function" ? pzHome() : null;
     const ord = (h, n) => (h ? h.replace('style="', `style="order:${n};`) : "");
     const col = (keys) => keys.filter((k) => !lay.hide.has(k)).sort((a, b) => lay.order.indexOf(a) - lay.order.indexOf(b)).map((k) => ord(B[k], lay.order.indexOf(k) * 2 + 2) + (k === "hero" && instCard ? ord(instCard.replace('<div class="hm-inst"', '<div class="hm-inst" style=""'), lay.order.indexOf(k) * 2 + 3) : "")).join("");
     const grid = ed ? `<div class="hm-grid pz-editing">${ed.order.map((k, i) => pzHomeWrap(k, B[k], i, ed.order.length)).join("")}</div>${pzHomeEditBar()}`
       : lay ? `<div class="hm-grid ${recNow ? "rec" : ""}">
-        <div class="hm-col hm-l">${lay.hide.has("hero") ? instCard : ""}${col(["hero", "svc", "steps", "todo"])}</div>
+        <div class="hm-col hm-l">${lay.hide.has("hero") ? instCard : ""}${col(["hero", "svc", "steps", "todo"])}${ord(csH, 3)}</div>
         <div class="hm-col hm-r">${col(["qa", "shift", "stats", "dash", "feed"])}</div>
       </div>`
       : `<div class="hm-grid ${fresh ? "fresh" : ""} ${recNow ? "rec" : ""}">
-        <div class="hm-col hm-l">${hero}${instCard}${homeSvcCard()}${fresh && !recNow ? stepsCard : ""}${todoCard}${fresh && !recNow ? "" : stepsCard}</div>
+        <div class="hm-col hm-l">${hero}${instCard}${csH}${homeSvcCard()}${fresh && !recNow ? stepsCard : ""}${todoCard}${fresh && !recNow ? "" : stepsCard}</div>
         <div class="hm-col hm-r">${qa}${homeShiftCard()}${stats}${homeDashLink()}${homeFeed(6)}</div>
       </div>`;
     return `<div class="inner hm${ed ? " pz-hedit-on" : ""}">

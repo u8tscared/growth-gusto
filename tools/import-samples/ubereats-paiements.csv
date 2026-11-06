@@ -1,0 +1,7 @@
+Nom du restaurant;ID de la commande;Date de la commande;Statut;Article;Quantité;Ventes (TTC);Frais de service Uber;Paiement total
+Le Bistrot;A1F2;03/11/2026;Livrée;Bourguignon maison;2;50,60;-15,18;35,42
+Le Bistrot;A1F2;03/11/2026;Livrée;Café gourmand;1;10,90;-3,27;7,63
+Le Bistrot;B7K9;03/11/2026;Livrée;Croquettes jambon x5;1;10,35;-3,11;7,24
+Le Bistrot;C3P1;04/11/2026;Livrée;Bourguignon maison;1;25,30;-7,59;17,71
+Le Bistrot;C3P1;04/11/2026;Livrée;Planche charcuterie;1;21,85;-6,56;15,29
+Total;;;;;;118,99;-35,71;83,29

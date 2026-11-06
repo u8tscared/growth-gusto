@@ -45,10 +45,11 @@
     clock: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>',
     edit: '<svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>',
     x: '<svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg>',
+    check: '<svg viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>',
     alert: '<svg viewBox="0 0 24 24"><path d="M12 9v4M12 17h.01"/><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/></svg>',
   };
 
-  const st = { pub: null, covers: 2, date: null, time: null, wait: false, step: 1, sending: false, err: "", done: null, name: "", phone: "", email: "", notes: "", more: false,
+  const st = { pub: null, covers: 2, date: null, time: null, wait: false, step: 1, sending: false, err: "", done: null, name: "", phone: "", email: "", notes: "", more: false, optin: false,
     mb: null, mview: "ticket" /* ticket | edit | cancel | gone */ };
   const app = $("#app");
   if (EMBED) document.documentElement.classList.add("embed");
@@ -216,9 +217,10 @@
         <label class="rv-f"><span>Téléphone</span><input id="fPhone" type="tel" inputmode="tel" autocomplete="tel" maxlength="25" value="${esc(st.phone)}" placeholder="06 12 34 56 78" enterkeyhint="next"></label>
         <label class="rv-f"><span>E-mail <i>${p.mail ? "pour recevoir la confirmation" : "facultatif"}</i></span><input id="fEmail" type="email" inputmode="email" autocomplete="email" maxlength="100" value="${esc(st.email)}" placeholder="vous@exemple.fr"></label>
         <label class="rv-f"><span>Une précision ? <i>facultatif</i></span><textarea id="fNotes" rows="2" maxlength="300" placeholder="Allergie, anniversaire, chaise bébé…">${esc(st.notes)}</textarea></label>
+        <button class="rv-opt${st.optin ? " on" : ""}" data-a="optin" role="checkbox" aria-checked="${st.optin}"><i>${svg.check}</i><span>Recevoir les nouvelles et les offres de ${esc(p.name || "ce restaurant")} <em>par e-mail ou SMS, désinscription en un clic</em></span></button>
         ${st.err ? `<div class="rv-err">${svg.alert}<span>${esc(st.err)}</span></div>` : ""}
         <button class="rv-btn big" data-a="send" ${okForm && !st.sending ? "" : "disabled"}>${st.sending ? `<span class="rv-spin"></span>Un instant…` : st.wait ? "M'inscrire sur la liste d'attente" : c.validate ? "Envoyer ma demande" : "Réserver"}</button>
-        <p class="rv-legal">Vos coordonnées servent uniquement au restaurant pour votre réservation.</p>
+        <p class="rv-legal">Vos coordonnées servent au restaurant pour votre réservation${st.optin ? " et pour ses nouvelles" : ""}. Jamais revendues.</p>
       </div>`}
     </section>${foot()}`;
     if (!st.painted) { st.painted = true; const card = $(".rv-card"); requestAnimationFrame(() => requestAnimationFrame(() => card && card.classList.remove("in"))); }
@@ -284,6 +286,7 @@
     if (a === "date") { const had = !!st.time; st.date = v; st.time = null; st.wait = false; st.err = ""; paint(); if (had || b.classList.contains("rv-link")) scrollTo("#rvTimes"); return; }
     if (a === "time") { const first = !st.time; st.time = v; st.wait = b.dataset.w === "1"; st.err = ""; paint(); if (first) scrollTo(".rv-form"); return; }
     if (a === "send") return send();
+    if (a === "optin") { keep(); st.optin = !st.optin; vib(8); b.classList.toggle("on", st.optin); b.setAttribute("aria-checked", st.optin); return; }
     if (a === "again") { st.done = null; st.time = null; st.wait = false; paint(); window.scrollTo({ top: 0, behavior: "smooth" }); return; }
     if (a === "ics") return ics(st.done);
     if (a === "mics") return ics(st.mb);
@@ -307,7 +310,7 @@
     st.sending = true; st.err = ""; paint();
     const wait = st.wait && WL(), status = wait ? "attente" : cfg().validate ? "avalider" : "en ligne";
     const data = { date: st.date, time: st.time, covers: st.covers, name, phone, status, source: "web", createdAt: Date.now(), at: atOf(st.date, st.time) };
-    if (email) data.email = email; if (notes) data.notes = notes;
+    if (email) data.email = email; if (notes) data.notes = notes; if (st.optin) data.optin = true;
     let id = "demo", k = newKey();
     try {
       if (DEMO) await new Promise((r) => setTimeout(r, 900));
