@@ -38,6 +38,7 @@ const sec = (k) => { try { return String(SEC[k].value() || "").trim(); } catch (
 const API = "https://api.enablebanking.com";
 const APP = "https://app.growthgusto.fr/";
 const REGION = "europe-west9";
+const ADMINS = ["marceau.ruis@gmail.com"]; /* keep in sync with js/config.js GG_ADMINS */
 const SYNC_EVERY = 6 * 36e5; /* PSD2: 4 reads a day without the user */
 const FIRST_DAYS = 90; /* history read at the first connection (most banks give 90 days without a new login) */
 class BqErr extends Error { constructor(code, status = 400) { super(code); this.code = code; this.status = status; } }
@@ -175,6 +176,11 @@ const banqueApi = onRequest({ region: REGION, cors: [/growthgusto\.fr$/, /growth
     if (op === "banks") { await caller(req, rid); res.json({ banks: (await banks()).map((x) => ({ name: x.name, logo: x.logo, beta: x.beta })) }); return; }
     if (op === "start") {
       const uid = await caller(req, rid); if (!configured()) throw new BqErr("not_configured", 503);
+      /* each linked account is billed by Enable Banking: paying Chef (complet) restaurants only, plus the Growth Gusto team */
+      const R = (await db.doc(`restos/${rid}`).get()).data() || {};
+      const paid = R.plan === "complet" && (!R.paidUntil || +R.paidUntil > Date.now());
+      const team = await admin.auth().getUser(uid).then((u) => ADMINS.includes(String(u.email || "").toLowerCase())).catch(() => false);
+      if (!paid && !team) throw new BqErr("plan", 402);
       const name = String(b.bank || "").slice(0, 120); const bank = (await banks()).find((x) => x.name === name); if (!bank) throw new BqErr("bank", 400);
       const psu = b.psu === "personal" ? "personal" : "business";
       const days = Math.max(1, Math.min(180, bank.max ? Math.floor(bank.max / 86400) : 90));

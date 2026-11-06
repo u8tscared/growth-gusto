@@ -139,7 +139,7 @@ const BQ_ERR = {
   auth: "Connectez-vous à votre compte pour relier la banque.", forbidden: "Seul le gérant peut relier la banque.", state: "Le lien a expiré. Recommencez la connexion.",
   denied: "Connexion annulée à la banque.", not_configured: "La connexion directe s'active très bientôt. En attendant, importez un relevé : c'est gratuit et ça marche avec toutes les banques.",
   http: "Le serveur ne répond pas. Réessayez dans un instant, ou importez un relevé.", refused: "La banque a refusé la demande. Réessayez, ou importez un relevé.", no_account: "Aucun compte trouvé à cette banque.",
-  unauthorized: "Cette banque n'est pas encore ouverte pour votre compte. Importez un relevé en attendant.", rate: "La banque limite les lectures. Réessayez dans quelques heures.",
+  unauthorized: "Cette banque n'est pas encore ouverte pour votre compte. Importez un relevé en attendant.", rate: "La banque limite les lectures. Réessayez dans quelques heures.", plan: "La connexion directe est comprise dans l'abonnement Chef. Importez un relevé en attendant.",
 };
 const bqErr = (e) => BQ_ERR[e && e.code] || "Connexion impossible pour l'instant. Réessayez, ou importez un relevé.";
 
@@ -244,8 +244,21 @@ const bqXGrab = () => { const x = S.ui.bqX; if (!x) return; const h = $("#bqXHt"
 
 /* ───────── connect: bank picker ───────── */
 const BQ_DEMO_BANKS = ["BNP Paribas", "Crédit Agricole", "Société Générale", "LCL", "Banque Populaire", "Caisse d'Epargne", "Crédit Mutuel", "CIC", "La Banque Postale", "Qonto", "Shine", "Boursorama", "HSBC", "Revolut Business", "Crédit Coopératif", "Banque Palatine"].map((name) => ({ name, logo: "" }));
+/* the direct link costs Growth Gusto a few € per account and month: only paying Chef (complet) restaurants, plus the Growth Gusto team */
+function bqPaidOk() {
+  if (!bqLive()) return true;
+  try { const em = (firebase.auth().currentUser || {}).email || ""; if ((window.GG_ADMINS || []).includes(em)) return true; } catch (e) {}
+  try { return typeof abPlan !== "function" || abPlan().plan === "complet"; } catch (e) { return true; }
+}
 async function bqConnect() {
   if (!finIsGerant()) { SFX.err(); toast("Réservé au gérant", "err"); return; }
+  if (!bqPaidOk()) {
+    openSheet(`<div class="fin-sh bq-sh"><div class="bq-xh"><span class="bq-cic big">${ico("bqBank")}</span><div><div class="h2">Connexion directe à la banque</div><div class="sub">Comprise dans l'abonnement Chef</div></div></div>
+      <p class="sub" style="margin:0">Une fois abonné, vos opérations arrivent toutes seules toutes les 6 heures. D'ici là, importez un relevé : même résultat, en un fichier.</p>
+      <button class="btn acc block" data-act="bqImport">${ico("bqUp")}Importer un relevé</button>
+      ${typeof VIEWS !== "undefined" && VIEWS.abonnement ? `<button class="btn soft block" data-go="abonnement">Voir l'abonnement</button>` : ""}</div>`);
+    return;
+  }
   S.ui.bqB = { q: "", psu: "business", list: bqLive() ? null : BQ_DEMO_BANKS, err: "" };
   bqBankPaint();
   if (bqLive()) {
