@@ -219,3 +219,18 @@
 .ab-delic .ico{width:26px;height:26px}
 .ab-delw{font-weight:700;color:#C8432A}
 .ab-delsh .btn.danger{background:#C8432A;color:#fff;border-color:#9E2F1B}
+/* paiement en ligne (Stripe) */
+.ab-wrap .spin{width:15px;height:15px;border-radius:50%;border:2.5px solid currentColor;border-right-color:transparent;display:inline-block;margin-right:8px;animation:abSpin .8s linear infinite;vertical-align:-3px}
+@keyframes abSpin{to{transform:rotate(360deg)}}
+.ab-bl{display:flex;align-items:flex-start;gap:10px;padding:11px 12px;border-radius:14px;background:var(--glass-2);font-size:13px;line-height:1.45;color:var(--ink);text-decoration:none}
+.ab-bl .ico{width:18px;height:18px;flex:none;margin-top:1px;color:var(--acc)}
+.ab-bl span{flex:1;min-width:0}
+.ab-bl.warn .ico{color:var(--warn)}
+.ab-bl.bad{background:color-mix(in srgb,var(--bad) 10%,transparent)}
+.ab-bl.bad .ico{color:var(--bad)}
+.ab-bl.tap{cursor:pointer}
+.ab-bl.tap>.ico:last-child{color:var(--muted);margin-left:auto}
+.ab-sadm .ab-acth>div{flex:1;min-width:0}
+.ab-sadm .note a{color:var(--bad);font-weight:700}
+@media (prefers-reduced-motion:reduce){.ab-wrap .spin{animation:none}}
+.ab-tva{display:flex;gap:9px;align-items:flex-start;font-size:12.5px;line-height:1.45;color:var(--muted)}.ab-tva input{margin-top:2px;accent-color:var(--acc)}

@@ -104,7 +104,7 @@ async function conf() {
 }
 
 /* ───────── setup (admin) ───────── */
-async function setup(key, by) {
+async function setup(key, by, tva) {
   if (!/^(sk|rk)_(live|test)_[A-Za-z0-9]{10,}$/.test(key)) throw new HttpsError("invalid-argument", "badkey");
   const live = /_live_/.test(key);
   let account = "";
@@ -120,11 +120,14 @@ async function setup(key, by) {
     const pr = await st(key, "/prices", { method: "POST", idem: "gg-price-" + lk, body: { product: prod.id, currency: "eur", unit_amount: P.cents, recurring: { interval: "month" }, tax_behavior: "exclusive", lookup_key: lk, nickname: `${P.t} mensuel`, metadata: { gg: k } } });
     prices[k] = pr.id;
   }
-  /* TVA 20 % on top of the HT price */
+  /* TVA 20 % on top of the HT price, only when the business charges VAT (a micro-entreprise under the threshold does not:
+     its invoices carry « TVA non applicable, art. 293 B du CGI » instead) */
   let tax = null;
-  const tr = await st(key, "/tax_rates", { query: { active: true, limit: 100 } });
-  const tx = (tr.data || []).find((x) => x.metadata && x.metadata.gg === "tva20");
-  tax = tx ? tx.id : (await st(key, "/tax_rates", { method: "POST", body: { display_name: "TVA", description: "TVA française 20 %", percentage: 20, inclusive: false, country: "FR", jurisdiction: "France", metadata: { gg: "tva20" } } })).id;
+  if (tva) {
+    const tr = await st(key, "/tax_rates", { query: { active: true, limit: 100 } });
+    const tx = (tr.data || []).find((x) => x.metadata && x.metadata.gg === "tva20");
+    tax = tx ? tx.id : (await st(key, "/tax_rates", { method: "POST", body: { display_name: "TVA", description: "TVA française 20 %", percentage: 20, inclusive: false, country: "FR", jurisdiction: "France", metadata: { gg: "tva20" } } })).id;
+  }
   /* customer portal: invoices, card, billing details, cancel at the end of the month */
   const portal = (await st(key, "/billing_portal/configurations", { method: "POST", body: {
     business_profile: { headline: "Growth Gusto · votre abonnement" },
@@ -140,9 +143,9 @@ async function setup(key, by) {
   try { hookC = await st(key, "/webhook_endpoints", { method: "POST", body: { url: HOOK_URL + "?c=1", enabled_events: CONNECT_EVENTS, connect: true, api_version: VERSION, description: "Growth Gusto · commandes des restaurants (Connect)" } }); }
   catch (e) { logger.warn("stripe connect webhook not created", e.message); }
   const now = Date.now();
-  await privRef().set({ on: true, live, account, prices, tax, portal, hookId: hook.id, hookCId: hookC ? hookC.id : null, connect: !!hookC, enc: seal({ key, whsec: hook.secret, whsecC: hookC ? hookC.secret : null }), at: now, by });
-  await pubRef().set({ stripe: true, live, at: now });
-  return { ok: true, live, account, connect: !!hookC };
+  await privRef().set({ on: true, live, account, prices, tax, tva: !!tva, portal, hookId: hook.id, hookCId: hookC ? hookC.id : null, connect: !!hookC, enc: seal({ key, whsec: hook.secret, whsecC: hookC ? hookC.secret : null }), at: now, by });
+  await pubRef().set({ stripe: true, live, tva: !!tva, at: now });
+  return { ok: true, live, account, tva: !!tva, connect: !!hookC };
 }
 
 /* ───────── shared with the other Stripe modules (functions/src/commande.js) ─────────
@@ -185,10 +188,10 @@ const stripeApi = onCall({ region: REGION, cors: true, secrets: STRIPE_SECRETS, 
   try {
     if (op === "status" || op === "setup" || op === "off") {
       if (!isAdmin(req)) throw new HttpsError("permission-denied", "admin");
-      if (op === "setup") return await setup(String(d.key || "").trim(), req.auth.token.email);
+      if (op === "setup") return await setup(String(d.key || "").trim(), req.auth.token.email, !!d.tva);
       if (op === "off") { await privRef().set({ on: false, offAt: Date.now() }, { merge: true }); await pubRef().set({ stripe: false, at: Date.now() }); return { ok: true }; }
       const s = await privRef().get(); const x = s.exists ? s.data() : {};
-      return { on: !!x.on, live: !!x.live, account: x.account || "", at: x.at || null, by: x.by || "" };
+      return { on: !!x.on, live: !!x.live, tva: !!x.tva, account: x.account || "", at: x.at || null, by: x.by || "" };
     }
     if (op === "checkout") {
       const pack = String(d.pack || ""); if (!AB_PRICES[pack]) throw new HttpsError("invalid-argument", "pack");
@@ -199,7 +202,7 @@ const stripeApi = onCall({ region: REGION, cors: true, secrets: STRIPE_SECRETS, 
         const sub = await st(C.key, "/subscriptions/" + s0.sub);
         if (["active", "trialing", "past_due"].includes(sub.status)) {
           const item = sub.items.data[0]; const up = LVL[pack] > LVL[packOfPrice(C, item.price) || "essentiel"];
-          const nsub = await st(C.key, "/subscriptions/" + sub.id, { method: "POST", body: { items: [{ id: item.id, price: C.prices[pack], tax_rates: [C.tax] }], proration_behavior: sub.status === "trialing" ? "none" : up ? "always_invoice" : "create_prorations", cancel_at_period_end: false, metadata: { rid: r.id, pack } } });
+          const nsub = await st(C.key, "/subscriptions/" + sub.id, { method: "POST", body: { items: [{ id: item.id, price: C.prices[pack], tax_rates: C.tax ? [C.tax] : "" }], proration_behavior: sub.status === "trialing" ? "none" : up ? "always_invoice" : "create_prorations", cancel_at_period_end: false, metadata: { rid: r.id, pack, app: "growth-gusto" } } });
           await applySub(C, nsub, r.id); return { changed: true, pack };
         }
       }
@@ -207,17 +210,17 @@ const stripeApi = onCall({ region: REGION, cors: true, secrets: STRIPE_SECRETS, 
       if (customer) { try { const c = await st(C.key, "/customers/" + customer); if (c.deleted) customer = null; } catch (e) { customer = null; } }
       if (!customer) {
         const email = req.auth.token.email || undefined;
-        customer = (await st(C.key, "/customers", { method: "POST", body: { email, name: String(r.name || "").slice(0, 200) || undefined, preferred_locales: ["fr"], metadata: { rid: r.id, uid: req.auth.uid } } })).id;
+        customer = (await st(C.key, "/customers", { method: "POST", body: { email, name: String(r.name || "").slice(0, 200) || undefined, preferred_locales: ["fr"], metadata: { rid: r.id, uid: req.auth.uid, app: "growth-gusto" }, invoice_settings: C.tva ? undefined : { footer: "TVA non applicable, art. 293 B du CGI" } } })).id;
         await db.doc(`restos/${r.id}`).set({ stripe: { ...s0, customer, live: !!C.live } }, { merge: true });
       }
       const now = Date.now(); const trialEnd = r.plan === "essai" && +r.trialEnds > now + 49 * 36e5 ? Math.floor(+r.trialEnds / 1000) : undefined;
       const P = AB_PRICES[pack];
       const ses = await st(C.key, "/checkout/sessions", { method: "POST", body: {
         mode: "subscription", customer, client_reference_id: r.id, locale: "fr",
-        line_items: [{ price: C.prices[pack], quantity: 1, tax_rates: [C.tax] }],
+        line_items: [{ price: C.prices[pack], quantity: 1, tax_rates: C.tax ? [C.tax] : undefined }],
         allow_promotion_codes: true, billing_address_collection: "required", tax_id_collection: { enabled: true }, customer_update: { name: "auto", address: "auto" },
-        subscription_data: { metadata: { rid: r.id, pack }, trial_end: trialEnd, description: `Growth Gusto · Pack ${P.t} · ${String(r.name || "").slice(0, 80)}` },
-        metadata: { rid: r.id, pack },
+        subscription_data: { metadata: { rid: r.id, pack, app: "growth-gusto" }, trial_end: trialEnd, description: `Growth Gusto · Pack ${P.t} · ${String(r.name || "").slice(0, 80)}` },
+        metadata: { rid: r.id, pack, app: "growth-gusto" },
         custom_text: { submit: { message: trialEnd ? `Rien n'est prélevé avant la fin de votre essai, le ${new Date(trialEnd * 1000).toLocaleDateString("fr-FR", { day: "numeric", month: "long", timeZone: "Europe/Paris" })}. Sans engagement, résiliable à tout moment.` : "Mensuel, sans engagement : résiliable à tout moment depuis l'application." } },
         success_url: APP + "?abo=ok&session={CHECKOUT_SESSION_ID}", cancel_url: APP + "?abo=annule",
       } });
@@ -263,8 +266,10 @@ const stripeWebhook = onRequest({ region: REGION, secrets: STRIPE_SECRETS, timeo
     if (isC || ev.account || (o.metadata && o.metadata.kind === "order")) {
       const hs = HANDLERS.order || []; if (!hs.length) { res.json({ received: true, ignored: true }); return; }
       for (const h of hs) await h(ev, { call: (path, opts = {}) => st(C.key, path, { account: ev.account, ...opts }) });
-    } else if (ev.type === "checkout.session.completed" && o.mode === "subscription" && o.subscription) {
+    } else if (ev.type === "checkout.session.completed" && o.mode === "subscription" && o.subscription && o.metadata && o.metadata.rid) {
       await applySub(C, await st(C.key, "/subscriptions/" + o.subscription), (o.metadata && o.metadata.rid) || o.client_reference_id);
+    } else if (ev.type === "checkout.session.completed" || (ev.type.startsWith("customer.subscription.") && !(o.metadata && o.metadata.rid)) || (ev.type.startsWith("invoice.") && !(o.subscription_details && o.subscription_details.metadata && o.subscription_details.metadata.rid))) {
+      res.json({ received: true, ignored: true }); return; /* the same Stripe account sells other things: not a Growth Gusto subscription */
     } else if (ev.type.startsWith("customer.subscription.")) {
       await applySub(C, o, null);
     } else if ((ev.type === "invoice.paid" || ev.type === "invoice.payment_failed") && o.subscription) {
