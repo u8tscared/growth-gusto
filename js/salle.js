@@ -572,7 +572,7 @@ VIEWS.cuisine = {
     const outs = slDishes().filter((n) => slOut(n.id) || slLeft(n.id) != null);
     const hasBar = all.some((o) => o.station === "bar");
     const sound = SFX.ctx && SFX.ctx.state === "running";
-    const right = `<span class="sl-clock mono" id="slClock">${hm(Date.now())}</span><button class="iconbtn${SL.print ? " on" : ""}" data-act="slPrintTog" aria-pressed="${SL.print}" aria-label="Imprimer chaque nouveau bon" title="Imprimer chaque nouveau bon">${ico("printer")}</button><button class="iconbtn sl-fullb" data-act="cmFull" aria-label="Plein écran" title="Plein écran">${ico("cmFull")}</button>`;
+    const right = `<span class="sl-clock mono" id="slClock">${hm(Date.now())}</span><button class="iconbtn${SL.print ? " on" : ""}" data-act="slPrintTog" aria-pressed="${SL.print}" aria-label="Imprimer chaque nouveau bon" title="Imprimer chaque nouveau bon">${ico("printer")}</button>`;
     const pas = (o) => `${(o.items || []).reduce((a, x) => a + (x.off ? 0 : +x.q || 0), 0)}`;
     return `<div class="inner wide sl sl-k">${topBar("Écran cuisine", { right })}
       ${sound ? "" : `<button class="sl-snd st" style="--i:1" data-act="slSound">${ico("sound")}<span><b>Touchez pour activer le carillon</b><em>La tablette sonne à chaque nouveau bon et à chaque changement.</em></span></button>`}

@@ -13,8 +13,8 @@ srv.listen(0,async()=>{const port=srv.address().port;const b=await chromium.laun
  for(const [w,h,dpr,label,ori] of jobs){
   const ctx=await b.newContext({viewport:{width:w,height:h},deviceScaleFactor:dpr});
   await ctx.route(/googleapis|gstatic/,rt=>rt.fulfill({body:'',contentType:'text/css'}));
-  const p=await ctx.newPage();await p.goto('http://localhost:'+port+'/');await p.waitForTimeout(2200);
-  await p.evaluate(()=>{const bt=document.getElementById('boot');bt.style.transition='none';bt.querySelector('.boot-ic').style.transition='none';bt.classList.remove('out');document.querySelectorAll('.tabbar,#app,.aurora').forEach(e=>e.style.visibility='hidden');});
+  const p=await ctx.newPage();await p.goto('http://localhost:'+port+'/?nointro');await p.waitForTimeout(2200);
+  await p.evaluate(()=>{const bt=document.getElementById('boot');bt.style.transition='none';bt.querySelector('.boot-ic').style.transition='none';bt.classList.remove('out','gone','gg-x');document.querySelectorAll('.tabbar,#app,.aurora').forEach(e=>e.style.visibility='hidden');});
   await p.waitForTimeout(300);
   const name=`splash-${w*dpr}x${h*dpr}.jpg`;
   await p.screenshot({path:path.join(ROOT,'icons',name),type:'jpeg',quality:90});
