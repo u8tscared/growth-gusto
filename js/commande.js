@@ -10,7 +10,7 @@
    Data:
      restos/{rid}/clientOrders/{id}  written by the server (functions/src/commande.js orderApi); the team moves status on:
                                      nouvelle → prep → prete → servie (+ prepAt, readyAt, doneAt, by). Read by js/achats.js for forecasts.
-     restos/{rid}/qrMenu/cfg         { on, table, takeaway, payOnline, payPlace, prepMin, tables, pickup:{days,windows:[{from,to}],step}, msg,
+     restos/{rid}/qrMenu/cfg         { on, table, takeaway, payOnline, payPlace, tablePay: avant|choix|apres (à table), prepMin, tables, pickup:{days,windows:[{from,to}],step}, msg,
                                        hidden:[noteId], out:{noteId:"YYYY-MM-DD"}, desc:{noteId:text}, veg:[noteId], setupAt }
      restos/{rid}/qrPay/link         Stripe account of the restaurant (server-written, members read)
      restos/{rid}/public/menu        projection read by the public page commande/ (cmPubDoc): never a client's data, never a cost price.
@@ -57,6 +57,13 @@ function cmCfg() {
   o.look = { ...CM_LOOK0, ...(c.look && typeof c.look === "object" ? c.look : {}) };
   return o;
 }
+/* paiement à table (cfg.tablePay): « avant » required when ordering (Stripe), « choix » the client picks, « apres » at the end of the meal.
+   Without Stripe, only « apres ». Older configs had only payOnline / payPlace: read them the same way the public page does. */
+const CM_TPAY = [["avant", "Obligatoire à la commande", "Le client paie en ligne avant que la commande parte en cuisine. Aucun oubli possible."],
+  ["choix", "Au choix du client", "Payer tout de suite en ligne, ou à la fin du repas."], ["apres", "À la fin du repas", "Pas de paiement en ligne à table : le serveur encaisse. La table est marquée « À régler »."]];
+function cmTablePay(c) { c = c || cmCfg(); const on = !!(CM.link && CM.link.charges) || DB.mode === "demo"; const v = ["avant", "choix", "apres"].includes(c.tablePay) ? c.tablePay : !c.payOnline ? "apres" : c.payPlace === false ? "avant" : "choix"; return on ? v : "apres"; }
+/* a QR order at a table that nobody has collected yet: big red « À régler » on the kitchen, the rail and the floor */
+const cmDue = (o) => !!o && o.src === "qr" && o.mode === "table" && !o.paid && !o.settled && !["apayer", "annulee", "abandonnee"].includes(o.status);
 /* the menu's sections: the 5 base kinds, renamed / reordered / completed by the gérant or by an import (cfg.secs [{id,t,k}]) */
 const CM_LOOK0 = { style: "moderne", acc: "violet", photos: true, cover: "" };
 const CM_ACCS = [["violet", "#5B2BFF", "Violet"], ["tomate", "#E5482A", "Tomate"], ["safran", "#E39A12", "Safran"], ["sauge", "#2F8F5B", "Sauge"], ["ocean", "#1F6FD1", "Océan"], ["encre", "#1B1530", "Encre"]];
@@ -126,7 +133,7 @@ function cmPubDoc() {
   let size = JSON.stringify(items).length; items.slice().sort((a, b) => (b.ph || "").length - (a.ph || "").length).forEach((it) => { if (size > 700000 && it.ph && it.ph.startsWith("data:")) { size -= it.ph.length; delete it.ph; } });
   const rs = typeof rsCfg === "function" ? rsCfg() : {};
   return { v: 1, name: (S.resto && S.resto.name) || "", logo: cmLogo(), address: rs.address || "", phone: rs.phone || "", msg: c.msg || "",
-    cfg: { on: !!c.on, table: !!c.table, takeaway: !!c.takeaway, payOnline: !!(c.payOnline && CM.link && CM.link.charges), payPlace: c.payPlace !== false || !(CM.link && CM.link.charges), prepMin: c.prepMin, tables: cmTablesN(), pickup: c.pickup },
+    cfg: { on: !!c.on, table: !!c.table, takeaway: !!c.takeaway, payOnline: !!(c.payOnline && CM.link && CM.link.charges), payPlace: c.payPlace !== false || !(CM.link && CM.link.charges), tablePay: cmTablePay(c), prepMin: c.prepMin, tables: cmTablesN(), pickup: c.pickup },
     cats: SECS.map(({ id, t }) => ({ id, t })), items, day: today, look: cmLookPub(c.look) };
 }
 const cmLookPub = (l) => ({ style: CM_STYLES.some((x) => x[0] === l.style) ? l.style : "moderne", acc: CM_ACCS.some((x) => x[0] === l.acc) ? l.acc : "violet", photos: l.photos !== false, cover: typeof l.cover === "string" && (/^https:\/\//.test(l.cover) && l.cover.length < 2000 || /^data:image\//.test(l.cover) && l.cover.length <= 170000) ? l.cover : "" });
@@ -249,10 +256,17 @@ function cmCard(o, k) {
     ${o.mode === "emporter" && o.name ? `<div class="cm-who">${esc(o.name)}${o.phone ? ` · <a href="tel:${esc(String(o.phone).replace(/[^\d+]/g, ""))}">${esc(o.phone)}</a>` : ""}</div>` : o.name ? `<div class="cm-who">${esc(o.name)}</div>` : ""}
     <ul class="cm-items">${(o.items || []).map((x) => `<li><b class="mono">${x.q}</b><span>${esc(x.name)}${x.note ? `<em>${esc(x.note)}</em>` : ""}</span></li>`).join("")}</ul>
     ${o.note ? `<div class="cm-onote">${ico("rsNote")}<span>${esc(o.note)}</span></div>` : ""}
-    <div class="cm-o-f"><span class="cm-pay ${o.paid ? "ok" : ""}">${o.paid ? `${ico("check")}Payée` : `${ico("cmCard")}À encaisser`}</span><b class="mono">${cmEur(o.total)}</b>
+    ${cmDue(o) ? cmDueBand(o) : ""}
+    <div class="cm-o-f"><span class="cm-pay ${o.paid || o.settled ? "ok" : ""}">${o.paid ? `${ico("check")}Payée` : o.settled ? `${ico("check")}Réglée` : `${ico("cmCard")}À encaisser`}</span><b class="mono">${cmEur(o.total)}</b>
       <button class="cm-more" data-act="cmMenu" data-id="${esc(o.id)}" aria-label="Plus d'actions">${ico("dots")}</button></div>
     ${next ? `<button class="btn ${o.status === "prete" ? "" : "acc"} block cm-next" data-act="cmNext" data-id="${esc(o.id)}" data-v="${next[0]}" ${busy ? "disabled" : ""}>${ico(next[2])}${next[1]}</button>` : ""}
   </article>`;
+}
+
+/* the red band, shared with the kitchen screen (js/salle.js) and the floor: the waiter taps « Réglé » once the table has paid */
+function cmDueBand(o, big) {
+  return `<div class="cm-due${big ? " big" : ""}" role="status"><span class="cm-due-i">${ico("cmCard")}</span><span class="cm-due-t"><b>À régler</b><em>${big ? "" : `Table ${esc(o.table)} · `}${cmEur(o.total)} · non payée</em></span>
+    <button class="cm-due-b" data-act="cmSettle" data-id="${esc(o.id)}" aria-label="Table ${esc(o.table)} réglée">${ico("check")}Réglé</button></div>`;
 }
 
 /* ── la carte ── */
@@ -352,8 +366,9 @@ function cmCfgTab() {
       <ul class="cm-sbul"><li>${ico("check")}Aucun abonnement Stripe : environ 1,5 % + 0,25 € par paiement (tarif Stripe).</li><li>${ico("check")}Virement automatique sur votre compte bancaire.</li><li>${ico("check")}Vous pouvez aussi garder le paiement sur place.</li></ul>
       ${mgr ? `<button class="btn acc block" data-act="cmConnect" ${CM.busy.connect ? "disabled" : ""}>${CM.busy.connect ? "Un instant…" : `${ico("cmStripe")}Relier mon compte Stripe`}</button>` : `<p class="note">Le gérant peut relier le compte Stripe.</p>`}`
     : l.charges ? `<div class="cm-stripe ok"><div class="cm-sl">${ico("check")}</div><div><b>Stripe relié${l.name ? ` · ${esc(l.name)}` : ""}</b><em>Les paiements arrivent sur votre compte Stripe.${l.live === false ? " Mode test." : ""}</em></div></div>
+      ${c.takeaway ? `<div class="cm-sub">${ico("cmBag")}À emporter</div>
       ${tog("cmPayOnline", c.payOnline, "Proposer « payer maintenant »", "Carte, Apple Pay ou Google Pay au moment de commander.")}
-      ${tog("cmPayPlace", c.payPlace !== false || !c.payOnline, "Proposer « payer sur place »", "À la fin du repas ou au retrait.", !c.payOnline)}`
+      ${tog("cmPayPlace", c.payPlace !== false || !c.payOnline, "Proposer « payer au retrait »", "Le client paie en venant chercher sa commande.", !c.payOnline)}` : ""}`
     : `<div class="cm-stripe wait"><div class="cm-sl">${ico("clock")}</div><div><b>Inscription Stripe à terminer</b><em>${l.details ? "Stripe vérifie vos informations. Ça prend en général quelques minutes." : "Il manque quelques informations (identité, IBAN) pour recevoir les paiements."}</em></div></div>
       ${mgr ? `<div class="cm-erow"><button class="btn acc sm" data-act="cmConnect">${l.details ? "Voir chez Stripe" : "Terminer chez Stripe"}</button><button class="btn soft sm" data-act="cmCheck">Actualiser</button></div>` : ""}`;
   return `<div class="cm-cfg">
@@ -369,10 +384,20 @@ function cmCfgTab() {
         ${P.windows.length < 2 ? `<button class="btn ghost sm" data-act="cmWinAdd">${ico("plus")}Ajouter un service</button>` : ""}</div>
     </div>` : ""}
     <div class="glass cm-blk st" style="--i:4"><div class="lbl">Paiement</div>${pay}</div>
+    ${c.table ? cmTablePayBlk(c) : ""}
     <div class="glass cm-blk st" style="--i:5"><div class="lbl">Message sur la carte</div>
       <input class="input" id="cmMsg" maxlength="140" value="${esc(c.msg || "")}" placeholder="Produits frais du marché, cuisinés sur place.">
       <p class="note">Une phrase affichée en haut de la carte. Le logo vient de Réglages › Logo.</p></div>
   </div>`;
+}
+
+/* « Paiement à table » : three big choices; the two online ones need the Stripe account */
+function cmTablePayBlk(c) {
+  const on = !!(CM.link && CM.link.charges) || DB.mode === "demo", cur = cmTablePay(c);
+  return `<div class="glass cm-blk st" style="--i:5"><div class="lbl">Paiement des commandes à table</div>
+    <div class="cm-tpay" role="radiogroup" aria-label="Paiement des commandes à table">${CM_TPAY.map(([k, t, d]) => { const dis = k !== "apres" && !on; return `<button class="cm-tp${cur === k ? " on" : ""}" role="radio" aria-checked="${cur === k}" data-act="cmTablePay" data-v="${k}" ${dis ? "disabled" : ""}>
+      <span class="cm-tp-r"></span><span class="cm-tp-x"><b>${t}</b><em>${dis ? "Reliez d'abord votre compte Stripe, juste au-dessus." : d}</em></span></button>`; }).join("")}</div>
+    <p class="note">${cur === "avant" ? "La commande n'arrive en cuisine qu'une fois payée." : "Tant qu'une commande QR n'est pas payée, la cuisine et la salle voient un gros « À régler » rouge sur la table. Le serveur touche « Réglé » quand il a encaissé."}</p></div>`;
 }
 
 /* ───────── dish sheet (edit the online bits, or create a dish) ───────── */
@@ -514,9 +539,9 @@ function cmSeedDemo() {
   mk("dm1", 9, 2, { table: "4", items: [it(0, 2), it(1, 1, "Sans oignons")], paid: true, pay: "stripe" });
   mk("dm2", 8, 6, { mode: "emporter", slot: "12:45", name: "Camille", phone: "06 12 34 56 78", items: [it(2, 1), it(3, 2)], status: "nouvelle" });
   mk("dm3", 7, 14, { table: "11", items: [it(1, 3), it(4, 2)], status: "prep", prepAt: now - 9 * 6e4, paid: true, pay: "stripe", note: "Les desserts plus tard, merci" });
-  mk("dm4", 6, 22, { table: "2", items: [it(0, 1), it(2, 1)], status: "prep", prepAt: now - 18 * 6e4 });
+  mk("dm4", 6, 22, { table: "5", items: [it(0, 1), it(2, 1)], status: "prep", prepAt: now - 18 * 6e4 });
   mk("dm5", 5, 31, { mode: "emporter", slot: "12:30", name: "Hugo", phone: "07 22 18 40 11", items: [it(3, 2)], status: "prete", readyAt: now - 3 * 6e4, paid: true, pay: "stripe" });
-  [4, 3, 2, 1].forEach((n, i) => mk("dmd" + n, n, 60 + i * 25, { table: String(3 + i * 2), items: [it(i, 2), it(i + 1, 1)], status: "servie", paid: i % 2 === 0, pay: i % 2 === 0 ? "stripe" : "place" }));
+  [4, 3, 2, 1].forEach((n, i) => mk("dmd" + n, n, 60 + i * 25, { table: String(3 + i * 2), items: [it(i, 2), it(i + 1, 1)], status: "servie", paid: i % 2 === 0, pay: i % 2 === 0 ? "stripe" : "place", settled: i % 2 !== 0 }));
   DB.local[path] = rows;
 }
 function cmDemoPing() {
@@ -606,6 +631,12 @@ Object.assign(ACT, {
   cmTableTog: async () => { const c = cmCfg(); SFX.tick(); await cmSaveCfg({ table: !c.table }); },
   cmTakeTog: async () => { const c = cmCfg(); SFX.tick(); await cmSaveCfg({ takeaway: !c.takeaway }); },
   cmPayOnline: async () => { const c = cmCfg(); SFX.tick(); await cmSaveCfg({ payOnline: !c.payOnline, ...(c.payOnline ? { payPlace: true } : {}) }); },
+  cmTablePay: async (a, id, v) => { if (!CM_TPAY.some((x) => x[0] === v) || cmTablePay() === v) return; SFX.tick(); buzz(4); await cmSaveCfg({ tablePay: v });
+    toast(v === "avant" ? "Paiement obligatoire à la commande" : v === "choix" ? "Le client choisit quand il paie" : "Paiement à la fin du repas"); },
+  cmSettle: async (a, id) => { const o = (CM.orders || []).find((x) => x.id === id); if (!o || o.settled) return; SFX.ok(); buzz(8);
+    const el = a.closest(".cm-due"); if (el) el.classList.add("out");
+    setTimeout(async () => { try { await safe(DB.update("clientOrders", id, { settled: true, settledAt: Date.now(), settledBy: S.me.id })); } catch (e) {}
+      S.ui.undo = () => DB.update("clientOrders", id, { settled: false, settledAt: null, settledBy: null }); toastUndo(`Table ${o.table} réglée`); if (typeof logEvent === "function") try { logEvent("commande", `Commande QR table ${o.table} réglée (${cmEur(o.total)})`); } catch (e) {} onData(); }, el ? 240 : 0); },
   cmPayPlace: async () => { const c = cmCfg(); SFX.tick(); await cmSaveCfg({ payPlace: c.payPlace === false }); },
   cmPrep: async (a, id, v) => { SFX.tick(); await cmSaveCfg({ prepMin: +v }); },
   cmDay: async (a, id, v) => { const c = cmCfg(), d = +v; const days = c.pickup.days.includes(d) ? c.pickup.days.filter((x) => x !== d) : [...c.pickup.days, d]; SFX.tick(); await cmSaveCfg({ pickup: { ...c.pickup, days } }); },

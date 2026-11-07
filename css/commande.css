@@ -250,3 +250,39 @@
 .cm-kds{all:unset;cursor:pointer;flex:none;display:flex;align-items:center;gap:10px;padding:0 16px;border-radius:18px;background:var(--tint);color:var(--accent-ink);box-shadow:0 0 0 1.5px #DCD0FF inset}
 .cm-kds .ico{width:22px;height:22px}
 .cm-kds span{display:flex;flex-direction:column}.cm-kds b{font-size:14px}.cm-kds em{font-style:normal;font-size:12px;color:var(--muted)}
+/* « À régler » : a QR order at a table not paid yet (js/commande.js cmDueBand, kitchen screen js/salle.js) */
+.cm-due{display:flex;align-items:center;gap:10px;padding:10px 10px 10px 12px;border-radius:16px;background:linear-gradient(135deg,var(--bad),#B0102A);color:#fff;box-shadow:0 6px 18px -6px rgb(212 42 72 / .55),0 0 0 1.5px rgb(255 255 255 / .18) inset;animation:cmDueIn .5s cubic-bezier(.34,1.56,.64,1) both,cmDuePulse 2.4s ease-in-out .6s infinite;transform-origin:center}
+.cm-due-i{display:grid;place-items:center;width:34px;height:34px;flex:none;border-radius:11px;background:rgb(255 255 255 / .2)}
+.cm-due-i .ico{width:19px;height:19px;color:#fff}
+.cm-due-t{display:flex;flex-direction:column;min-width:0;flex:1}
+.cm-due-t b{font-size:17px;font-weight:900;letter-spacing:.02em;text-transform:uppercase;line-height:1.1}
+.cm-due-t em{font-style:normal;font-size:12.5px;font-weight:650;opacity:.92;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cm-due-b{all:unset;box-sizing:border-box;cursor:pointer;display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:0 14px;border-radius:13px;background:#fff;color:#B0102A;font-weight:850;font-size:14px;flex:none;transition:transform .2s cubic-bezier(.34,1.56,.64,1)}
+.cm-due-b .ico{width:16px;height:16px}
+.cm-due-b:active{transform:scale(.94)}
+.cm-due-b:focus-visible{outline:3px solid #fff;outline-offset:2px}
+.cm-due.big{margin:0 10px;padding:12px 12px 12px 14px;border-radius:18px}
+.cm-due.big .cm-due-t b{font-size:22px}
+.cm-due.big .cm-due-i{width:40px;height:40px}
+.cm-due.out{animation:cmDueOut .24s ease-in forwards}
+.cm-o .cm-due{margin:2px 0 0}
+:where(html[data-theme=dark]) .cm-due{background:linear-gradient(135deg,#E3304E,#A10F28);box-shadow:0 6px 20px -6px rgb(255 60 90 / .45),0 0 0 1.5px rgb(255 255 255 / .14) inset}
+:where(html[data-theme=dark]) .cm-due-b{background:#fff;color:#A10F28}
+@keyframes cmDueIn{from{opacity:0;transform:scale(.9)}to{opacity:1;transform:none}}
+@keyframes cmDuePulse{0%,100%{box-shadow:0 6px 18px -6px rgb(212 42 72 / .55),0 0 0 0 rgb(212 42 72 / .45)}50%{box-shadow:0 6px 18px -6px rgb(212 42 72 / .55),0 0 0 7px rgb(212 42 72 / 0)}}
+@keyframes cmDueOut{to{opacity:0;transform:scale(.92)}}
+@media (prefers-reduced-motion:reduce){.cm-due{animation:none}}
+/* paiement à table : three choices */
+.cm-tpay{display:flex;flex-direction:column;gap:8px}
+.cm-tp{all:unset;box-sizing:border-box;cursor:pointer;display:flex;align-items:center;gap:12px;padding:13px 14px;border-radius:16px;background:var(--cream-2);box-shadow:0 0 0 1.5px transparent inset;transition:background .2s,box-shadow .25s,transform .25s cubic-bezier(.34,1.56,.64,1)}
+.cm-tp:active{transform:scale(.985)}
+.cm-tp:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.cm-tp[disabled]{cursor:default;opacity:.55}
+.cm-tp-r{width:20px;height:20px;flex:none;border-radius:50%;box-shadow:0 0 0 2px var(--rim-2) inset;transition:box-shadow .25s cubic-bezier(.34,1.56,.64,1)}
+.cm-tp-x{display:flex;flex-direction:column;gap:2px;min-width:0}
+.cm-tp-x b{font-size:14.5px;font-weight:800;color:var(--ink)}
+.cm-tp-x em{font-style:normal;font-size:12.5px;line-height:1.4;color:var(--muted)}
+.cm-tp.on{background:rgb(var(--w) / .7);box-shadow:0 0 0 2px var(--accent) inset}
+.cm-tp.on .cm-tp-r{box-shadow:0 0 0 6px var(--accent) inset}
+.cm-sub{display:flex;align-items:center;gap:6px;margin:12px 0 6px;font-size:12px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
+.cm-sub .ico{width:15px;height:15px}

@@ -121,11 +121,11 @@ FEATURES = [
   img="menu-qr", tags=[SECOND],
   card="QR code à table, à emporter, paiement en ligne, carte importée en une minute.",
   blocks=[
-   ("Le menu QR à table", "Le client scanne, choisit, commande. Le bon arrive sur l'écran cuisine, avec la table. Il suit sa commande en direct.", ["Photos et allergènes", "Suivi en direct", "Bons sur l'écran cuisine"], "menu-qr", "v", []),
+   ("Le menu QR à table", "Le client scanne, choisit, commande. Le bon arrive sur l'écran cuisine, avec la table. Il suit sa commande en direct. Vous choisissez si le paiement est obligatoire à la commande, au choix du client, ou à la fin du repas : une table pas encore payée s'affiche en gros « À régler » rouge, en cuisine comme en salle.", ["Photos et allergènes", "Paiement obligatoire ou non, au choix", "« À régler » en rouge : aucun oubli"], "menu-qr", "v", []),
    ("À emporter, avec créneaux", "Un lien à partager : le client choisit son heure de retrait et paie en ligne s'il le souhaite. Vous gardez la main sur les créneaux.", ["Créneaux de retrait", "Paiement en ligne par Stripe", "Sans commission Growth Gusto"], "commandes", "s", []),
    ("Votre carte, importée", "Donnez le PDF, une photo ou l'adresse de votre site : l'app lit la carte, devine les allergènes, et vous vérifiez tout avant de publier. Trois styles, six couleurs.", ["PDF, photo ou site web", "Allergènes devinés, à confirmer", "Impression A4"], "carte-import", "l", ["Par import"]),
   ],
-  faq=[("Le paiement en ligne est-il obligatoire ?", "Non. Le client peut commander et payer à table ou au comptoir. Le paiement en ligne passe par Stripe, sur votre propre compte."),
+  faq=[("Le paiement en ligne est-il obligatoire ?", "C'est vous qui choisissez. À table : paiement obligatoire à la commande, au choix du client, ou à la fin du repas. Le paiement en ligne passe par Stripe, sur votre propre compte."),
        ("Growth Gusto prend-il une commission sur les commandes ?", "Non. Seuls les frais de paiement Stripe s'appliquent si vous activez le paiement en ligne.")],
   related=["prise-de-commande", "recettes-allergenes", "fidelite-clients"], guides=["allergenes-restaurant"]),
 

@@ -403,3 +403,4 @@
 .sl-stkl span.out{padding:0 10px;color:var(--faint);text-decoration:line-through}
 .sl-stkb{all:unset;cursor:pointer;flex:none;font-size:13px;font-weight:760;color:#8A4B00;padding:6px 6px}
 .sl-stkt{flex:none;align-self:center;font-style:normal;font-size:12px;font-weight:760;color:#8A4B00;text-transform:uppercase;letter-spacing:.04em}
+.sl-due-l{display:flex;flex-direction:column;gap:8px}
