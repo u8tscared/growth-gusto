@@ -660,3 +660,5 @@
 .lb-buyi i{display:block;font-style:normal;font-size:12px;font-weight:700;color:var(--acc);margin-top:1px}
 .lb-buyi em{display:block;font-style:normal;font-size:12.5px;line-height:1.4;color:var(--muted);margin-top:3px}
 .lb-buyi>.ico:last-child{color:var(--muted);align-self:center}
+/* doigt : les points de l'assistant restent fins, la zone qu'on touche fait 44 px de haut */
+@media (pointer:coarse){.lbw-dot{position:relative}.lbw-dot::after{content:"";position:absolute;inset:-12px -4px}}
