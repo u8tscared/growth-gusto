@@ -97,8 +97,12 @@ async function create(d) {
   total = r2(total);
   let pay = d.pay === "stripe" ? "stripe" : "place";
   let link = null;
+  /* à table: the restaurant's choice (cfg.tablePay « avant » required when ordering, « choix », « apres » at the end of the meal);
+     takeaway, or an older menu doc: payOnline / payPlace */
+  const tp = mode === "table" && ["avant", "choix", "apres"].includes(c.tablePay) ? (c.payOnline ? c.tablePay : "apres") : "";
+  if (tp === "apres") pay = "place";
   if (pay === "stripe") { link = await linkOf(rid); if (!c.payOnline || !canCharge(link)) throw err("failed-precondition", "paiement"); if (total < 0.5) pay = "place"; }
-  if (pay === "place" && c.payPlace === false && c.payOnline) throw err("failed-precondition", "paiement");
+  if (pay === "place" && total >= 0.5 && (tp === "avant" || (!tp && c.payPlace === false && c.payOnline))) throw err("failed-precondition", "paiement_oblig");
 
   /* the same request sent again (the client's network dropped before our answer reached it: js/reseau-client.js tries again with the
      same `rq`): answer with the order already created, never a second one */

@@ -98,7 +98,9 @@
     const m = String((e && e.message) || "");
     const T = { ferme: "Le restaurant ne prend plus de commandes en ligne pour le moment.", plat: "Un plat de votre commande n'est plus disponible. Vérifiez votre panier.",
       prix: "La carte vient de changer. Vérifiez votre panier puis réessayez.", creneau: "Cet horaire n'est plus disponible. Choisissez-en un autre.",
-      paiement: "Le paiement en ligne n'est pas disponible pour le moment. Choisissez « payer sur place ».", trop: "Trop de commandes en même temps. Réessayez dans une minute.",
+      paiement: payModes().includes("place") ? "Le paiement en ligne ne répond pas pour le moment. Choisissez « payer sur place », ou réessayez dans un instant."
+        : "Le paiement en ligne ne répond pas pour le moment. Réessayez dans un instant : rien n'a été débité. Si ça continue, appelez le personnel.",
+      paiement_oblig: "Ce restaurant demande de payer au moment de commander. Choisissez « payer maintenant ».", trop: "Trop de commandes en même temps. Réessayez dans une minute.",
       lien: "Ce lien n'est plus valide.", table: "Indiquez le numéro de votre table.", contact: "Indiquez votre prénom et votre téléphone." };
     return T[m] || (navigator.onLine === false ? "Pas de connexion internet. Réessayez dans un instant." : "Ça n'a pas marché. Réessayez, ou demandez au personnel.");
   };
@@ -107,7 +109,7 @@
   const DEMO_PH = (h1, h2, e) => `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120"><defs><radialGradient id="g" cx=".35" cy=".3" r=".9"><stop offset="0" stop-color="${h1}"/><stop offset="1" stop-color="${h2}"/></radialGradient></defs><rect width="120" height="120" fill="url(#g)"/><text x="60" y="76" font-size="46" text-anchor="middle">${e}</text></svg>`)}`;
   function demoPub() {
     return { name: "Le Bistrot Démo", address: "8 place du Marché, Lyon 2e", phone: "04 78 42 18 90", logo: "", msg: "Produits frais du marché, cuisinés sur place.", look: { style: "moderne", acc: "violet", photos: true, cover: "" },
-      cfg: { on: true, table: true, takeaway: true, payOnline: true, payPlace: true, prepMin: 20, tables: 18, pickup: { days: [0, 1, 2, 3, 4, 5, 6], windows: [{ from: "11:30", to: "14:00" }, { from: "18:30", to: "22:00" }], step: 15 }, tipNote: "" },
+      cfg: { on: true, table: true, takeaway: true, payOnline: true, payPlace: true, tablePay: "choix", prepMin: 20, tables: 18, pickup: { days: [0, 1, 2, 3, 4, 5, 6], windows: [{ from: "11:30", to: "14:00" }, { from: "18:30", to: "22:00" }], step: 15 }, tipNote: "" },
       cats: [{ id: "partage", t: "À partager" }, { id: "entree", t: "Entrées" }, { id: "plat", t: "Plats" }, { id: "dessert", t: "Desserts" }, { id: "boisson", t: "Boissons" }],
       items: [
         { id: "d1", t: "Croquettes de jambon", d: "Béchamel crémeuse, jambon ibérique, chapelure maison. Par six.", p: 9, c: "partage", al: ["gluten", "lait", "oeufs"], ph: DEMO_PH("#F6C97A", "#C9822E", "🥘") },
@@ -172,7 +174,11 @@
     return [...new Set(out)].sort();
   }
   const takeawayOpen = () => !!cfg().takeaway && pickupSlots().length > 0;
-  const payModes = () => { const c = cfg(); const m = []; if (c.payOnline) m.push("stripe"); if (c.payPlace !== false || !c.payOnline) m.push("place"); return m; };
+  /* à table, the restaurant picks (cfg.tablePay): "avant" pay when ordering (required), "choix" the client picks, "apres" at the end of the meal.
+     Takeaway keeps payOnline / payPlace. An older menu doc without tablePay falls back on those two. */
+  const tablePay = () => { const c = cfg(); if (["avant", "choix", "apres"].includes(c.tablePay)) return !c.payOnline && c.tablePay !== "apres" ? "apres" : c.tablePay; return !c.payOnline ? "apres" : c.payPlace === false ? "avant" : "choix"; };
+  const payModes = () => { const c = cfg(); if (st.mode === "table") { const tp = tablePay(); return tp === "avant" ? ["stripe"] : tp === "apres" ? ["place"] : ["stripe", "place"]; }
+    const m = []; if (c.payOnline) m.push("stripe"); if (c.payPlace !== false || !c.payOnline) m.push("place"); return m; };
 
   /* ───────── the restaurant's look: style, colour, photos, cover (cmPubDoc look) ───────── */
   const LOOKS = ["moderne", "bistrot", "elegant"], ACCS = ["violet", "tomate", "safran", "sauge", "ocean", "encre"];
@@ -354,7 +360,7 @@
         <label class="qm-f"><span>Téléphone</span><input id="qmPhone" type="tel" autocomplete="tel" inputmode="tel" maxlength="20" value="${esc(st.phone)}" placeholder="06 12 34 56 78"></label></div>`
       : `<div class="qm-blk"><label class="qm-f"><span>Votre prénom <i>(facultatif)</i></span><input id="qmName" autocomplete="given-name" maxlength="40" value="${esc(st.name)}" placeholder="Pour qu'on vous reconnaisse"></label></div>`}
       <div class="qm-blk"><label class="qm-f"><span>Un mot pour l'équipe <i>(facultatif)</i></span><input id="qmNote" maxlength="200" value="${esc(st.note)}" placeholder="${st.mode === "table" ? "Les desserts plus tard, merci" : "Couverts, sauce à part…"}"></label></div>
-      ${modes.length ? `<div class="qm-blk"><div class="qm-bh">${svg.card}<b>Paiement</b></div><div class="qm-pays">${modes.map((m) => m === "stripe"
+      ${modes.length ? `<div class="qm-blk"><div class="qm-bh">${svg.card}<b>Paiement</b></div>${st.mode === "table" && modes.length === 1 ? `<p class="qm-payn">${modes[0] === "stripe" ? `${esc(st.pub.name || "Le restaurant")} demande de régler en commandant. La cuisine reçoit votre commande dès le paiement.` : "Vous réglez à la fin du repas, auprès du serveur. Rien à payer maintenant."}</p>` : ""}<div class="qm-pays">${modes.map((m) => m === "stripe"
         ? `<button class="qm-pay${st.pay === m ? " on" : ""}" data-a="pay" data-v="stripe"><span class="qm-radio"></span><span class="qm-pay-tx"><b>Payer maintenant</b><em>Carte bancaire, Apple Pay, Google Pay</em></span><span class="qm-cards"><i class="cb">CB</i><i class="vi">VISA</i><i class="mc"><s></s><s></s></i></span></button>`
         : `<button class="qm-pay${st.pay === m ? " on" : ""}" data-a="pay" data-v="place"><span class="qm-radio"></span><span class="qm-pay-tx"><b>${st.mode === "table" ? "Payer à la fin du repas" : "Payer au retrait"}</b><em>Carte, espèces ou titre-restaurant, sur place</em></span>${svg.coins}</button>`).join("")}</div></div>` : ""}
       <div class="qm-tot"><span>Total</span><b class="mono">${eur(t)}</b></div>

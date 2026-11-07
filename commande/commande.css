@@ -231,6 +231,7 @@ button.qm-mc:active{transform:translateY(3px)}
 .qm-slot.on{background:var(--accent);color:#fff;box-shadow:0 3px 0 var(--accent-edge)}
 .qm-slot.on i{color:#D9D2FF}
 .qm-pays{display:flex;flex-direction:column;gap:8px}
+.qm-payn{margin:-2px 0 10px;font-size:13.5px;line-height:1.45;color:var(--muted);font-weight:600}
 .qm-pay{all:unset;box-sizing:border-box;cursor:pointer;display:flex;align-items:center;gap:12px;padding:14px;border-radius:18px;background:#fff;box-shadow:0 0 0 1.5px var(--rim-2) inset,0 3px 0 var(--edge-b);transition:box-shadow .25s,transform .25s var(--spring)}
 .qm-pay:active{transform:translateY(2px)}
 .qm-pay>svg{width:24px;height:24px;color:var(--faint)}
