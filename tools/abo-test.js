@@ -49,7 +49,8 @@ module.exports = async (page, shot) => {
   await page.evaluate(() => go("resa")); await page.waitForTimeout(600); ok(await page.evaluate(() => /pack Second/.test((document.querySelector(".ab-up") || {}).textContent || "")), "reservations gated under Essentiel");
   await page.evaluate(async () => { await DB.update("restos", S.rid, { plan: "pro", pack: "pro" }); }); await page.evaluate(() => go("stock")); await page.waitForTimeout(600);
   ok(await page.evaluate(() => !document.querySelector(".ab-up")), "stock open under Pro");
-  await page.evaluate(() => go("pointeuse")); await page.waitForTimeout(600); ok(await page.evaluate(() => /pack Chef/.test((document.querySelector(".ab-up") || {}).textContent || "")), "pointeuse gated with a Complet card under Pro"); await shot("32-upgrade-pointeuse-pro");
+  await page.evaluate(() => go("pointeuse")); await page.waitForTimeout(600); ok(await page.evaluate(() => !document.querySelector(".ab-up")), "pointeuse open under Pro (planning + pointeuse in Second)");
+  await page.evaluate(() => go("finance")); await page.waitForTimeout(600); ok(await page.evaluate(() => /pack Chef/.test((document.querySelector(".ab-up") || {}).textContent || "")), "finance gated with a Complet card under Pro"); await shot("32-upgrade-finance-pro");
   await page.evaluate(() => go("abonnement")); await page.waitForTimeout(700); ok(await page.evaluate(() => /Pack actuel/.test(document.querySelector(".ab-pack.pro").textContent) && /Nous écrire/.test(document.querySelector(".ab-pack.essentiel").textContent)), "Pro = current, Essentiel = downgrade by mail"); await shot("33-abonnement-pro");
   await page.evaluate(async () => { await DB.update("restos", S.rid, { plan: "complet", pack: "complet" }); }); await page.evaluate(() => go("stock")); await page.waitForTimeout(600);
   ok(await page.evaluate(() => !document.querySelector(".ab-up")), "stock open again under Complet");
