@@ -439,6 +439,79 @@ html:not([data-acc="violet"]) .qm-k,html:not([data-acc="violet"]) .qm-hn p{color
 [data-look="elegant"].noph .qm-it-ph{order:5;width:auto;height:auto;margin-top:2px}
 [data-look="elegant"].noph .qm-add,[data-look="elegant"].noph .qm-step{position:static;transform:none}
 
+/* ── at the table: call the waiter, ask for the bill ── */
+.qm-fab{all:unset;box-sizing:border-box;cursor:pointer;position:fixed;z-index:31;right:max(14px,calc(50% - 306px));bottom:calc(env(safe-area-inset-bottom,0px) + 16px);display:flex;align-items:center;gap:9px;height:54px;padding:0 18px 0 8px;border-radius:19px;background:var(--ink);color:#fff;font-weight:720;font-size:15px;box-shadow:0 4px 0 #000,0 18px 34px -14px rgba(27,21,48,.6);transition:transform .5s var(--spring),bottom .5s var(--spring),background .3s;animation:qmFabIn .7s .35s var(--spring) both}
+.qm-fab:active{transform:translateY(4px) scale(.97);box-shadow:0 0 0 #000}
+.qm-fab.up{bottom:calc(env(safe-area-inset-bottom,0px) + 90px)}
+.qm-fab-ic{width:40px;height:40px;border-radius:14px;background:rgba(255,255,255,.12);display:grid;place-items:center;color:var(--saffron)}
+.qm-fab-ic svg{width:21px;height:21px;stroke-width:2.3}
+.qm-fab:not(.live) .qm-fab-ic svg{animation:qmRing 3.6s 1.4s ease-in-out infinite}
+.qm-fab.live{background:var(--accent);box-shadow:0 4px 0 var(--accent-edge),0 18px 34px -14px rgba(76,31,234,.7)}
+.qm-fab.live .qm-fab-ic{background:rgba(255,255,255,.18);color:#fff;position:relative}
+.qm-fab.live.new .qm-fab-ic::after{content:"";position:absolute;inset:-3px;border-radius:16px;box-shadow:0 0 0 2px #fff;animation:qmHalo 1.6s ease-out infinite}
+.qm-fab.live.vu{background:var(--ok);box-shadow:0 4px 0 #06603F,0 18px 34px -14px rgba(14,138,95,.6)}
+.qm-cts{display:flex;flex-direction:column;gap:10px}
+.qm-ct{all:unset;box-sizing:border-box;cursor:pointer;display:flex;align-items:center;gap:14px;padding:14px;border-radius:20px;background:var(--paper);box-shadow:0 0 0 1.5px var(--rim-2) inset,0 4px 0 var(--edge-b);transition:transform .25s var(--spring),box-shadow .2s,background .2s}
+.qm-ct:active{transform:translateY(3px) scale(.99)}
+.qm-ct.on{background:var(--tint);box-shadow:0 0 0 2.5px var(--accent) inset,0 4px 0 var(--accent-edge)}
+.qm-ct-ic{width:52px;height:52px;flex:none;border-radius:17px;display:grid;place-items:center;background:var(--ink);color:var(--saffron)}
+.qm-ct-ic.addition{background:var(--saffron);color:var(--ink)}
+.qm-ct-ic svg{width:26px;height:26px}
+.qm-ct.on .qm-ct-ic svg{animation:qmRing 1s ease-in-out}
+.qm-ct-tx{display:flex;flex-direction:column;gap:3px;min-width:0}
+.qm-ct-tx b{font-family:var(--d);font-size:18px;font-weight:760;letter-spacing:-.02em}
+.qm-ct-tx em{font-style:normal;font-size:13.5px;color:var(--muted);line-height:1.35}
+.qm-csl{display:flex;gap:8px;margin-top:12px}
+.qm-cs,.qm-cp{all:unset;box-sizing:border-box;cursor:pointer;flex:1;display:flex;align-items:center;justify-content:center;gap:7px;height:48px;padding:0 10px;border-radius:15px;background:var(--paper);font-weight:680;font-size:14.5px;box-shadow:0 0 0 1.5px var(--rim-2) inset,0 3px 0 var(--edge-b);transition:transform .2s var(--spring)}
+.qm-cs:active,.qm-cp:active{transform:translateY(3px)}
+.qm-cs.on,.qm-cp.on{background:var(--ink);color:#fff;box-shadow:0 3px 0 #000}
+.qm-cs svg,.qm-cp svg{color:var(--accent)}.qm-cs.on svg,.qm-cp.on svg{color:var(--saffron)}
+.qm-cpay{margin-top:16px;animation:qmRise .45s var(--soft) both}
+.qm-cpays{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.qm-cp{flex-direction:column;height:66px;gap:4px;font-size:13px;text-align:center;line-height:1.15}
+.qm-opt{margin-left:auto;font-size:12px;color:var(--faint);font-weight:600}
+.qm-cst{display:flex;flex-direction:column;align-items:center;text-align:center;padding-top:26px !important}
+.qm-cst>.qm-x{position:absolute;right:14px;top:14px}
+.qm-cst h3{margin:16px 0 0;font-family:var(--d);font-size:28px;font-weight:780;letter-spacing:-.035em}
+.qm-cst>p{margin:6px 0 0;color:var(--ink-2);font-size:15.5px;max-width:300px;line-height:1.45}
+.qm-cring{position:relative;width:128px;height:128px;display:grid;place-items:center}
+.qm-cring span{position:relative;z-index:1;width:84px;height:84px;border-radius:28px;background:var(--ink);color:var(--saffron);display:grid;place-items:center;box-shadow:0 5px 0 #000;animation:qmBloom .6s var(--spring) both}
+.qm-cring span svg{width:40px;height:40px;stroke-width:2.2;animation:qmRing 1.3s ease-in-out infinite}
+.qm-cring i{position:absolute;inset:18px;border-radius:36px;border:2.5px solid var(--accent);opacity:0;animation:qmWave 2.4s ease-out infinite}
+.qm-cring i:nth-child(2){animation-delay:.8s}.qm-cring i:nth-child(3){animation-delay:1.6s}
+.qm-cring.vu span,.qm-cring.fait span{background:var(--ok);color:#fff;box-shadow:0 5px 0 #06603F}
+.qm-cring.vu span svg,.qm-cring.fait span svg{animation:qmPop .5s var(--spring)}
+.qm-cring.vu i{border-color:var(--ok)}
+.qm-cring.fait i{display:none}
+.qm-cchip{margin-top:16px;display:inline-flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:4px 8px;padding:10px 14px;border-radius:15px;background:var(--cream-2);font-size:14px;max-width:100%}
+.qm-cchip svg{color:var(--accent)}.qm-cchip span{color:var(--muted)}
+.qm-cwait{display:flex;align-items:center;gap:8px;font-size:13.5px;color:var(--muted);margin:14px 0 0}
+.qm-dots{display:inline-flex;gap:4px}.qm-dots i{width:6px;height:6px;border-radius:50%;background:var(--accent);animation:qmDot 1.2s ease-in-out infinite}
+.qm-dots i:nth-child(2){animation-delay:.15s}.qm-dots i:nth-child(3){animation-delay:.3s}
+/* ── the bill of a table (customer screen QR) ── */
+.qm-billp{align-items:center;gap:16px;padding-top:24px}
+.qm-billp .qm-ticket{animation-delay:.1s}
+.qm-tk-l.paid{padding-top:8px}.qm-tk-l .pd{color:var(--ok);font-weight:650}.qm-tk-l .pd span:first-child{display:flex;align-items:center;gap:6px}.qm-tk-l .pd svg{width:15px;height:15px;stroke-width:3}
+.qm-tk-t.left b{color:var(--accent-ink);font-size:22px}
+.qm-bpay{width:100%;max-width:400px;display:flex;flex-direction:column;gap:12px}
+.qm-bpay .qm-btn.block{width:100%}
+.qm-segs{display:flex;padding:4px;border-radius:16px;background:var(--cream-2);gap:4px}
+.qm-segs button{all:unset;cursor:pointer;flex:1;text-align:center;height:42px;line-height:42px;border-radius:12px;font-weight:700;font-size:14.5px;color:var(--ink-2);transition:background .25s,color .25s,box-shadow .25s}
+.qm-segs button.on{background:#fff;color:var(--ink);box-shadow:0 2px 0 var(--edge-b),0 0 0 1px var(--rim) inset}
+.qm-parts{display:flex;flex-direction:column;gap:8px;animation:qmRise .4s var(--soft) both}
+.qm-parts>div{display:flex;align-items:center;justify-content:space-between;gap:12px;font-weight:650;font-size:14.5px}
+.qm-fine{display:flex;align-items:center;justify-content:center;gap:6px;font-size:12.5px;color:var(--muted);margin:0;text-align:center}
+.qm-fine svg{width:14px;height:14px}
+.qm-bok{display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center}
+.qm-bok h2{margin:6px 0 0;font-family:var(--d);font-size:28px;font-weight:780;letter-spacing:-.035em}
+.qm-bok p{margin:0;color:var(--ink-2)}
+.qm-rev{margin-top:8px;width:100%;max-width:340px}.qm-rev svg{color:var(--saffron);fill:var(--saffron)}
+.qm-spin.big{width:38px;height:38px;border-width:4px}
+@keyframes qmFabIn{from{opacity:0;transform:translateY(30px) scale(.8)}to{opacity:1;transform:none}}
+@keyframes qmHalo{from{opacity:.9;transform:scale(1)}to{opacity:0;transform:scale(1.5)}}
+@keyframes qmWave{0%{opacity:.7;transform:scale(.8)}100%{opacity:0;transform:scale(1.45)}}
+@keyframes qmDot{0%,80%,100%{transform:translateY(0);opacity:.4}40%{transform:translateY(-5px);opacity:1}}
+@media (prefers-reduced-motion:reduce){.qm-fab,.qm-cring i,.qm-cring span svg,.qm-fab-ic svg,.qm-dots i{animation:none !important}}
 /* ── prix dynamiques (js/prix.js): happy hour and plat du jour, the old price struck through ── */
 .qm-was{font-family:var(--m);font-size:12.5px;color:var(--faint);text-decoration-thickness:1.5px;text-decoration-color:var(--tomato)}
 .qm-pr.deal{color:var(--tomato)}

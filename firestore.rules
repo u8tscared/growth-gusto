@@ -173,8 +173,8 @@ service cloud.firestore {
 
       // ── everything else (fridges, readings, lots, stock, tickets, staff, finances…): members only ──
       match /{col}/{doc} {
-        allow read: if !(col in ['members', 'sensorKeys', 'pennylane', 'plSent', 'plInv', 'qrPay', 'bankTx', 'bank', 'push', 'consignes', 'chatGroups', 'events']) && isMember(rid);
-        allow create, update, delete: if !(col in ['members', 'sensorKeys', 'pennylane', 'plSent', 'plInv', 'qrPay', 'bankTx', 'bank', 'push', 'consignes', 'chatGroups', 'events']) && isMemberAfter(rid);
+        allow read: if !(col in ['members', 'sensorKeys', 'pennylane', 'plSent', 'plInv', 'qrPay', 'bankTx', 'bank', 'push', 'consignes', 'chatGroups', 'events', 'billPays']) && isMember(rid);
+        allow create, update, delete: if !(col in ['members', 'sensorKeys', 'pennylane', 'plSent', 'plInv', 'qrPay', 'bankTx', 'bank', 'push', 'consignes', 'chatGroups', 'events', 'billPays']) && isMemberAfter(rid);
       }
       // the action log (journal des actions, js/relais.js): append-only. Each line is signed by its author; nobody edits or erases it,
       // except the app's own « Annuler » right after a gesture (within 15 minutes), the « annulé ensuite » mark and the photo
@@ -207,6 +207,10 @@ service cloud.firestore {
       }
       match /bank/{doc} {
         allow read, write: if isGerant(rid);
+      }
+      // online payments of a table's bill (functions/src/commande.js billPay): written by the server only
+      match /billPays/{doc} {
+        allow read: if isMember(rid);
       }
       // commande en ligne (js/commande.js, functions/src/commande.js): the restaurant's Stripe account state, written by the server only
       match /qrPay/{doc} {
