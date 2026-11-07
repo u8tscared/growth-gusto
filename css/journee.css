@@ -1,0 +1,7 @@
+/* Journée du restaurant (js/journee.js) : les préréglages sont des boutons qui ont l'air de lignes */
+.jn .jn-list{padding-top:4px;padding-bottom:4px}
+.jn button.li{appearance:none;-webkit-appearance:none;background:none;border:0;font:inherit;color:inherit;text-align:left;width:calc(100% + 20px)}
+.jn button.li .tx em{white-space:normal}
+.jn .jn-pre.on .tx b{color:var(--accent-ink)}
+.jn .jn-pre>svg{flex:none;width:20px;height:20px;color:var(--accent-ink)}
+.jn .chips .chip{min-width:52px;min-height:44px}

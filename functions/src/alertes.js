@@ -146,7 +146,11 @@ async function escalate(rid, resto) {
 
 /* ───────── detection (same rules as alCompute() in js/alertes.js) ───────── */
 async function detect(rid, resto) {
-  const cfg = cfgOf(resto), P = paris(), today = P.day, base = `restos/${rid}/`;
+  /* la journée du restaurant (restos.day.start, 4 h par défaut, comme js/core.js) : à 1 h du matin, on est encore sur la veille */
+  const dc = resto.day || {}, st = Number.isFinite(+dc.start) && dc.start != null && dc.start !== "" ? Math.max(0, Math.min(10, +dc.start)) : 4;
+  const cfg = cfgOf(resto), P = paris(), B = paris(Date.now() - st * 36e5), today = B.day, base = `restos/${rid}/`;
+  const bm = (P.min - st * 60 + 1440) % 1440; /* minutes depuis le début de la journée du restaurant */
+  const off = (Array.isArray(dc.off) ? dc.off : []).some((o) => o && o.from && today >= o.from && today <= (o.to || o.from));
   const fridges = cfg.on.temp || cfg.on.missed ? await all(db().collection(base + "fridges")) : [];
   const frName = (id) => (fridges.find((f) => f.id === id) || {}).name || "Frigo";
   const readings = fridges.length ? await all(db().collection(base + "readings").where("day", "==", today)) : [];
@@ -154,13 +158,13 @@ async function detect(rid, resto) {
     if (r.ok !== false || !fridges.some((f) => f.id === r.fridgeId)) continue;
     await raise(rid, "temp_" + r.id, { type: "temp", level: "bad", fridgeId: r.fridgeId, value: r.value, at: r.at || Date.now(), text: `${frName(r.fridgeId)} à ${fmt(r.value)} °C`, sub: r.action || `Hors seuil · relevé du ${r.slot === "soir" ? "soir" : "midi"}` });
   }
-  if (cfg.on.missed && fridges.length && !cfg.closed.includes(P.wd)) for (const slot of ["midi", "soir"]) {
-    const end = hmMin(cfg.slots[slot]); if (end == null) continue; const dueMin = end + (+cfg.delay || 0);
-    if (P.min < dueMin || P.min > dueMin + 6 * 60) continue; /* only during the 6 h after the deadline */
-    if (resto.createdAt && resto.createdAt > Date.now() - (P.min - dueMin) * 60e3) continue; /* the restaurant did not exist yet */
+  if (cfg.on.missed && fridges.length && !cfg.closed.includes(B.wd) && !off) for (const slot of ["midi", "soir"]) {
+    const end = hmMin(cfg.slots[slot]); if (end == null) continue; const dueMin = (end + (+cfg.delay || 0) - st * 60 + 1440) % 1440;
+    if (bm < dueMin || bm > dueMin + 6 * 60) continue; /* only during the 6 h after the deadline */
+    if (resto.createdAt && resto.createdAt > Date.now() - (bm - dueMin) * 60e3) continue; /* the restaurant did not exist yet */
     const done = new Set(readings.filter((r) => r.slot === slot).map((r) => r.fridgeId));
     const miss = fridges.filter((f) => !done.has(f.id)); if (!miss.length) continue;
-    await raise(rid, `missed_${today}_${slot}`, { type: "missed", level: miss.length === fridges.length ? "bad" : "warn", slot, day: today, at: Date.now(), text: `Relevé du ${slot} oublié`, sub: miss.length === fridges.length ? `Aucun frigo relevé (${miss.length})` : miss.map((f) => f.name).slice(0, 3).join(", ") + (miss.length > 3 ? ` +${miss.length - 3}` : "") });
+    await raise(rid, `missed_${today}_${slot}`, { type: "missed", level: miss.length === fridges.length ? "bad" : "warn", slot, day: today, at: Date.now(), text: `Relevé ${((n) => (/^(midi|soir|matin|déjeuner|dîner|service|brunch)$/.test(n) ? "du " : /^[aeiouyhéèêàâîôû]/.test(n) ? "d'" : "de ") + n)(String((Array.isArray(dc.names) && dc.names[slot === "soir" ? 1 : 0]) || slot).toLowerCase())} oublié`, sub: miss.length === fridges.length ? `Aucun frigo relevé (${miss.length})` : miss.map((f) => f.name).slice(0, 3).join(", ") + (miss.length > 3 ? ` +${miss.length - 3}` : "") });
   }
   /* once a day, from 7:00 Paris: DLC and obligations */
   if (P.min >= 7 * 60 && (resto.alertState || {}).daily !== today) {

@@ -73,7 +73,7 @@ function alSeenPut(keys) {
 
 /* ───────── the engine: pure on a data bundle, so « Mes établissements » can run it on another restaurant ───────── */
 function alCompute(D, cfg, now = Date.now()) {
-  const out = []; const today = dayKey(new Date(now)), yday = addDays(today, -1);
+  const out = []; const today = dayKey(new Date(now - GG_DAY.start * 36e5)), yday = addDays(today, -1);
   const fr = D.fridges || [], frName = (id) => (fr.find((f) => f.id === id) || {}).name || "Frigo";
   /* temperature out of range, last 48 h, not corrected since */
   if (cfg.on.temp) (D.readings || []).forEach((r) => {
@@ -82,15 +82,15 @@ function alCompute(D, cfg, now = Date.now()) {
   });
   /* missed rounds: the service ended (+ delay) and some fridges were not read */
   if (cfg.on.missed && fr.length) [yday, today].forEach((day) => {
-    const d = parseDay(day); if (cfg.closed.includes(d.getDay())) return;
+    const d = parseDay(day); if (cfg.closed.includes(d.getDay()) || (typeof ggClosed === "function" && ggClosed(day))) return;
     ["midi", "soir"].forEach((slot) => {
-      const end = alHm(cfg.slots[slot]); if (end == null) return;
+      let end = alHm(cfg.slots[slot]); if (end == null) return; if (end < GG_DAY.start * 60) end += 1440; /* « 02:30 » = la nuit qui suit */
       const due = d.getTime() + (end + (+cfg.delay || 0)) * 6e4; if (now < due) return;
       if (D.since && D.since > due) return; /* the restaurant did not exist yet */
       const exp = fr.filter((f) => !f.createdAt || f.createdAt < due);
       const done = new Set((D.readings || []).filter((r) => r.day === day && r.slot === slot).map((r) => r.fridgeId));
       const miss = exp.filter((f) => !done.has(f.id)); if (!miss.length) return;
-      out.push({ key: `missed_${day}_${slot}`, type: "missed", level: miss.length === exp.length ? "bad" : "warn", slot, day, at: due, text: `Relevé du ${slot} oublié${day === yday ? " hier" : ""}`, sub: miss.length === exp.length ? `Aucun frigo relevé (${miss.length})` : `${miss.map((f) => f.name).slice(0, 3).join(", ")}${miss.length > 3 ? ` +${miss.length - 3}` : ""}` });
+      out.push({ key: `missed_${day}_${slot}`, type: "missed", level: miss.length === exp.length ? "bad" : "warn", slot, day, at: due, text: `Relevé ${slotDu(slot)} oublié${day === yday ? " hier" : ""}`, sub: miss.length === exp.length ? `Aucun frigo relevé (${miss.length})` : `${miss.map((f) => f.name).slice(0, 3).join(", ")}${miss.length > 3 ? ` +${miss.length - 3}` : ""}` });
     });
   });
   /* DLC today or past, on products still in a fridge */

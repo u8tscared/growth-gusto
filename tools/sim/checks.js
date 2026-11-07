@@ -115,7 +115,7 @@ const SPECIFIC = {
     return { ok: r.h < 6, titre: r.n + " équipements à relever", detail: `le relevé fait ${r.h} hauteurs d'écran` };
   },
   async semaineSeulement(page) {
-    const r = await page.evaluate(() => { go("registre"); const t = document.querySelector("#viewport .view").innerText; return { manque: (t.match(/manquant|oubli|non fait|pas fait/gi) || []).length, ferme: /fermé|jour de fermeture|fermeture/i.test(t) }; });
+    const r = await page.evaluate(() => { go("registre"); const t = document.querySelector("#viewport .view").innerText; let k = dayKey(); while (parseDay(k).getDay() !== 0) k = addDays(k, -1); return { manque: (t.match(/manquant|oubli|non fait|pas fait/gi) || []).length, ferme: typeof ggClosed === "function" ? ggClosed(k) : /fermé|jour de fermeture|fermeture/i.test(t) }; });
     return { ok: r.ferme, info: true, titre: "Fermé le week-end", detail: r.ferme ? "jours de fermeture reconnus" : `pas de jours de fermeture dans le registre : samedi et dimanche sans relevé comptent comme des oublis (${r.manque} mentions d'oubli)` };
   },
   async vitrines(page) { const r = await page.evaluate(() => S.fridges.filter((f) => f.type === "vitrine").length); return { ok: r > 0, titre: "Vitrines réfrigérées", detail: r + " vitrines relevées" }; },

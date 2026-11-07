@@ -41,7 +41,7 @@ module.exports = [
     attentes: ["fortVolume", "sansResa"],
   },
   {
-    id: "bar", nom: "Le Comptoir Nocturne", type: "bar", ville: "Bordeaux", depart: "demo", plan: "pro", pack: "pro",
+    id: "bar", day: { start: 8, cut: 22, names: ["Ouverture", "Fermeture"] }, nom: "Le Comptoir Nocturne", type: "bar", ville: "Bordeaux", depart: "demo", plan: "pro", pack: "pro",
     resume: "Bar à cocktails ouvert de 18 h à 2 h, petite carte à partager, l'équipe finit après minuit.",
     sites: ["Le Comptoir Nocturne"], marques: [],
     equipe: [["Mathis Leroy", "gerant", "bar"], ["Alice Rey", "equipe", "bar"], ["Gabriel Noël", "equipe", "bar"], ["Camille Fabre", "equipe", "salle"], ["Ibrahim Sow", "equipe", "cuisine"]],
@@ -71,7 +71,7 @@ module.exports = [
     attentes: ["extras", "sansSalle"],
   },
   {
-    id: "hotel", nom: "Hôtel du Lac", type: "brasserie", ville: "Évian", depart: "demo", plan: "complet", pack: "complet",
+    id: "hotel", day: { start: 4, cut: 14, names: ["Matin", "Soir"] }, nom: "Hôtel du Lac", type: "brasserie", ville: "Évian", depart: "demo", plan: "complet", pack: "complet",
     resume: "Hôtel 4 étoiles : restaurant, bar, petit-déjeuner dès 6 h 30 et room service, 30 personnes en cuisine et en salle.",
     sites: ["Hôtel du Lac"], marques: ["Restaurant Le Belvédère", "Bar du Lac", "Petit-déjeuner"],
     equipe: [["Philippe Arnaud", "gerant", "salle"], ["Sylvie Carpentier", "chef", "cuisine"], ["Romain Dumont", "chef", "second"], ["Agathe Lemaire", "equipe", "cuisine"], ["Bruno Colas", "equipe", "cuisine"], ["Célia Renard", "equipe", "cuisine"], ["David Giraud", "equipe", "cuisine"], ["Elise Brunet", "equipe", "salle"], ["Farid Aubert", "equipe", "salle"], ["Gaëlle Simon", "equipe", "salle"], ["Henri Prévost", "equipe", "bar"], ["Isabelle Klein", "equipe", "bar"], ["Jean Rolland", "equipe", "plonge"], ["Kelly Hamon", "equipe", "plonge"], ["Lucas Morin", "equipe", "salle"], ["Marion Riviere", "equipe", "cuisine"], ["Nicolas Gay", "equipe", "salle"], ["Ophélie Roche", "equipe", "salle"], ["Pierre Meunier", "equipe", "cuisine"], ["Quentin Lacroix", "equipe", "salle"], ["Rose Dupuis", "equipe", "salle"], ["Samuel Fleury", "equipe", "cuisine"], ["Tania Joly", "equipe", "bar"], ["Ugo Charpentier", "equipe", "plonge"], ["Valérie Baron", "equipe", "salle"], ["William Huet", "equipe", "cuisine"], ["Xavier Perret", "equipe", "salle"], ["Yasmine Benoit", "equipe", "salle"], ["Zacharie Rey", "equipe", "cuisine"], ["Anaïs Cordier", "equipe", "salle"]],
@@ -121,7 +121,7 @@ module.exports = [
     attentes: ["nouveauClient", "packCommis", "tabletteFamille"],
   },
   {
-    id: "boulangerie", nom: "Fournil & Co", type: "boulangerie", ville: "Rennes", depart: "demo", plan: "pro", pack: "pro",
+    id: "boulangerie", day: { start: 4, cut: 14, names: ["Matin", "Soir"] }, nom: "Fournil & Co", type: "boulangerie", ville: "Rennes", depart: "demo", plan: "pro", pack: "pro",
     resume: "Boulangerie avec snacking : sandwichs et salades du jour en vitrine, ouverte de 6 h 30 à 19 h 30, 7 jours sur 7.",
     sites: ["Fournil & Co"], marques: [],
     equipe: [["Sébastien Hamel", "gerant", "cuisine"], ["Aurélie Hamel", "chef", "salle"], ["Corentin Le Gall", "equipe", "cuisine"], ["Maëlle Tanguy", "equipe", "salle"], ["Yann Guillou", "equipe", "cuisine"], ["Lise Kerjean", "equipe", "salle"]],
@@ -131,7 +131,7 @@ module.exports = [
     attentes: ["serviceContinu", "vitrines"],
   },
   {
-    id: "cantine", nom: "Restaurant d'entreprise Atelier 9", type: "autre", ville: "Grenoble", depart: "demo", plan: "complet", pack: "complet",
+    id: "cantine", closed: [0, 6], nom: "Restaurant d'entreprise Atelier 9", type: "autre", ville: "Grenoble", depart: "demo", plan: "complet", pack: "complet",
     resume: "Restauration collective : 450 repas le midi du lundi au vendredi, plats témoins obligatoires, pas de prise de commande.",
     sites: ["Atelier 9"], marques: [],
     equipe: [["Valérie Guérin", "gerant", "cuisine"], ["Franck Michaud", "chef", "cuisine"], ["Sonia Lemoine", "equipe", "cuisine"], ["Patrick Hoarau", "equipe", "cuisine"], ["Nathalie Roux", "equipe", "salle"], ["Didier Vasseur", "equipe", "plonge"], ["Mélanie Joubert", "equipe", "salle"], ["Kader Belkacem", "equipe", "plonge"]],

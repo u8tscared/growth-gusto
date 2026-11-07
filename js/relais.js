@@ -105,7 +105,7 @@ const PA_ORDER = ["rupture", "rappel", "casse", "prep", "commande", "info"];
 const PA_MOOD = { calme: ["Calme", "paCalm", "Service tranquille"], charge: ["Chargé", "paBusy", "Ça a bien tourné"], feu: ["Coup de feu", "cfFlame", "On a été pris de vitesse"] };
 const PA = { rid: null, rows: null, F: null, R: null, seen: new Set(), pend: false, rec: null };
 const PA_SLOT = { midi: "midi", soir: "soir" };
-const paSlotT = (s) => (s === "soir" ? "du soir" : "du midi");
+const paSlotT = (s) => slotDu(s);
 const paNext = (day = dayKey(), slot = slotNow()) => (slot === "midi" ? { day, slot: "soir" } : { day: addDays(day, 1), slot: "midi" });
 function PA_ROWS() {
   if (!S.rid) return [];

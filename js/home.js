@@ -199,7 +199,8 @@ VIEWS.home = {
     const greet = now.getHours() < 5 || now.getHours() >= 18 ? "Bonsoir" : "Bonjour";
     const { done, exp } = todayStats(slot); const pct = exp ? Math.round((done / exp) * 100) : 0;
     const rsSlot = readingsFor(dayKey(), slot);
-    const pend = S.fridges.filter((f) => !rsSlot.find((r) => r.fridgeId === f.id));
+    const shut = typeof ggClosed === "function" && ggClosed(dayKey());
+    const pend = shut ? [] : S.fridges.filter((f) => !rsSlot.find((r) => r.fridgeId === f.id));
         const lots = activeLots(); const watch = lots.filter((l) => (daysUntil(dlcOf(l)) ?? 99) <= 3).length;
     const ch = homeChoreStats(); const inv = homeInv();
     const todo = homeTodo(slot, pend); const urgent = todo.filter((t) => t.tone === "bad").length;
@@ -214,8 +215,8 @@ VIEWS.home = {
     const drawn = frAll.map((f, i) => { const r = rsSlot.find((x) => x.fridgeId === f.id); const k = frKind(f); const st = r ? (r.ok === false ? "bad" : "ok") : "todo";
       return `<button class="hm-dfr ${k} ${st} ${f.id === nextId ? "next" : ""}" style="--j:${i}" ${r ? `data-go="frigo" data-id="${f.id}"` : `data-act="homeFridge" data-id="${f.id}"`} aria-label="${esc(f.name)}${r ? ` : ${fmt(r.value)} °C` : " : à relever"}"><span class="bx"><span class="lcd">${r ? `${fmt(r.value)}°` : "--,-"}</span>${k === "cg" ? "" : `<span class="hd"></span>`}</span><span class="nm">${esc(f.name)}</span></button>`; }).join("") + (S.fridges.length > FR_MAX ? `<button class="hm-dfr plus" data-go="releve" aria-label="Tous les frigos"><span class="bx">+${S.fridges.length - FR_MAX}</span><span class="nm">Autres</span></button>` : "");
     const hero = `<section class="hero hm-hero wall st" style="--i:1" data-go="releve" role="button" tabindex="0" aria-label="Ouvrir les relevés">
-      <div class="hm-ht"><span class="hm-kick">Relevé du ${slot}</span><span class="hm-cnt mono">${done} / ${exp}</span></div>
-      <div class="hm-big">${!exp ? "Ajoutez vos frigos" : pend.length ? `${homePlural(pend.length, "frigo")} à relever` : slot === "midi" ? "Bouclé pour ce midi" : "Tout est relevé"}</div>
+      <div class="hm-ht"><span class="hm-kick">${shut ? "Fermé aujourd'hui" : `Relevé ${esc(slotDu(slot))}`}</span><span class="hm-cnt mono">${done} / ${exp}</span></div>
+      <div class="hm-big">${!exp ? "Ajoutez vos frigos" : shut ? "Aucun relevé attendu" : pend.length ? `${homePlural(pend.length, "frigo")} à relever` : slot === "midi" && slotName("midi") === "Midi" ? "Bouclé pour ce midi" : "Tout est relevé"}</div>
       ${exp ? `<div class="hm-kitchen"><div class="hm-drawn">${drawn}</div><i class="hm-floor"></i></div>` : ""}
       ${!exp ? `<button class="hm-cta-w" data-go="frigos">${ico("plus")}Ajouter un frigo</button>` : pend.length ? `<button class="hm-cta-w" data-act="homeFridge" data-id="${pend[0].id}"><span>Relever ${esc(pend[0].name)}</span>${ico("arrow")}</button>` : `<span class="hm-cta-w done">${slot === "midi" ? "Prochain relevé ce soir" : "Tous les frigos sont signés"}</span>`}
     </section>`;

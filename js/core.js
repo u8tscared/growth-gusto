@@ -9,7 +9,12 @@ const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "
 const fmt = (n, d = 1) => (n == null || isNaN(n) ? "–" : Number(n).toFixed(d).replace(".", ","));
 const num = (v) => { const n = parseFloat(String(v ?? "").replace(",", ".").replace(/\s/g, "")); return isNaN(n) ? null : n; };
 const pad = (n) => String(n).padStart(2, "0");
-const dayKey = (d = new Date()) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+/* « La journée du restaurant » (restos/{rid}.day = { start, cut, names }) : la journée commence à `start` heures (4 h par défaut),
+   donc ce qui se fait à 1 h du matin compte pour la veille (bar, brasserie qui ferme tard) ; le premier relevé va jusqu'à `cut` heures,
+   le second après ; `names` = les deux moments (Midi / Soir, Matin / Soir, Ouverture / Fermeture). dayKey() sans date = la journée en cours. */
+const GG_DAY = { start: 4, cut: 16, names: ["Midi", "Soir"] };
+const ggDayNow = () => new Date(Date.now() - GG_DAY.start * 36e5);
+const dayKey = (d) => { d = d || ggDayNow(); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; };
 const monthKey = (d = new Date()) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}`;
 const prevMonthKey = () => { const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - 1); return monthKey(d); };
 const MONTHS = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"];
@@ -19,10 +24,18 @@ const parseDay = (k) => { if (!k) return null; const [y, m, d] = k.split("-").ma
 const daysUntil = (k) => { const d = parseDay(k); if (!d) return null; const t = parseDay(dayKey()); return Math.round((d - t) / 864e5); };
 const shortDate = (k) => { const d = parseDay(k); return d ? `${pad(d.getDate())}/${pad(d.getMonth() + 1)}` : "–"; };
 const hm = (ts) => { const d = new Date(ts); return `${pad(d.getHours())}:${pad(d.getMinutes())}`; };
-const when = (ts) => { const d = new Date(ts); const k = dayKey(d); const t = dayKey(); if (k === t) return hm(ts); const y = new Date(); y.setDate(y.getDate() - 1); if (k === dayKey(y)) return `hier ${hm(ts)}`; return `${shortDate(k)} ${hm(ts)}`; };
+const when = (ts) => { const d = new Date(ts); const k = dayKey(d); const t = dayKey(new Date()); if (k === t) return hm(ts); const y = new Date(); y.setDate(y.getDate() - 1); if (k === dayKey(y)) return `hier ${hm(ts)}`; return `${shortDate(k)} ${hm(ts)}`; };
 const addDays = (k, n) => { const d = parseDay(k) || new Date(); d.setDate(d.getDate() + n); return dayKey(d); };
 const rid6 = () => { const a = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ"; let s = ""; for (let i = 0; i < 5; i++) s += a[Math.floor(Math.random() * a.length)]; return s; };
-const slotNow = () => (new Date().getHours() < 16 ? "midi" : "soir");
+const slotNow = () => { const d = new Date(), h = d.getHours() + d.getMinutes() / 60; const r = (x) => (x - GG_DAY.start + 24) % 24; return r(h) < r(GG_DAY.cut) ? "midi" : "soir"; };
+/* nom affiché d'un moment de relevé : slotName("midi") → « Midi » (ou « Matin », « Ouverture »…), low = en minuscules */
+const slotName = (s, low) => { const t = GG_DAY.names[s === "soir" ? 1 : 0] || (s === "soir" ? "Soir" : "Midi"); return low ? t.toLowerCase() : t; };
+/* « du midi », « du soir », « du matin », mais « d'ouverture », « de fermeture » : la phrase suit le nom choisi */
+const slotDu = (s) => { const n = slotName(s, true); return /^(midi|soir|matin|déjeuner|dîner|diner|petit-déjeuner|service|brunch|goûter)$/.test(n) ? "du " + n : /^[aeiouyhéèêàâîôû]/.test(n) ? "d'" + n : "de " + n; };
+/* jour de fermeture : jour de la semaine fermé (Réglages › Journée, partagé avec les alertes : alertCfg.closed) ou période fermée
+   (restos.day.off = [{ from, to, label }] : congés, saison). Ces jours-là, aucun relevé n'est attendu. */
+function ggClosed(k, r = S.resto) { if (!k || !r) return false; const d = parseDay(k); const wk = r.alertCfg && Array.isArray(r.alertCfg.closed) ? r.alertCfg.closed : []; if (d && wk.includes(d.getDay())) return true; return ((r.day && Array.isArray(r.day.off)) ? r.day.off : []).some((o) => o && o.from && k >= o.from && k <= (o.to || o.from)); }
+function ggDaySync(r) { const c = (r && r.day) || {}; GG_DAY.start = Number.isFinite(+c.start) && c.start !== "" && c.start != null ? Math.max(0, Math.min(10, +c.start)) : 4; GG_DAY.cut = Number.isFinite(+c.cut) && c.cut != null && c.cut !== "" ? Math.max(1, Math.min(23.5, +c.cut)) : 16; GG_DAY.names = Array.isArray(c.names) && c.names.length === 2 && c.names.every((x) => typeof x === "string" && x.trim()) ? c.names.map((x) => x.trim().slice(0, 16)) : ["Midi", "Soir"]; }
 const firstName = (n) => (n || "").trim().split(/\s+/)[0] || "";
 const initials = (n) => (n || "?").trim().split(/\s+/).map((w) => w[0]).slice(0, 2).join("").toUpperCase();
 const PALETTE = ["#5B2BFF", "#1E7F55", "#E0582F", "#C2337A", "#3B6FD8", "#8A4DFF", "#0E8C9E", "#B97D0E"];
@@ -324,7 +337,7 @@ const myRole = () => (S.isOwner ? "gerant" : (S.members.find((m) => m.id === S.m
 
 function readingsFor(day, slot) { return S.readings.filter((r) => r.day === day && (!slot || r.slot === slot) && S.fridges.some((f) => f.id === r.fridgeId)); }
 function todayStats(slot) {
-  const day = dayKey(); if (slot) { const exp = S.fridges.length; const set = new Set(readingsFor(day, slot).map((r) => r.fridgeId)); return { done: Math.min(set.size, exp), exp }; }
+  const day = dayKey(); if (ggClosed(day)) { const n = S.fridges.length * (slot ? 1 : 2); return { done: n, exp: n, closed: true }; } if (slot) { const exp = S.fridges.length; const set = new Set(readingsFor(day, slot).map((r) => r.fridgeId)); return { done: Math.min(set.size, exp), exp }; }
   const exp = S.fridges.length * 2; const set = new Set(readingsFor(day).map((r) => r.fridgeId + r.slot));
   return { done: Math.min(set.size, exp), exp };
 }
@@ -365,6 +378,7 @@ async function boot() {
     S.restos = rows.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
     if (!S.rid || !S.restos.find((r) => r.id === S.rid)) { S.rid = S.restos[0]?.id || null; if (S.rid) attachResto(); }
     S.resto = S.restos.find((r) => r.id === S.rid) || null;
+    ggDaySync(S.resto); if (!S.ready) S.slot = slotNow();
     if (!S.ready) { S.ready = true; finishBoot(); } else refresh();
     /* removed from every team (or the last restaurant deleted): back to « créer ou rejoindre » */
     if (S.ready && DB.uid && !S.restos.length && typeof AUTH !== "undefined" && AUTH.noResto) AUTH.noResto();
@@ -861,7 +875,7 @@ function registerSW() {
    to the foreground. A new v means the code running here is old: with nothing in progress the app reloads silently (caches dropped,
    so the reload is guaranteed fresh); otherwise a toast offers « Mettre à jour ». sessionStorage guards against reload loops:
    one reload attempt per version per session, after which the version is simply adopted. */
-const APP_V = "2026-11-07.28";
+const APP_V = "2026-11-07.29";
 /* logos of the tools Growth Gusto connects to (img/logos/<id>.svg|png): caisses, réservations, comptabilité, banque, paiement */
 const BRAND_LOGOS = { sumup: "svg", zelty: "png", lightspeed: "svg", tiller: "svg", square: "svg", innovorder: "svg", popina: "png", zenchef: "svg", thefork: "png", sevenrooms: "png", guestonline: "png", resy: "svg", opentable: "svg", formitable: "svg", google: "svg", pennylane: "svg", qonto: "svg", quickbooks: "svg", sage: "svg", odoo: "svg", stripe: "svg", zebra: "svg" };
 const brandLogo = (id) => BRAND_LOGOS[id] ? `<img class="brand-logo" src="img/logos/${id}.${BRAND_LOGOS[id]}" alt="" loading="lazy" decoding="async" draggable="false">` : "";
