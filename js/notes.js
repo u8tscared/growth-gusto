@@ -2,7 +2,9 @@
 /* Data shape (collection "notes"), backward compatible with v1 docs {title, cat, body, ingredients[{name,qty,unit}], uid, at, updatedAt}:
    cat: "Recettes" | "Procédures" | "Notes" (legacy "Hygiène" is shown as Procédures)
    body: free text (Notes) or intro / conseils (Recettes, Procédures). Legacy recipes kept their steps in body: they are split into steps on read.
-   steps: [string] · portions: number · allergens: [key] · photo: url · seed: starter key */
+   steps: [string] · portions: number · allergens: [key] · photo: url · seed: starter key
+   stepPh: [url|""] (a photo per step, same index as steps) · dress: text (dressage) · dressPh: url · vessel: « Assiette creuse », « Verre ballon »…
+   Read step by step on the kitchen and bar screens (js/recette.js, route « recette »). */
 
 Object.assign(IC, {
   ntChef: ["M17 21a1 1 0 0 0 1-1v-5.35c0-.46.32-.85.74-1.03a4 4 0 0 0-2.18-7.58 5 5 0 0 0-9.12 0A4 4 0 0 0 5.26 13.62c.42.18.74.57.74 1.03V20a1 1 0 0 0 1 1Z", "M6 17h12"],
@@ -203,7 +205,8 @@ VIEWS.fiche = {
     const pill = k === "Recettes" ? `<span class="nt-pills"><span class="pill acc">${ico("ntChef")}Recette</span>${n.carte ? `<span class="pill ok">${ico("ntMenu")}À la carte · ${esc(noteCarteCat(n.carteCat))}${num(n.price) ? ` · ${esc(noteEur(n.price))}` : ""}</span>` : ""}</span>` : k === "Procédures" ? `<span class="pill ok">${ico("shield")}Procédure</span>` : `<span class="pill neu">${ico("ntNote")}Note</span>`;
     const hero = `<div class="nt-hero st ${n.photo ? "has-ph" : ""}" style="--i:1">${n.photo ? `<div class="nt-photo"><img src="${esc(n.photo)}" alt=""></div>` : ""}<div class="nt-htx">${pill}<h1 class="nt-title">${esc(n.title || "Sans titre")}</h1><span class="who">${avatar(n.uid, true)}${esc(firstName(nameOf(n.uid)))} · modifié ${when(n.updatedAt || n.at)}</span></div></div>`;
     const top = `<div class="top st" style="--i:0"><button class="iconbtn" data-act="back" aria-label="Retour">${ico("back")}</button><span class="h2"></span><button class="btn soft sm" data-act="noteEdit" data-id="${esc(n.id)}">${ico("edit")}Modifier</button></div>`;
-    const stepsHTML = steps.length ? `<div class="glass pad st" style="--i:4"><span class="lbl">Étapes</span><ol class="nt-steps">${steps.map((s, i) => `<li><span class="nt-snum mono">${i + 1}</span><span>${noteTy(esc(s))}</span></li>`).join("")}</ol></div>` : "";
+    const sph = Array.isArray(n.stepPh) && Array.isArray(n.steps) ? n.stepPh : [];
+    const stepsHTML = steps.length ? `<div class="glass pad st" style="--i:4"><div class="nt-sthead"><span class="lbl">Étapes</span>${k === "Recettes" ? `<button class="btn soft sm nt-runb" data-go="recette" data-id="${esc(n.id)}">${ico("rpPlay")}Pas à pas</button>` : ""}</div><ol class="nt-steps">${steps.map((s, i) => `<li><span class="nt-snum mono">${i + 1}</span><span>${noteTy(esc(s))}${sph[i] ? `<img class="nt-stph" src="${esc(sph[i])}" alt="" loading="lazy">` : ""}</span></li>`).join("")}</ol></div>` : "";
     const introHTML = (lbl, i) => (intro ? `<div class="glass pad st nt-intro" style="--i:${i}"><span class="lbl">${lbl}</span><p>${noteTy(esc(intro))}</p></div>` : "");
     if (k === "Recettes") {
       const alHTML = noteAlCardHTML(n);
@@ -213,7 +216,7 @@ VIEWS.fiche = {
       return `<div class="inner wide nt-wrap">${top}${hero}${seg}<div id="ntFBody" class="nt-fbody">${alHTML}<div class="cols nt-cols"><div>
         <div class="glass pad st nt-ingcard" style="--i:3"><span class="lbl">${num(n.portions) ? "Pour combien de portions ?" : "Multiplier la recette"}</span>${noteScalerHTML(n)}
         ${ings.length ? `<ul class="nt-ings" id="ntIngs">${noteIngHTML(n)}</ul>` : `<p class="note" style="margin:0">Pas encore d'ingrédients. ${noteTap("« Modifier »")} pour les ajouter.</p>`}</div>
-        </div><div>${stepsHTML || `<div class="glass pad st" style="--i:4"><span class="lbl">Étapes</span><p class="note" style="margin:6px 0 0">Pas encore d'étapes. ${noteTap("« Modifier »")} pour les écrire.</p></div>`}${introHTML("Conseils du chef", 5)}${noteCostHTML(n)}</div></div></div>${noteFilesHTML(n)}
+        </div><div>${stepsHTML || `<div class="glass pad st" style="--i:4"><span class="lbl">Étapes</span><p class="note" style="margin:6px 0 0">Pas encore d'étapes. ${noteTap("« Modifier »")} pour les écrire.</p></div>`}${noteDressHTML(n)}${introHTML("Conseils du chef", 5)}${noteCostHTML(n)}</div></div></div>${noteFilesHTML(n)}
         <div class="ctabar nt-usebar st" style="--i:9">${noteLastUseHTML(n)}<button class="btn acc block" data-act="noteUse" data-id="${esc(n.id)}">${ico("ntUse")}Utiliser la recette</button></div></div>`;
     }
     if (k === "Procédures") return `<div class="inner nt-wrap nt-pread">${top}${hero}${steps.length ? noteRunHTML(n, steps, introHTML("Quand et pourquoi", 2)) : `${introHTML("Quand et pourquoi", 2)}<div class="glass empty st" style="--i:3">Aucune étape. ${noteTap("« Modifier »")} pour les écrire.</div>`}${noteFilesHTML(n)}</div>`;
@@ -233,17 +236,35 @@ VIEWS.fiche = {
   },
 };
 
+/* dressage: the photo of the finished plate, how it is laid out, and the plate or glass it goes on */
+function noteDressHTML(n) {
+  if (!n.dress && !n.dressPh && !n.vessel) return "";
+  return `<div class="glass pad st nt-dress" style="--i:5"><span class="lbl">Dressage</span>${n.dressPh ? `<img class="nt-drph" src="${esc(n.dressPh)}" alt="Le plat dressé" loading="lazy">` : ""}
+    ${n.vessel ? `<p class="nt-vessel">${ico("rpPlate")}<b>${esc(n.vessel)}</b></p>` : ""}${n.dress ? `<p>${noteTy(esc(n.dress))}</p>` : ""}</div>`;
+}
+function noteStepPhHTML(N, i) {
+  const u = (N.stepPh || [])[i];
+  return u ? `<button class="nt-sph on" data-act="noteStepPh" data-v="${i}" aria-label="Retirer la photo de l'étape ${i + 1}" title="Retirer la photo"><img src="${esc(u)}" alt=""><i>${ico("x")}</i></button>`
+    : `<button class="nt-sph" data-act="noteStepPh" data-v="${i}" aria-label="Photo de l'étape ${i + 1}" title="Photo de l'étape (facultatif)">${ico("camera")}</button>`;
+}
+function noteDressEdHTML(N) {
+  return `<div class="glass pad st nt-esec" style="--i:5"><span class="lbl">Dressage</span><p class="note" style="margin:0">Ce que voit la cuisine (ou le bar) à la dernière étape, sur l'écran pas à pas.</p>
+    <div class="nt-edress">${N.dressPh ? `<button class="nt-sph big on" data-act="noteStepPh" data-v="dress" aria-label="Retirer la photo du dressage"><img src="${esc(N.dressPh)}" alt=""><i>${ico("x")}</i></button>` : `<button class="nt-sph big" data-act="noteStepPh" data-v="dress">${ico("camera")}<span>Photo du plat dressé</span></button>`}
+      <div class="nt-edrx"><input class="input" data-bind="ui.note.vessel" maxlength="60" value="${esc(N.vessel || "")}" placeholder="Assiette, bol, verre… (ex. Verre ballon)" aria-label="Contenant"><textarea class="input" rows="3" data-bind="ui.note.dress" placeholder="Ex. Viande au centre, carottes glacées autour, sauce nappée, persil plat.">${esc(N.dress || "")}</textarea></div></div></div>`;
+}
+
 /* ───────── editor ───────── */
 function noteDraft(id) {
   const n = S.notes.find((x) => x.id === id);
-  if (!n) { const cat = S.ui.noteNewCat || "Recettes"; return { _id: id, title: "", cat, body: "", ingredients: cat === "Recettes" ? [{ name: "", qty: "", unit: "g" }] : [], steps: cat === "Notes" ? [] : [""], portions: cat === "Recettes" ? 4 : "", allergens: [], alNo: [], carte: false, carteCat: "plat", price: "", photo: "" }; }
+  if (!n) { const cat = S.ui.noteNewCat || "Recettes"; return { _id: id, title: "", cat, body: "", ingredients: cat === "Recettes" ? [{ name: "", qty: "", unit: "g" }] : [], steps: cat === "Notes" ? [] : [""], portions: cat === "Recettes" ? 4 : "", allergens: [], alNo: [], carte: false, carteCat: "plat", price: "", photo: "", stepPh: [], dress: "", dressPh: "", vessel: "" }; }
   const d = JSON.parse(JSON.stringify(n)); d._id = id; d.cat = noteKind(n);
   if (!Array.isArray(d.steps)) { if (d.cat === "Notes") d.steps = []; else { d.steps = noteSplit(d.body); d.body = ""; } }
   if (d.cat !== "Notes" && !d.steps.length) d.steps = [""];
   d.ingredients ||= []; d.allergens = [...new Set((d.allergens || []).map(noteAlId))]; d.alNo ||= []; d.photo ||= ""; d.portions ??= ""; d.carte = !!d.carte; d.carteCat ||= "plat"; d.price ??= "";
+  d.stepPh = Array.isArray(d.stepPh) ? d.stepPh.slice(0, d.steps.length) : []; d.dress ||= ""; d.dressPh ||= ""; d.vessel ||= "";
   ["id", "updatedAt", "uid", "at"].forEach((key) => delete d[key]); return d;
 }
-const noteSnap = (N) => JSON.stringify({ t: (N.title || "").trim(), c: N.cat, b: (N.body || "").trim(), i: (N.ingredients || []).filter((g) => String(g.name || "").trim()), s: (N.steps || []).filter((s) => s.trim()), p: String(N.portions ?? ""), a: [...(N.allergens || [])].sort(), no: [...(N.alNo || [])].sort(), k: N.cat === "Recettes" ? [!!N.carte, N.carte ? N.carteCat : "", String(N.price ?? "").trim()] : 0, ph: N.photo || "" });
+const noteSnap = (N) => JSON.stringify({ t: (N.title || "").trim(), c: N.cat, b: (N.body || "").trim(), i: (N.ingredients || []).filter((g) => String(g.name || "").trim()), s: (N.steps || []).filter((s) => s.trim()), p: String(N.portions ?? ""), a: [...(N.allergens || [])].sort(), no: [...(N.alNo || [])].sort(), k: N.cat === "Recettes" ? [!!N.carte, N.carte ? N.carteCat : "", String(N.price ?? "").trim()] : 0, ph: N.photo || "", sp: (N.steps || []).map((s, i) => (s.trim() ? (N.stepPh || [])[i] || "" : "")).filter(Boolean), dr: [(N.dress || "").trim(), N.dressPh || "", (N.vessel || "").trim()] });
 VIEWS.note = {
   live: false,
   render({ id }) {
@@ -259,13 +280,13 @@ VIEWS.note = {
       <button class="btn ghost sm" data-act="noteIngAdd" style="align-self:flex-start">${ico("plus")}Ajouter un ingrédient</button></div>
       <div class="glass pad st nt-esec" style="--i:4"><span class="lbl">Allergènes</span><p class="note" style="margin:0">Ceux des ingrédients liés au stock s'ajoutent tout seuls. Touchez un allergène pour l'ajouter ou le confirmer.</p><div class="nt-als nt-alsed" id="ntAlEd">${noteAlEdHTML(N)}</div></div>
       ${noteCarteEdHTML(N)}`;
-    const stepsHTML = `<div class="glass pad st nt-esec" style="--i:5"><span class="lbl">Étapes</span><div class="nt-esteps">${N.steps.map((s, i) => `<div class="nt-estep"><span class="nt-snum mono">${i + 1}</span><textarea class="input" rows="1" data-bind="ui.note.steps.${i}" data-nkey="step" data-i="${i}" enterkeyhint="next" placeholder="${i === 0 ? (isR ? "Ex. Mélanger le sucre, le sel et les baies roses." : "Ex. Débrancher la machine.") : "Étape suivante"}" aria-label="Étape ${i + 1}">${esc(s)}</textarea><button class="iconbtn nt-del" data-act="noteStepDel" data-v="${i}" aria-label="Retirer l'étape">${ico("x")}</button></div>`).join("")}</div>
+    const stepsHTML = `<div class="glass pad st nt-esec" style="--i:5"><span class="lbl">Étapes</span><div class="nt-esteps">${N.steps.map((s, i) => `<div class="nt-estep"><span class="nt-snum mono">${i + 1}</span><textarea class="input" rows="1" data-bind="ui.note.steps.${i}" data-nkey="step" data-i="${i}" enterkeyhint="next" placeholder="${i === 0 ? (isR ? "Ex. Mélanger le sucre, le sel et les baies roses." : "Ex. Débrancher la machine.") : "Étape suivante"}" aria-label="Étape ${i + 1}">${esc(s)}</textarea><button class="iconbtn nt-del" data-act="noteStepDel" data-v="${i}" aria-label="Retirer l'étape">${ico("x")}</button>${!isN ? noteStepPhHTML(N, i) : ""}</div>`).join("")}</div>
       <button class="btn ghost sm" data-act="noteStepAdd" style="align-self:flex-start">${ico("plus")}Ajouter une étape</button><p class="note" style="margin:0">Astuce : la touche Entrée crée l'étape suivante.</p></div>`;
     const bodyHTML = isN ? `<div class="glass pad st nt-esec" style="--i:3"><span class="lbl">Contenu</span><textarea class="input nt-ebody" data-bind="ui.note.body" placeholder="Écrivez ici…">${esc(N.body)}</textarea></div>`
       : `<div class="glass pad st nt-esec" style="--i:6"><span class="lbl">${isR ? "Conseils du chef" : "Quand et pourquoi"}</span><textarea class="input" style="min-height:96px" data-bind="ui.note.body" placeholder="${isR ? "Dressage, conservation, astuces… (facultatif)" : "Fréquence, matériel, précautions… (facultatif)"}">${esc(N.body)}</textarea></div>`;
     const phHTML = !isN || N.photo ? `<div class="st" style="--i:2">${photo}</div>` : "";
     /* desktop: two columns (ingrédients | étapes), the title stays full width */
-    const colsHTML = isN ? `${phHTML}${bodyHTML}` : isR ? `<div class="nt-ecols"><div>${phHTML}${ingsHTML}</div><div>${stepsHTML}${bodyHTML}</div></div>` : `<div class="nt-ecols"><div>${stepsHTML}</div><div>${phHTML}${bodyHTML}</div></div>`;
+    const colsHTML = isN ? `${phHTML}${bodyHTML}` : isR ? `<div class="nt-ecols"><div>${phHTML}${ingsHTML}</div><div>${stepsHTML}${noteDressEdHTML(N)}${bodyHTML}</div></div>` : `<div class="nt-ecols"><div>${stepsHTML}</div><div>${phHTML}${bodyHTML}</div></div>`;
     return `<div class="inner nt-wrap nt-ed ${isN ? "nt-edn" : ""}"><div class="top st" style="--i:0"><button class="iconbtn" data-act="noteBack" aria-label="Retour">${ico("back")}</button><span class="h2">${id === "new" ? "Nouvelle fiche" : "Modifier la fiche"}</span>${id !== "new" ? `<button class="iconbtn" data-act="noteDel" aria-label="Supprimer la fiche" style="color:var(--bad)">${ico("trash")}</button>` : ""}</div>
       <div class="glass pad st nt-esec" style="--i:1"><textarea class="input nt-etitle" rows="1" data-bind="ui.note.title" enterkeyhint="done" placeholder="${isR ? "Nom de la recette" : isN ? "Titre de la note" : "Nom de la procédure"}" aria-label="Titre">${esc(N.title)}</textarea>
         <div class="seg nt-seg" id="ntESeg"><span class="knob" style="width:calc(33.33% - 3px);transform:translateX(${ix * 100}%)"></span>${NOTE_TABS.map(([k, ic]) => `<button class="${N.cat === k ? "on" : ""}" data-act="noteSetCat" data-v="${k}">${ico(ic)}<span>${k === "Recettes" ? "Recette" : k === "Procédures" ? "Procédure" : "Note"}</span></button>`).join("")}</div></div>
@@ -283,7 +304,7 @@ VIEWS.note = {
     if (!v._ntKeys) v._ntKeys = 1, v.addEventListener("keydown", (e) => {
       const t = e.target; if (S.route !== "note" || e.key !== "Enter" || e.shiftKey || !t.dataset.nkey || e.isComposing) return;
       const i = +t.dataset.i; e.preventDefault();
-      if (t.dataset.nkey === "step") { S.ui.note.steps.splice(i + 1, 0, ""); S.ui.noteFocus = `[data-nkey=step][data-i="${i + 1}"]`; noteRer(); return; }
+      if (t.dataset.nkey === "step") { S.ui.note.steps.splice(i + 1, 0, ""); if ((S.ui.note.stepPh ||= []).length > i + 1) S.ui.note.stepPh.splice(i + 1, 0, ""); S.ui.noteFocus = `[data-nkey=step][data-i="${i + 1}"]`; noteRer(); return; }
       const ins = $$("input", t.closest(".nt-erow")); const k = ins.indexOf(t); if (k < ins.length - 1) { ins[k + 1].focus(); return; }
       const L = S.ui.note.ingredients; if (i === L.length - 1) L.push({ name: "", qty: "", unit: "g" }); S.ui.noteFocus = `.nt-n[data-i="${i + 1}"]`; noteRer();
     });
@@ -362,8 +383,8 @@ Object.assign(ACT, {
   noteSetCat: (a, id, v) => { const N = S.ui.note; if (N.cat === v) return; N.cat = v; if (v !== "Notes" && !N.steps.length) N.steps = [""]; if (v === "Recettes" && !N.ingredients.length) N.ingredients = [{ name: "", qty: "", unit: "g" }]; if (v === "Recettes" && !N.portions) N.portions = 4; SFX.tick(); noteRer(); },
   noteIngAdd: () => { const L = S.ui.note.ingredients; L.push({ name: "", qty: "", unit: "g" }); S.ui.noteFocus = `.nt-n[data-i="${L.length - 1}"]`; SFX.tick(); noteRer(); },
   noteIngDel: (a, id, v) => { S.ui.note.ingredients.splice(+v, 1); SFX.close(); noteRer(); },
-  noteStepAdd: () => { const L = S.ui.note.steps; L.push(""); S.ui.noteFocus = `[data-nkey=step][data-i="${L.length - 1}"]`; SFX.tick(); noteRer(); },
-  noteStepDel: (a, id, v) => { S.ui.note.steps.splice(+v, 1); if (!S.ui.note.steps.length) S.ui.note.steps.push(""); SFX.close(); noteRer(); },
+  noteStepAdd: () => { const L = S.ui.note.steps; L.push(""); (S.ui.note.stepPh ||= []).length = Math.min(S.ui.note.stepPh.length, L.length); S.ui.noteFocus = `[data-nkey=step][data-i="${L.length - 1}"]`; SFX.tick(); noteRer(); },
+  noteStepDel: (a, id, v) => { S.ui.note.steps.splice(+v, 1); (S.ui.note.stepPh ||= []).splice(+v, 1); if (!S.ui.note.steps.length) S.ui.note.steps.push(""); SFX.close(); noteRer(); },
   noteAl: (a, id, v) => {
     const N = S.ui.note; const L = N.allergens; const D = noteAlDetail(N)[v];
     if (D && D.from.length && !L.includes(v)) { SFX.tap(); toast(`Vient de : ${D.from.join(", ")}`); return; }
@@ -377,6 +398,14 @@ Object.assign(ACT, {
     S.ui.notePhBusy = false; if (S.route === "note" && S.ui.note === N) noteRer();
   },
   notePhotoDel: () => { S.ui.note.photo = ""; S.ui.note.photoId = ""; SFX.close(); noteRer(); },
+  /* a photo per step, and the dressage photo: what the plate (or the glass) looks like when it leaves */
+  noteStepPh: async (a, id, v) => {
+    const N = S.ui.note, i = v === "dress" ? -1 : +v; const has = i < 0 ? N.dressPh : (N.stepPh || [])[i];
+    if (has) { if (i < 0) N.dressPh = ""; else N.stepPh[i] = ""; SFX.close(); noteRer(); return; }
+    const [f] = await pickImage(); if (!f) return; S.ui.notePhBusy = true; a.classList.add("busy");
+    try { const r = await notePhotoUrl(f); if (S.ui.note === N) { if (i < 0) N.dressPh = r.url; else { N.stepPh ||= []; while (N.stepPh.length < i) N.stepPh.push(""); N.stepPh[i] = r.url; } SFX.ok(); } } catch (e) { console.warn(e); SFX.err(); toast("Photo illisible. Essayez une autre image.", "err"); }
+    S.ui.notePhBusy = false; if (S.route === "note" && S.ui.note === N) noteRer();
+  },
   noteBack: () => { S.ui.notePending = null; if (!noteDirty()) { SFX.tap(); noteLeave(); return; } noteAskLeave(); },
   noteDiscard: () => {
     closeSheet(true); const p = S.ui.notePending; S.ui.notePending = null;
@@ -394,8 +423,10 @@ Object.assign(ACT, {
     const d = { title, cat: N.cat, body: String(N.body || "").trim(), updatedAt: Date.now(), uid: S.me.id,
       ingredients: isR ? (N.ingredients || []).filter((g) => String(g.name || "").trim() || g.productId || g.noteId).map((g) => noteIngClean(g)) : [],
       steps: isN ? [] : (N.steps || []).map((s) => String(s || "").trim()).filter(Boolean),
+      stepPh: isN ? [] : (N.steps || []).map((s, i) => [String(s || "").trim(), (N.stepPh || [])[i] || ""]).filter((x) => x[0]).map((x) => x[1]),
       allergens: isR ? N.allergens || [] : [], portions: isR ? Math.round(por * 100) / 100 : 1, photo: N.photo || "", photoId: N.photoId || "" };
-    if (isR) { const pr = num(N.price); Object.assign(d, { alNo: (N.alNo || []).filter((x) => !d.allergens.includes(x)), carte: !!N.carte, carteCat: N.carteCat || "plat", price: pr > 0 ? Math.round(pr * 100) / 100 : null }); }
+    if (isR) { const pr = num(N.price); Object.assign(d, { alNo: (N.alNo || []).filter((x) => !d.allergens.includes(x)), carte: !!N.carte, carteCat: N.carteCat || "plat", price: pr > 0 ? Math.round(pr * 100) / 100 : null, dress: String(N.dress || "").trim(), dressPh: N.dressPh || "", vessel: String(N.vessel || "").replace(/\s+/g, " ").trim() }); }
+    if (!(d.stepPh || []).some(Boolean)) d.stepPh = [];
     a.disabled = true;
     try {
       let nid = id;
