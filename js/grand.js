@@ -1,7 +1,9 @@
 /* Growth Gusto — « Grand écran »: a service screen (coup de feu, écran cuisine, commandes, prise de commande, réservations)
    takes the whole screen: no left menu, no tab bar, content as wide as the screen, screen kept awake.
    Works everywhere, including the app added to the home screen: the menus are hidden by the app itself (html.gg-big), and where the
-   browser allows it (computer, Android, iPad) the browser's own fullscreen hides its bars too. iPhone has no such API: the app mode alone.
+   browser allows it (computer, Android, iPad) the browser's own fullscreen hides its bars too. iPhone Safari has no such API (Apple allows it
+   for videos only): there the app hides everything it can, tightens the screen, and explains once that Safari's own bars only go away in the
+   app added to the home screen (bigTip), which really is full screen.
    Remembered per screen on this device, so a kitchen tablet reopens straight in grand écran. Esc or the same button leaves it.
    The button comes with topBar() (core.js) on every screen of BIG_ROUTES; coup de feu puts it in its own header (rush.js). */
 Object.assign(IC, {
@@ -18,6 +20,9 @@ function bigBtn(cls = "") {
   const on = BIG.on;
   return `<button class="btn soft sm gg-bigb${on ? " on" : ""}${cls ? " " + cls : ""}" data-act="bigTog" aria-pressed="${on}" title="${on ? "Revenir à l'affichage normal (Échap)" : "Afficher en grand écran, sans les menus"}">${ico(on ? "bigOut" : "bigIn")}<span>${on ? "Réduire" : "Grand écran"}</span></button>`;
 }
+/* can this browser hide its own bars? iPhone Safari: never (even when an old WebKit exposes the call, it only works on videos) */
+const bigCanFs = () => { const de = document.documentElement; if (typeof IS_IOS !== "undefined" && IS_IOS && !IS_IPAD) return false; return !!(de.requestFullscreen || de.webkitRequestFullscreen) && document.fullscreenEnabled !== false && document.webkitFullscreenEnabled !== false; };
+const bigInApp = () => typeof isStandalone === "function" && isStandalone();
 const bigFsEl = () => document.fullscreenElement || document.webkitFullscreenElement || null;
 function bigFs(on) {
   const de = document.documentElement;
@@ -48,7 +53,28 @@ function bigSet(on, { tap = false } = {}) {
   try { localStorage.setItem(bigKey(S.route), on ? "1" : "0"); } catch (e) {}
   if (tap) bigFs(on);
   if (bigApply(on)) { renderChrome(); rerender(); }
-  if (tap) { SFX.tap && SFX.tap(); toast(on ? "Grand écran : le même bouton vous ramène" : "Affichage normal"); }
+  if (!tap) return;
+  SFX.tap && SFX.tap();
+  /* iPhone in Safari: the browser keeps its bars whatever a page does, so say it once, with the way to the real thing */
+  if (on && !bigInApp() && !bigCanFs()) {
+    let seen = false; try { seen = localStorage.getItem("gg-big-tip") === "1"; localStorage.setItem("gg-big-tip", "1"); } catch (e) {}
+    if (!seen) { openSheet(bigTip()); return; }
+    toast("Barres de Safari : ouvrez Gusto depuis l'écran d'accueil"); return;
+  }
+  toast(on ? "Grand écran : le même bouton vous ramène" : "Affichage normal");
+}
+function bigTip() {
+  const step = (n, html) => `<li><span class="n mono">${n}</span><span>${html}</span></li>`;
+  const menu = typeof IOS_MENU !== "undefined" && IOS_MENU;
+  const steps = menu
+    ? step(1, `Touchez <span class="key">${ico("dots").replace("<svg ", '<svg style="transform:rotate(90deg)" ')}</span> en bas, puis <b>Partager</b>`) + step(2, `Choisissez <span class="key">${ico("addsq")}</span> <b>Sur l'écran d'accueil</b>`) + step(3, `Laissez <b>Ouvrir comme app web</b> activé, puis <b>Ajouter</b>`)
+    : step(1, `Touchez <span class="key">${ico("share")}</span> <b>Partager</b>`) + step(2, `Choisissez <span class="key">${ico("addsq")}</span> <b>Sur l'écran d'accueil</b>`);
+  return `<div class="gg-tip"><div class="sl-shh"><span class="h2">Grand écran sur iPhone</span><button class="iconbtn" data-act="sheetClose" aria-label="Fermer">${ico("x")}</button></div>
+    <div class="gg-tip-ill" aria-hidden="true"><span class="gg-tip-ph"><i class="gg-tip-bar"></i><i class="gg-tip-sc"></i><i class="gg-tip-bar b"></i></span>${ico("bigIn")}<span class="gg-tip-ph full"><i class="gg-tip-sc"></i></span></div>
+    <p class="gg-tip-p">C'est fait : les menus de Gusto sont cachés et l'écran est resserré. <b>Les barres de Safari, elles, restent</b> : Apple ne laisse aucun site les cacher sur iPhone.</p>
+    <p class="gg-tip-p">Pour un vrai plein écran, ouvrez Gusto depuis l'écran d'accueil. C'est la même app, avec vos données, sans aucune barre :</p>
+    <ol class="inst-steps">${steps}</ol>
+    <button class="btn acc block gg-tip-ok" data-act="sheetClose">C'est noté</button></div>`;
 }
 Object.assign(ACT, {
   bigTog: () => bigSet(!BIG.on, { tap: true }),
