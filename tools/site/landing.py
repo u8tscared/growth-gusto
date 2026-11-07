@@ -1,7 +1,8 @@
 """Accueil de growthgusto.fr (site/index.html, fait main) : régénère les blocs entre marqueurs à partir de accueil.py.
 
   <!--feat:…-->  groupes « Fonctionnalités »     <!--chips:…-->  pastilles + nombre de fonctions
-  <!--ld:…-->    données structurées (SEO)        (nav, menu et pied de page : build.py)
+  <!--ld:…-->    données structurées (SEO)        <!--plan-<id>:…-->  contenu des trois packs (content_misc.PLANS)
+  (nav, menu et pied de page : build.py)
 Seules les fonctions dont au moins un écran existe dans l'app sont affichées (registre.py). Lancé par build.py.
 """
 import html, json, re
@@ -33,6 +34,18 @@ def put(h, name, body):
     i, j = h.index(a) + len(a), h.index(b)
     return h[:i] + "\n" + body + "\n" + h[j:]
 
+def build_plans(h):
+    """Tarifs de l'accueil : la même liste que la page /tarifs (content_misc.PLANS), pour qu'elles ne divergent jamais."""
+    from content_misc import PLANS
+    nb = lambda x: re.sub(r" ([:;?!])", "&nbsp;\\1", re.sub(r"(\d) €", "\\1&nbsp;€", x))
+    for pid, _name, price, who, all_, groups in PLANS:
+        lis = (f'<li class="all">{nb(esc(all_))}</li>\n' if all_ else "")
+        lis += "\n".join(f'<li class="grp">{esc(g)}</li>' + "".join(f"<li>{nb(esc(x))}</li>" for x in items) for g, items in groups)
+        body = (f'<p class="who">{nb(esc(who))}</p>\n<div class="price"><b>{price}</b><span>€ HT<br>par mois</span></div>\n'
+                f'<p class="eq">Sans engagement · sans frais d\'installation</p>\n<ul>{lis}</ul>')
+        h = put(h, f"plan-{pid}", body)
+    return h
+
 def build_home(h):
     out, chips, n = [], [], 0
     gs = groups()
@@ -61,6 +74,7 @@ def build_home(h):
         out.append("</div>")
     chips.append('<a class="chip" href="#integrations">Ce qui se relie</a><a class="chip" href="#import">Import depuis un autre logiciel</a>')
     h = put(h, "feat", "\n".join(out))
+    h = build_plans(h)
     h = put(h, "chips", f'<p class="chips-h"><b>{n} fonctions</b>, une seule app</p>\n<div class="chips">' + "".join(chips) + "</div>")
 
     # données structurées : organisation, l'app avec ses trois packs et sa liste de fonctions, la FAQ relue sur la page

@@ -12,7 +12,7 @@ Règles :
 Une fonction rattachée à un écran qui n'existe plus est simplement masquée (ce n'est pas une erreur) : c'est ce qui permet
 de retirer un module de l'app sans toucher au site.
 """
-import pathlib, sys
+import pathlib, re, sys
 
 HERE = pathlib.Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
@@ -55,6 +55,17 @@ def main(argv):
         for img in [p["img"]] + [b[3] for b in p["blocks"]]:
             if not (SITE / "img" / (img + ".jpg")).exists():
                 errs.append("Capture manquante pour la page « %s » : site/img/%s.jpg" % (p["slug"], img))
+
+    # tarifs du site (content_misc.PLANS, repris sur l'accueil) = prix et noms des packs de l'app (js/abo.js AB_PACKS)
+    import ast
+    abo = (registre.ROOT / "js" / "abo.js").read_text()
+    site_plans = ast.literal_eval(re.search(r"^PLANS = (\[.*?\n\])\n", (pathlib.Path(__file__).parent / "content_misc.py").read_text(), re.S | re.M).group(1).replace("{N}", ""))
+    for pid, name, price, *_ in site_plans:
+        m = re.search(pid + r': \{ t: "([^"]+)", price: (\d+)', abo)
+        if not m:
+            errs.append("Pack « %s » du site introuvable dans js/abo.js (AB_PACKS)." % pid)
+        elif (m.group(1), m.group(2)) != (name, price):
+            errs.append("Tarif du pack « %s » : le site dit %s %s €, l'app (js/abo.js) dit %s %s €." % (pid, name, price, m.group(1), m.group(2)))
 
     if nav is not None:
         a, b = set(app), set(nav)

@@ -14,7 +14,7 @@ TYPES = [
   feats=["haccp-temperatures", "etiquettes-dlc", "reservations", "prise-de-commande", "marges-achats", "caisse-stock"],
   faq=[("Le plat du jour change tous les jours. C'est un problème ?", "Non. Créez la recette en une minute avec ses ingrédients : la marge et les allergènes sont calculés tout de suite. Le plat peut ensuite être mis en avant sur le menu QR."),
        ("On a une terrasse l'été.", "Ajoutez une salle « Terrasse » sur le plan de salle, avec ses tables. Vous l'ouvrez ou la fermez selon la météo, et les réservations en tiennent compte."),
-       ("Quel pack choisir ?", "Le pack Second couvre l'hygiène, la salle, la caisse et le stock. Prenez Chef si vous voulez aussi le planning, la pointeuse et les finances.")],
+       ("Quel pack choisir ?", "Le pack Second couvre l'hygiène, la salle, la caisse, le stock, la pointeuse et le planning de la semaine. Prenez Chef pour le planning intelligent, les salaires et les finances.")],
   guides=["normes-haccp-restaurant", "temperatures-reglementaires", "dlc-ddm-etiquetage"]),
 
  dict(slug="restaurant-gastronomique", short="Restaurant gastronomique", ic="star", icc="s",
@@ -27,7 +27,7 @@ TYPES = [
   feats=["recettes-allergenes", "etiquettes-dlc", "controle-sanitaire", "reservations", "fidelite-clients", "equipe-planning"],
   faq=[("Les allergènes sont-ils calculés automatiquement ?", "Oui : chaque ingrédient porte ses allergènes parmi les 14 obligatoires, et chaque recette en hérite, sous-recettes comprises. Vous imprimez le tableau pour la salle."),
        ("Peut-on noter les allergies d'un client ?", "Oui, sur sa fiche client. Elles s'affichent sur la réservation et sur le plan de salle le soir du service."),
-       ("Quel pack choisir ?", "Le pack Chef, pour avoir aussi le planning de la brigade, la pointeuse et les finances. Le pack Second suffit si vous gérez l'équipe ailleurs.")],
+       ("Quel pack choisir ?", "Le pack Chef, pour le planning intelligent de la brigade, les salaires et les finances. Le pack Second suffit déjà pour la salle, la pointeuse et le planning de la semaine.")],
   guides=["allergenes-restaurant", "refroidissement-rapide", "plan-de-maitrise-sanitaire"]),
 
  dict(slug="pizzeria", short="Pizzeria", ic="pizza", icc="k",
@@ -40,7 +40,7 @@ TYPES = [
   feats=["prise-de-commande", "menu-qr", "caisse-stock", "etiquettes-dlc", "marges-achats", "haccp-temperatures"],
   faq=[("Uber Eats et Deliveroo arrivent-ils dans l'app ?", "Par import : vous déposez le relevé de ventes, et l'app en tire le chiffre, les commissions et le stock déduit. Les commandes en direct sur l'écran cuisine arrivent bientôt, en option."),
        ("Les clients peuvent-ils commander en ligne ?", "Oui : un lien de commande à emporter, avec créneaux de retrait. La commande arrive sur l'écran cuisine. Le client paie au retrait, ou en ligne par Stripe si vous l'activez, sans commission Growth Gusto."),
-       ("Quel pack choisir ?", "Le pack Second : prise de commande, menu QR, caisse, stock et relevés des plateformes y sont inclus.")],
+       ("Quel pack choisir ?", "Le pack Second : prise de commande, menu QR, caisse, stock et relevés des plateformes y sont inclus. Plusieurs enseignes depuis la même cuisine ? Le pack Chef suit chaque marque à part.")],
   guides=["dlc-ddm-etiquetage", "temperatures-reglementaires", "huile-de-friture"]),
 
  dict(slug="traiteur", short="Traiteur", ic="truck", icc="l",
@@ -53,7 +53,7 @@ TYPES = [
   feats=["etiquettes-dlc", "controle-sanitaire", "recettes-allergenes", "haccp-temperatures", "marges-achats", "equipe-planning"],
   faq=[("Le refroidissement rapide est-il suivi ?", "Oui : vous notez la température au départ et à l'arrivée, l'app vérifie le délai et demande une action si la limite est dépassée."),
        ("Un rappel de lot, comment ça se passe ?", "Vous tapez le numéro de lot ou le fournisseur : l'app montre les réceptions, les préparations et les étiquettes concernées, avec les dates."),
-       ("Quel pack choisir ?", "Le pack Commis couvre toute l'hygiène et la traçabilité. Prenez Chef pour le planning des équipes de production et les finances.")],
+       ("Quel pack choisir ?", "Le pack Commis couvre toute l'hygiène et la traçabilité. Le pack Second ajoute la pointeuse et le planning de la semaine, le pack Chef le planning intelligent et les finances.")],
   guides=["refroidissement-rapide", "plan-de-maitrise-sanitaire", "dlc-ddm-etiquetage"]),
 
  dict(slug="cafe-bar", short="Café, bar et salon de thé", ic="cup", icc="r",
@@ -79,7 +79,7 @@ TYPES = [
   feats=["haccp-temperatures", "etiquettes-dlc", "prise-de-commande", "caisse-stock", "marges-achats", "equipe-planning"],
   faq=[("L'huile de friture est-elle suivie ?", "Oui : le test de l'huile (composés polaires) se note dans l'app, avec le changement de bain. La limite réglementaire est de 25 % de composés polaires."),
        ("Mon équipe change souvent.", "Chaque nouvel arrivant a son compte en un code, et la formation HACCP intégrée lui apprend les gestes de base."),
-       ("Quel pack choisir ?", "Le pack Second, pour la prise de commande, l'écran cuisine, la caisse et le stock. Le pack Chef ajoute le planning et la pointeuse, utiles avec beaucoup d'extras.")],
+       ("Quel pack choisir ?", "Le pack Second, pour la prise de commande, l'écran cuisine, la caisse, le stock, la pointeuse et les alertes d'heures sup. Le pack Chef ajoute le planning intelligent, utile avec beaucoup d'extras.")],
   guides=["huile-de-friture", "formation-hygiene-obligatoire", "controle-sanitaire-ddpp"]),
 ]
 
