@@ -19,6 +19,15 @@
 
 TAB_OF.notifs = "more";
 (function puNav() { if (NAV.some((n) => n[0] === "notifs")) return; const i = NAV.findIndex((n) => n[0] === "consignes"); NAV.splice(i >= 0 ? i + 1 : NAV.length, 0, ["notifs", "puBell", "Notifications"]); })();
+if (typeof PC_LECONS === "object") PC_LECONS.notifs = {
+  t: "Notifications",
+  d: "Chacun reçoit sur son téléphone ce qui concerne son poste : bons en cuisine, plats prêts en salle, chiffre du service pour le patron.",
+  steps: ["Touchez « Activer sur cet appareil »", "Choisissez votre poste : Cuisine, Salle, Bar ou Patron", "Coupez ce qui ne vous sert pas, ou réglez des heures calmes"],
+  q: ["Un serveur reçoit « Table 4 prêt » pour…", ["Les tables qu'il a envoyées", "Toutes les tables du restaurant", "Aucune table"], 0],
+  sc: { k: "toggles", t: "Notifications", rows: [["cmBell", "Plat prêt", 1], ["slHat", "Nouveau bon", 0], ["puEuro", "Chiffre du service", 1]] },
+  who: ["cuisine", "salle", "bar", "plonge", "boss"],
+  tip: "Sur iPhone, ajoutez d'abord l'app à l'écran d'accueil.",
+};
 Object.assign(IC, {
   puBell: ["M6 9a6 6 0 0 1 12 0c0 6 2.5 8 2.5 8h-17S6 15 6 9z", "f:M6 9a6 6 0 0 1 12 0c0 6 2.5 8 2.5 8h-17S6 15 6 9z", "M10.2 20.5a2 2 0 0 0 3.6 0", "M19.5 3.5a7 7 0 0 1 2 4", "M4.5 3.5a7 7 0 0 0-2 4"],
   puPhone: ["r:6.5,2.5,11,19,2.6", "f:M8.5 2.5h7a2 2 0 0 1 2 2v15a2 2 0 0 1-2 2h-7a2 2 0 0 1-2-2v-15a2 2 0 0 1 2-2z", "M10.5 18.5h3"],
