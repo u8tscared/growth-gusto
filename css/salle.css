@@ -404,3 +404,28 @@
 .sl-stkb{all:unset;cursor:pointer;flex:none;font-size:13px;font-weight:760;color:#8A4B00;padding:6px 6px}
 .sl-stkt{flex:none;align-self:center;font-style:normal;font-size:12px;font-weight:760;color:#8A4B00;text-transform:uppercase;letter-spacing:.04em}
 .sl-due-l{display:flex;flex-direction:column;gap:8px}
+/* client de la table : « Qui est à table ? » */
+.sl-cl{display:flex;flex-direction:column;gap:6px;margin-bottom:6px}
+.sl-clr{all:unset;box-sizing:border-box;cursor:pointer;display:flex;align-items:center;gap:11px;padding:8px 10px;min-height:52px;border-radius:16px;background:#F7F0E3;transition:background .2s,box-shadow .2s}
+.sl-clr.on{background:var(--tint);box-shadow:inset 0 0 0 1.5px var(--accent)}
+.sl-clr:focus-visible{outline:2.5px solid var(--accent);outline-offset:2px}
+.sl-clr .tx{flex:1;min-width:0;display:flex;flex-direction:column}
+.sl-clr .tx b{font-size:15px;font-weight:680;display:flex;align-items:center;gap:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sl-clr .tx em{font-style:normal;font-size:12.5px;color:var(--muted)}
+.sl-clg{width:36px;height:36px;border-radius:50%;display:grid;place-items:center;background:var(--paper);color:var(--ink-2);flex:none}
+.sl-clg .ico{width:18px;height:18px}
+.sl-clc{width:22px;height:22px;flex:none;display:grid;place-items:center;color:var(--accent)}
+.sl-clc .ico{width:18px;height:18px}
+.sl-clr.add{background:transparent;border:1.5px dashed var(--rim-2)}
+.sl-clq{height:46px}
+#slClR{display:flex;flex-direction:column;gap:6px}
+.sl-clnew{display:flex;flex-direction:column;gap:8px;margin-bottom:6px}
+.sl-clnew .input{height:46px}
+.sl-clna{display:flex;gap:8px;justify-content:flex-end}
+.sl-cle{margin:0;color:var(--tomato);font-size:13px;min-height:0}
+.sl-cle:empty{display:none}
+.sl-tcl{all:unset;box-sizing:border-box;cursor:pointer;display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:999px;background:#F7F0E3;font-weight:650;color:var(--ink-2);min-height:28px}
+.sl-tcl.on{background:var(--tint);color:var(--accent-ink)}
+.sl-tcl .ico{width:14px;height:14px}
+.sl-tcl em{font-style:normal;display:inline-flex;align-items:center;gap:3px;color:var(--tomato);font-size:12px}
+.sl-tcl:focus-visible{outline:2.5px solid var(--accent);outline-offset:2px}

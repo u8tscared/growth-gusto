@@ -279,7 +279,7 @@ function rsCard(b, cfg, i) {
     <button class="rs-hit" data-act="rsOpen" data-id="${esc(b.id)}" aria-label="${esc(b.name || "Réservation")}, ${+b.covers || 0} personnes à ${b.time}"></button>
     <span class="rs-cv"><b>${+b.covers || 0}</b><i>pers.</i></span>
     <span class="rs-tx"><b>${esc(b.name || "Sans nom")}</b>
-      <em>${cl && cl.vip ? `<span class="rs-vip">VIP</span>` : ""}${cs && cs.noshow ? `<span class="rs-nsw">${rsPl(cs.noshow, "no-show")}</span>` : ""}${tb ? `<span class="rs-tbl">T${esc(typeof plLabel === "function" ? plLabel(b, cfg) || tb.n : tb.n)}</span>` : ""}${web ? `<span class="rs-web">${fresh ? "Nouveau · " : ""}en ligne</span>` : ""}${typeof rzBadge === "function" ? rzBadge(b) : ""}${b.phone ? `<span>${esc(b.phone)}</span>` : ""}</em>
+      <em>${rsVip(b.phone) ? `<span class="rs-vip">VIP</span>` : ""}${cs && cs.noshow ? `<span class="rs-nsw">${rsPl(cs.noshow, "no-show")}</span>` : ""}${tb ? `<span class="rs-tbl">T${esc(typeof plLabel === "function" ? plLabel(b, cfg) || tb.n : tb.n)}</span>` : ""}${web ? `<span class="rs-web">${fresh ? "Nouveau · " : ""}en ligne</span>` : ""}${typeof rzBadge === "function" ? rzBadge(b) : ""}${b.phone ? `<span>${esc(b.phone)}</span>` : ""}</em>
       ${b.notes ? `<span class="rs-note ${nk}">${nk ? ico("alert") : ""}${esc(b.notes)}</span>` : ""}</span>
     ${btn}
   </div>`;
@@ -306,12 +306,16 @@ function rsReqPanel(cfg) {
   return `<section class="rs-reqs st" style="--i:1"><div class="rs-rqh"><span class="rs-rqn">${L.length}</span><b>${L.length > 1 ? "Demandes à valider" : "Demande à valider"}</b></div>
     ${L.slice(0, 6).map((b) => { const cs = rsStatOf(b.phone), cl = rsClientOf(b.phone), nk = rsNoteKind(b.notes); return `<div class="rs-req" data-card="${esc(b.id)}">
       <button class="rs-rqi" data-act="rsOpen" data-id="${esc(b.id)}"><span class="rs-cv"><b>${+b.covers || 0}</b><i>pers.</i></span>
-        <span class="rs-tx"><b>${esc(b.name || "")}</b><em><span class="rs-rqd">${esc((rsRel(b.date) || rsShort(b.date)))} · ${b.time}</span>${cl && cl.vip ? `<span class="rs-vip">VIP</span>` : ""}${cs && cs.visits ? `<span>${rsPl(cs.visits, "visite")}</span>` : ""}${cs && cs.noshow ? `<span class="rs-nsw">${rsPl(cs.noshow, "no-show")}</span>` : ""}${rsFdTags(b)}</em>
+        <span class="rs-tx"><b>${esc(b.name || "")}</b><em><span class="rs-rqd">${esc((rsRel(b.date) || rsShort(b.date)))} · ${b.time}</span>${rsVip(b.phone) ? `<span class="rs-vip">VIP</span>` : ""}${cs && cs.visits ? `<span>${rsPl(cs.visits, "visite")}</span>` : ""}${cs && cs.noshow ? `<span class="rs-nsw">${rsPl(cs.noshow, "no-show")}</span>` : ""}${rsFdTags(b)}</em>
         ${b.notes ? `<span class="rs-note ${nk}">${nk ? ico("alert") : ""}${esc(b.notes)}</span>` : ""}</span></button>
       <div class="rs-rqb"><button class="btn soft" data-act="rsRefuse" data-id="${esc(b.id)}">${ico("x")}Refuser</button><button class="btn acc" data-act="rsAccept" data-id="${esc(b.id)}">${ico("check")}Accepter</button></div>
     </div>`; }).join("")}${L.length > 6 ? `<p class="rs-lp">+ ${L.length - 6} autres demandes</p>` : ""}</section>`;
 }
 /* client file: restos/{rid}/clients/{phone key} { name, phone, email?, vip?, notes? } + what the bookings say */
+/* VIP: ticked by hand (vip), taken off by hand (vipOff), or given on its own after the visits set in the loyalty settings
+   (restos/{rid}.fidCfg.vipAuto + vipN). js/clients.js counts every visit (bookings, take-away, counter, tables); here only bookings. */
+function rsVipOf(d, visits) { d = d || {}; if (d.vipOff) return false; if (d.vip) return true; const c = (S.resto && S.resto.fidCfg) || {}; return !!c.vipAuto && (+visits || 0) >= Math.max(2, +c.vipN || 10); }
+function rsVip(ph) { try { if (typeof fdPerson === "function") { const p = fdPerson(ph); if (p) return !!p.vip; } } catch (e) {} const s0 = rsStatOf(ph); return rsVipOf(rsClientOf(ph), s0 && s0.visits); }
 const rsClientOf = (ph) => { const k = rsPk(ph); return k ? R.clients.find((c) => c.id === k) || null : null; };
 let rsStatMemo = { src: null, map: null };
 function rsStats() {
@@ -446,7 +450,7 @@ const rsNorm = (t) => String(t || "").toLowerCase().normalize("NFD").replace(/[\
 function rsPeople() {
   const m = {}; Object.entries(rsStats()).forEach(([k, x]) => { m[k] = { id: k, name: x.name, phone: x.phone, email: x.email, visits: x.visits, noshow: x.noshow }; });
   R.clients.forEach((c) => { if (!c || !c.id) return; m[c.id] = { visits: 0, noshow: 0, ...(m[c.id] || {}), ...c, id: c.id }; });
-  return Object.values(m);
+  return Object.values(m).map((c) => ({ ...c, vip: c.phone ? rsVip(c.phone) : rsVipOf(c, c.visits) }));
 }
 function rsSugHtml() {
   const e = R.ed; if (!e) return ""; const pk = rsPk(e.phone);
@@ -481,7 +485,7 @@ function rsOpenSheet(id) {
     : `<div class="rs-sts">${sts.map(([k, t, ic]) => `<button class="rs-sb k-${k}${cur === k ? " on" : ""}" data-act="rsSetSt" data-id="${esc(b.id)}" data-v="${k}" aria-pressed="${cur === k}">${ico(ic)}<span>${b.status === "refuse" && k === "annule" ? "Refusée" : t}</span></button>`).join("")}</div>`;
   openSheet(`<div class="rs-bk">
     <div class="rs-bkh"><span class="rs-cv big"><b>${+b.covers || 0}</b><i>pers.</i></span><div><button class="rs-who" data-act="rsClient" data-id="${esc(b.id)}" ${rsPk(b.phone) ? "" : "disabled"}><span class="h2">${esc(b.name || "Sans nom")}</span>${rsPk(b.phone) ? ico("chev") : ""}</button><em>${esc(rsLong(b.date))} · <b>${b.time}</b>${tb ? ` · table ${esc(typeof plLabel === "function" ? plLabel(b, cfg) || tb.n : tb.n)}` : ""}</em></div></div>
-    ${cs && (cs.visits || cs.noshow || (cl && (cl.vip || cl.notes || (cl.allergens || []).length))) ? `<button class="rs-cline" data-act="rsClient" data-id="${esc(b.id)}">${cl && cl.vip ? `<span class="rs-vip">VIP</span>` : ""}<span>${cs.visits ? rsPl(cs.visits, "visite") : "Première visite"}</span>${cs.noshow ? `<span class="rs-nsw">${rsPl(cs.noshow, "no-show")}</span>` : ""}${rsFdTags(b)}${cl && cl.notes ? `<span class="rs-cn">${esc(cl.notes)}</span>` : ""}</button>` : ""}
+    ${cs && (cs.visits || cs.noshow || (rsVip(b.phone) || (cl && (cl.notes || (cl.allergens || []).length)))) ? `<button class="rs-cline" data-act="rsClient" data-id="${esc(b.id)}">${rsVip(b.phone) ? `<span class="rs-vip">VIP</span>` : ""}<span>${cs.visits ? rsPl(cs.visits, "visite") : "Première visite"}</span>${cs.noshow ? `<span class="rs-nsw">${rsPl(cs.noshow, "no-show")}</span>` : ""}${rsFdTags(b)}${cl && cl.notes ? `<span class="rs-cn">${esc(cl.notes)}</span>` : ""}</button>` : ""}
     ${rsWeb(b) ? `<div class="rs-from">${ico("rsWeb")}<span>Réservé en ligne${b.createdAt ? ` le ${shortDate(dayKey(new Date(+b.createdAt || Date.now())))} à ${hm(+b.createdAt || Date.now())}` : ""}</span></div>` : ""}
     ${b.clientChange ? `<div class="rs-from cc">${ico("edit")}<span>${b.clientChange.what === "annule" ? "Annulée" : "Modifiée"} par le client ${when(b.clientChange.at)}</span></div>` : ""}
     ${b.notes ? `<div class="rs-note big ${nk}">${nk ? ico("alert") : ico("rsNote")}<span>${esc(b.notes)}</span></div>` : ""}
@@ -527,12 +531,12 @@ function rsFdTags(b) {
 }
 function rsClientSheet(b) {
   const k = rsPk(b.phone); if (!k) return; const cs = rsStatOf(b.phone) || { visits: 0, noshow: 0, cancel: 0, list: [] }, cl = rsClientOf(b.phone) || {};
-  R.cl = { id: k, name: cl.name || b.name || "", phone: cl.phone || b.phone || "", email: cl.email || cs.email || b.email || "", vip: !!cl.vip, notes: cl.notes || "" };
+  R.cl = { id: k, name: cl.name || b.name || "", phone: cl.phone || b.phone || "", email: cl.email || cs.email || b.email || "", vip: rsVip(b.phone), vip0: rsVip(b.phone), notes: cl.notes || "" };
   const past = cs.list.slice(0, 8);
   openSheet(`<div class="rs-cf">
     <div class="rs-edh"><span class="h2">${esc(R.cl.name || "Client")}</span><button class="iconbtn" data-act="sheetClose" aria-label="Fermer">${ico("x")}</button></div>
     <div class="rs-cfs"><div><b>${cs.visits}</b><em>visite${cs.visits > 1 ? "s" : ""}</em></div><div class="${cs.noshow ? "bad" : ""}"><b>${cs.noshow}</b><em>no-show</em></div><div><b>${cs.cancel}</b><em>annulée${cs.cancel > 1 ? "s" : ""}</em></div><div><b>${cs.last ? shortDate(cs.last) : "–"}</b><em>dernière</em></div></div>
-    <button class="rs-tog${R.cl.vip ? " on" : ""}" data-act="rsClVip" aria-pressed="${R.cl.vip}"><span><b>Client VIP</b><em>Un badge VIP sur chacune de ses réservations.</em></span><i></i></button>
+    <button class="rs-tog${R.cl.vip ? " on" : ""}" data-act="rsClVip" aria-pressed="${R.cl.vip}"><span><b>Client VIP</b><em>${(S.resto && S.resto.fidCfg && S.resto.fidCfg.vipAuto) ? `Donné tout seul à partir de ${Math.max(2, +S.resto.fidCfg.vipN || 10)} visites, ou à la main ici.` : "Un badge VIP sur chacune de ses réservations."}</em></span><i></i></button>
     <label class="rs-big-in sm"><span>Notes (allergies, préférences)</span><textarea class="input" id="rsClNotes" rows="2" maxlength="300" placeholder="Allergie arachides, aime la table près de la fenêtre…">${esc(R.cl.notes)}</textarea></label>
     <div class="rs-cfc">${R.cl.phone ? `<a href="tel:${esc(String(R.cl.phone).replace(/[^\d+]/g, ""))}">${ico("rsPhone")}${esc(R.cl.phone)}</a>` : ""}${R.cl.email ? `<span>${ico("rsMail")}${esc(R.cl.email)}</span>` : ""}</div>
     ${past.length ? `<div class="rs-cfh"><b>Historique</b>${past.map((x) => `<div class="rs-cfr"><span>${shortDate(x.date)} · ${x.time}</span><span>${+x.covers || 0} pers.</span><span class="rs-stp ${(RS_ST[x.status] || RS_ST.avenir).k}">${(RS_ST[x.status] || RS_ST.avenir).t}</span></div>`).join("")}</div>` : ""}
@@ -918,7 +922,7 @@ Object.assign(ACT, {
     a.disabled = true;
     /* keep what js/clients.js keeps in the same file (allergies, birthday, consent, loyalty stamps) */
     const { id: _cid, ...was } = R.clients.find((x) => x.id === c.id) || {};
-    try { await safe(DB.set("clients", c.id, DB.clean({ ...was, name: String(c.name || "").slice(0, 60), phone: String(c.phone || "").slice(0, 25), email: String(c.email || "").slice(0, 120), vip: !!c.vip, notes: c.notes, updatedAt: Date.now() }))); } catch (e) { a.disabled = false; return; }
+    try { await safe(DB.set("clients", c.id, DB.clean({ ...was, name: String(c.name || "").slice(0, 60), phone: String(c.phone || "").slice(0, 25), email: String(c.email || "").slice(0, 120), ...(c.vip !== c.vip0 ? { vip: !!c.vip, vipOff: !c.vip } : {}), notes: c.notes, updatedAt: Date.now() }))); } catch (e) { a.disabled = false; return; }
     R.cl = null; closeSheet(true); SFX.done(); toast("Fiche client enregistrée");
   },
   rsEdSug: (a, id, v) => {
