@@ -152,6 +152,7 @@ VIEWS.coupdefeu = {
         <div class="cf-ht"><span class="cf-kick"><i class="cf-dot"></i>Coup de feu</span><b>${s ? esc(cfSvcT(s).replace(/^./, (c) => c.toUpperCase())) : "Hors service"}</b><em>${s ? `${cfSpanT(s)}${!s.live && s.inMin > 0 ? ` · dans ${s.inMin} min` : ""}` : "Allumé à la main"}</em></div>
         <span class="cf-clock mono" id="cfClock">${hm(Date.now())}</span>
         ${typeof bigBtn === "function" ? bigBtn("cf-big") : ""}
+        ${typeof thTopBtn === "function" ? thTopBtn().replace('class="iconbtn th-topbtn"', 'class="iconbtn cf-set th-topbtn"') : ""}
         <button class="iconbtn cf-set" data-act="cfSet" aria-label="Réglages du coup de feu" title="Réglages">${ico("sliders")}</button>
         <button class="btn soft cf-exit" data-act="cfExit">${ico("cfDoor")}<span>Quitter</span></button>
       </header>
