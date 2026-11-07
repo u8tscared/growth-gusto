@@ -318,7 +318,7 @@ function fdKeep(b = $("#sheetBody")) {
 function fdAddPaint() {
   const a = FD.add; if (!a) return;
   openSheet(`<div class="fd-sh"><div class="fd-shh"><span class="fd-cic">${ico("fdUsers")}</span><div style="flex:1"><b class="h3">Nouveau client</b><em class="sub">Le téléphone ou l'e-mail suffit</em></div><button class="iconbtn" data-act="sheetClose" aria-label="Fermer">${ico("x")}</button></div>
-    <label class="field"><span>Nom</span><input class="input" id="fdAn" value="${esc(a.name)}" maxlength="60" placeholder="Camille Martin" autocomplete="off"></label>
+    <label class="field"><span>Nom</span><input class="input" id="fdAn" autocapitalize="words" autocorrect="off" spellcheck="false" value="${esc(a.name)}" maxlength="60" placeholder="Camille Martin" autocomplete="off"></label>
     <div class="grid2"><label class="field"><span>Téléphone</span><input class="input" id="fdAp" type="tel" inputmode="tel" value="${esc(a.phone)}" maxlength="25" placeholder="06 12 34 56 78"></label>
       <label class="field"><span>E-mail</span><input class="input" id="fdAe" type="email" inputmode="email" value="${esc(a.email)}" maxlength="120" placeholder="camille@mail.fr"></label></div>
     <button class="rs-tog${a.ok ? " on" : ""}" data-act="fdAddOk" aria-pressed="${a.ok}"><span><b>Accepte vos nouvelles</b><em>Le client vient de vous dire oui (e-mail et SMS)</em></span><i></i></button>
