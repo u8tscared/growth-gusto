@@ -1,7 +1,13 @@
 #!/usr/bin/env python3
-"""Builds the pages of growthgusto.fr (everything except the home page, which is hand-made: site/index.html).
+"""Builds growthgusto.fr: every page, plus the generated blocks of the hand-made home page (site/index.html).
 
-  python3 tools/site/build.py
+  python3 tools/site/build.py        (also run by every deploy: .github/workflows/deploy.yml, and checked on every PR)
+
+The site follows the app: tools/site/registre.py reads the app menu (NAV), and every feature on the home page
+(tools/site/accueil.py) and every /fonctionnalites page (content_features.py, app=[…]) is tied to app screens.
+A feature whose screens are gone from the app disappears from the home page, the feature hub, the footer and the
+cards; its page is no longer built, the stale file is deleted and links to it point to /fonctionnalites instead.
+tools/site/check.py fails when an app screen has no site content.
 
 Content lives in tools/site/content_*.py. Each page gets its own title, description, canonical URL,
 breadcrumbs, structured data (BreadcrumbList + the page's own type) and internal links; sitemap.xml is rewritten.
@@ -15,7 +21,17 @@ SITE = HERE.parent.parent / "site"
 sys.path.insert(0, str(HERE))
 BASE = "https://growthgusto.fr"
 APP = "https://app.growthgusto.fr"
-TODAY = datetime.date(2026, 11, 6).isoformat()
+def _today():
+    """Sitemap date = date of the last commit (stable from one build to the next), today if git is not there."""
+    import subprocess
+    try:
+        d = subprocess.run(["git", "log", "-1", "--format=%cs"], cwd=HERE, capture_output=True, text=True, timeout=10).stdout.strip()
+        if re.fullmatch(r"\d{4}-\d{2}-\d{2}", d):
+            return d
+    except Exception:
+        pass
+    return datetime.date.today().isoformat()
+TODAY = _today()
 
 def ver(rel):
     """Short content hash so browsers never mix a new page with an old stylesheet."""
@@ -107,7 +123,10 @@ def footer():
         if more:
             li += f'<li><a class="all" href="{more[0]}">{e(more[1])}</a></li>'
         return f'<div class="sf-col"><h3>{title}</h3><ul>{li}</ul></div>'
-    feats = [(f"/fonctionnalites/{s}", BY[s]["short"]) for s in ("haccp-temperatures", "etiquettes-dlc", "controle-sanitaire", "reservations", "caisse-stock")]
+    from content_features import live_features
+    pref = ("haccp-temperatures", "etiquettes-dlc", "controle-sanitaire", "reservations", "caisse-stock")  # preferred, if still in the app
+    lf = sorted(live_features(), key=lambda f: (f["slug"] not in pref, pref.index(f["slug"]) if f["slug"] in pref else 0))
+    feats = [(f"/fonctionnalites/{f['slug']}", f["short"]) for f in lf[:5]]
     types = [(f"/restaurants/{t['slug']}", t["short"]) for t in TYPES[:5]]
     guides = [(f"/guides/{g['slug']}", g["short"]) for g in GUIDES[:5]]
     co = [("/tarifs", "Tarifs"), ("/integrations", "Ce qui se relie"), ("/comparatif", "Comparatif"), ("/faq", "Questions fréquentes"), ("/a-propos", "À propos"), ("/contact", "Contact")]
@@ -166,6 +185,12 @@ def card(href, title, text, ic=None, icc="", tags=(), go="Découvrir", shot=None
 
 PAGES = []
 
+def fix_links(doc):
+    """A link to a feature page that is no longer built (its app screens were removed) goes to the feature hub instead."""
+    from content_features import FEATURES, live_slugs
+    ok = live_slugs()
+    return re.sub(r'href="/fonctionnalites/([a-z0-9-]+)"', lambda m: m.group(0) if m.group(1) in ok else 'href="/fonctionnalites"', doc)
+
 def page(path, title, desc, body, trail, ld=(), og=None, cur=None, extra_head=""):
     canon = BASE + path
     ldx = [crumbs_ld(trail)] + list(ld)
@@ -211,7 +236,7 @@ def page(path, title, desc, body, trail, ld=(), og=None, cur=None, extra_head=""
 '''
     out = SITE / (path.strip("/") + ".html")
     out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(doc)
+    out.write_text(fix_links(doc))
     PAGES.append((path, title))
 
 def main():
@@ -219,6 +244,13 @@ def main():
     import content_features, content_types, content_guides, content_compare, content_misc
     for m in (content_features, content_types, content_guides, content_compare, content_misc):
         m.build()
+    # pages of a previous build that are no longer generated (e.g. a feature removed from the app): delete them
+    built = {SITE / (pth.strip("/") + ".html") for pth, _ in PAGES}
+    for d in ("fonctionnalites", "restaurants", "guides", "comparatif"):
+        for f in (SITE / d).glob("*.html"):
+            if f not in built:
+                f.unlink()
+                print("removed", f.relative_to(SITE))
     # sitemap
     urls = [("/", "1.0", "weekly")] + [(p, "0.8" if p.count("/") == 1 else "0.7", "monthly") for p, _ in PAGES] + [(p, "0.2", "yearly") for p in ("/cgv", "/mentions-legales", "/confidentialite")]
     sm = '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' + "".join(
@@ -235,8 +267,10 @@ def main():
     for k, v in (("nav", links), ("menu", menu)):
         a, b = h.index(f"<!--{k}:start-->"), h.index(f"<!--{k}:end-->")
         h = h[:a + len(f"<!--{k}:start-->")] + v + h[b:]
-    idx.write_text(h)
-    print(len(PAGES), "pages,", len(urls), "URLs in the sitemap")
+    from landing import build_home
+    h, nf, ng = build_home(h)
+    idx.write_text(fix_links(h))
+    print(nf, "features in", ng, "groups on the home page;", len(PAGES), "pages,", len(urls), "URLs in the sitemap")
 
 if __name__ == "__main__":
     main()

@@ -12,7 +12,7 @@ module.exports = async (page, shot) => {
       const plus = new Set([...document.querySelectorAll('.cc-gt')].map((b) => b.dataset.go));
       const tabs = new Set([...document.querySelectorAll('#tabbar [data-tab]')].map((b) => b.dataset.tab));
       const nav = (typeof esNavRoutes === 'function' ? esNavRoutes() : NAV.filter((n) => n[0] !== 'sep' && VIEWS[n[0]] && canSee(n[0])).map((n) => n[0])).filter((r) => r !== 'home');
-      res({ label, sp: typeof esCur === 'function' ? esCur() : '', mode: DB.mode, missing: nav.filter((x) => !plus.has(x) && !tabs.has(x)) });
+      res({ label, sp: typeof esCur === 'function' ? esCur() : '', mode: DB.mode, missing: nav.filter((x) => !plus.has(x) && !tabs.has(x)), all: NAV.filter((n) => n[0] !== 'sep').map((n) => n[0]) });
     }, 900);
   }), label);
   const out = [];
@@ -42,4 +42,5 @@ module.exports = async (page, shot) => {
   const bad = out.filter((r) => r.missing.length);
   if (bad.length) throw new Error('absent du menu Plus sur téléphone/tablette : ' + bad.map((r) => `${r.label} (${r.sp}) → ${r.missing.join(', ')}`).join(' ; '));
   console.log('NAV OK : tous les écrans sont dans le menu Plus (' + out.map((r) => r.label).join(', ') + ')');
+  console.log('NAV ROUTES ' + out[0].all.join(',')); // lu par tools/ci.js : le site vitrine doit voir le même menu (tools/site/check.py)
 };
