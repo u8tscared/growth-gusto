@@ -396,7 +396,7 @@ const AUTH = {
     if (opts.reset) this.ui.back = [];
     this.ui.screen = screen; this.st = screen;
     el.classList.toggle("au-inapp", this.inApp); el.dataset.screen = screen;
-    if (first) { el.hidden = false; void el.offsetWidth; el.classList.add("on"); document.documentElement.classList.toggle("au-open", !this.inApp); const b = $("#boot"); b && setTimeout(() => b.classList.add("out"), 120); }
+    if (first) { el.hidden = false; void el.offsetWidth; el.classList.add("on"); document.documentElement.classList.toggle("au-open", !this.inApp); const b = $("#boot"); if (window.bootOut) bootOut(120); else if (b) setTimeout(() => b.classList.add("out"), 120); }
     this.paint(first);
   },
   hide() {

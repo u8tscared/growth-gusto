@@ -161,7 +161,7 @@ VIEWS.commandes = {
     if (S.params && S.params.tab && CM.tabFrom !== S.params) { CM.tab = S.params.tab; CM.tabFrom = S.params; }
     const c = cmCfg(), live = cmOrdersToday().filter(cmLiveSt), mgr = cmMgr();
     const setup = !(CM.cfgDoc && CM.cfgDoc.setupAt);
-    const right = `${c.on ? `<span class="cm-onp"><i></i>Ouvert</span>` : `<span class="cm-onp off"><i></i>Fermé</span>`}<button class="iconbtn cm-fullb" data-act="cmFull" aria-label="Écran cuisine plein écran" title="Plein écran">${ico("cmFull")}</button>`;
+    const right = `${c.on ? `<span class="cm-onp"><i></i>Ouvert</span>` : `<span class="cm-onp off"><i></i>Fermé</span>`}`;
     const tabs = [["live", "cmChef", "En cuisine", live.length], ["carte", "book", "La carte", 0], ["qr", "cmQr", "QR codes", 0], ["cfg", "sliders", "Réglages", 0]];
     let body = "";
     if (!cmCanOnline()) body = cmLocalCard();
