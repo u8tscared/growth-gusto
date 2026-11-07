@@ -171,14 +171,24 @@ const AUTH = {
   /* ───────────── signed in ───────────── */
   async signedIn(u, opt = {}) {
     this.user = u; auLS.set("gg-mode", "cloud"); this.emit("signin");
-    let doc = {};
-    try { const s = await this.timeout(this.fs.collection("users").doc(u.uid).get(), 12000); doc = s.exists ? s.data() || {} : {}; } catch (e) { console.warn("users get", e && e.code); }
+    const doc = await this.userDoc(u.uid);
     this.restos = Array.isArray(doc.restos) ? doc.restos : [];
     const prof = { name: u.displayName || doc.name || "", email: u.email || "", photo: u.photoURL || "" };
     if (prof.name !== doc.name || prof.email !== doc.email || prof.photo !== doc.photo) this.fs.collection("users").doc(u.uid).set({ ...prof, updatedAt: Date.now(), ...(doc.createdAt ? {} : { createdAt: Date.now() }) }, { merge: true }).catch((e) => console.warn("users set", e && e.code));
     /* an e-mail/password account checks its address first (6-digit code, or Firebase's link while the server is off) */
     if (this.needVerify(u, opt.fresh)) return this.verifyStart(u);
     this.route();
+  },
+  /* my users/{uid} doc. Offline (a kitchen whose Wi-Fi is down, or connected but reaching nothing), the app must open on its cached copy
+     at once: never wait 12 s, and never take a failed read for « no restaurant » (that would show the « create a restaurant » screen).
+     The device copy answers first when it lists restaurants; the live list (core watchMyRestos) corrects it a moment later. */
+  async userDoc(uid) {
+    const ref = this.fs.collection("users").doc(uid);
+    const cache = async () => { try { const c = await ref.get({ source: "cache" }); return c.exists ? c.data() || {} : null; } catch (e) { return null; } };
+    const c = await cache();
+    if (c && Array.isArray(c.restos) && c.restos.length) { ref.get().catch(() => {}); return c; }
+    try { const s = await this.timeout(ref.get(), navigator.onLine === false ? 2500 : 9000); return s.exists ? s.data() || {} : {}; }
+    catch (e) { console.warn("users get", e && e.code); return c || {}; }
   },
   route() {
     const u = this.user;
@@ -202,6 +212,7 @@ const AUTH = {
     try { await this.auth.signOut(); } catch (e) {}
     /* a shared kitchen tablet: the next person must not find the previous account's cached data */
     try { await this.fs.terminate(); await this.fs.clearPersistence(); } catch (e) {}
+    auLS.del("gg-netq"); /* js/horsligne.js: labels of the changes still waiting belong to this account */
     auLS.set("gg-mode", "out"); auLS.del("gg-rid-c"); this.emit("signout");
     location.reload();
   },
@@ -1116,6 +1127,7 @@ const AUTH = {
       }
       auLS.sdel("gg-del-account"); auLS.set("gg-mode", "out"); auLS.del("gg-rid-c"); auLS.del("gg-imp-" + uid); auLS.del("gg-last"); auLS.del("gg-last-email"); auLS.del("gg-invite"); auLS.sset("gg-au-flash", "Votre compte a été supprimé.");
       try { await this.fs.terminate(); await this.fs.clearPersistence(); } catch (e) {}
+      auLS.del("gg-netq");
       SFX.close(); location.reload();
     } catch (e) {
       console.warn("delete account", e); auLS.sdel("gg-del-account"); SFX.err();
@@ -1166,6 +1178,8 @@ const AUTH = {
   /* ───────────── network state (accounts only): offline pill, « synchronisé » on return ───────────── */
   watchNet() {
     if (this._net) return; this._net = true;
+    /* js/horsligne.js draws the richer « hors ligne / envoi / à jour » capsule and its sheet */
+    if (typeof NET !== "undefined") return NET.start(this.fs);
     const pill = document.createElement("div"); pill.id = "auNet"; pill.className = "au-net"; pill.setAttribute("role", "status");
     pill.innerHTML = `${ico("auOff")}<span>Hors ligne · envoi au retour du réseau</span>`; document.body.appendChild(pill);
     const upd = () => { const off = navigator.onLine === false; pill.classList.toggle("on", off); document.documentElement.classList.toggle("au-offline", off); };
