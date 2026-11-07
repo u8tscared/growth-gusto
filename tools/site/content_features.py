@@ -94,7 +94,7 @@ FEATURES = [
 
  dict(slug="prise-de-commande", short="Prise de commande et écran cuisine", ic="order", icc="t",
   title="Prise de commande au téléphone et écran cuisine pour restaurant · Growth Gusto",
-  desc="Le serveur prend la commande sur son téléphone, la cuisine la reçoit sur une tablette avec minuteurs et allergies en rouge. Ruptures en direct, notes de frais avec TVA. Sans encaissement dans l'app.",
+  desc="Le serveur prend la commande sur son téléphone, la cuisine la reçoit sur une tablette avec minuteurs et allergies en rouge. Ruptures en direct, note de frais (facture avec TVA) depuis l'addition. Sans encaissement dans l'app.",
   kick="Prise de commande", h1='De la table à la cuisine, <span class="hl">en un tap.</span>',
   lede="Le serveur touche la table, ajoute les plats, les cuissons et les allergies, et envoie en cuisine. La cuisine voit les bons arriver avec un minuteur, et prévient quand c'est prêt.",
   img="salle", tags=[SECOND],
@@ -103,11 +103,11 @@ FEATURES = [
    ("Le serveur commande au téléphone", "Plan de salle ou grille des numéros, couverts, plats de la carte, cuissons, allergies du client. Boissons, entrées, plats, desserts : on envoie suite par suite.", ["Notes de cuisson et allergies", "Alerte si un plat contient l'allergie", "« Envoyer la suite »", "Changer de table, accoler ou séparer des tables"], "salle", "t", []),
    ("Les ruptures sous les yeux du serveur", "En cuisine, chaque plat est Disponible, Limité à quelques portions ou Épuisé. Le serveur voit « Il reste 7 » sur sa commande, son téléphone sonne quand un plat tombe en rupture, et un plat épuisé disparaît du menu QR.", ["Disponible, Limité (N portions), Épuisé", "Bandeau « Il reste » sur la commande", "Vous choisissez quand le compteur baisse : commande, envoi, prêt ou encaissement", "Retiré du menu QR à zéro"], "table", "r", []),
    ("L'écran cuisine", "Une tablette au passe : les bons de la salle et du menu QR arrivent ensemble, avec le numéro de table, un minuteur coloré et les allergies en rouge. Lancer, prêt, à suivre.", ["« Table 8 · Commande QR » sur le bon", "Rappeler le serveur : son téléphone sonne, « La cuisine vous appelle »", "Filtre cuisine ou bar, carillon à chaque bon", "Bon imprimé sur l'imprimante d'étiquettes"], "cuisine", "v", []),
-   ("La note de frais du client", "Un client demande une note pour sa société ? Depuis l'addition de la table ou à la main : « 4 repas complets × 37,25 € » ou le détail, la TVA ventilée à 10 % et 20 %, numérotée. Imprimée ou envoyée par e-mail.", ["Deux présentations : repas complets ou détail", "TVA ventilée par taux", "Numérotation continue, annulation tracée", "Impression, PDF ou e-mail"], "frais", "k", []),
+   ("La note de frais du client", "Un client paie pour sa société ? Dans l'addition, un interrupteur « Note de frais » : la facture à son nom, « 4 repas complets » ou le détail, la TVA à 10 % et 20 %. Le montant vient de la table, jamais tapé à la main. Imprimée ou envoyée par e-mail.", ["Deux présentations : repas complets ou détail", "TVA ventilée par taux", "Numérotation continue, avoir en cas d’erreur", "Impression, PDF ou e-mail"], "frais", "k", []),
   ],
   faq=[("Peut-on encaisser dans Growth Gusto ?", "Non. L'addition est préparée dans l'app, l'encaissement se fait sur votre caisse habituelle. Encaisser dans l'app demanderait une certification NF525."),
        ("Faut-il du matériel spécial ?", "Non : les téléphones des serveurs et une tablette en cuisine suffisent. Une imprimante d'étiquettes peut imprimer les bons."),
-       ("Comment faire une note de frais avec TVA ?", "Depuis l'addition de la table, touchez « Note de frais », ou faites-la à la main avec le montant payé et le nombre de couverts. La note dit « 4 repas complets × 37,25 € » ou le détail des plats, avec la TVA ventilée à 10 % et 20 %. Elle est numérotée et s'imprime ou part par e-mail. Inclus dans les packs Second et Chef.")],
+       ("Comment faire une note de frais avec TVA ?", "Dans l'addition de la table, activez « Note de frais » et indiquez la société : quand la table est réglée, la facture est éditée à son nom, « 4 repas complets » ou le détail des plats, avec la TVA à 10 % et 20 %. Numérotation continue, avoir en cas d'erreur, impression ou e-mail. Inclus dans les packs Second et Chef.")],
   related=["menu-qr", "reservations", "caisse-stock"], guides=[]),
 
  dict(slug="menu-qr", short="Menu QR et commande en ligne", ic="qr", icc="",

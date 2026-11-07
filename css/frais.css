@@ -1,95 +1,78 @@
-/* Growth Gusto — notes de frais (js/frais.js). Prefix nf- */
-.nf .ico{width:20px;height:20px}
-.nf-hero{padding:18px;display:flex;flex-direction:column;gap:14px}
-.nf-hl{display:flex;gap:12px;align-items:flex-start}
-.nf-hl b{display:block;font-size:16.5px;letter-spacing:-.02em}
-.nf-hl p{margin:3px 0 0;font-size:13.5px;color:var(--muted);line-height:1.45}
-.nf-hk,.nf-ic{flex:none;width:44px;height:44px;border-radius:14px;display:grid;place-items:center;color:var(--accent);background:color-mix(in srgb,var(--accent) 12%,transparent)}
-.nf-hk .ico{width:23px;height:23px}
-.nf-hs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
-.nf-hs>div{padding:10px 12px;border-radius:14px;background:var(--well);min-width:0}
-.nf-hs b{display:block;font-size:15.5px;letter-spacing:-.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.nf-hs span{font-size:11.5px;font-weight:700;color:var(--muted)}
-.nf-set{all:unset;cursor:pointer;box-sizing:border-box;display:flex;align-items:center;gap:12px;padding:14px 16px;border-radius:20px;border:1.5px dashed color-mix(in srgb,var(--warn) 45%,transparent)}
-.nf-set>.ico:first-child{color:var(--warn);flex:none}
-.nf-set span{flex:1;min-width:0}.nf-set b{display:block;font-size:14.5px}.nf-set em{font-style:normal;font-size:12.5px;color:var(--muted)}
-.nf-search{position:relative}
-.nf-search>span{position:absolute;left:13px;top:50%;transform:translateY(-50%);color:var(--faint);display:grid}
-.nf-search>span .ico{width:17px;height:17px}
-.nf-search .input{padding-left:38px}
-.nf-list{display:flex;flex-direction:column;gap:8px}
-.nf-row{all:unset;cursor:pointer;box-sizing:border-box;display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:18px;transition:transform .25s var(--spring)}
-.nf-row:active{transform:scale(.985)}
-.nf-row:focus-visible{outline:2.5px solid var(--accent)}
-.nf-ic{width:40px;height:40px;border-radius:13px}
-.nf-rt{flex:1;min-width:0}
-.nf-rt b{display:block;font-size:14.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.nf-rt em{font-style:normal;font-size:12.5px;color:var(--muted)}
-.nf-rv{display:flex;flex-direction:column;align-items:flex-end;gap:2px}
-.nf-rv b{font-size:15px}
-.nf-rv i{font-style:normal;font-size:11px;font-weight:800;color:var(--bad)}
-.nf-row.void .nf-rt b,.nf-row.void .nf-rv b{text-decoration:line-through;color:var(--faint)}
-.nf-row.void .nf-ic{color:var(--faint);background:var(--well)}
-.nf-legal{padding:0 4px}
-@media (min-width:960px){.nf-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.nf-list>.empty{grid-column:1/-1}}
-
-/* editor */
-.nf-form{display:flex;flex-direction:column;gap:12px;min-width:0}
-.nf-seg button{display:inline-flex;align-items:center;justify-content:center;gap:7px}
-.nf-seg .ico{width:17px;height:17px}
-.nf-card{padding:16px;display:flex;flex-direction:column;gap:14px}
+/* Growth Gusto — note de frais dans l'addition (js/frais.js). Prefix nf- */
+/* the switch in the bill */
+.nf-bill{border-radius:16px;background:var(--glass);box-shadow:0 0 0 1px var(--line) inset;overflow:hidden;transition:box-shadow .25s}
+.nf-bill.on{box-shadow:0 0 0 1.5px color-mix(in srgb,var(--accent) 45%,transparent) inset}
+.nf-tg{all:unset;cursor:pointer;box-sizing:border-box;width:100%;display:flex;align-items:center;gap:12px;padding:12px 14px}
+.nf-tg:focus-visible{outline:2.5px solid var(--accent);outline-offset:-3px;border-radius:16px}
+.nf-tgi{flex:none;width:38px;height:38px;border-radius:12px;display:grid;place-items:center;color:var(--accent);background:var(--tint-acc)}
+.nf-tgi .ico{width:20px;height:20px}
+.nf-tgt{flex:1;min-width:0}.nf-tgt b{display:block;font-size:15px}.nf-tgt em{font-style:normal;font-size:12.5px;color:var(--muted);line-height:1.35;display:block}
+.nf-sw{flex:none;width:46px;height:28px;border-radius:99px;background:rgb(var(--k) / .14);position:relative;transition:background .25s}
+.nf-sw i{position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:#fff;box-shadow:0 2px 6px rgba(0,0,0,.2);transition:transform .35s var(--spring)}
+.nf-bill.on .nf-sw{background:var(--accent)}.nf-bill.on .nf-sw i{transform:translateX(18px)}
+.nf-fields{display:flex;flex-direction:column;gap:12px;padding:2px 14px 14px}
+.nf-sh .nf-fields{padding:0}
+.nf-fields .input{height:46px;font-size:15px}
 .nf-chips{display:flex;flex-wrap:wrap;gap:7px}
 .nf-chips.col{flex-direction:column}.nf-chips.col .chip{justify-content:center}
 .nf-chips .chip{min-height:40px;padding:8px 13px}
-.nf-amt{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:end}
-.nf-eur{position:relative}
-.nf-eur i{position:absolute;right:14px;top:50%;transform:translateY(-50%);font-style:normal;font-weight:800;color:var(--muted)}
-.nf-eur .input{padding-right:34px;font-size:18px;font-weight:700}
-.nf-alc .input{font-size:15.5px}
-.nf-step{height:50px}
-.nf-step b{min-width:28px;text-align:center;font-size:17px}
-.nf-step .ico{width:18px;height:18px}
-.nf-tabs{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
-.nf-tab{all:unset;cursor:pointer;box-sizing:border-box;display:flex;flex-direction:column;gap:2px;padding:12px 14px;border-radius:16px;background:var(--glass);border:1.5px solid var(--edge);transition:all .25s var(--spring)}
-.nf-tab b{font-size:15px}.nf-tab em{font-style:normal;font-size:12px;color:var(--muted)}.nf-tab span{font-weight:800;font-size:14.5px;margin-top:4px}
-.nf-tab.on{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 9%,var(--glass));box-shadow:0 8px 20px -12px color-mix(in srgb,var(--accent) 60%,transparent)}
-.nf-tab:active{transform:scale(.97)}
-.nf-none{display:flex;gap:10px;align-items:flex-start;padding:14px;border-radius:16px;background:var(--well);font-size:13.5px;color:var(--muted);line-height:1.45}
-.nf-none .ico{flex:none;width:20px;height:20px;margin-top:1px}
-.nf-side{display:flex;flex-direction:column;gap:12px;min-width:0}
-.nf-prev{display:flex;flex-direction:column;gap:8px}
-.nf-cta{margin-top:2px}
-@media (min-width:960px){.nf-side{position:sticky;top:20px}.nf-cols{grid-template-columns:minmax(0,1fr) minmax(0,.9fr)}}
+.nf-chips.sm .chip{min-height:34px;padding:6px 11px;font-size:12.5px}
+.nf-vat{display:flex;flex-direction:column;gap:4px;padding:10px 12px;border-radius:12px;background:var(--well)}
+.nf-vat div{display:flex;align-items:baseline;gap:10px;font-size:13px}
+.nf-vat span{font-weight:800;flex:1}.nf-vat em{font-style:normal;color:var(--muted);font-size:12px}.nf-vat b{min-width:70px;text-align:right}
+.nf-done{all:unset;cursor:pointer;box-sizing:border-box;width:100%;display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:16px;background:var(--tint-ok);color:var(--ok)}
+.nf-done span{flex:1;min-width:0}.nf-done b{display:block;font-size:14.5px}.nf-done em{font-style:normal;font-size:12.5px;color:var(--ink-2)}
+.nf-done .ico{width:20px;height:20px;flex:none}
 
-/* the paper note (in the app; the print uses its own CSS in js/frais.js) */
-.nf-paper{position:relative;background:#FFFEFB;color:#1A1A22;border-radius:6px;padding:22px 20px 18px;font-size:13px;line-height:1.45;box-shadow:0 1px 0 rgba(0,0,0,.04),0 18px 40px -22px rgba(30,20,90,.45);overflow:hidden}
-.nf-paper::after{content:"";position:absolute;left:0;right:0;bottom:0;height:8px;background:radial-gradient(circle at 6px 8px,transparent 5px,#FFFEFB 5.5px) 0 0/12px 8px repeat-x;transform:translateY(4px);opacity:0}
+/* the floor: tables settled today */
+.nf-flh{padding:0 4px}
+.nf-lnk{all:unset;cursor:pointer;font-size:13px;font-weight:800;color:var(--accent-ink);padding:8px 2px}
+.nf-done-l{padding:4px 8px}
+.nf-dr{display:flex;align-items:center;gap:12px;padding:10px 6px;border-bottom:1px solid var(--line)}
+.nf-dr:last-child{border-bottom:0}
+.nf-drt{flex:1;min-width:0}.nf-drt b{display:block;font-size:14.5px}.nf-drt em{font-style:normal;font-size:12.5px;color:var(--muted)}
+.nf-dr .btn{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.nf-dr .btn .ico{width:16px;height:16px}
+
+/* list sheet */
+.nf-list{display:flex;flex-direction:column;gap:6px;max-height:60vh;overflow:auto}
+.nf-row{all:unset;cursor:pointer;box-sizing:border-box;display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:14px;background:var(--glass);box-shadow:0 0 0 1px var(--line) inset}
+.nf-row:focus-visible{outline:2.5px solid var(--accent)}
+.nf-ic{flex:none;width:38px;height:38px;border-radius:12px;display:grid;place-items:center;color:var(--accent);background:var(--tint-acc)}
+.nf-ic .ico{width:19px;height:19px}
+.nf-rt{flex:1;min-width:0}.nf-rt b{display:block;font-size:14.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.nf-rt em{font-style:normal;font-size:12.5px;color:var(--muted)}
+.nf-rv{display:flex;flex-direction:column;align-items:flex-end;gap:2px}.nf-rv b{font-size:14.5px}.nf-rv i{font-style:normal;font-size:11px;font-weight:800;color:var(--bad)}
+.nf-row.void .nf-rt b,.nf-row.void .nf-rv b{text-decoration:line-through;color:var(--faint)}
+.nf-set{all:unset;cursor:pointer;box-sizing:border-box;display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:16px;border:1.5px dashed color-mix(in srgb,var(--warn) 50%,transparent)}
+.nf-set>.ico:first-child{color:var(--warn);flex:none;width:20px;height:20px}
+.nf-set span{flex:1;min-width:0}.nf-set b{display:block;font-size:14px}.nf-set em{font-style:normal;font-size:12.5px;color:var(--muted)}
+
+/* the paper (in the app; the print uses its own CSS in js/frais.js) */
+.nf-paper{position:relative;background:#FFFEFB;color:#1A1A22;border-radius:6px;padding:20px 18px 16px;font-size:12.5px;line-height:1.45;box-shadow:0 1px 0 rgba(0,0,0,.04),0 18px 40px -22px rgba(30,20,90,.45);overflow:hidden}
 .nf-paper header{display:flex;flex-direction:column;align-items:center;text-align:center;gap:1px;padding-bottom:12px;border-bottom:1px dashed #BDB8C8}
-.nf-paper header b{font-size:16px;letter-spacing:-.02em}
-.nf-paper header span{font-size:11.5px;color:#5B5668}
+.nf-paper header b{font-size:15.5px;letter-spacing:-.02em}.nf-paper header span{font-size:11.5px;color:#5B5668}.nf-paper header .miss{color:#C0263F;font-weight:700}
 .nf-pt{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin:14px 0 2px}
-.nf-pt b{font-size:15px;letter-spacing:-.01em}.nf-pt span{font-size:12px;color:#5B5668;font-family:"JetBrains Mono",ui-monospace,monospace}
+.nf-pt b{font-size:16px}.nf-pt span{font-size:12px;color:#5B5668;font-family:"JetBrains Mono",ui-monospace,monospace}
 .nf-meta{display:flex;flex-direction:column;font-size:12px;color:#5B5668;margin-bottom:10px}
-.nf-paper table{width:100%;border-collapse:collapse;font-size:12.5px}
-.nf-paper th{font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:#6E6880;text-align:left;font-weight:800;border-bottom:1px solid #2A2633;padding:5px 3px}
+.nf-client{display:flex;flex-direction:column;padding:9px 11px;border:1px solid #E2DDE8;border-radius:8px;margin-bottom:12px}
+.nf-client em{font-style:normal;font-size:9.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#7A7488}.nf-client b{font-size:13.5px}.nf-client span{font-size:12px;color:#5B5668}
+.nf-paper table{width:100%;border-collapse:collapse;font-size:12px}
+.nf-paper th{font-size:9.5px;text-transform:uppercase;letter-spacing:.05em;color:#6E6880;text-align:left;font-weight:800;border-bottom:1px solid #2A2633;padding:5px 3px}
 .nf-paper td{padding:6px 3px;border-bottom:1px solid #EEEAF2;vertical-align:top}
-.nf-paper .m{text-align:right;white-space:nowrap;font-family:"JetBrains Mono",ui-monospace,monospace;font-size:12px}
-.nf-paper .q{width:28px;font-family:"JetBrains Mono",ui-monospace,monospace}
-.nf-paper .nf-0{text-align:center;color:#8A8498;padding:14px 0}
-.nf-tot{display:flex;justify-content:space-between;align-items:baseline;margin:12px 0 2px;font-weight:700}
-.nf-tot b{font-size:20px;letter-spacing:-.02em;font-family:"JetBrains Mono",ui-monospace,monospace}
-.nf-paper .pp{margin:0 0 8px;text-align:right;font-size:12px;color:#5B5668}
-.nf-r{margin-top:8px}
-.nf-r tfoot td{font-weight:800;border-bottom:0}
+.nf-paper td small{display:block;font-size:11px;color:#6E6880}
+.nf-paper .m{text-align:right;white-space:nowrap;font-family:"JetBrains Mono",ui-monospace,monospace;font-size:11.5px}
+.nf-paper .q{width:24px;font-family:"JetBrains Mono",ui-monospace,monospace}
+.nf-r{margin-top:12px}
+.nf-tots{margin:10px 0 0 auto;width:min(230px,100%)}
+.nf-tots div{display:flex;justify-content:space-between;padding:2px 0;font-size:12.5px}
+.nf-tots b{font-family:"JetBrains Mono",ui-monospace,monospace;font-weight:600}
+.nf-tots .big{border-top:1px solid #2A2633;margin-top:4px;padding-top:6px;font-size:14px;font-weight:800}.nf-tots .big b{font-size:17px;font-weight:800}
 .nf-foot{display:flex;flex-direction:column;align-items:center;text-align:center;gap:1px;margin-top:14px;padding-top:12px;border-top:1px dashed #BDB8C8;font-size:11.5px;color:#5B5668}
-.nf-void{position:absolute;top:44%;left:50%;transform:translate(-50%,-50%) rotate(-16deg);font-size:40px;font-weight:900;letter-spacing:.02em;color:rgba(212,42,72,.3);border:4px solid rgba(212,42,72,.3);padding:2px 16px;border-radius:12px;pointer-events:none}
-.nf-paper.void td,.nf-paper.void .nf-tot{color:#9A95A8}
+.nf-void{position:absolute;top:44%;left:50%;transform:translate(-50%,-50%) rotate(-16deg);font-size:38px;font-weight:900;color:rgba(212,42,72,.3);border:4px solid rgba(212,42,72,.3);padding:2px 16px;border-radius:12px;pointer-events:none}
 
 /* sheets */
 .nf-sh{display:flex;flex-direction:column;gap:14px}
-.nf-sh .nf-paper{max-height:56vh;overflow:auto}
+.nf-sh .nf-paper{max-height:52vh;overflow:auto}
 .nf-acts{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px}
-.nf-acts .btn{display:inline-flex;align-items:center;justify-content:center;gap:7px}
-.nf-acts .ico,.nf-cxb .ico,.nf-billbtn .ico{width:18px;height:18px}
-.nf-cx{text-align:center;color:var(--bad);font-weight:700}
-.nf-billbtn{display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:8px}
+.nf-acts .btn,.nf-cxb{display:inline-flex;align-items:center;justify-content:center;gap:7px}
+.nf-acts .ico,.nf-cxb .ico{width:18px;height:18px}
