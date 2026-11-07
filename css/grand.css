@@ -1,7 +1,7 @@
 /* Growth Gusto — « Grand écran » (js/grand.js): service screens without the menus, as wide as the screen */
 .gg-bigb{flex:none;min-height:44px;gap:7px;padding:0 14px;white-space:nowrap}
 .gg-bigb .ico{width:18px;height:18px}
-.gg-bigb.on{background:var(--ink,#1B1530);color:#fff;box-shadow:0 3px 0 #000}
+.gg-bigb.on{background:#1B1530;color:#fff;box-shadow:0 0 0 1px rgba(255,255,255,.16) inset,0 3px 0 #000}
 .cf-head .gg-bigb{background:rgba(255,255,255,.12);color:#fff;box-shadow:0 0 0 1px rgba(255,255,255,.18) inset;margin:0}
 .cf-head .gg-bigb.on{background:rgba(255,255,255,.22)}
 @media (max-width:620px){.gg-bigb{padding:0;width:44px;justify-content:center}.gg-bigb span{display:none}}
@@ -11,7 +11,20 @@ html.gg-big .side{display:none!important}
 html.gg-big .tabbar{transform:translateY(calc(140% + env(safe-area-inset-bottom,0px)))!important;pointer-events:none}
 html.gg-big .view{padding-bottom:calc(max(14px,env(safe-area-inset-bottom,0px)) + 14px)}
 html.gg-big .inner,html.gg-big .inner.wide{max-width:min(100%,1760px)}
-@media (min-width:960px){html.gg-big .view{padding:22px 28px 28px}}
+@media (min-width:960px){html.gg-big .view{padding:calc(env(safe-area-inset-top,0px) + 22px) max(28px,env(safe-area-inset-right,0px)) calc(max(14px,env(safe-area-inset-bottom,0px)) + 14px) max(28px,env(safe-area-inset-left,0px))}}
+/* demo: the pill went to the bottom, so the room kept for it at the top goes back to the screen */
+html.au-demomode.gg-big .view{padding-top:calc(env(safe-area-inset-top,0px) + 14px)}
+/* phone (iPhone above all, where the browser keeps its bars): every pixel goes to the service, edge to edge within the safe areas */
+@media (max-width:620px){
+  html.gg-big .view,html.au-demomode.gg-big .view{padding:calc(env(safe-area-inset-top,0px) + 8px) max(8px,env(safe-area-inset-right,0px)) calc(max(8px,env(safe-area-inset-bottom,0px)) + 8px) max(8px,env(safe-area-inset-left,0px))}
+  html.gg-big .cf-head .cf-fl,html.gg-big .cf-head .cf-set,html.gg-big .df-strips.cf{display:none!important}
+  html.gg-big .cf-head{padding-top:10px;padding-bottom:10px}
+}
+/* phone on its side (landscape iPhone): same, the notch side stays clear */
+@media (max-height:500px) and (orientation:landscape){
+  html.gg-big .view,html.au-demomode.gg-big .view{padding:calc(env(safe-area-inset-top,0px) + 8px) max(12px,env(safe-area-inset-right,0px)) calc(max(8px,env(safe-area-inset-bottom,0px)) + 6px) max(12px,env(safe-area-inset-left,0px))}
+  html.gg-big .cf-head .cf-fl,html.gg-big .df-strips.cf{display:none!important}
+}
 /* the moment it switches: the screen settles into its new width */
 html.gg-big-in .viewport{animation:ggBigIn .55s cubic-bezier(.2,.8,.2,1)}
 @keyframes ggBigIn{from{opacity:.4;transform:scale(.985)}to{opacity:1;transform:none}}
@@ -19,3 +32,14 @@ html.gg-big-in .viewport{animation:ggBigIn .55s cubic-bezier(.2,.8,.2,1)}
 /* demo: the « Mode démo » pill moves to the bottom (the tab bar is gone), so it never covers the screen's own buttons */
 html.gg-big .au-dbar{top:auto!important;bottom:max(14px,env(safe-area-inset-bottom,0px))}
 html.gg-big .au-dbar:not(.on){display:none}
+/* iPhone in Safari: the one-time « vrai plein écran » explanation */
+.gg-tip-ill{display:flex;align-items:center;justify-content:center;gap:16px;margin:6px 0 14px;color:var(--muted)}
+.gg-tip-ill>.ico{width:22px;height:22px}
+.gg-tip-ph{width:58px;height:104px;border-radius:14px;padding:5px;display:flex;flex-direction:column;gap:4px;background:#1B1530;box-shadow:0 0 0 1px rgba(255,255,255,.12) inset,0 6px 18px rgba(27,21,48,.22)}
+.gg-tip-bar{display:block;height:12px;border-radius:5px;background:rgba(255,255,255,.28)}
+.gg-tip-sc{display:block;flex:1;border-radius:7px;background:linear-gradient(160deg,#7A4DFF,#FF8A4C)}
+.gg-tip-ph.full{animation:ggTipIn 1.6s cubic-bezier(.2,.8,.2,1) infinite alternate}
+@keyframes ggTipIn{from{transform:scale(.94)}to{transform:scale(1.04)}}
+@media (prefers-reduced-motion:reduce){.gg-tip-ph.full{animation:none}}
+.gg-tip-p{margin:0 0 10px;font-size:14.5px;line-height:1.45}
+.gg-tip-ok{margin-top:14px}

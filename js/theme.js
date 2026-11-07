@@ -3,9 +3,11 @@
    Choix par appareil (localStorage) :
      gg-theme      auto (comme le téléphone) · light · dark · soir (sombre de 19 h à 7 h)
      gg-theme-svc  "0" pour couper « écrans de service toujours sombres » (activé par défaut)
+     gg-theme-cf   "dark" si l'appareil a choisi le coup de feu en sombre (bouton lune de son en-tête) ; sinon le coup de feu est
+                   TOUJOURS clair, quel que soit le reste (demande de Marceau, 2026-11-07)
    html[data-theme] vaut toujours "light" ou "dark" (posé avant le premier affichage par le petit script du <head> d'index.html).
 
-   Les écrans de service (écran cuisine, bar, coup de feu, et toute vue qui déclare VIEWS.x.dark = true) passent en sombre
+   Les écrans de service (écran cuisine, bar, recette, et toute vue qui déclare VIEWS.x.dark = true) passent en sombre
    d'eux-mêmes quand « écrans de service toujours sombres » est activé : moins d'éblouissement en cuisine et en salle le soir.
 
    Le look sombre :
@@ -19,19 +21,22 @@
 (function () {
   const LS = { get: (k) => { try { return localStorage.getItem(k); } catch (e) { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} } };
   const MQ = (() => { try { return matchMedia("(prefers-color-scheme: dark)"); } catch (e) { return null; } })();
-  const SVC_ROUTES = ["cuisine", "bar", "coupdefeu", "recette"];
+  const SVC_ROUTES = ["cuisine", "bar", "recette"];
+  /* coup de feu: light by default, always; dark only when chosen on its own header, on this device */
+  const CF_R = "coupdefeu";
   const TH = (window.TH = {
     pref: ["auto", "light", "dark", "soir"].includes(LS.get("gg-theme")) ? LS.get("gg-theme") : "auto",
     svc: LS.get("gg-theme-svc") !== "0",
     eff: document.documentElement.dataset.theme === "dark" ? "dark" : "light",
     patched: false,
+    cfDark: LS.get("gg-theme-cf") === "dark",
   });
   const night = () => { const h = new Date().getHours(); return h >= 19 || h < 7; };
   const route = () => (typeof S !== "undefined" && S && S.route) || "";
   const svcRoute = (r) => SVC_ROUTES.includes(r) || !!(typeof VIEWS !== "undefined" && VIEWS[r] && VIEWS[r].dark === true);
   /* the look the person chose, before service screens */
   const prefDark = () => TH.pref === "dark" || (TH.pref === "auto" && !!(MQ && MQ.matches)) || (TH.pref === "soir" && night());
-  const wanted = () => (TH.svc && svcRoute(route()) ? "dark" : prefDark() ? "dark" : "light");
+  const wanted = () => (route() === CF_R ? (TH.cfDark ? "dark" : "light") : TH.svc && svcRoute(route()) ? "dark" : prefDark() ? "dark" : "light");
   TH.svcNow = () => TH.svc && svcRoute(route());
 
   const M = window.THMAP;
@@ -130,7 +135,7 @@
   window.thRow = () => icoOk() ? `<div class="li tap th-row" data-act="thSheet"><span class="ic w-vi">${ico(icFor())}</span><div class="tx"><b>Apparence</b><em>${esc(label())}</em></div>${ico("chev")}</div>` : "";
   /* a quick switch for service screens' top bar (cuisine, bar…): one tap, no menu */
   window.thTopBtn = () => {
-    if (!icoOk() || !svcRoute(route())) return "";
+    if (!icoOk() || (!svcRoute(route()) && route() !== CF_R)) return "";
     const d = TH.eff === "dark";
     return `<button class="iconbtn th-topbtn" data-act="thQuick" aria-label="${d ? "Passer en clair" : "Passer en sombre"}" title="${d ? "Passer en clair" : "Passer en sombre"}">${ico(d ? "thSun" : "thMoon")}</button>`;
   };
@@ -138,7 +143,7 @@
   const sheetHTML = () => `<div class="th-sheet">
       <div class="th-hd"><span class="ic w-vi">${ico("thMoon")}</span><div><div class="h2">Apparence</div><p class="sub">Sur cet appareil seulement. Chacun choisit le sien.</p></div></div>
       <div class="th-opts" role="radiogroup" aria-label="Apparence">${OPTS.map(([k, t, s]) => `<button class="th-opt ${TH.pref === k ? "on" : ""}" role="radio" aria-checked="${TH.pref === k}" data-act="thSet" data-v="${k}">${pv(k)}<b>${t}</b><em>${s}</em></button>`).join("")}</div>
-      <div class="glass pad th-svc"><div class="li tap" data-act="thSvc" role="switch" aria-checked="${TH.svc}"><span class="ic w-in">${ico(typeof IC !== "undefined" && IC.slHat ? "slHat" : "thMoon")}</span><div class="tx"><b>Service toujours en sombre</b><em>Écran cuisine, bar et coup de feu, même en mode clair</em></div>${typeof ccSw === "function" ? ccSw(TH.svc) : ""}</div></div>
+      <div class="glass pad th-svc"><div class="li tap" data-act="thSvc" role="switch" aria-checked="${TH.svc}"><span class="ic w-in">${ico(typeof IC !== "undefined" && IC.slHat ? "slHat" : "thMoon")}</span><div class="tx"><b>Service toujours en sombre</b><em>Écran cuisine et bar, même en mode clair. Le coup de feu reste clair</em></div>${typeof ccSw === "function" ? ccSw(TH.svc) : ""}</div></div>
       <button class="btn acc block" data-act="sheetClose">${ico("check")}C'est bon</button>
     </div>`;
   const refreshSheet = () => {
@@ -164,6 +169,14 @@
     /* service screens: flip this device between light and dark in one tap (it becomes the device's choice) */
     thQuick: (a, id, v, e) => {
       const toDark = TH.eff !== "dark";
+      /* coup de feu keeps its own choice: the rest of the app is not touched */
+      if (route() === CF_R) {
+        TH.cfDark = toDark; LS.set("gg-theme-cf", toDark ? "dark" : "light");
+        try { SFX.tap(); buzz(6); } catch (x) {}
+        apply(tap(e, a)); refreshSheet();
+        try { toast(toDark ? "Coup de feu en sombre sur cet appareil" : "Coup de feu en clair", "info"); } catch (x) {}
+        return;
+      }
       if (!toDark && TH.svcNow()) { TH.svc = false; LS.set("gg-theme-svc", "0"); }
       TH.pref = toDark ? "dark" : "light"; LS.set("gg-theme", TH.pref);
       try { SFX.tap(); buzz(6); } catch (x) {}
