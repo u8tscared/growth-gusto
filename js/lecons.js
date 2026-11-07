@@ -306,7 +306,7 @@ const PC_FAMILLES = [
   ["stock", "Stock & achats", "Inventaire, commandes fournisseurs préparées", "box", ["stock", "achats", "fournisseurs"], "Gestion"],
   ["gaspi", "Gaspillage", "Chaque perte en euros", "gpBin", ["gaspillage"], "Gestion"],
   ["marges", "Marges & factures", "Coût des plats, factures lues en photo", "mgCoin", ["marges", "factures"], "Gestion"],
-  ["dash", "Tableau de bord", "Les chiffres clés en un écran", "dash", ["dashboard"], "Gestion"],
+  ["dash", "Tableau de bord & prévisions", "Les chiffres clés, et ce qui vous attend d'après l'an dernier", "dash", ["dashboard", "previsions"], "Gestion"],
   ["finance", "Finances & comptabilité", "Résultat du mois, banque, Pennylane", "euro", ["finance", "pennylane"], "Gestion"],
   ["consignes", "Consignes & discussion", "Ce que l'équipe doit savoir aujourd'hui", "csMega", ["consignes", "defis"], "Équipe"],
   ["pointeuse", "Pointeuse", "Heures justes, en un geste", "clock", ["pointeuse"], "Équipe"],
