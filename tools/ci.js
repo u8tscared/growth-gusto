@@ -55,3 +55,11 @@ for(const [nom,env] of [['téléphone',{}],['tablette',{TABLET:'1'}]])for(const 
   const mm=o.match(/ERRORS: (\[[\s\S]*\])/);const ee=mm?JSON.parse(mm[1]):null;
   if(n.status!==0||/SCRIPT ERROR/.test(o)||!new RegExp(k+' OK').test(o)||!ee||ee.length){console.log("\n"+(k==='FIGE'?"L'écran bouge sous le doigt":"Le mode événement ne reste pas à part")+" sur "+nom+" : voir ci-dessus ("+t+").");process.exit(1);}
 }
+// 8) l'addition plat par plat (js/salle.js, js/appel.js, commande/commande.js) : chacun choisit ses plats, ce qui est payé est coché
+//    et le reste se met à jour pour l'équipe, l'écran client et la page du client (tools/pp-ui.js)
+{
+  const n=spawnSync(process.execPath,['tools/run.js','tools/pp-ui.js'],{encoding:'utf8',env:{...process.env,OUT:path.join(ROOT,'tools/out/ci')},timeout:180000});
+  const o=(n.stdout||'')+(n.stderr||'');console.log('plat par plat : '+(o.match(/PP (OK|KO)[\s\S]*/)||[o.trim()])[0]);
+  const mm=o.match(/ERRORS: (\[[\s\S]*\])/);const ee=mm?JSON.parse(mm[1]):null;
+  if(n.status!==0||/SCRIPT ERROR/.test(o)||!/PP OK/.test(o)||!ee||ee.length){console.log("\nL'addition plat par plat est cassée : voir ci-dessus (tools/pp-ui.js).");process.exit(1);}
+}

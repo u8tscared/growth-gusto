@@ -200,11 +200,17 @@
     }
     if (op === "callSt") { const c = demo.call; if (!c) throw new Error("lien"); if (d.cancel && c.status === "new") c.status = "annule"; return { call: { ...c } }; }
     if (op === "bill") {
-      const lines = [{ name: "Limonade maison", q: 2, amount: 9 }, { name: "Velouté de potimarron", q: 2, amount: 17 }, { name: "Bœuf bourguignon", q: 2, amount: 44 }, { name: "Filet de bar, beurre blanc", q: 2, amount: 48 }, { name: "Mousse au chocolat", q: 1, amount: 0, free: true }];
-      const total = lines.reduce((a, l) => a + l.amount, 0), pays = demo.pays || (demo.pays = []), paid = pays.reduce((a, x) => a + x.amount, 0);
-      return { bill: { table: "3", covers: 4, open: true, lines, total, paid, left: Math.max(0, total - paid), payOnline: true, pays: pays.map((x) => ({ ...x })) } };
+      const rk = (n, u) => `${n}|${u.toFixed(2)}`, L = [["Limonade maison", 2, 4.5], ["Velouté de potimarron", 2, 8.5], ["Bœuf bourguignon", 2, 22], ["Filet de bar, beurre blanc", 2, 24]];
+      const pays = demo.pays || (demo.pays = []), P = {}; pays.forEach((x) => (x.lines || []).forEach((l) => { P[l.rk] = (P[l.rk] || 0) + l.q; }));
+      const lines = [...L.map(([name, q, u]) => ({ rk: rk(name, u), name, q, unit: u, amount: q * u, free: false, paid: Math.min(q, P[rk(name, u)] || 0), hold: 0 })), { rk: "f|Mousse au chocolat|0.00", name: "Mousse au chocolat", q: 1, unit: 0, amount: 0, free: true, paid: 0, hold: 0 }];
+      const total = lines.reduce((a, l) => a + l.amount, 0), paid = pays.reduce((a, x) => a + x.amount, 0);
+      return { bill: { table: "3", covers: 4, open: true, lines, total, paid, left: Math.max(0, total - paid), payOnline: true, tips: true, pays: pays.map((x) => ({ ...x })) } };
     }
-    if (op === "billPay") { const id = "demo" + Date.now().toString(36); (demo.pays || (demo.pays = [])).push({ id, amount: +d.amount, status: "paye", at: Date.now(), paidAt: Date.now() }); return { bp: id, demo: true }; }
+    if (op === "billPay") {
+      const id = "demo" + Date.now().toString(36), lines = Array.isArray(d.lines) ? d.lines : null;
+      let amount = +d.amount; if (lines) { const b = (await demoApi("bill", {})).bill; amount = lines.reduce((a, l) => { const r = b.lines.find((x) => x.rk === l.rk); return a + (r ? r.unit * l.q : 0); }, 0); }
+      (demo.pays || (demo.pays = [])).push({ id, amount, status: "paye", at: Date.now(), paidAt: Date.now(), ...(lines ? { lines } : {}), ...(+d.tip > 0 ? { tip: +d.tip } : {}) }); return { bp: id, demo: true };
+    }
     throw new Error("op");
   }
 
@@ -551,47 +557,81 @@
 
   /* ───────── the bill of a table, from the customer screen's QR (?r=…&b=<tab>&k=<key>, orderApi op "bill" / "billPay") ───────── */
   const BID = (Q.get("b") || "").trim(), BK = (Q.get("k") || "").trim().toLowerCase(), BP = (Q.get("bp") || "").trim(), BN = Math.max(1, Math.min(20, parseInt(Q.get("n") || "0", 10) || 0));
-  const bs = { back: BP, bill: null, how: BN > 1 ? "part" : "tout", parts: BN > 1 ? BN : 2, mine: 1, busy: false, err: "", pollN: 0 };
-  const billMine = () => { const b = bs.bill; if (!b) return 0; if (bs.how === "tout") return b.left; return Math.min(b.left, Math.ceil((b.total / bs.parts) * bs.mine * 100) / 100); };
+  /* how: "tout" the whole bill, "plats" my own dishes (plat par plat: ticked dishes are paid, the rest updates live for everyone), "part" an equal share */
+  const bs = { back: BP, bill: null, how: BN > 1 ? "part" : "tout", parts: BN > 1 ? BN : 2, mine: 1, sel: {}, tip: 0, busy: false, err: "", pollN: 0, liveT: 0, since: Date.now() };
+  const billRows = () => ((bs.bill && bs.bill.lines) || []).filter((l) => !l.free);
+  const rowLeft = (l) => Math.max(0, l.q - (l.paid || 0) - (l.hold || 0));
+  const selN = () => Object.values(bs.sel).reduce((a, q) => a + q, 0);
+  const billMine = () => {
+    const b = bs.bill; if (!b) return 0; if (bs.how === "tout") return b.left;
+    if (bs.how === "plats") return Math.min(b.left, Math.round(billRows().reduce((a, l) => a + (l.unit || 0) * (bs.sel[l.rk] || 0), 0) * 100) / 100);
+    return Math.min(b.left, Math.ceil((b.total / bs.parts) * bs.mine * 100) / 100);
+  };
+  const billTip = () => (bs.bill && bs.bill.tips !== false && bs.bill.payOnline ? tipOf(bs.tip || 0, billMine()) : 0);
+  /* someone else paid meanwhile: what I picked can't be more than what is left */
+  const clampSel = () => { const R = billRows(); Object.keys(bs.sel).forEach((k) => { const l = R.find((x) => x.rk === k); const m = l ? rowLeft(l) : 0; if ((bs.sel[k] || 0) > m) bs.sel[k] = m; if (!bs.sel[k]) delete bs.sel[k]; }); };
   function paintBill() {
     const bp = bs.back, b = bs.bill, p = st.pub || {}, done = b && b.left <= 0.004 && b.total > 0, back = bp && b && b.pays.find((x) => x.id === bp);
     document.title = `Addition · ${p.name || "Restaurant"}`;
     if (!b) return;
-    const okNow = back && back.status === "paye", waiting = back && back.status === "apayer";
-    const lines = b.lines.map((l) => `<div><span><b>${l.q}×</b> ${esc(l.name)}</span><span class="mono">${l.free ? "offert" : eur(l.amount)}</span></div>`).join("");
-    const paidRows = b.pays.filter((x) => x.status === "paye").map((x) => `<div class="pd"><span>${svg.check}Payé en ligne</span><span class="mono">− ${eur(x.amount)}</span></div>`).join("");
+    clampSel();
+    const okNow = back && back.status === "paye", waiting = back && back.status === "apayer", pick = bs.how === "plats" && !okNow && !waiting && !done && b.open && b.payOnline;
+    const lineH = (l) => {
+      if (l.free) return `<div><span><b>${l.q}×</b> ${esc(l.name)}</span><span class="mono">offert</span></div>`;
+      const s = bs.sel[l.rk] || 0, lf = rowLeft(l), allPaid = (l.paid || 0) >= l.q;
+      const tag = [l.paid ? `<i class="qm-pd">${svg.check}${allPaid ? "payé" : `${l.paid} payé${l.paid > 1 ? "s" : ""}`}</i>` : "", l.hold ? `<i class="qm-pd hold">${l.hold} en cours</i>` : ""].join("");
+      if (!pick) return `<div class="${allPaid ? "pdl" : ""}"><span><b>${l.q}×</b> ${esc(l.name)}${tag}</span><span class="mono">${eur(l.amount)}</span></div>`;
+      if (!lf) return `<div class="qm-pk off"><i class="qm-ck">${svg.check}</i><span><b>${l.q}×</b> ${esc(l.name)}${tag}</span><span class="mono">${eur(l.amount)}</span></div>`;
+      return `<div class="qm-pk${s ? " on" : ""}"><button class="qm-pkb" data-a="billPick" data-v="${esc(l.rk)}" aria-pressed="${!!s}"><i class="qm-ck">${s > 1 || (s && lf > 1) ? `<b class="mono">${s}</b>` : svg.check}</i><span><b>${l.q}×</b> ${esc(l.name)}${tag}</span><span class="mono">${eur(l.amount)}</span></button>
+        ${s && lf > 1 ? `<div class="qm-pkq"><span>J'en paie</span><div class="qm-qty sm"><button data-a="billLess" data-v="${esc(l.rk)}" aria-label="Un de moins">${svg.minus}</button><b class="mono">${s}</b><button data-a="billPick" data-v="${esc(l.rk)}" aria-label="Un de plus" ${s >= lf ? "disabled" : ""}>${svg.plus}</button></div><em>sur ${lf} · <b class="mono">${eur((l.unit || 0) * s)}</b></em></div>` : ""}</div>`;
+    };
+    const lines = b.lines.map(lineH).join("");
+    const paidRows = b.pays.filter((x) => x.status === "paye").map((x) => `<div class="pd"><span>${svg.check}${x.till ? "Payé au serveur" : "Payé en ligne"}</span><span class="mono">− ${eur(x.amount)}</span></div>`).join("");
     const review = p.review ? `<a class="qm-btn soft qm-rev" href="${esc(p.review)}" target="_blank" rel="noopener">${svg.star}Laisser un avis sur Google</a>` : "";
     let pay = "";
     if (okNow || done) pay = `<div class="qm-bok st" style="--i:2"><div class="qm-ring prete" aria-hidden="true"><svg viewBox="0 0 120 120"><circle class="tr" cx="60" cy="60" r="52"/><circle class="pg" cx="60" cy="60" r="52" style="--p:1"/></svg><div class="qm-ring-c">${svg.check}</div>${Array.from({ length: 14 }, (_, k) => `<i style="--a:${k * 26}deg;--d:${(k % 5) * 40}ms"></i>`).join("")}</div>
-      <h2>${done ? "Tout est réglé" : "Merci, c'est payé"}</h2><p>${done ? "Merci pour votre visite, à très bientôt !" : `${eur(back.amount)} réglés. ${b.left > 0 ? `Il reste ${eur(b.left)} pour la table.` : ""}`}</p>${review}</div>`;
+      <h2>${done ? "Tout est réglé" : "Merci, c'est payé"}</h2><p>${done ? "Merci pour votre visite, à très bientôt !" : `${eur(back.amount)} réglés. ${b.left > 0 ? `Il reste ${eur(b.left)} pour la table : les autres voient leurs plats à jour.` : ""}`}</p>${review}</div>`;
     else if (waiting) pay = `<div class="qm-bok st"><span class="qm-spin big"></span><h2>Paiement en cours</h2><p>On attend la confirmation de votre banque.</p></div>`;
     else if (!b.open) pay = `<p class="qm-msgline info">${svg.check}<span>Cette table est réglée. Merci et à bientôt !</span></p>${review}`;
     else if (!b.payOnline) pay = `<p class="qm-msgline info">${svg.card}<span>Réglez auprès de votre serveur : carte, espèces ou titre-restaurant.</span></p>`;
     else {
-      const amt = billMine();
-      pay = `<div class="qm-bpay st" style="--i:2"><div class="qm-segs">${[["tout", "Tout régler"], ["part", "Payer ma part"]].map(([k, t]) => `<button class="${bs.how === k ? "on" : ""}" data-a="billHow" data-v="${k}">${t}</button>`).join("")}</div>
+      const amt = billMine(), tip = billTip(), n = selN();
+      const tipH = b.tips !== false && amt >= 1 ? `<div class="qm-blk qm-tipb"><div class="qm-bh">${svg.coins}<b>Un pourboire pour l'équipe ?</b></div><div class="qm-tips">${TIPS.map((pc) => `<button class="qm-tip${(bs.tip || 0) === pc ? " on" : ""}" data-a="billTip" data-v="${pc}" aria-pressed="${(bs.tip || 0) === pc}">${pc ? `<b>${pc} %</b><em class="mono">${eur(tipOf(pc, amt))}</em>` : `<b>Non merci</b>`}</button>`).join("")}</div>${tip ? `<p class="qm-tipn">Merci ! Il revient en entier à l'équipe, en salle et en cuisine.</p>` : ""}</div>` : "";
+      pay = `<div class="qm-bpay st" style="--i:2"><div class="qm-segs">${[["tout", "Tout régler"], ["plats", "Mes plats"], ["part", "Une part"]].map(([k, t]) => `<button class="${bs.how === k ? "on" : ""}" data-a="billHow" data-v="${k}">${t}</button>`).join("")}</div>
+        ${bs.how === "plats" ? `<p class="qm-pkh">${n ? `${n} plat${n > 1 ? "s" : ""} choisi${n > 1 ? "s" : ""} · <b class="mono">${eur(amt)}</b>${n ? ` <button class="qm-lnk" data-a="billClear">Effacer</button>` : ""}` : "Touchez sur l'addition ce que vous avez pris."}</p>` : ""}
         ${bs.how === "part" ? `<div class="qm-parts"><div><span>On partage en</span><div class="qm-qty sm"><button data-a="billParts" data-v="-1" aria-label="Moins" ${bs.parts <= 2 ? "disabled" : ""}>${svg.minus}</button><b class="mono">${bs.parts}</b><button data-a="billParts" data-v="1" aria-label="Plus">${svg.plus}</button></div></div>
           <div><span>Je paie pour</span><div class="qm-qty sm"><button data-a="billMine" data-v="-1" aria-label="Moins" ${bs.mine <= 1 ? "disabled" : ""}>${svg.minus}</button><b class="mono">${bs.mine}</b><button data-a="billMine" data-v="1" aria-label="Plus" ${bs.mine >= bs.parts - 1 ? "disabled" : ""}>${svg.plus}</button></div></div></div>` : ""}
+        ${tipH}
         ${bs.err ? `<p class="qm-err">${svg.alert}${esc(bs.err)}</p>` : ""}
-        <button class="qm-btn big block" data-a="billGo" ${bs.busy || amt < 1 ? "disabled" : ""}>${bs.busy ? `<span class="qm-spin"></span>Un instant…` : `${svg.lock}Payer ${eur(amt)}`}</button>
+        <button class="qm-btn big block" data-a="billGo" ${bs.busy || amt < 1 ? "disabled" : ""}>${bs.busy ? `<span class="qm-spin"></span>Un instant…` : bs.how === "plats" && !n ? "Choisissez vos plats" : `${svg.lock}Payer ${eur(amt + tip)}`}</button>
         <p class="qm-fine">${svg.lock}Paiement sécurisé par Stripe, directement au restaurant. Carte, Apple Pay, Google Pay.</p></div>`;
     }
+    const keep = window.scrollY;
     app.innerHTML = `${hero(`Table ${b.table}`)}<section class="qm-card qm-billp">
-      <div class="qm-ticket st" style="--i:1"><div class="qm-tk-h">Votre addition · Table ${esc(b.table)}${b.covers ? ` · ${b.covers} couvert${b.covers > 1 ? "s" : ""}` : ""}</div>
+      <div class="qm-ticket st${pick ? " pick" : ""}" style="--i:1"><div class="qm-tk-h">Votre addition · Table ${esc(b.table)}${b.covers ? ` · ${b.covers} couvert${b.covers > 1 ? "s" : ""}` : ""}</div>
         <div class="qm-tk-l">${lines}</div><div class="qm-tk-t"><span>Total</span><b class="mono">${eur(b.total)}</b></div>
         ${paidRows ? `<div class="qm-tk-l paid">${paidRows}</div><div class="qm-tk-t left"><span>Reste à payer</span><b class="mono">${eur(b.left)}</b></div>` : ""}</div>
       ${pay}</section>${foot()}`;
-    if (okNow || done) { chime(); vib([20, 40, 20]); }
+    /* a repaint of the same screen (a tap, a live update) stays still; a new screen (paid, waiting) plays its entrance */
+    const kind = okNow || done ? "ok" : waiting ? "wait" : "pay";
+    if (bs.painted === kind) { app.classList.add("qm-still"); window.scrollTo(0, keep); } else app.classList.remove("qm-still");
+    bs.painted = kind;
+    if ((okNow || done) && !bs.cheered) { bs.cheered = true; chime(); vib([20, 40, 20]); }
   }
+  /* the bill stays live while it is open: another guest pays, the waiter notes a payment, everyone sees the rest at once */
+  const billLive = () => { clearTimeout(bs.liveT); const b = bs.bill; if (!b || !b.open || (b.left <= 0.004 && b.total > 0) || Date.now() - bs.since > 45 * 6e4) return; bs.liveT = setTimeout(() => { if (document.hidden) { billLive(); return; } loadBill(false); }, 6000); };
   async function loadBill(first) {
-    clearTimeout(st.pollT);
+    clearTimeout(st.pollT); clearTimeout(bs.liveT);
     try {
-      const r = await api("bill", { tid: BID, k: BK, bp: bs.back }); const was = bs.bill; bs.bill = r.bill;
+      const r = await api("bill", { tid: BID, k: BK, bp: bs.back }, { quiet: !first }); const was = bs.bill; bs.bill = r.bill;
+      /* someone at the table already paid part of it: the next guest starts on « Mes plats » */
+      if (!was && BN <= 1 && r.bill.paid > 0 && r.bill.left > 0.004) bs.how = "plats";
       const back = bs.back && r.bill.pays.find((x) => x.id === bs.back);
-      if (first || !was || JSON.stringify(was) !== JSON.stringify(r.bill)) paintBill();
-      if (back && back.status === "apayer" && bs.pollN++ < 20) st.pollT = setTimeout(() => loadBill(false), 3000);
-    } catch (e) { console.warn(e); if (!bs.bill) paintMsg("Addition introuvable", String((e && e.message) || "") === "lien" ? "Ce QR code n'est plus valide. Demandez au serveur d'afficher à nouveau l'addition." : errText(e), true); }
+      if (first || !was || JSON.stringify(was) !== JSON.stringify(r.bill)) { if (!bs.busy) paintBill(); }
+      if (back && back.status === "apayer" && bs.pollN++ < 20) st.pollT = setTimeout(() => loadBill(false), 3000); else billLive();
+    } catch (e) { console.warn(e); if (!bs.bill) paintMsg("Addition introuvable", String((e && e.message) || "") === "lien" ? "Ce QR code n'est plus valide. Demandez au serveur d'afficher à nouveau l'addition." : errText(e), true); else billLive(); }
   }
+  document.addEventListener("visibilitychange", () => { if (!document.hidden && bs.bill && BID) loadBill(false); });
 
   /* ───────── actions ───────── */
   const ACT = {
@@ -622,17 +662,27 @@
     },
     callAgain: async () => { if (!st.call || st.sending) return; st.sending = true; try { const c = st.call.call; const r = await api("call", { table: c.table, kind: c.kind, pay: c.pay }); st.call = r; saveCall(); pop(); vib(12); keepScroll(paintCallState); } catch (e) { console.warn(e); } st.sending = false; },
     callCancel: async () => { if (!st.call) return; try { const r = await api("callSt", { cid: st.call.cid, k: st.call.k, cancel: 1 }); st.call.call = r.call; } catch (e) { console.warn(e); } st.call = null; saveCall(); clearTimeout(st.callT); pop(480, 0.07, 0.03); closeSheet(); refreshFab(); },
-    billHow: (el) => { bs.how = el.dataset.v; bs.mine = Math.min(bs.mine, bs.parts - 1); pop(760, 0.05, 0.03); vib(6); paintBill(); },
+    billHow: (el) => { bs.how = el.dataset.v; bs.mine = Math.min(bs.mine, bs.parts - 1); bs.err = ""; pop(760, 0.05, 0.03); vib(6); paintBill(); },
     billParts: (el) => { bs.parts = Math.max(2, Math.min(20, bs.parts + +el.dataset.v)); bs.mine = Math.min(bs.mine, bs.parts - 1); pop(640 + bs.parts * 20, 0.05, 0.03); vib(6); paintBill(); },
     billMine: (el) => { bs.mine = Math.max(1, Math.min(bs.parts - 1, bs.mine + +el.dataset.v)); pop(640 + bs.mine * 20, 0.05, 0.03); vib(6); paintBill(); },
+    /* plat par plat: a tap takes one more of that dish (up to what nobody paid yet), then none again */
+    billPick: (el) => { const k = el.dataset.v, l = billRows().find((x) => x.rk === k); if (!l) return; const n = (bs.sel[k] || 0) + 1; if (n > rowLeft(l)) { delete bs.sel[k]; pop(480, 0.07, 0.03); } else { bs.sel[k] = n; pop(700 + n * 40, 0.05, 0.03); } bs.err = ""; vib(6); paintBill(); },
+    billLess: (el) => { const k = el.dataset.v; bs.sel[k] = (bs.sel[k] || 0) - 1; if (bs.sel[k] <= 0) delete bs.sel[k]; pop(520, 0.06, 0.03); vib(6); paintBill(); },
+    billClear: () => { bs.sel = {}; pop(480, 0.07, 0.03); vib(6); paintBill(); },
+    billTip: (el) => { bs.tip = +el.dataset.v || 0; pop(bs.tip ? 880 : 620, 0.05, 0.03); vib(bs.tip ? [6, 30, 6] : 6); paintBill(); },
     billGo: async () => {
       if (bs.busy) return; bs.busy = true; bs.err = ""; paintBill();
       try {
-        const r = await api("billPay", { tid: BID, k: BK, amount: billMine(), back: location.origin + location.pathname });
+        const lines = bs.how === "plats" ? Object.entries(bs.sel).filter(([, q]) => q > 0).map(([rk, q]) => ({ rk, q })) : null, tip = billTip();
+        const r = await api("billPay", { tid: BID, k: BK, amount: billMine(), ...(lines ? { lines } : {}), ...(tip ? { tip } : {}), back: location.origin + location.pathname });
         if (r.url) { location.href = r.url; return; }
         /* the demo: no Stripe, the page comes back as from Stripe's success page */
-        history.replaceState(null, "", `?r=${encodeURIComponent(RID)}&b=${encodeURIComponent(BID)}&k=${BK}&bp=${encodeURIComponent(r.bp)}&paid=1`); bs.busy = false; bs.back = r.bp; loadBill(true);
-      } catch (e) { console.warn(e); bs.busy = false; const m = String((e && e.message) || ""); bs.err = m === "regle" ? "Cette table vient d'être réglée." : m === "montant" ? "Le montant n'est pas valable." : errText(e); vib([30, 30, 30]); paintBill(); }
+        history.replaceState(null, "", `?r=${encodeURIComponent(RID)}&b=${encodeURIComponent(BID)}&k=${BK}&bp=${encodeURIComponent(r.bp)}&paid=1`); bs.busy = false; bs.back = r.bp; bs.sel = {}; loadBill(true);
+      } catch (e) {
+        console.warn(e); bs.busy = false; const m = String((e && e.message) || "");
+        bs.err = m === "regle" ? "Cette table vient d'être réglée." : m === "plats" ? "Un de ces plats vient d'être payé par quelqu'un d'autre : l'addition est à jour." : m === "montant" ? "Le montant n'est pas valable." : m === "pourboire" ? "Ce pourboire n'est pas valable." : errText(e);
+        vib([30, 30, 30]); if (m === "plats") loadBill(false); paintBill();
+      }
     },
     cart: () => { if (!count()) return; st.err = ""; pop(700, 0.06, 0.03); paintCart(); },
     lq: (el) => { const l = st.cart[+el.dataset.i]; if (!l) return; l.q = Math.max(0, Math.min(30, l.q + +el.dataset.v)); st.cart = st.cart.filter((x) => x.q > 0); saveCart(); pop(560, 0.05, 0.03); vib(6); if (!st.cart.length) { closeSheet(); st.view = "menu"; paintMenu(); return; } keepScroll(paintCart); },

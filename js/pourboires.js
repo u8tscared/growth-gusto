@@ -484,6 +484,16 @@ if (typeof slBillPaint === "function") {
   const tpBase = slBillPaint;
   slBillPaint = function (first) { const r = tpBase.apply(this, arguments); tpWatch(); tpBillInject(); return r; }; // eslint-disable-line no-global-assign
 }
+/* plat par plat (js/salle.js slBillPart): the tip chosen while one guest pays goes with that payment, not with the table's close */
+async function tpTakeBillTip(tab, partId) {
+  const B = TP.bill && tab && TP.bill.tab === tab.id ? { ...TP.bill } : null; if (!B || !(B.amt > 0)) return 0;
+  TP.bill = null; const day = dayKey(), mk = day.slice(0, 7); if (TP.months[mk]) return 0;
+  try {
+    await safe(DB.set("tips", "part_" + partId, { at: Date.now(), day, amount: B.amt, method: B.method, src: "salle", table: String(tab.table || ""), tabId: tab.id, partId, waiter: tab.by || S.me.id, waiterName: tab.byName || S.me.name || "", service: new Date().getHours() < 16 ? "midi" : "soir", uid: S.me.id, by: (typeof esActorName === "function" && esActorName()) || S.me.name || "" }));
+  } catch (e) { return 0; }
+  return B.amt;
+}
+function tpDropBillTip(partId) { DB.del("tips", "part_" + partId).catch((e) => console.warn("pourboires", e)); }
 if (typeof ACT.slClose === "function") {
   const tpClose0 = ACT.slClose;
   ACT.slClose = async function () {

@@ -15,8 +15,9 @@
  *     op "callSt"   { rid, cid, k, cancel? } → { call } its state (« Sarah arrive »); cancel=1 withdraws a call nobody took yet
  *     op "bill"     { rid, tid, k, bp? } → { bill } the bill of a table, from the customer screen's QR (k = salleTabs/{tid}.payKey, set by the app
  *                   when the waiter shows the bill): lines, total, what was already paid online, what is left. bp = a payment back from Stripe.
- *     op "billPay"  { rid, tid, k, amount, back } → { url } Stripe Checkout on the restaurant's own account for the whole bill or a share.
- *                   The amount is checked against the table's own lines (never the client's numbers). restos/{rid}/billPays/{id} keeps it.
+ *     op "billPay"  { rid, tid, k, amount, lines?, tip?, back } → { url } Stripe Checkout on the restaurant's own account for the whole bill,
+ *                   a share, or the guest's own dishes (lines [{ rk, q }], « plat par plat »). The amount is always recomputed from the table's
+ *                   own lines (never the client's numbers). restos/{rid}/billPays/{id} keeps it. tip (cfg.tips): max(20 €, 30 %) of the amount.
  *   and, for the restaurant's team (signed in, member):
  *     op "connect"  gérant → { url } Stripe onboarding link for the restaurant's own Stripe account (created once, type Standard)
  *     op "check"    gérant → refreshes restos/{rid}/qrPay/link from Stripe → { link }
@@ -42,7 +43,9 @@
  *                                   ({ rid, bp, … } for a bill payment, id {rid}_bp_{id})
  *   restos/{rid}/tableCalls/{id}    { table, kind, pay, at, again?, n, day, status: new|vu|fait|annule, k, seenAt?, by?, byName?, doneAt? }
  *                                   (members read and move it on: « J'y vais », « C'est fait »)
- *   restos/{rid}/billPays/{id}      { tabId, table, amount, status: apayer|paye|abandonnee, at, paidAt?, sid, acct, pi?, email? }   (members read)
+ *   restos/{rid}/billPays/{id}      { tabId, table, amount, lines?:[{ rk, q }], tip?, status: apayer|paye|abandonnee, at, paidAt?, sid, acct, pi?, email? }   (members read)
+ *   restos/{rid}/salleTabs/{id}.parts [{ id, at, how, amount, lines:[{ rk, q }] }]  dishes the team noted as paid at the till (js/salle.js)
+ *   restos/{rid}/tips/bp_{id}       the tip given with a bill paid online
  *   payReviews/{rid}_{o|p}_{id}     { rid, kind, id, email, name, mode, paidAt, due }  a paid order or bill whose payer gets the review e-mail
  *                                   (« Merci de votre visite », Google link) once due: functions/src/resa.js payReviewTick sends and deletes it
  *   callSeq/{rid}                   { min, cnt }                   a per-minute cap on the calls of one restaurant
@@ -427,16 +430,27 @@ async function callState(d) {
 }
 
 /* ───────── the bill of a table, paid from the customer screen's QR ───────── */
-/* the same sums as js/salle.js slTotal: lines not cancelled, not offered, price + paid extras */
-function billOf(tab) {
+/* the same sums as js/salle.js slTotal: lines not cancelled, not offered, price + paid extras.
+   A paying row = one dish at one price, key rk = name|unit (the same as js/salle.js slRk): what « plat par plat » pays for. */
+const rkOf = (name, u) => `${String(name || "").trim().slice(0, 80)}|${r2(u).toFixed(2)}`;
+const HOLD = 31 * 6e4; /* a Stripe page lives 31 min: its dishes are held for the others meanwhile */
+function billOf(tab, pays) {
   const L = (Array.isArray(tab.items) ? tab.items : []).filter((x) => x && !x.off), agg = new Map();
   let total = 0;
   for (const x of L) {
     const unit = r2((+x.price || 0) + (Array.isArray(x.extras) ? x.extras : []).reduce((a, e) => a + (+(e && e.p) || 0), 0)), q = Math.max(0, Math.floor(+x.q || 0));
     if (!q) continue; const free = !!x.free; if (!free) total += unit * q;
-    const key = [x.name, unit, free ? 1 : 0].join("|"); const a = agg.get(key) || { name: clean(x.name, 80), unit, q: 0, free }; a.q += q; agg.set(key, a);
+    const key = free ? "f|" + rkOf(x.name, 0) : rkOf(x.name, unit); const a = agg.get(key) || { rk: key, name: clean(x.name, 80), unit: free ? 0 : unit, q: 0, free }; a.q += q; agg.set(key, a);
   }
-  return { lines: [...agg.values()].slice(0, 120).map((a) => ({ name: a.name, q: a.q, amount: a.free ? 0 : r2(a.unit * a.q), free: a.free })), total: r2(total) };
+  const P = new Map(), add = (Ls, f) => (Array.isArray(Ls) ? Ls : []).slice(0, 120).forEach((l) => { if (!l || typeof l.rk !== "string") return; const a = P.get(l.rk) || { paid: 0, hold: 0 }; a[f] += Math.max(0, Math.floor(+l.q || 0)); P.set(l.rk, a); });
+  (Array.isArray(tab.parts) ? tab.parts : []).forEach((p) => add(p && p.lines, "paid"));
+  const now = Date.now(); (pays || []).forEach((p) => { if (p.status === "paye") add(p.lines, "paid"); else if (p.status === "apayer" && now - (p.at || 0) < HOLD) add(p.lines, "hold"); });
+  const lines = [...agg.values()].slice(0, 120).map((a) => {
+    const pp = P.get(a.rk) || { paid: 0, hold: 0 }, paid = a.free ? 0 : Math.min(a.q, pp.paid), hold = a.free ? 0 : Math.min(a.q - paid, pp.hold);
+    return { rk: a.rk, name: a.name, q: a.q, unit: a.unit, amount: a.free ? 0 : r2(a.unit * a.q), free: a.free, paid, hold };
+  });
+  const parts = r2((Array.isArray(tab.parts) ? tab.parts : []).reduce((s2, p) => s2 + (+(p && p.amount) || 0), 0));
+  return { lines, total: r2(total), parts };
 }
 async function billTab(d) {
   const rid = String(d.rid || ""), tid = String(d.tid || ""), k = String(d.k || "");
@@ -449,10 +463,12 @@ async function billPays(rid, tid) {
   return q ? q.docs.map((x) => ({ id: x.id, ...x.data() })) : [];
 }
 async function billView(rid, tid, tab, P) {
-  const b = billOf(tab), pays = await billPays(rid, tid), paid = r2(pays.filter((p) => p.status === "paye").reduce((a, p) => a + (+p.amount || 0), 0));
+  const pays = await billPays(rid, tid), b = billOf(tab, pays), online = r2(pays.filter((p) => p.status === "paye").reduce((a, p) => a + (+p.amount || 0), 0)), paid = r2(online + b.parts);
   const c = (P && P.cfg) || {}; const link = c.payOnline ? await linkOf(rid) : null;
+  const tills = (Array.isArray(tab.parts) ? tab.parts : []).slice(0, 40).map((p) => ({ id: "s" + String(p.id || "").slice(0, 20), amount: r2(p.amount), status: "paye", at: +p.at || 0, paidAt: +p.at || 0, till: true }));
   return { table: tab.table || "", covers: +tab.covers || 0, open: tab.status === "open", lines: b.lines, total: b.total, paid, left: r2(Math.max(0, b.total - paid)),
-    payOnline: !!(c.payOnline && canCharge(link)), pays: pays.filter((p) => p.status !== "abandonnee").map((p) => ({ id: p.id, amount: p.amount, status: p.status, at: p.at, paidAt: p.paidAt || null })) };
+    payOnline: !!(c.payOnline && canCharge(link)), tips: c.tips !== false,
+    pays: [...pays.filter((p) => p.status !== "abandonnee").map((p) => ({ id: p.id, amount: p.amount, status: p.status, at: p.at, paidAt: p.paidAt || null, tip: +p.tip || 0 })), ...tills] };
 }
 async function settleBill(rid, bp, ses) {
   const ref = db.doc(`restos/${rid}/billPays/${bp}`);
@@ -464,6 +480,8 @@ async function settleBill(rid, bp, ses) {
       t.update(ref, { status: "paye", paidAt: Date.now(), pi: typeof ses.payment_intent === "string" ? ses.payment_intent : (ses.payment_intent && ses.payment_intent.id) || null, ...(em ? { email: em } : {}) });
       /* the bill is paid at the end of the meal: the review e-mail leaves about an hour later (functions/src/resa.js payReviewTick) */
       if (em) t.set(db.doc(`payReviews/${rid}_p_${bp}`), { rid, kind: "p", id: bp, email: em, name: clean(payName(ses), 60), mode: "addition", table: o.table || "", paidAt: Date.now(), due: Date.now() + 60 * 6e4 });
+      /* the tip joins the team's pot (js/pourboires.js) */
+      if (+o.tip > 0) t.set(db.doc(`restos/${rid}/tips/bp_${bp}`), { at: Date.now(), day: parisNow().day, amount: r2(o.tip), method: "ligne", src: "qr", table: o.table || "", tabId: o.tabId || "", billPay: bp, service: parisNow().min < 16 * 60 ? "midi" : "soir", uid: "server", by: "Addition QR" });
     }
     else if (dead && o.status === "apayer") t.update(ref, { status: "abandonnee" });
   });
@@ -479,16 +497,31 @@ async function billPay(d) {
   const ps = await db.doc(`restos/${rid}/public/menu`).get(); const P = ps.exists ? ps.data() : {}; const c = P.cfg || {};
   const link = await linkOf(rid); if (!c.payOnline || !canCharge(link)) throw err("failed-precondition", "paiement");
   const v = await billView(rid, tid, tab, P);
-  const amount = r2(Math.min(v.left, Math.max(0, +d.amount || 0))); if (!(amount >= 1)) throw err("invalid-argument", "montant");
+  /* « plat par plat »: the guest's dishes, priced from the table, only what nobody else paid or is paying */
+  let lines = null, amount;
+  if (Array.isArray(d.lines) && d.lines.length) {
+    lines = []; let sum = 0;
+    for (const l of d.lines.slice(0, 60)) {
+      const row = v.lines.find((x) => !x.free && x.rk === String((l && l.rk) || "")), q = Math.floor(+(l && l.q) || 0);
+      if (!row || !(q >= 1) || q > row.q - row.paid - row.hold) throw err("failed-precondition", "plats");
+      const was = lines.find((x) => x.rk === row.rk); if (was) { if (was.q + q > row.q - row.paid - row.hold) throw err("failed-precondition", "plats"); was.q += q; } else lines.push({ rk: row.rk, q });
+      sum += row.unit * q;
+    }
+    amount = r2(Math.min(v.left, sum));
+  } else amount = r2(Math.min(v.left, Math.max(0, +d.amount || 0)));
+  if (!(amount >= 1)) throw err("invalid-argument", "montant");
+  let tip = 0;
+  if (c.tips !== false && +d.tip > 0) { tip = r2(Math.floor(+d.tip * 100) / 100); if (!(tip >= 0.5) || tip > Math.max(20, r2(amount * 0.3))) throw err("invalid-argument", "pourboire"); }
   const ref = db.collection(`restos/${rid}/billPays`).doc(), at = Date.now(), exp = Math.floor(at / 1000) + 31 * 60, cents = Math.round(amount * 100);
-  await ref.set({ tabId: tid, table: tab.table || "", amount, status: "apayer", at });
+  await ref.set({ tabId: tid, table: tab.table || "", amount, status: "apayer", at, ...(lines ? { lines } : {}), ...(tip ? { tip } : {}) });
   const back = BACKS.some((re) => re.test(String(d.back || ""))) ? String(d.back) : PAGE;
   const q = `?r=${encodeURIComponent(rid)}&b=${encodeURIComponent(tid)}&k=${d.k}&bp=${ref.id}`;
   const part = amount < v.left - 0.004;
   try {
     const ses = await S._stripeCall("/checkout/sessions", { method: "POST", account: link.acct, idem: "gg-bill-" + ref.id, body: {
       mode: "payment", locale: "fr", expires_at: exp, client_reference_id: ref.id,
-      line_items: [{ quantity: 1, price_data: { currency: "eur", unit_amount: cents, product_data: { name: `${clean(P.name, 60) || "Restaurant"} · table ${tab.table || ""}${part ? " · votre part" : " · addition"}`.slice(0, 120) } } }],
+      line_items: [{ quantity: 1, price_data: { currency: "eur", unit_amount: cents, product_data: { name: `${clean(P.name, 60) || "Restaurant"} · table ${tab.table || ""}${lines && part ? " · vos plats" : part ? " · votre part" : " · addition"}`.slice(0, 120) } } },
+        ...(tip ? [{ quantity: 1, price_data: { currency: "eur", unit_amount: Math.round(tip * 100), product_data: { name: "Pourboire pour l'équipe" } } }] : [])],
       metadata: { kind: "order", rid, bp: ref.id, tab: tid, app: "growth-gusto" },
       payment_intent_data: { description: `Addition table ${tab.table || ""}${part ? " (part)" : ""}`, metadata: { kind: "order", rid, bp: ref.id, tab: tid, app: "growth-gusto" },
         ...(FEE_BPS ? { application_fee_amount: Math.floor((cents * FEE_BPS) / 10000) } : {}) },
