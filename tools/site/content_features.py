@@ -166,7 +166,7 @@ FEATURES = [
 
  dict(slug="equipe-planning", short="Équipe, planning et pointeuse", ic="users", icc="",
   title="Planning, pointeuse et messagerie d'équipe pour restaurant · Growth Gusto",
-  desc="Comptes de l'équipe, consignes et messagerie, défis d'équipe, passation de service, journal des actions, accès temporaires, pointeuse, planning intelligent proposé d'après les couverts prévus, repères HCR, employés et salaires, export paie pour le comptable.",
+  desc="Comptes de l'équipe, consignes et messagerie, défis d'équipe, passation de service, journal des actions, accès temporaires, pointeuse avec ticket d'heures au départ, relevé d'heures en PDF, planning intelligent proposé d'après les couverts prévus, repères HCR, employés et salaires, export paie pour le comptable.",
   kick="Équipe", h1='Chacun son compte, <span class="hl">son planning.</span>',
   lede="Chaque cuisinier a son compte : vous voyez qui a fait quoi. Les consignes arrivent sur le téléphone de chacun, les défis motivent la salle. La pointeuse et le planning préparent la paie.",
   img="equipe", tags=[CHEF],
@@ -178,7 +178,7 @@ FEATURES = [
    ("Passation de service", "En fin de service, un mot pour l'équipe suivante : ruptures, casse, client à rappeler, ce qu'il reste à préparer. L'app reprend la journée pour vous ; l'équipe suivante le lit en arrivant et signe.", ["Repris tout seul de la journée", "Client à rappeler, avec son numéro", "Lu par qui, et à quelle heure"], "passation", "r", [COMMIS]),
    ("Journal des actions", "Qui a annulé, offert ou modifié quoi, et quand, avec le montant. Chaque ligne est signée et rien ne s'efface, pas même par le gérant.", ["Annulations et offerts, avec montant", "Filtres par personne et par type", "« À regarder » quand quelqu'un sort du lot"], "journal", "t", [COMMIS]),
    ("Accès temporaires", "Un extra pour le week-end, un stagiaire pour un mois : vous choisissez la date de fin et l'accès se ferme tout seul. Prolonger ou rouvrir, c'est un geste.", ["Extra, stagiaire, saison, remplacement", "Fin ce soir, cette semaine ou à une date", "Ce qu'ils ont fait reste signé"], "acces", "v", [COMMIS]),
-   ("La pointeuse", "Arrivée, pause, départ : chacun touche son prénom sur la tablette.", ["Heures réelles", "Pauses", "Retards repérés"], "pointeuse", "k", [CHEF]),
+   ("La pointeuse", "Arrivée, pause, départ : chacun touche son prénom sur la tablette. Au départ, ses heures du jour s'affichent et il imprime son ticket s'il le veut.", ["Heures réelles", "Ticket au départ", "Relevé PDF à signer"], "pointeuse", "k", [CHEF]),
    ("Le planning intelligent", "L'app prépare la semaine pour vous : les couverts prévus (ventes passées, réservations), les dispos et les congés de chacun, les heures du contrat et le coût de l'équipe. Il manque quelqu'un samedi soir ? Elle vous le dit. Vous ajustez d'un geste, vous publiez, chacun le voit sur son téléphone.", ["Couverts prévus par service", "Dispos et congés respectés", "Coût chargé et % du chiffre d'affaires", "11 h de repos et 2 jours off"], "planning", "s", [CHEF]),
    ("Planning et heures", "Le planning de la semaine, les heures prévues et pointées, avec les repères de la convention HCR. Export pour le comptable.", ["Repères HCR", "Heures sup", "Export paie"], "planning", "l", [CHEF]),
   ],

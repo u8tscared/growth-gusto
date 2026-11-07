@@ -17,7 +17,7 @@ PLANS = [
    ("Salle", ["Carnet de réservations, sans commission", "Lien de réservation pour vos clients", "Plan de salle et placement automatique", "Prise de commande, écran cuisine, ruptures en direct", "Coup de feu calé sur les réservations", "Avis Google demandé après le repas", "Menu QR et commande en ligne, carte importée", "Réservations Zenchef et TheFork, par import", "Fichier clients et fidélité"]),
    ("Caisse et stock", ["Caisse reliée en direct : SumUp, Square", "Autres caisses : import des ventes ou photo du ticket Z", "Uber Eats, Deliveroo, Just Eat : import des relevés", "Stock déduit des ventes, selon vos recettes", "Inventaire mensuel guidé", "Notes de frais avec TVA ventilée", "Tableau de bord"])]),
  ("complet", "Chef", "169", "Toute la maison tourne : HACCP, salle, caisse, stock, équipe et chiffres.", "Tout Second, plus :", [
-   ("Équipe", ["Pointeuse", "Planning, heures et repères HCR", "Export paie pour le comptable", "Employés et salaires"]),
+   ("Équipe", ["Pointeuse et ticket d'heures", "Relevé d'heures en PDF", "Planning, heures et repères HCR", "Export paie pour le comptable", "Employés et salaires"]),
    ("Finances", ["Finances et marges", "Banque : import du relevé (connexion directe bientôt)", "Lien direct avec Pennylane"]),
    ("Et aussi", ["Plusieurs restaurants, 49 € HT par restaurant en plus", "Mise en route avec nous (visio 30 min)", "Support prioritaire 7 j/7"])]),
 ]
