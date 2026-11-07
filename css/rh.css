@@ -657,3 +657,6 @@ html.rh-kiosk .side{display:none!important}
 .rh-pdf .note{margin:0}
 @media (max-width:560px){.rh-pdf-l{grid-template-columns:1fr;gap:8px}.rh-pdf-o{min-height:56px;padding:10px 12px}}
 @media (max-width:440px){.rh-staff .rh-bt{display:none}}
+.rh-away{display:inline-block;margin-left:4px;padding:0 6px;border-radius:999px;font-size:11.5px;font-weight:750;color:var(--accent-ink);background:rgb(var(--k) / .05)}
+.rh-awayn{display:flex;gap:8px;align-items:flex-start}.rh-awayn svg{flex:none;width:16px;height:16px;margin-top:2px;color:var(--accent-ink)}
+.rh-sites .chip{min-height:40px}
