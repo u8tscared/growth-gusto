@@ -53,9 +53,6 @@ window.GG_DEMO = {
     /* each person's access, from their job (js/perms.js presets): « Voir comme » (js/espaces.js) shows the app exactly as they see it */
     const demoPerms = (mid, poste) => { if (mid === "demo-camille" || typeof pmPreset !== "function") return null; const p = pmPreset(mid === "demo-thomas" || mid === "demo-ines" ? "second" : poste); if (mid === "demo-thomas") p.caps.seeMoney = true, p.modules.dashboard = true, p.modules.finance = true; return p; };
     team.forEach(([mid, name, role, color, , , , , poste], i) => { const perms = demoPerms(mid, poste); put("members", { name, role, color, poste, joinedAt: now - (400 - i * 40) * 864e5, email: mid === "demo-camille" ? "camille@bistrot-demo.fr" : "", ...(perms ? { perms } : {}) }, mid); });
-    /* demandes de l'équipe (js/espaces.js « Mon espace » / « Demandes de l'équipe ») */
-    [["demo-sarah", "conge", 18, 21, "Mariage de ma sœur à Bordeaux", "attente", 1], ["demo-hugo", "dispo", 4, 4, "Libre tous les lundis midi ce mois-ci", "attente", 0], ["demo-lucas", "echange", 6, 6, "avec Inès Benali · je prends son soir, elle prend mon midi", "ok", 3], ["demo-sarah", "absence", -9, -9, "Rendez-vous médical le matin", "ok", 12]]
-      .forEach(([mid, kind, a, b, note, status, ago]) => { const t = team.find((x) => x[0] === mid); put("esRequests", { kind, from: addDays(today, a), to: addDays(today, b), note, memberId: mid, name: t[1], staffId: "s_" + mid, status, at: now - ago * 864e5 - 3 * 36e5, uid: mid, ...(status !== "attente" ? { answeredBy: "demo-camille", answeredByName: "Camille Laurent", answeredAt: now - ago * 864e5 } : {}) }); });
     /* planning intelligent (js/planif.js) : indisponibilités et postes de renfort */
     const DEMO_PF = { "demo-hugo": { off: { 0: ["midi"], 2: ["midi"], 3: ["midi"], 4: ["midi"], 5: ["midi"], 6: ["midi"] } }, "demo-sarah": { off: { 0: ["soir"] } }, "demo-lucas": { alsoPosts: ["plonge"] }, "demo-ines": { off: { 3: ["midi"] } } };
     const staffIds = {};
@@ -256,6 +253,44 @@ window.GG_DEMO = {
           });
         }
       });
+    }
+
+    /* ── demandes RH (js/demandes.js): rules of the restaurant, a 2-step leave, a swap waiting for Inès, sick leaves with and without the paper ── */
+    D.restos[RID].drCfg = {
+      k: { conge: { on: true, notice: 30, strict: false, steps: [{ who: "chef" }, { who: "gerant" }], cc: [], doc: "none", docH: 48, max: 21, half: false, rep: false, peer: false, info: false },
+        maladie: { on: true, notice: 0, strict: false, steps: [{ who: "gerant" }], cc: ["demo-thomas"], doc: "required", docH: 48, max: 0, half: false, rep: false, peer: false, info: true },
+        absence: { on: true, notice: 2, strict: false, steps: [{ who: "gerant" }], cc: [], doc: "optional", docH: 72, max: 3, half: true, rep: false, peer: false, info: false },
+        echange: { on: true, notice: 2, strict: true, steps: [{ who: "gerant" }], cc: [], doc: "none", docH: 48, max: 0, half: false, rep: false, peer: true, info: false },
+        dispo: { on: true, notice: 14, strict: true, steps: [{ who: "gerant" }], cc: [], doc: "none", docH: 48, max: 0, half: true, rep: true, peer: false, info: false } },
+      blackout: [{ t: "Fêtes de fin d'année", from: today.slice(0, 4) + "-12-20", to: (+today.slice(0, 4) + 1) + "-01-02", kinds: ["conge"], strict: false }], maxOff: 2, boss: true,
+    };
+    {
+      const nm = (mid) => team.find((t) => t[0] === mid)[1];
+      const H = (a, mid, ago, t) => ({ at: now - ago, by: mid, n: nm(mid), a, ...(t ? { t } : {}) });
+      const sh = (mid, d0, d1, pm) => Object.entries(D[P("shifts")] || {}).map(([id, x]) => ({ id, ...x })).filter((x) => x.staffId === "s_" + mid && x.day >= addDays(today, d0) && x.day <= addDays(today, d1) && (pm == null || (x.start < "16:00") === pm)).sort((a, b) => (a.day + a.start).localeCompare(b.day + b.start))[0];
+      const R = (mid, o) => put("esRequests", { memberId: mid, name: nm(mid), staffId: "s_" + mid, uid: mid, slot: "jour", note: "", reason: "", cc: [], docs: [], docNeed: "none", cur: 0, ...o });
+      const nextMon = (() => { let d = addDays(today, 15); while (parseDay(d).getDay() !== 1) d = addDays(d, 1); return d; })();
+      R("demo-sarah", { kind: "conge", from: addDays(today, 18), to: addDays(today, 21), note: "Mariage de ma sœur à Bordeaux", status: "attente", at: now - 864e5 - 3 * 36e5, late: true,
+        steps: [{ who: "chef", st: "ok", by: "demo-thomas", byName: "Thomas Girard", at: now - 5 * 36e5, c: "OK pour moi, je vois avec Léa" }, { who: "gerant", st: "attente" }], cur: 1,
+        hist: [H("send", "demo-sarah", 864e5 + 3 * 36e5), H("ok", "demo-thomas", 5 * 36e5, "OK pour moi, je vois avec Léa")] });
+      R("demo-hugo", { kind: "dispo", from: nextMon, to: nextMon, rep: "week", until: addDays(nextMon, 56), slot: "midi", reason: "", note: "Cours de permis le lundi midi", status: "attente", at: now - 2 * 36e5, steps: [{ who: "gerant", st: "attente" }], hist: [H("send", "demo-hugo", 2 * 36e5)] });
+      const a = sh("demo-lucas", 7, 13, false), b = sh("demo-ines", 7, 13, true);
+      if (a) R("demo-lucas", { kind: "echange", from: a.day, to: a.day, note: "Anniversaire de ma grand-mère", status: "attente", at: now - 40 * 6e4,
+        peer: { id: "demo-ines", name: "Inès Benali", staffId: "s_demo-ines", st: "attente" }, shift: { id: a.id, day: a.day, start: a.start, end: a.end, post: a.post }, ...(b && b.day !== a.day ? { shift2: { id: b.id, day: b.day, start: b.start, end: b.end, post: b.post } } : {}),
+        steps: [{ who: "gerant", st: "attente" }], hist: [H("send", "demo-lucas", 40 * 6e4)] });
+      const doc = (t1, t2) => "data:image/svg+xml;charset=utf-8," + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="900" height="1200" viewBox="0 0 900 1200"><rect width="900" height="1200" fill="#fbfaf6"/><rect x="40" y="40" width="820" height="1120" fill="none" stroke="#c9c2b4" stroke-width="3" stroke-dasharray="14 10"/><text x="450" y="150" font-family="Helvetica,Arial" font-size="44" font-weight="700" text-anchor="middle" fill="#1b1530">${t1}</text><text x="450" y="205" font-family="Helvetica,Arial" font-size="26" text-anchor="middle" fill="#7a7488">${t2}</text>${[300, 360, 420, 480, 600, 660, 720, 840, 900].map((y, i) => `<rect x="110" y="${y}" width="${[620, 540, 660, 380, 600, 520, 640, 300, 420][i]}" height="18" rx="9" fill="#e4ded2"/>`).join("")}<text x="450" y="1080" font-family="Helvetica,Arial" font-size="30" font-weight="700" text-anchor="middle" fill="#d42a48" transform="rotate(-8 450 1080)">EXEMPLE · DÉMO</text></svg>`);
+      const docId = put("rhDocs", { reqId: "rq-hugo-arret", uid: "demo-hugo", readers: ["demo-camille", "demo-thomas"], name: "arret-de-travail.jpg", type: "image/svg+xml", size: 182000, data: doc("Avis d'arrêt de travail", "Document d'exemple : aucune donnée réelle"), at: now - 30 * 36e5, by: "demo-hugo" }, "doc-hugo-arret");
+      put("esRequests", { memberId: "demo-hugo", name: nm("demo-hugo"), staffId: "s_demo-hugo", uid: "demo-hugo", kind: "maladie", from: addDays(today, -1), to: addDays(today, 2), slot: "jour", reason: "Arrêt de travail", note: "Grippe, le médecin m'arrête 4 jours", status: "ok", at: now - 31 * 36e5, steps: [], cur: 0, cc: ["demo-thomas"], docNeed: "required",
+        docs: [{ id: docId, name: "arret-de-travail.jpg", type: "image/svg+xml", size: 182000, at: now - 30 * 36e5 }], answeredBy: "demo-hugo", answeredByName: "Hugo Martin", answeredAt: now - 31 * 36e5,
+        hist: [H("send", "demo-hugo", 31 * 36e5), { at: now - 31 * 36e5 + 1, by: "demo-hugo", n: "Hugo Martin", a: "auto" }, H("doc", "demo-hugo", 30 * 36e5, "arret-de-travail.jpg")] }, "rq-hugo-arret");
+      R("demo-lea", { kind: "maladie", from: today, to: addDays(today, 1), reason: "Enfant malade", note: "Mon fils a de la fièvre, je préviens dès que possible", status: "ok", at: now - 2 * 36e5, steps: [], cc: ["demo-thomas"], docNeed: "required", docDue: now + 46 * 36e5, answeredBy: "demo-lea", answeredByName: "Léa Fontaine", answeredAt: now - 2 * 36e5, hist: [H("send", "demo-lea", 2 * 36e5), { at: now - 2 * 36e5 + 1, by: "demo-lea", n: "Léa Fontaine", a: "auto" }] });
+      R("demo-lucas", { kind: "conge", from: addDays(today, 34), to: addDays(today, 38), note: "Vacances en famille", status: "ok", at: now - 6 * 864e5, steps: [{ who: "chef", st: "ok", by: "demo-ines", byName: "Inès Benali", at: now - 5 * 864e5 }, { who: "gerant", st: "ok", by: "demo-camille", byName: "Camille Laurent", at: now - 4 * 864e5, c: "Bonnes vacances !" }], cur: 2, answeredBy: "demo-camille", answeredByName: "Camille Laurent", answeredAt: now - 4 * 864e5, answer: "Bonnes vacances !",
+        hist: [H("send", "demo-lucas", 6 * 864e5), H("ok", "demo-ines", 5 * 864e5), H("ok", "demo-camille", 4 * 864e5, "Bonnes vacances !")] });
+      R("demo-sarah", { kind: "absence", from: addDays(today, -9), to: addDays(today, -9), slot: "midi", reason: "Rendez-vous médical", note: "Le matin, je viens le soir", status: "ok", at: now - 12 * 864e5, docNeed: "optional", steps: [{ who: "gerant", st: "ok", by: "demo-camille", byName: "Camille Laurent", at: now - 11 * 864e5 }], cur: 1, answeredBy: "demo-camille", answeredByName: "Camille Laurent", answeredAt: now - 11 * 864e5, hist: [H("send", "demo-sarah", 12 * 864e5), H("ok", "demo-camille", 11 * 864e5)] });
+      R("demo-thomas", { kind: "conge", from: addDays(today, -40), to: addDays(today, -36), note: "Pont du 11 novembre", status: "refus", at: now - 70 * 864e5, steps: [{ who: "gerant", st: "refus", by: "demo-camille", byName: "Camille Laurent", at: now - 69 * 864e5, c: "Inès est déjà en congé cette semaine-là, on en reparle ?" }], cur: 0, answeredBy: "demo-camille", answeredByName: "Camille Laurent", answeredAt: now - 69 * 864e5, answer: "Inès est déjà en congé cette semaine-là, on en reparle ?",
+        hist: [H("send", "demo-thomas", 70 * 864e5), H("refus", "demo-camille", 69 * 864e5, "Inès est déjà en congé cette semaine-là, on en reparle ?")] });
+      R("demo-ines", { kind: "echange", from: addDays(today, -5), to: addDays(today, -5), note: "Je prends son soir, il prend mon midi", status: "ok", at: now - 8 * 864e5, peer: { id: "demo-lucas", name: "Lucas Petit", staffId: "s_demo-lucas", st: "ok", at: now - 8 * 864e5 + 36e5 }, steps: [{ who: "gerant", st: "ok", by: "demo-camille", byName: "Camille Laurent", at: now - 7 * 864e5 }], cur: 1, swapped: true, answeredBy: "demo-camille", answeredByName: "Camille Laurent", answeredAt: now - 7 * 864e5,
+        hist: [H("send", "demo-ines", 8 * 864e5), H("peer_ok", "demo-lucas", 8 * 864e5 - 36e5), H("ok", "demo-camille", 7 * 864e5), { at: now - 7 * 864e5 + 2, by: "demo-camille", n: "Camille Laurent", a: "swap" }] });
     }
 
     /* ── annual obligations (one late, one due soon) + intervention log ── */

@@ -24,14 +24,14 @@ const db = () => admin.firestore();
 const REGION = "europe-west9", TZ = "Europe/Paris";
 
 /* ───────── what each role gets by default (same as NF_DEF in js/notifs.js) ───────── */
-const KINDS = ["k_new", "k_rush", "k_mod", "b_new", "s_ready", "s_call", "qr", "resa", "ca", "haccp", "geste", "heures", "consigne", "chat"];
+const KINDS = ["k_new", "k_rush", "k_mod", "b_new", "s_ready", "s_call", "qr", "resa", "ca", "haccp", "geste", "heures", "consigne", "chat", "rh"];
 const DEF = {
-  patron: ["qr", "resa", "ca", "haccp", "geste", "heures", "consigne", "chat"],
-  chef: ["k_new", "k_rush", "k_mod", "haccp", "heures", "consigne", "chat"],
-  cuisine: ["k_new", "k_rush", "k_mod", "consigne", "chat"],
-  salle: ["s_ready", "s_call", "qr", "resa", "consigne", "chat"],
-  bar: ["b_new", "s_ready", "s_call", "consigne", "chat"],
-  plonge: ["consigne", "chat"],
+  patron: ["qr", "resa", "ca", "haccp", "geste", "heures", "consigne", "chat", "rh"],
+  chef: ["k_new", "k_rush", "k_mod", "haccp", "heures", "consigne", "chat", "rh"],
+  cuisine: ["k_new", "k_rush", "k_mod", "consigne", "chat", "rh"],
+  salle: ["s_ready", "s_call", "qr", "resa", "consigne", "chat", "rh"],
+  bar: ["b_new", "s_ready", "s_call", "consigne", "chat", "rh"],
+  plonge: ["consigne", "chat", "rh"],
 };
 const POSTE = { cuisine: "cuisine", second: "cuisine", salle: "salle", bar: "bar", plonge: "plonge" };
 function profileOf(m, post) {

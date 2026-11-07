@@ -56,17 +56,18 @@ const PU_KINDS = [
   ["heures", "patron", "hsGauge", "warn", "Heures sup.", "Un employé dépasse vos seuils ou va sortir du cadre légal"],
   ["consigne", "equipe", "csMega", "w-vi", "Consignes", "Plat du jour, rupture, info"],
   ["chat", "equipe", "csChat", "w-sk", "Discussion", "Les messages de vos groupes"],
+  ["rh", "equipe", "esInbox", "w-sa", "Demandes RH", "Congés, arrêts, échanges : une demande à valider, une réponse"],
 ];
 const PU_K = Object.fromEntries(PU_KINDS.map((k) => [k[0], k]));
 const PU_GROUPS = [["cuisine", "En cuisine"], ["bar", "Au bar"], ["salle", "En salle"], ["patron", "Pour le patron"], ["equipe", "Toute l'équipe"]];
 /* same table as DEF in functions/src/notifs.js */
 const PU_DEF = {
-  patron: ["qr", "resa", "ca", "haccp", "geste", "heures", "consigne", "chat"],
-  chef: ["k_new", "k_rush", "k_mod", "haccp", "heures", "consigne", "chat"],
-  cuisine: ["k_new", "k_rush", "k_mod", "consigne", "chat"],
-  salle: ["s_ready", "s_call", "qr", "resa", "consigne", "chat"],
-  bar: ["b_new", "s_ready", "s_call", "consigne", "chat"],
-  plonge: ["consigne", "chat"],
+  patron: ["qr", "resa", "ca", "haccp", "geste", "heures", "consigne", "chat", "rh"],
+  chef: ["k_new", "k_rush", "k_mod", "haccp", "heures", "consigne", "chat", "rh"],
+  cuisine: ["k_new", "k_rush", "k_mod", "consigne", "chat", "rh"],
+  salle: ["s_ready", "s_call", "qr", "resa", "consigne", "chat", "rh"],
+  bar: ["b_new", "s_ready", "s_call", "consigne", "chat", "rh"],
+  plonge: ["consigne", "chat", "rh"],
 };
 /* the four presets shown as cards: [profile, icon, title, line] */
 const PU_PRESETS = [["cuisine", "pmToque", "Cuisine", "Les bons, ce qui est réclamé, ce qui change"], ["salle", "pmCloche", "Salle", "Plats prêts, commandes en ligne, résas"], ["bar", "pmGlass", "Bar", "Les boissons à préparer, les plats prêts"], ["patron", "puEuro", "Patron", "Le chiffre, les alertes, les gestes"]];
@@ -201,6 +202,7 @@ function puEx() {
     heures: [`${firstName((S.members || []).find((m) => m.role !== "gerant")?.name) || "Lucas"} va sortir du cadre légal`, "D'après le planning : 49 h cette semaine, 48 h maximum (HCR)"],
     consigne: ["Rupture · Thomas", `Plus de ${sh(D[1])} ce soir, proposez le ${sh(D[3] || D[0])}`],
     chat: ["Inès · Cuisine", "Je passe chez le primeur à 16h, il vous faut quelque chose ?"],
+    rh: ["Demande à valider : Sarah · congé", "du mer. 25 nov. au sam. 28 nov. · « Mariage de ma sœur »"],
   };
 }
 
