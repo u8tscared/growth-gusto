@@ -381,7 +381,7 @@ function ctDocForm() {
 function ctDocAlg() {
   const D = ctAlgData(); if (!D.R.length || typeof ALLERGENS === "undefined") return `<p class="rp-empty">Aucune fiche recette enregistrée.</p>`;
   const S2 = { gluten: "Gluten", crustaces: "Crustacés", oeufs: "Œufs", poissons: "Poissons", arachides: "Arachides", soja: "Soja", lait: "Lait", fruitscoque: "Fruits à coque", celeri: "Céleri", moutarde: "Moutarde", sesame: "Sésame", sulfites: "Sulfites", lupin: "Lupin", mollusques: "Mollusques" };
-  return `<p class="rp-note">Les 14 allergènes à déclarer (règlement UE 1169/2011, décret 2015-447), pour chaque plat, y compris ceux apportés par les produits et sous-recettes. Ce tableau est présenté au client qui le demande.</p>
+  return `<p class="rp-note">Les 14 allergènes à déclarer (règlement UE 1169/2011, décret 2015-447), pour chaque plat, y compris ceux apportés par les produits et sous-recettes. Ce tableau est mis à la disposition des clients par écrit, de façon lisible et visible en salle, sans qu'ils aient à le demander.</p>
     ${ctSc(`<table class="rp-t rp-alg"><thead><tr><th>Plat</th>${ALLERGENS.map((x) => `<th class="v"><span>${esc(S2[x.id] || x.t)}</span></th>`).join("")}</tr></thead><tbody>${D.R.map(({ n, a }) => `<tr><td>${esc(n.title || "Sans titre")}</td>${ALLERGENS.map((x) => `<td class="c${a.includes(x.id) ? " on" : ""}">${a.includes(x.id) ? "●" : ""}</td>`).join("")}</tr>`).join("")}</tbody></table>`)}`;
 }
 function ctDocPms() { const d = ctPmsDoc(); if (!d) return `<p class="rp-empty">Le plan de maîtrise sanitaire n'a pas encore été rédigé dans l'application.</p>`; return `<p class="rp-note">Version du ${ctFull(ctDayOf(d.updatedAt || d.generatedAt))}${d.updatedBy ? `, mise à jour par ${esc(d.updatedBy)}` : ""}.</p>${d.sections.map((s, i) => `<div class="ct-pmsd"><h3>${8}.${i + 1} ${esc(s.title)}</h3>${ctMd(s.text)}</div>`).join("")}`; }
@@ -461,7 +461,7 @@ const CT_Q = [
   { k: "tenue", t: "Qui lave les tenues de cuisine ?", kind: "one", o: [["presta", "Une blanchisserie"], ["place", "Lavées sur place"], ["salaries", "Chaque salarié chez lui"]] },
   { k: "dechets", t: "Vos déchets", kind: "multi", o: [["tri", "Tri sélectif"], ["huiles", "Huiles de friture collectées"], ["bio", "Biodéchets collectés"], ["local", "Local ou bacs dédiés"]] },
   { k: "desinf", t: "Quel produit pour désinfecter ?", s: "Le nom du produit, ou laissez le texte proposé.", kind: "text", ph: "Détergent-désinfectant contact alimentaire (norme EN 1276)" },
-  { k: "alg", t: "Comment informez-vous sur les allergènes ?", kind: "one", o: [["app", "Fiche allergènes de chaque plat"], ["carte", "Mention sur la carte ou l'ardoise"], ["affiche", "Affiche « demandez-nous »"], ["tous", "Plusieurs de ces moyens"]] },
+  { k: "alg", t: "Comment informez-vous sur les allergènes ?", kind: "one", o: [["app", "Fiche allergènes de chaque plat"], ["carte", "Mention sur la carte ou l'ardoise"], ["affiche", "Tableau ou classeur des allergènes visible en salle"], ["tous", "Plusieurs de ces moyens"]] },
 ];
 function ctPmsDefaults() {
   const nm = S.products.map((p) => ctNorm(p.name)).concat(S.notes.filter(ctIsRecipe).map((n) => ctNorm(n.title))).join(" | ");
@@ -554,7 +554,8 @@ function ctPmsBuild(A) {
     "| Plats cuisinés à l'avance, préparations réfrigérées | 0 à +3 °C |",
     "| Viandes hachées, préparations de viandes hachées | +2 °C |",
     "| Poissons, crustacés et produits de la pêche frais | 0 à +2 °C (glace fondante) |",
-    "| Abats, volailles et lapins découpés | +3 °C |",
+    "| Abats (volailles, lapins, gibier, ongulés) | +3 °C |",
+    "| Volailles, lapins, découpes | +4 °C |",
     "| Préparations de viandes | +4 °C |",
     "| Viandes, produits laitiers frais, crèmes, desserts | +4 °C |",
     "| Surgelés, glaces | -18 °C |",
@@ -572,7 +573,7 @@ function ctPmsBuild(A) {
     "## Déchets",
     `${labs("dechets").join(", ") || "Poubelles à commande non manuelle"}. Les poubelles de cuisine sont munies de couvercles à commande non manuelle et vidées au moins une fois par jour.${has("dechets", "huiles") ? " Les huiles de friture usagées sont stockées en bidons fermés et collectées par une entreprise agréée." : ""}`,
     "## Allergènes",
-    `Les 14 allergènes réglementaires sont identifiés pour chaque plat (fiches recettes de l'application). Information du client : ${lab("alg", A.alg).toLowerCase() || "sur demande"}. Les préparations sans allergène sont réalisées avec du matériel propre et à l'écart des autres préparations ; toute modification de recette entraîne la mise à jour de la fiche.`,
+    `Les 14 allergènes réglementaires sont identifiés pour chaque plat (fiches recettes de l'application). Information du client : ${lab("alg", A.alg).toLowerCase() || "par écrit, en salle"}. Les préparations sans allergène sont réalisées avec du matériel propre et à l'écart des autres préparations ; toute modification de recette entraîne la mise à jour de la fiche.`,
   ].join("\n") });
   /* HACCP: hazard analysis and CCP table, built from the answers */
   const ccp = [

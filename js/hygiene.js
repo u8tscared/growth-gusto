@@ -146,7 +146,7 @@ function hyCoolForm() {
     ${sug.length ? `<div class="chips hy-rc">${sug.map((n) => `<button class="chip${F.noteId === n.id ? " on" : ""}" data-act="hyCoolRec" data-id="${n.id}">${ico("book")}${esc(n.title)}</button>`).join("")}</div>` : ""}
     <div class="field"><span>Quantité <em class="hy-opt">facultatif</em></span><div class="hy-qrow"><input class="input mono" id="hyQty" inputmode="decimal" value="${esc(F.qty)}" placeholder="0" aria-label="Quantité"><div class="hy-units">${["kg", "L", "portions"].map((u) => `<button class="chip${F.unit === u ? " on" : ""}" data-act="hyCoolUnit" data-v="${u}">${u}</button>`).join("")}</div></div></div>
     ${F.kind === "refroid" ? `<div class="field"><span>Cellule de refroidissement</span><div class="hy-units">${[[1, "Oui"], [0, "Non, à l'air"]].map(([v, t]) => `<button class="chip${+F.cell === v ? " on" : ""}" data-act="hyCoolCell" data-v="${v}">${t}</button>`).join("")}</div></div>` : ""}
-    <div class="field"><span>Température à cœur au départ${F.kind === "remise" ? " <em class=\"hy-opt\">facultatif</em>" : ""}</span>${hyTempIn("hyT0", F.t0, F.kind === "refroid" ? "65" : "3")}</div>
+    <div class="field"><span>Température à cœur au départ${F.kind === "remise" ? " <em class=\"hy-opt\">facultatif</em>" : ""}</span>${hyTempIn("hyT0", F.t0, F.kind === "refroid" ? "63" : "3")}</div>
     <p class="hy-verdict ${warn ? "warn" : ""}" id="hyT0v">${warn ? "Moins de 63 °C : le refroidissement doit commencer dès la fin de cuisson." : ""}</p>
     <button class="btn acc block" data-act="hyCoolGo">${ico("clock")}Lancer le chrono</button>
   </div>`;
@@ -163,7 +163,7 @@ function hyMeasureForm(b) {
   const K = hyKind(b), ph = hyPhase(b), left = b.startAt + K.lim - Date.now();
   return `<div class="hy-sh">
     <div class="hy-shh">${hyWell(K.ic, K.tone)}<div><b class="h3">${esc(b.plat)}</b><em>${ph === "late" ? `Délai dépassé de ${hyDur(-left)}` : `Il reste ${hyDur(left)} · objectif ${b.kind === "remise" ? "≥" : "≤"} ${K.goal}`}</em></div></div>
-    <div class="field"><span>Température à cœur</span>${hyTempIn("hyT1", S.ui.hyT1 || "", b.kind === "remise" ? "65" : "8")}</div>
+    <div class="field"><span>Température à cœur</span>${hyTempIn("hyT1", S.ui.hyT1 || "", b.kind === "remise" ? "63" : "8")}</div>
     <p class="hy-verdict" id="hyT1v"></p>
     <button class="btn acc block" data-act="hyMeasureOk" data-id="${b.id}">Valider la mesure</button>
   </div>`;
@@ -630,12 +630,12 @@ async function hySeedMaybe() {
   const rec = hyRecipes(); const rid = (t) => (rec.find((n) => n.title.toLowerCase().includes(t)) || {}).id;
   const put = (col, d) => DB.add(col, d).catch(() => {});
   /* refroidissement: one batch running now, one remise running, 14 days of history with one non-conformity */
-  await put("cooling", { kind: "refroid", plat: "Bœuf bourguignon", ...(rid("bourguignon") ? { noteId: rid("bourguignon") } : {}), qty: 6, unit: "kg", cell: true, startAt: now - 84 * M, t0: 71, checks: [{ at: now - 40 * M, t: 34 }], status: "run", day: dayKey(), ...who() });
+  await put("cooling", { kind: "refroid", plat: "Bœuf bourguignon", ...(rid("bourguignon") ? { noteId: rid("bourguignon") } : {}), qty: 6, unit: "kg", cell: true, startAt: now - 84 * M, t0: 63, checks: [{ at: now - 40 * M, t: 34 }], status: "run", day: dayKey(), ...who() });
   await put("cooling", { kind: "remise", plat: "Soupe à l'oignon", qty: 4, unit: "L", startAt: now - 22 * M, t0: 4, checks: [], status: "run", day: dayKey(), ...who() });
   const plats = [["Bœuf bourguignon", "bourguignon", 6, "kg"], ["Fond de veau", "", 5, "L"], ["Blanquette de veau", "", 4, "kg"], ["Sauce tomate", "", 3, "L"], ["Riz pilaf", "", 2.5, "kg"], ["Crème anglaise", "", 2, "L"]];
   for (let i = 1; i <= 14; i++) {
     const p = plats[i % plats.length]; const st = now - i * 864e5 - (3 + (i % 3)) * H; const dur = (68 + ((i * 17) % 44)) * M; const ko = i === 6;
-    await put("cooling", { kind: i % 4 === 0 ? "remise" : "refroid", plat: p[0], ...(p[1] && rid(p[1]) ? { noteId: rid(p[1]) } : {}), qty: p[2], unit: p[3], cell: i % 5 !== 0, startAt: st, t0: i % 4 === 0 ? 3 + (i % 3) : 66 + (i % 6), checks: [], status: ko ? "ko" : "ok", endAt: st + (ko ? 138 * M : i % 4 === 0 ? dur / 2 : dur), t1: i % 4 === 0 ? 68 + (i % 5) : ko ? 14 : 4 + (i % 6), ...(ko ? { action: "Produit jeté", actionNote: "Cellule en panne, technicien appelé" } : {}), day: dayKey(new Date(st)), ...who() });
+    await put("cooling", { kind: i % 4 === 0 ? "remise" : "refroid", plat: p[0], ...(p[1] && rid(p[1]) ? { noteId: rid(p[1]) } : {}), qty: p[2], unit: p[3], cell: i % 5 !== 0, startAt: st, t0: i % 4 === 0 ? 3 + (i % 3) : 63, checks: [], status: ko ? "ko" : "ok", endAt: st + (ko ? 138 * M : i % 4 === 0 ? dur / 2 : dur), t1: i % 4 === 0 ? 68 + (i % 5) : ko ? 14 : 4 + (i % 6), ...(ko ? { action: "Produit jeté", actionNote: "Cellule en panne, technicien appelé" } : {}), day: dayKey(new Date(st)), ...who() });
   }
   /* friture: two fryers */
   const f1 = await DB.add("fryers", { name: "Friteuse frites", every: 8, svc: 6, lastChange: now - 4 * 864e5, order: 1, createdAt: now - 200 * 864e5 }).catch(() => null);
