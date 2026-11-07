@@ -4,7 +4,9 @@ rules_version = '2';
 //   users/{uid}                      { name, email, photo, restos: [rid] }       the person's own profile and restaurant list
 //   restos/{rid}                     { name, owner, createdAt, plan: essai|essentiel|pro|complet|suspendu, pack, trialEnds, paidUntil… }   one restaurant
 //                                    (the commercial fields are set by the gérant with an activation code, or by a Growth Gusto admin: js/abo.js)
-//   restos/{rid}/members/{memberId}  { name, email, role: gerant|chef|equipe, joinedAt, perms? }  memberId = uid (account) or a kitchen profile id
+//   restos/{rid}/members/{memberId}  { name, email, role: gerant|chef|equipe, joinedAt, perms?, until? }  memberId = uid (account) or a kitchen profile id
+//                                    until (ms, optional, 0 = no limit): a temporary access (extra, stagiaire, js/relais.js) that ends by itself:
+//                                    once passed, the person reads and writes nothing of the restaurant (isMember below)
 //                                    perms (optional map): employee permissions, set only by a gérant (or copied from the invite on join)
 //   restos/{rid}/{collection}/{id}   fridges, readings, lots, products, tickets, staff… (members only)
 //   invites/{code}                   { rid, restoName, role, perms?, createdBy, createdAt, expiresAt (ms), uses }
@@ -16,9 +18,11 @@ service cloud.firestore {
     function restoPath(rid) { return /databases/$(database)/documents/restos/$(rid); }
     function memberPath(rid) { return /databases/$(database)/documents/restos/$(rid)/members/$(request.auth.uid); }
     function invitePath(code) { return /databases/$(database)/documents/invites/$(code); }
-    function isMember(rid) { return signedIn() && exists(memberPath(rid)); }
+    // a temporary access (members/{id}.until, ms) is over once its time has passed; no field, 0 or not a number = no limit
+    function accessOk(d) { return !('until' in d) || !(d.until is number) || d.until == 0 || d.until > request.time.toMillis(); }
+    function isMember(rid) { return signedIn() && exists(memberPath(rid)) && accessOk(get(memberPath(rid)).data); }
     // after the write (or the whole batch): lets a new restaurant, an import or a join write its first docs atomically
-    function isMemberAfter(rid) { return signedIn() && existsAfter(memberPath(rid)); }
+    function isMemberAfter(rid) { return signedIn() && existsAfter(memberPath(rid)) && accessOk(getAfter(memberPath(rid)).data); }
     function isGerant(rid) { return isMember(rid) && get(memberPath(rid)).data.role == 'gerant'; }
     function ownerOf(rid) { return get(restoPath(rid)).data.owner; }
     // consignes (js/consignes.js): a gérant always; then the people listed in restos/{rid}.csCfg.writers, or (no list yet) the chefs
@@ -125,7 +129,8 @@ service cloud.firestore {
 
       // ── team: only a gérant manages it ──
       match /members/{mid} {
-        allow read: if isMember(rid) || isAdmin();
+        // everyone reads the team; a person whose temporary access ended still reads their own doc (the app says « accès terminé »)
+        allow read: if isMember(rid) || isAdmin() || (signedIn() && mid == me());
         allow create: if signedIn() && validRole(request.resource.data.role) && validPerms(request.resource.data) && (
              // the owner's own gérant membership, written in the same batch as the restaurant (no perms: a gérant has them all)
              (mid == me() && request.resource.data.role == 'gerant' && getAfter(restoPath(rid)).data.owner == me()
@@ -139,6 +144,8 @@ service cloud.firestore {
               && get(invitePath(request.resource.data.invite)).data.rid == rid
               && get(invitePath(request.resource.data.invite)).data.role == request.resource.data.role
               && get(invitePath(request.resource.data.invite)).data.expiresAt > request.time.toMillis()
+              // a temporary invite (extra, stagiaire) gives exactly its end date, never a longer one
+              && request.resource.data.get('until', 0) == get(invitePath(request.resource.data.invite)).data.get('until', 0)
               && (('perms' in get(invitePath(request.resource.data.invite)).data)
                     ? request.resource.data.get('perms', null) == get(invitePath(request.resource.data.invite)).data.perms
                     : !('perms' in request.resource.data)))
@@ -146,7 +153,7 @@ service cloud.firestore {
         // a gérant edits anyone (role, perms) but cannot demote the owner; anyone edits their own name/photo/PIN but never their role or perms
         allow update: if validRole(request.resource.data.role) && validPerms(request.resource.data) && (
              (isGerant(rid) && (mid != ownerOf(rid) || request.resource.data.role == 'gerant'))
-          || (mid == me() && isMember(rid) && unchanged(['role', 'invite', 'perms']))
+          || (mid == me() && isMember(rid) && unchanged(['role', 'invite', 'perms', 'until', 'tmp', 'tmpFrom']))
         );
         // a gérant removes someone (never the owner); anyone can leave, except the owner;
         // the owner removes anyone, themselves included, when deleting the restaurant (the app empties every subcollection first)
@@ -166,8 +173,22 @@ service cloud.firestore {
 
       // ── everything else (fridges, readings, lots, stock, tickets, staff, finances…): members only ──
       match /{col}/{doc} {
-        allow read: if !(col in ['members', 'sensorKeys', 'pennylane', 'plSent', 'plInv', 'qrPay', 'bankTx', 'bank', 'push', 'consignes', 'chatGroups']) && isMember(rid);
-        allow create, update, delete: if !(col in ['members', 'sensorKeys', 'pennylane', 'plSent', 'plInv', 'qrPay', 'bankTx', 'bank', 'push', 'consignes', 'chatGroups']) && isMemberAfter(rid);
+        allow read: if !(col in ['members', 'sensorKeys', 'pennylane', 'plSent', 'plInv', 'qrPay', 'bankTx', 'bank', 'push', 'consignes', 'chatGroups', 'events']) && isMember(rid);
+        allow create, update, delete: if !(col in ['members', 'sensorKeys', 'pennylane', 'plSent', 'plInv', 'qrPay', 'bankTx', 'bank', 'push', 'consignes', 'chatGroups', 'events']) && isMemberAfter(rid);
+      }
+      // the action log (journal des actions, js/relais.js): append-only. Each line is signed by its author; nobody edits or erases it,
+      // except the app's own « Annuler » right after a gesture (within 15 minutes), the « annulé ensuite » mark and the photo
+      // purge of the registre, and the owner emptying the whole restaurant.
+      match /events/{id} {
+        allow read: if isMember(rid);
+        // signed by the account, or by one of the restaurant's people on a shared device (kitchen profile: uid = their member id)
+        allow create: if isMemberAfter(rid) && request.resource.data.get('uid', '') is string
+                      && (request.resource.data.uid == me() || existsAfter(/databases/$(database)/documents/restos/$(rid)/members/$(request.resource.data.uid)));
+        allow update: if isMember(rid) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['cancelled', 'cancelledAt', 'cancelledBy', 'photoUrl']);
+        allow delete: if (isMember(rid) && resource.data.get('uid', '') is string
+                          && (resource.data.uid == me() || exists(/databases/$(database)/documents/restos/$(rid)/members/$(resource.data.uid)))
+                          && resource.data.get('at', 0) is number && resource.data.get('at', 0) > request.time.toMillis() - 900000)
+                      || (signedIn() && ownerOf(rid) == me());
       }
       // Pennylane (js/pennylane.js, functions/src/pennylane.js): accounting, so gérants only; the server writes with admin rights
       match /pennylane/{doc} {

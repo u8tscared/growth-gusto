@@ -20,6 +20,7 @@ module.exports = async (page) => {
       if (!Array.isArray(L.q) || typeof L.q[0] !== 'string' || !Array.isArray(L.q[1]) || L.q[1].length < 2 || !(L.q[2] >= 0 && L.q[2] < L.q[1].length)) w('question (q) mal formée : ["question ?", ["réponse", …], index de la bonne]');
       if (!L.sc || !PC_SCENES.includes(L.sc.k)) w('scène (sc.k) inconnue : ' + (L.sc && L.sc.k) + ' (au choix : ' + PC_SCENES.join(', ') + ')');
       ((L.sc && L.sc.rows) || []).forEach((row) => { if (L.sc.k !== 'check' && row[0] && !IC[row[0]]) w('icône inconnue dans la scène : ' + row[0]); });
+      if (typeof L.who === 'string') L.who = [L.who];
       if (L.who && (!Array.isArray(L.who) || L.who.some((x) => !['cuisine', 'salle', 'bar', 'plonge', 'boss'].includes(x)))) w('who : cuisine, salle, bar, plonge ou boss');
     };
     Object.entries(PC_LECONS).forEach(([k, L]) => check(k, L));

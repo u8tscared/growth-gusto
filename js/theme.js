@@ -19,7 +19,7 @@
 (function () {
   const LS = { get: (k) => { try { return localStorage.getItem(k); } catch (e) { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} } };
   const MQ = (() => { try { return matchMedia("(prefers-color-scheme: dark)"); } catch (e) { return null; } })();
-  const SVC_ROUTES = ["cuisine", "bar", "coupdefeu"];
+  const SVC_ROUTES = ["cuisine", "bar", "coupdefeu", "recette"];
   const TH = (window.TH = {
     pref: ["auto", "light", "dark", "soir"].includes(LS.get("gg-theme")) ? LS.get("gg-theme") : "auto",
     svc: LS.get("gg-theme-svc") !== "0",

@@ -1,0 +1,41 @@
+// node tools/run.js tools/br-ui.js (DESKTOP=1 / TABLET=1 too): demo → écran bar → recette d'un cocktail pas à pas → écran cuisine → recette du bourguignon, dressage, minuteur → coup de feu Bar.
+module.exports = async (page, shot) => {
+  await page.waitForTimeout(1500);
+  await page.$eval('[data-act=auDemo]', (e) => e.click());
+  await page.waitForTimeout(2500);
+  const ev = (f, a) => page.evaluate(f, a);
+  await ev(() => go('cuisine')); await page.waitForTimeout(1200); await ev(() => go('bar')); await page.waitForTimeout(1500);
+  await shot('br-1-bar');
+  const info = await ev(() => ({ cards: document.querySelectorAll('.br-card').length, recs: document.querySelectorAll('.br-card .rp-kb').length, tot: document.querySelectorAll('.br-tr').length, sweet: document.querySelectorAll('.br-sw').length, on: brOn() }));
+  console.log('BAR', JSON.stringify(info));
+  await page.$eval('.br-card .rp-kb', (e) => e.click()); await page.waitForTimeout(900);
+  await shot('br-2-cocktail');
+  await page.$eval('[data-act=rpGo][data-v="1"]', (e) => e.click()); await page.waitForTimeout(600);
+  await page.$eval('[data-act=rpGo][data-v="1"]', (e) => e.click()); await page.waitForTimeout(600);
+  await page.$eval('[data-act=rpGo][data-v="1"]', (e) => e.click()); await page.waitForTimeout(600);
+  await shot('br-3-cocktail-dressage');
+  await page.$eval('[data-act=rpDone]', (e) => e.click()); await page.waitForTimeout(1200);
+  console.log('BACK', await ev(() => S.route));
+  await ev(() => go('cuisine')); await page.waitForTimeout(1200);
+  await shot('br-4-cuisine');
+  const kc = await ev(() => ({ cards: document.querySelectorAll('.sl-kcard').length, bar: document.querySelectorAll('.sl-kcard.bar').length, recs: document.querySelectorAll('.sl-kcard .rp-kb').length, tobar: !!document.querySelector('.sl-tobar') }));
+  console.log('CUISINE', JSON.stringify(kc));
+  await ev(() => go('recette', { id: 'n-bourgui', q: 4 })); await page.waitForTimeout(900);
+  await shot('br-5-bourgui');
+  await ev(() => { RP.i = 2; rpPaint(); }); await page.waitForTimeout(500);
+  await shot('br-6-bourgui-step-photo');
+  await ev(() => { RP.i = 3; rpPaint(); }); await page.waitForTimeout(300);
+  const tb = await page.$('[data-act=rpTimer]'); if (tb) { await tb.click(); await page.waitForTimeout(1300); }
+  await shot('br-7-timer');
+  await ev(() => { RP.i = 5; rpPaint(); }); await page.waitForTimeout(500);
+  await shot('br-8-dressage');
+  await ev(() => ACT.rpAll()); await page.waitForTimeout(500);
+  await shot('br-9-all');
+  await ev(() => { localStorage.setItem('gg-cf-role-' + S.rid, 'bar'); go('coupdefeu'); }); await page.waitForTimeout(1300);
+  await shot('br-10-cf-bar');
+  await ev(() => go('fiche', { id: 'n-bourgui' })); await page.waitForTimeout(900);
+  await shot('br-11-fiche');
+  await ev(() => { S.ui.note = null; go('note', { id: 'n-bourgui' }); }); await page.waitForTimeout(900);
+  await ev(() => { const e = document.querySelector('.nt-esteps'); if (e) e.scrollIntoView(); }); await page.waitForTimeout(400);
+  await shot('br-12-editor');
+};

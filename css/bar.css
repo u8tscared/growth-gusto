@@ -1,0 +1,49 @@
+/* Growth Gusto — écran bar (js/bar.js). Prefix « br ». Built on the kitchen screen's cards (css/salle.css .sl-kcard), in bar blue. */
+
+.br-card>header{background:linear-gradient(120deg,#1F7AE0,#2A5BEA 60%,#4A3BE6)}
+.br-card.warm>header{background:linear-gradient(120deg,#E0752F,#D9572F)}
+.br-card.late>header{background:#D42A48}
+.br-card .sl-kit li>b{background:#1F4FBF}
+.br-card .sl-kit li.ok>b{background:#0E8A5F}
+.br-card .sl-kit li{align-items:center}
+.br-card .sl-kit li>span{flex:1;min-width:0}
+.br-vs{font-style:normal;font-size:12px;font-weight:700;color:#1F5FB8;background:#E6F0FF;border-radius:7px;padding:1px 8px;width:fit-content}
+.br-card .sl-kgo.rdy{background:#0E8A5F;box-shadow:0 4px 0 #06603F}
+.br-card.fresh{animation:slIn .8s var(--spring) both,brGlow 2.4s .5s ease-out}
+@keyframes brGlow{0%{box-shadow:0 0 0 1.5px var(--rim) inset,0 0 0 0 rgba(31,122,224,.55)}35%{box-shadow:0 0 0 1.5px var(--rim) inset,0 0 0 12px rgba(31,122,224,0)}100%{box-shadow:0 0 0 1.5px var(--rim) inset,0 3px 0 var(--edge-b)}}
+.sl-tag.brt{background:#E6F0FF;color:#1F5FB8}
+
+/* setup banner: the drinks only here */
+.br-setup{display:flex;align-items:center;gap:14px;padding:14px 16px;border-radius:20px}
+.br-setup>div{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.br-setup b{font-size:15px}.br-setup em{font-style:normal;font-size:13px;color:var(--muted);line-height:1.4}
+.br-si{flex:none;width:46px;height:46px;border-radius:15px;display:grid;place-items:center;background:linear-gradient(140deg,#5FB2FF,#2A5BEA);color:#fff;box-shadow:0 8px 18px -8px rgba(42,91,234,.7)}
+.br-si .ico{width:24px;height:24px}
+@media (max-width:620px){.br-setup{flex-wrap:wrap}.br-setup .btn{width:100%}}
+
+/* side: what to pour */
+.br-tot>header .ico{color:#2A5BEA}
+.br-tr{display:flex;align-items:center;gap:10px;padding:7px 0;border-top:1px solid var(--rim)}
+.br-tr>b{min-width:34px;height:34px;border-radius:11px;display:grid;place-items:center;font-size:17px;background:linear-gradient(140deg,#5FB2FF,#2A5BEA);color:#fff;box-shadow:0 3px 0 #1D3FA8}
+.br-tr>span{flex:1;min-width:0;display:flex;flex-direction:column}
+.br-tr>span b{font-size:14.5px}.br-tr>span em{font-style:normal;font-size:12px;color:var(--muted)}
+.br-sweet>header .ico{color:#8B5A2B}
+.br-swn{margin:0 0 4px;font-size:12.5px;color:var(--muted)}
+.br-sw{display:flex;align-items:center;gap:10px;padding:7px 0;border-top:1px solid var(--rim);font-size:13.5px}
+.br-sw>b{min-width:34px;height:30px;border-radius:10px;display:grid;place-items:center;background:#F3E6D8;color:#6B4320;font-size:15px}
+.br-sw>span{flex:1;min-width:0;font-weight:650}.br-sw>em{font-style:normal;font-size:12px;color:var(--muted)}
+.br-off{align-self:flex-start}
+
+/* empty state: three glasses filling up */
+.br-ill{display:flex;align-items:flex-end;gap:10px;height:60px;margin-bottom:4px}
+.br-ill i{position:relative;width:26px;height:46px;border-radius:4px 4px 10px 10px;border:2.5px solid #9DBDF0;overflow:hidden}
+.br-ill i::after{content:"";position:absolute;left:0;right:0;bottom:0;height:40%;background:linear-gradient(#7FB8FF,#2A5BEA);animation:brFill 3.2s var(--ease) infinite alternate}
+.br-ill i:nth-child(2){height:56px}.br-ill i:nth-child(2)::after{animation-delay:.4s;background:linear-gradient(#FFB36B,#F26B21)}
+.br-ill i:nth-child(3)::after{animation-delay:.8s;background:linear-gradient(#9DE3A9,#3E9B52)}
+@keyframes brFill{from{height:18%}to{height:78%}}
+
+/* coup de feu, role Bar */
+.cf-r-bar .cf-kpi>div:first-child b{color:#2A5BEA}
+@media (prefers-reduced-motion:reduce){.br-ill i::after,.br-card.fresh{animation:none}}
+.es-mk.bar .mk-bons>i b{background:#2A5BEA}.es-mk.bar .mk-bons>i.hot b{background:#F26B21}
+@media (min-width:620px) and (max-width:899px){.sl-kgrid.br-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}

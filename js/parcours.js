@@ -199,7 +199,7 @@ function pcCan(m, r) {
 }
 const pcPosteOf = (m) => (m && (typeof ES_POSTE_OF !== "undefined" ? ES_POSTE_OF[m.poste] : m.poste)) || (m && m.role === "chef" ? "cuisine" : "");
 function pcWho(r) {
-  const L = PC_LECONS[r]; if (L && Array.isArray(L.who)) return L.who;
+  const L = PC_LECONS[r]; if (L && typeof L.who === "string") L.who = [L.who]; if (L && Array.isArray(L.who)) return L.who;
   const out = []; try { Object.entries(ES_POSTES).forEach(([k, v]) => { if (v.tools.includes(r)) out.push(k); }); } catch (e) {}
   return out.length ? out : ["boss"];
 }

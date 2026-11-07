@@ -85,6 +85,15 @@ NEW = {
     "livraison": dict(img="livraison", t="Uber Eats, Deliveroo, Just Eat",
         p="Déposez le relevé de ventes de chaque plateforme{0}: le chiffre, les commissions et ce qui vous est versé arrivent dans vos finances, le stock est déduit selon vos recettes et vous voyez la vraie marge de chaque plat.".format(N),
         ul=["Relevé de ventes, par import", "Commissions dans les finances", "Vraie marge par plat, livraison comprise", f"Commandes en direct sur l'écran cuisine{N}: bientôt"]),
+    "passation": dict(img="passation", t="Passation de service",
+        p="En fin de service, un mot pour l'équipe suivante{0}: ruptures, casse, client à rappeler, ce qu'il reste à préparer. L'app reprend la journée pour vous, et l'équipe suivante le lit en arrivant et signe.".format(N),
+        ul=["Repris tout seul{0}: ruptures, casse, refroidissements, DLC".format(N), "Client à rappeler, avec son numéro", "Lu par qui, et à quelle heure", "Rien à signaler{0}? Un seul geste".format(N)]),
+    "journal": dict(img="journal", t="Journal des actions",
+        p="Qui a annulé, offert ou modifié quoi, et quand, avec le montant. Chaque ligne est signée et rien ne s'efface, pas même par le gérant.",
+        ul=["Annulations et offerts, avec leur motif et leur montant", "Filtres par personne, par jour, par type", f"«{N}À regarder{N}» quand quelqu'un sort du lot", "Export pour le comptable"]),
+    "acces": dict(img="acces", t="Accès temporaires",
+        p="Un extra pour le week-end, un stagiaire pour un mois{0}: vous choisissez la date de fin, et l'accès se ferme tout seul. Prolonger ou rouvrir, c'est un geste.".format(N),
+        ul=["Extra, stagiaire, saison, remplacement", "Ce soir, cette semaine, ce mois ou une date", "Se ferme tout seul, à l'heure dite", "Ce qu'ils ont fait reste signé à leur nom"]),
 }
 
 # integration labels (Marceau: be honest about what is really linked)
@@ -108,7 +117,7 @@ GROUPS = [
     ("g-gestion", "s", "Au bureau", "Caisse, stock et chiffres", "Savoir ce que vous avez, ce que vous vendez, ce que vous gagnez.", False,
         [("caisse", SECOND, None), ("livraison", SECOND, IMPORT), ("tickets", SECOND, None), ("frais", SECOND, None), ("stock", SECOND, None), ("dashboard", SECOND, None), ("finance", CHEF, None), ("banque", CHEF, IMPORT), ("sites", CHEF, None)]),
     ("g-equipe", "v", "L'équipe", "Équipe, pointeuse et planning", "Chacun son compte, ses horaires, son planning.", True,
-        [("equipe", None, None), ("consignes", None, None), ("defis", SECOND, None), ("pointeuse", CHEF, None), ("planning", CHEF, None), ("staff", CHEF, None)]),
+        [("equipe", None, None), ("consignes", None, None), ("defis", SECOND, None), ("passation", None, None), ("journal", None, None), ("acces", None, None), ("pointeuse", CHEF, None), ("planning", CHEF, None), ("staff", CHEF, None)]),
 ]
 
 PLUS = '<svg class="fi-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>'

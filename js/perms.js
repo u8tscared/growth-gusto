@@ -241,6 +241,7 @@ function pmPane(F) {
     ${F.connect === "local" ? `<label class="pm-pin"><span class="lbl pm-lbl">Son code à 4 chiffres <em class="pm-opt-t">facultatif</em></span><input class="input mono pm-pinin" id="pmPin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off" value="${esc(F.pin)}" placeholder="Sinon, il le crée à sa première connexion"></label>` : ""}`; }
   if (F.step === "recap") { const can = F.admin ? ["tout voir et tout gérer, y compris l'équipe et l'abonnement"] : PM_MODS.filter((x) => F.modules[x[0]] && (VIEWS[x[0]] || x[0] === "staff")).map((x) => x[4]).concat(PM_CAPS.filter((c) => F.caps[c[0]] && c[0] !== "seeMoney").map((c) => c[4]));
     const must = F.admin ? [] : PM_REQ.filter((r) => F.require[r[0]]).map((r) => r[4]);
+    const axT = typeof axFlowRecap === "function" && !F.admin ? axFlowRecap(F) : ""; if (axT) can.push(axT);
     const how = F.mode === "edit" ? "" : F.connect === "invite" ? (F.email ? `recevoir son invitation par e-mail (${F.email})` : "se connecter sur son téléphone avec une invitation") : "se connecter sur cet appareil";
     return `<div class="pm-q pm-rq"><span class="pm-rava">${pmAvaHTML(F, 72)}</span><h2 class="pm-h">${esc(F.name || "Nouvel équipier")}</h2><p class="pm-s">${F.admin ? "Gère le restaurant" : F.poste ? PM_POSTES[F.poste][0] : "Équipier"}</p></div>
     <div class="pm-rec"><div class="pm-rc"><b class="pm-rt">${nm} pourra</b><ul>${can.length ? can.map((t) => `<li><span class="pm-b ok"></span>${esc(t)}</li>`).join("") : `<li><span class="pm-b"></span>pointer et signer, sans autre module</li>`}${how ? `<li><span class="pm-b ok"></span>${how}</li>` : ""}</ul></div>
@@ -296,7 +297,8 @@ async function pmSave() {
     if (F.mode === "edit") {
       const m = pmMember(F.id); if (!m) throw new Error("gone");
       if (m.role === "gerant" && role !== "gerant" && (S.members || []).filter((x) => x.role === "gerant").length < 2) { SFX.err(); toast("Il faut au moins un gérant dans l'équipe.", "err"); F.busy = false; btn && btn.removeAttribute("disabled"); return; }
-      const patch = { name: F.name, role, perms, poste: F.poste || "", ...(F.photo !== (m.photo || "") ? { photo: F.photo || "" } : {}) };
+      const ax = typeof axFlowPatch === "function" && !F.admin ? axFlowPatch(F) : {}; /* js/relais.js: temporary access */
+      const patch = { name: F.name, role, perms, poste: F.poste || "", ...(F.photo !== (m.photo || "") ? { photo: F.photo || "" } : {}), ...ax, ...(F.admin && m.until ? { until: 0 } : {}) };
       await safe(DB.update("members", F.id, patch));
       S.profiles[F.id] = { ...(S.profiles[F.id] || {}), name: F.name, ...(F.photo ? { avatarUrl: F.photo } : {}) };
       await logEvent("team", `a changé les accès de ${fn}`);
@@ -304,7 +306,8 @@ async function pmSave() {
     }
     if (F.connect === "invite") {
       const code = typeof auCode === "function" ? auCode(8) : Math.random().toString(36).slice(2, 10).toUpperCase(); const now = Date.now();
-      const doc = { rid: S.rid, restoName: S.resto?.name || "", role, perms, name: F.name, poste: F.poste || "", ...(F.photo ? { photo: F.photo } : {}), createdBy: S.me.id, createdByName: S.me.name || "", createdAt: now, expiresAt: now + 7 * 864e5, uses: 0, maxUses: 1 };
+      const ax = typeof axFlowPatch === "function" && !F.admin ? axFlowPatch(F) : {}; /* js/relais.js: the access ends by itself, copied on join */
+      const doc = { rid: S.rid, restoName: S.resto?.name || "", role, perms, name: F.name, poste: F.poste || "", ...(F.photo ? { photo: F.photo } : {}), createdBy: S.me.id, createdByName: S.me.name || "", createdAt: now, expiresAt: Math.min(now + 7 * 864e5, ax.until || Infinity), uses: 0, maxUses: 1, ...(ax.until ? { until: ax.until, tmp: ax.tmp } : {}) };
       if (DB.uid && typeof AUTH !== "undefined" && AUTH.fs) await AUTH.timeout(AUTH.fs.collection("invites").doc(code).set(doc), 12000);
       if (S.ui.auInv && S.ui.auInv.list) S.ui.auInv.list.unshift({ code, ...doc });
       await logEvent("team", `a invité ${fn}`).catch(() => {});
@@ -315,7 +318,8 @@ async function pmSave() {
     }
     const id = "m" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
     const pinP = F.pin && typeof ccPinPatch === "function" ? ccPinPatch(id, F.pin) : {};
-    await safe(DB.set("members", id, { role, name: F.name, color: F.color, joinedAt: Date.now(), by: S.me.id, poste: F.poste || "", perms, ...(F.photo ? { photo: F.photo } : {}), ...pinP }));
+    const axL = typeof axFlowPatch === "function" && !F.admin ? axFlowPatch(F) : {};
+    await safe(DB.set("members", id, { role, name: F.name, color: F.color, joinedAt: Date.now(), by: S.me.id, poste: F.poste || "", perms, ...(F.photo ? { photo: F.photo } : {}), ...pinP, ...(axL.until ? axL : {}) }));
     S.profiles[id] = { name: F.name, color: F.color, ...(F.photo ? { avatarUrl: F.photo } : {}) };
     await logEvent("team", `a ajouté ${F.name} à l'équipe`);
     const from = F.from; pmClose(); SFX.done(); buzz([10, 30, 10]); burst(window.innerWidth / 2, window.innerHeight / 2); toast(`${fn} fait partie de l'équipe`);
