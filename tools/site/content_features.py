@@ -166,14 +166,15 @@ FEATURES = [
 
  dict(slug="equipe-planning", short="Équipe, planning et pointeuse", ic="users", icc="",
   title="Planning, pointeuse et messagerie d'équipe pour restaurant · Growth Gusto",
-  desc="Comptes de l'équipe, consignes et messagerie, pointeuse, planning avec repères HCR, employés et salaires, export paie pour le comptable.",
+  desc="Comptes de l'équipe, consignes et messagerie, défis d'équipe, pointeuse, planning avec repères HCR, employés et salaires, export paie pour le comptable.",
   kick="Équipe", h1='Chacun son compte, <span class="hl">son planning.</span>',
-  lede="Chaque cuisinier a son compte : vous voyez qui a fait quoi. Les consignes arrivent sur le téléphone de chacun. La pointeuse et le planning préparent la paie.",
+  lede="Chaque cuisinier a son compte : vous voyez qui a fait quoi. Les consignes arrivent sur le téléphone de chacun, les défis motivent la salle. La pointeuse et le planning préparent la paie.",
   img="equipe", tags=[CHEF],
-  card="Comptes, consignes, pointeuse, planning HCR, export paie.",
+  card="Comptes, consignes, défis d'équipe, pointeuse, planning HCR, export paie.",
   blocks=[
    ("Les comptes de l'équipe", "Utilisateurs illimités, rôles gérant, chef, équipe. Chaque relevé, étiquette ou réception porte un prénom.", ["Utilisateurs illimités", "Rôles et accès", "Invitation par code ou QR"], "equipe", "v", [COMMIS]),
    ("Consignes et messagerie par groupes", "Plat du jour, rupture, info : la consigne arrive chez ceux qu'elle concerne et vous voyez qui l'a lue. La discussion a ses groupes : Toute l'équipe, Cuisine, Salle, et ceux que vous créez.", ["Consigne pour tous ou pour un groupe", "Vous choisissez qui peut publier", "Lu, et qui a lu", "Dictée vocale"], "consignes", "s", [COMMIS]),
+   ("Les défis d'équipe", "« 20 desserts ce soir » : vous lancez le défi, les ventes se comptent toutes seules depuis la prise de commande et le menu QR, et le classement bouge en direct. Quand c'est gagné, tous les écrans fêtent la victoire.", ["Desserts, boissons, un plat, chiffre d'affaires, ticket moyen", "Classement en direct par serveur", "Trophées et récompenses"], "defis", "t", [SECOND]),
    ("La pointeuse", "Arrivée, pause, départ : chacun touche son prénom sur la tablette.", ["Heures réelles", "Pauses", "Retards repérés"], "pointeuse", "k", [CHEF]),
    ("Planning et heures", "Le planning de la semaine, les heures prévues et pointées, avec les repères de la convention HCR. Export pour le comptable.", ["Repères HCR", "Heures sup", "Export paie"], "planning", "l", [CHEF]),
   ],
