@@ -56,9 +56,11 @@ window.GG_DEMO = {
     /* demandes de l'équipe (js/espaces.js « Mon espace » / « Demandes de l'équipe ») */
     [["demo-sarah", "conge", 18, 21, "Mariage de ma sœur à Bordeaux", "attente", 1], ["demo-hugo", "dispo", 4, 4, "Libre tous les lundis midi ce mois-ci", "attente", 0], ["demo-lucas", "echange", 6, 6, "avec Inès Benali · je prends son soir, elle prend mon midi", "ok", 3], ["demo-sarah", "absence", -9, -9, "Rendez-vous médical le matin", "ok", 12]]
       .forEach(([mid, kind, a, b, note, status, ago]) => { const t = team.find((x) => x[0] === mid); put("esRequests", { kind, from: addDays(today, a), to: addDays(today, b), note, memberId: mid, name: t[1], staffId: "s_" + mid, status, at: now - ago * 864e5 - 3 * 36e5, uid: mid, ...(status !== "attente" ? { answeredBy: "demo-camille", answeredByName: "Camille Laurent", answeredAt: now - ago * 864e5 } : {}) }); });
+    /* planning intelligent (js/planif.js) : indisponibilités et postes de renfort */
+    const DEMO_PF = { "demo-hugo": { off: { 0: ["midi"], 2: ["midi"], 3: ["midi"], 4: ["midi"], 5: ["midi"], 6: ["midi"] } }, "demo-sarah": { off: { 0: ["soir"] } }, "demo-lucas": { alsoPosts: ["plonge"] }, "demo-ines": { off: { 3: ["midi"] } } };
     const staffIds = {};
     team.forEach(([mid, name, , color, jobRole, contract, weeklyHours, hourlyGross, post], i) => {
-      staffIds[mid] = put("staff", { memberId: mid, name, role: jobRole, color, contract, weeklyHours, hourlyGross: hourlyGross || 24, chargesPct: contract === "Extra" ? 30 : 42, active: true, start: addDays(today, -(400 - i * 40)), post }, "s_" + mid);
+      staffIds[mid] = put("staff", { memberId: mid, name, role: jobRole, color, contract, weeklyHours, hourlyGross: hourlyGross || 24, chargesPct: contract === "Extra" ? 30 : 42, active: true, start: addDays(today, -(400 - i * 40)), post, ...(DEMO_PF[mid] || {}) }, "s_" + mid);
     });
     const who = team.map((t) => t[0]), cooks = ["demo-thomas", "demo-ines", "demo-lucas"];
 
@@ -153,8 +155,8 @@ window.GG_DEMO = {
       L.forEach((l, i) => put("lots", { name: l.name, productId: l.productId, qty: l.qty, unit: l.unit, lot: l.lot, dlc: l.dlc, supplier, receptionId: recId, fridgeId: l.fridgeId, status: "in", receivedTemp: l.temp, code: "GG-" + rid6(), photoId: "", photoUrl: "", createdAt: t + i, uid: pick(cooks) }));
       L.forEach((l) => put("moves", { productId: l.productId, name: l.name, qty: l.qty, unit: l.unit, kind: "reception", ref: recId, refType: "reception", at: t, uid: "demo-thomas", by: "Thomas Girard" }));
     });
-    put("lots", { name: "Fond de veau maison", productId: "p-fond", qty: 2, unit: "L", lot: "MAISON", dlc: addDays(today, -1), supplier: "Fait maison", receptionId: "", fridgeId: "fr-cf", status: "opened", dlcOpen: addDays(today, -1), receivedTemp: null, code: "GG-" + rid6(), createdAt: now - 4 * 864e5, uid: "demo-ines" });
-    put("lots", { name: "Mayonnaise maison", productId: "", qty: 1, unit: "kg", lot: "MAISON", dlc: today, supplier: "Fait maison", receptionId: "", fridgeId: "fr-cf", status: "opened", dlcOpen: today, receivedTemp: null, code: "GG-" + rid6(), createdAt: now - 2 * 864e5, uid: "demo-lucas" });
+    put("lots", { name: "Fond de veau maison", productId: "p-fond", qty: 2, unit: "L", lot: "MAISON", dlc: addDays(today, -1), supplier: "Fait maison", receptionId: "", fridgeId: "fr-cf", status: "opened", openedAt: now - 2 * 864e5 - 3 * 36e5, openedBy: "demo-thomas", dlcOpen: addDays(today, -1), receivedTemp: null, code: "GG-" + rid6(), createdAt: now - 4 * 864e5, uid: "demo-ines" });
+    put("lots", { name: "Mayonnaise maison", productId: "", qty: 1, unit: "kg", lot: "MAISON", dlc: today, supplier: "Fait maison", receptionId: "", fridgeId: "fr-cf", status: "opened", openedAt: now - 864e5 - 5 * 36e5, openedBy: "demo-lucas", dlcOpen: today, receivedTemp: null, code: "GG-" + rid6(), createdAt: now - 2 * 864e5, uid: "demo-lucas" });
     put("lots", { name: "Croquettes de jambon (panées)", productId: "", qty: 60, unit: "pièce", lot: "MAISON", dlc: addDays(today, 1), supplier: "Fait maison", receptionId: "", fridgeId: "fr-cf", status: "in", receivedTemp: null, code: "GG-" + rid6(), createdAt: now - 864e5, uid: "demo-ines" });
     if (hourNow >= 11 && hourNow < 23) {
       const svcAt = at(today, 11, 2);

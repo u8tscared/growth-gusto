@@ -673,7 +673,7 @@ Object.assign(ACT, {
   pcNudge: (a, id) => {
     const m = pcMember(id); if (!m) return; const tx = `${firstName(m.name)}, ta formation Growth Gusto t'attend : Prise en main, environ ${pcMins(pcProg(id).total - pcProg(id).n)} minutes.`;
     if (typeof csPost === "function" && !pcDemo()) { try { csPost({ kind: "info", text: tx }); } catch (e) {} }
-    if (navigator.share && !pcDemo()) navigator.share({ text: tx + " " + location.origin }).catch(() => {}); else { try { navigator.clipboard.writeText(tx); } catch (e) {} }
+    if (navigator.share && !pcDemo()) navigator.share({ text: tx + " " + location.origin }).catch(() => {}); else { try { navigator.clipboard.writeText(tx).catch(() => {}); } catch (e) {} }
     closeSheet(); toast(pcDemo() ? "Rappel envoyé (démo)" : "Message prêt à envoyer"); SFX.ok();
   },
   /* onboarding questions */

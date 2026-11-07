@@ -7,6 +7,8 @@
  *               op "key"        → Zelty: checks the API key typed by the gérant, stores it encrypted, first sync
  *               op "sync"       → syncs one caisse now → { added }
  *               op "disconnect" → forgets the tokens, status « off »
+ *               op "history"    → { from, to } (≤ 40 days): last year's sales, totals per day → restos/{rid}/history/{day}
+ *                                 { day, ttc, ht?, n, src } (js/previsions.js: N-1 forecast). SumUp and Square. Returns { days, more, cursor }.
  *   caisseTick() plain async function, NOT scheduled here (cost rule): the lead's single scheduled job calls it every 15 min.
  *               It syncs every connected caisse whose last sync is older than 10 min. The scheduled job must declare
  *               `secrets: CAISSE_SECRETS` (exported below) so the tokens can be refreshed and decrypted.
@@ -229,6 +231,68 @@ P.zelty = {
   },
 };
 
+/* ───────── historique (N-1) : totaux par jour sur une fenêtre, sans le détail des articles ─────────
+ * fetchTotals(tokens, fromMs, toMs) → { rows:[{ at, total, ht }], more, cursor } : au plus ~60 pages par appel, `more` si la fenêtre
+ * n'est pas finie (l'app rappelle avec from = cursor). Écrit restos/{rid}/history/{jour} (js/previsions.js le lit). */
+P.sumup.fetchTotals = async function (T, from, to) {
+  const rows = []; let cursor = from;
+  const q = new URLSearchParams({ oldest_time: new Date(from).toISOString(), newest_time: new Date(to).toISOString(), order: "ascending", limit: "100" });
+  q.append("statuses[]", "SUCCESSFUL");
+  let url = "https://api.sumup.com/v0.1/me/transactions/history?" + q.toString(); let page = 0;
+  for (; url && page < 60; page++) {
+    const r = await http(url, { token: T.access });
+    for (const it of (r && r.items) || []) {
+      const at = Date.parse(it.timestamp); if (!at || at >= to) continue; cursor = Math.max(cursor, at);
+      if (it.type && it.type !== "PAYMENT") continue;
+      rows.push({ at, total: r2((first(it.amount) || 0) - (first(it.tip_amount) || 0)), ht: null });
+    }
+    const next = ((r && r.links) || []).find((l) => l.rel === "next");
+    url = next && next.href ? (next.href.startsWith("http") ? next.href : "https://api.sumup.com/v0.1/me/transactions/history" + (next.href.startsWith("?") ? "" : "?") + next.href) : null;
+  }
+  return { rows, more: !!url, cursor: cursor + 1 };
+};
+P.square.fetchTotals = async function (T, from, to) {
+  const loc = await http(SQ + "/v2/locations", { token: T.access, headers: SQV }); const ids = ((loc && loc.locations) || []).filter((l) => l.status !== "INACTIVE").map((l) => l.id).slice(0, 10);
+  const rows = []; let cursor = from; let c = null; let page = 0;
+  if (!ids.length) return { rows, more: false, cursor: to };
+  const cents = (m) => (m && n(m.amount) != null ? n(m.amount) / 100 : null);
+  for (; page < 40; page++) {
+    const r = await http(SQ + "/v2/orders/search", { method: "POST", token: T.access, headers: SQV, json: { location_ids: ids, limit: 500, return_entries: false, ...(c ? { cursor: c } : {}), query: { filter: { date_time_filter: { closed_at: { start_at: new Date(from).toISOString(), end_at: new Date(to).toISOString() } }, state_filter: { states: ["COMPLETED"] } }, sort: { sort_field: "CLOSED_AT", sort_order: "ASC" } } } });
+    for (const o of (r && r.orders) || []) {
+      const at = Date.parse(o.closed_at || o.updated_at || o.created_at); if (!at) continue; cursor = Math.max(cursor, at);
+      const total = r2((cents(o.total_money) || 0) - (cents(o.total_tip_money) || 0)); const tax = cents(o.total_tax_money);
+      rows.push({ at, total, ht: tax != null ? r2(total - tax) : null });
+    }
+    c = r && r.cursor; if (!c) break;
+  }
+  return { rows, more: !!c, cursor: cursor + 1 };
+};
+
+/* one window of history: refresh the token if needed, fetch the totals, add them up per day (Europe/Paris) and write history/{day}.
+   A day cut by the window edge is completed by the next call (merge, and the cursor is a timestamp). */
+async function historyOne(rid, prov, from, to) {
+  const ref = tokRef(rid, prov); const snap = await ref.get(); if (!snap.exists) throw new CxErr("not_connected", 404);
+  const p = P[prov]; if (!p || !p.fetchTotals) throw new CxErr("unsupported", 400);
+  let T = open(snap.data().enc);
+  if (!p.key && T.expiresAt && T.expiresAt < Date.now() + 120000 && T.refresh) { T = await p.refresh(T); await ref.set({ enc: seal(T) }, { merge: true }); }
+  let r;
+  try { r = await p.fetchTotals(T, from, to); }
+  catch (e) { if (e.code !== "unauthorized" || p.key || !T.refresh) throw e; T = await p.refresh(T); await ref.set({ enc: seal(T) }, { merge: true }); r = await p.fetchTotals(T, from, to); }
+  const by = {};
+  r.rows.forEach((x) => { const d = dayOf(x.at); const e = (by[d] ||= { ttc: 0, ht: 0, htAll: true, n: 0, first: x.at }); e.ttc += x.total; if (x.ht != null) e.ht += x.ht; else e.htAll = false; e.n++; e.first = Math.min(e.first, x.at); });
+  const days = Object.keys(by).sort(); const b = db.batch();
+  for (const d of days) {
+    const e = by[d]; const hr = db.doc(`restos/${rid}/history/${d}`);
+    /* the first window touching a day writes it, a later window (same day, continued) adds to it */
+    const cont = dayOf(from - 1) === d;
+    if (cont) b.set(hr, { ttc: admin.firestore.FieldValue.increment(r2(e.ttc)), n: admin.firestore.FieldValue.increment(e.n), at: Date.now() }, { merge: true });
+    else b.set(hr, { day: d, ttc: r2(e.ttc), ht: e.htAll ? r2(e.ht) : null, n: e.n, covers: null, src: prov, at: Date.now() });
+  }
+  if (days.length) await b.commit();
+  if (!r.more) await setStatus(rid, prov, { historyAt: Date.now() });
+  return { days: days.length, more: r.more, cursor: r.more ? r.cursor : to };
+}
+
 function tok(t, old = {}) {
   if (!t || !t.access_token) throw new CxErr("upstream", 502);
   const exp = n(t.expires_in) ? Date.now() + n(t.expires_in) * 1000 : t.expires_at ? Date.parse(t.expires_at) : Date.now() + 3500 * 1000;
@@ -350,6 +414,11 @@ const caisseApi = onRequest({ region: REGION, cors: [/growthgusto\.fr$/, /growth
       await setStatus(rid, prov, { status: "connected", merchant, connectedAt: Date.now(), lastSync: null, lastError: null, active: true });
       const r = await syncOne(rid, prov).catch(() => ({ added: 0 }));
       res.json({ ok: true, merchant, added: r.added }); return;
+    }
+    if (op === "history") {
+      await caller(req, rid, true); const from = +b.from, to = +b.to;
+      if (!(from > 0 && to > from && to - from <= 40 * 864e5 && from > Date.now() - 800 * 864e5)) throw new CxErr("range", 400);
+      res.json({ ok: true, ...(await historyOne(rid, prov, from, Math.min(to, Date.now()))) }); return;
     }
     if (op === "sync") { await caller(req, rid, false); res.json({ ok: true, ...(await syncOne(rid, prov)) }); return; }
     if (op === "disconnect") {

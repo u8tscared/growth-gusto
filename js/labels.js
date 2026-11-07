@@ -369,7 +369,7 @@ function lbGeom(l, roll, st) {
   const tw = roll.w - 3.6 - (qr ? qr + 1.6 : 0);
   const fn0 = LB_FN[st.txt], fd0 = LB_FD[st.dlc], fs0 = LB_FS[st.txt], fc0 = 2.5 * [0, 0.88, 1, 1.12][st.txt];
   const op = l.status === "opened"; const nm = l.name || ""; const brand = st.brand ? lbBrand() : null; const alg = st.alg ? lbAllergens(l) : [];
-  const meta = [st.dates ? (op ? `Ouvert le ${shortDate(dayKey(new Date(l.openedAt)))} à ${hm(l.openedAt)}` : `Reçu le ${l.createdAt ? shortDate(dayKey(new Date(l.createdAt))) : "–"}`) : "", st.lot && l.lot ? `${st.dates ? "lot" : "Lot"} ${l.lot}` : ""].filter(Boolean).join(" · ");
+  const meta = [st.dates ? (op && l.openedAt ? `Ouvert le ${shortDate(dayKey(new Date(l.openedAt)))} à ${hm(l.openedAt)}` : op ? "Ouvert" : `Reçu le ${l.createdAt ? shortDate(dayKey(new Date(l.createdAt))) : "–"}`) : "", st.lot && l.lot ? `${st.dates ? "lot" : "Lot"} ${l.lot}` : ""].filter(Boolean).join(" · ");
   const qty = st.qty ? [lbQty(l), l.supplier].filter(Boolean).join(" · ") : "";
   const maxL = cont ? 3 : 2;
   const lines = (f) => Math.max(1, Math.min(maxL, Math.ceil((nm.length * 0.53 * f * 1.12) / Math.max(10, tw))));
