@@ -57,7 +57,7 @@
       "trailingSlash": false,
       "headers": [
         {
-          "source": "**/*.@(html|css|js)",
+          "source": "**/*.@(html|css|js|jpg|png|svg)",
           "headers": [
             {
               "key": "Cache-Control",
