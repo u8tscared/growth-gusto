@@ -166,11 +166,11 @@ FEATURES = [
 
  dict(slug="equipe-planning", short="Équipe, planning et pointeuse", ic="users", icc="",
   title="Planning, pointeuse et messagerie d'équipe pour restaurant · Growth Gusto",
-  desc="Comptes de l'équipe, consignes et messagerie, défis d'équipe, passation de service, journal des actions, accès temporaires, pointeuse, planning avec repères HCR, employés et salaires, export paie pour le comptable.",
+  desc="Comptes de l'équipe, consignes et messagerie, défis d'équipe, passation de service, journal des actions, accès temporaires, pointeuse, planning intelligent proposé d'après les couverts prévus, repères HCR, employés et salaires, export paie pour le comptable.",
   kick="Équipe", h1='Chacun son compte, <span class="hl">son planning.</span>',
   lede="Chaque cuisinier a son compte : vous voyez qui a fait quoi. Les consignes arrivent sur le téléphone de chacun, les défis motivent la salle. La pointeuse et le planning préparent la paie.",
   img="equipe", tags=[CHEF],
-  card="Comptes, consignes, passation, journal des actions, défis, pointeuse, planning HCR.",
+  card="Comptes, consignes, passation, journal des actions, défis, pointeuse, planning intelligent.",
   blocks=[
    ("Les comptes de l'équipe", "Utilisateurs illimités, rôles gérant, chef, équipe. Chaque relevé, étiquette ou réception porte un prénom.", ["Utilisateurs illimités", "Rôles et accès", "Invitation par code ou QR"], "equipe", "v", [COMMIS]),
    ("Consignes et messagerie par groupes", "Plat du jour, rupture, info : la consigne arrive chez ceux qu'elle concerne et vous voyez qui l'a lue. La discussion a ses groupes : Toute l'équipe, Cuisine, Salle, et ceux que vous créez.", ["Consigne pour tous ou pour un groupe", "Vous choisissez qui peut publier", "Lu, et qui a lu", "Dictée vocale"], "consignes", "s", [COMMIS]),
@@ -179,6 +179,7 @@ FEATURES = [
    ("Journal des actions", "Qui a annulé, offert ou modifié quoi, et quand, avec le montant. Chaque ligne est signée et rien ne s'efface, pas même par le gérant.", ["Annulations et offerts, avec montant", "Filtres par personne et par type", "« À regarder » quand quelqu'un sort du lot"], "journal", "t", [COMMIS]),
    ("Accès temporaires", "Un extra pour le week-end, un stagiaire pour un mois : vous choisissez la date de fin et l'accès se ferme tout seul. Prolonger ou rouvrir, c'est un geste.", ["Extra, stagiaire, saison, remplacement", "Fin ce soir, cette semaine ou à une date", "Ce qu'ils ont fait reste signé"], "acces", "v", [COMMIS]),
    ("La pointeuse", "Arrivée, pause, départ : chacun touche son prénom sur la tablette.", ["Heures réelles", "Pauses", "Retards repérés"], "pointeuse", "k", [CHEF]),
+   ("Le planning intelligent", "L'app prépare la semaine pour vous : les couverts prévus (ventes passées, réservations), les dispos et les congés de chacun, les heures du contrat et le coût de l'équipe. Il manque quelqu'un samedi soir ? Elle vous le dit. Vous ajustez d'un geste, vous publiez, chacun le voit sur son téléphone.", ["Couverts prévus par service", "Dispos et congés respectés", "Coût chargé et % du chiffre d'affaires", "11 h de repos et 2 jours off"], "planning", "s", [CHEF]),
    ("Planning et heures", "Le planning de la semaine, les heures prévues et pointées, avec les repères de la convention HCR. Export pour le comptable.", ["Repères HCR", "Heures sup", "Export paie"], "planning", "l", [CHEF]),
   ],
   faq=[("Combien d'utilisateurs ?", "Illimités, dans tous les packs."),
@@ -222,7 +223,7 @@ BY = {f["slug"]: f for f in FEATURES}
 def build():
     # hub
     cards = "".join(card(f"/fonctionnalites/{f['slug']}", e(f["short"]), e(f["card"]), f["ic"], f["icc"], [t for t in f["tags"] if t != COMMIS] or ["Tous les packs"], dl=i % 3) for i, f in enumerate(FEATURES))
-    words = ["Relevés de températures", "Sondes sans fil", "Étiquettes DLC", "Réception", "Plan de nettoyage", "PMS", "Mode contrôle", "Rappel de lot", "14 allergènes", "Process HACCP", "Formation", "Réservations", "Plan de salle", "Prise de commande", "Écran cuisine", "Menu QR", "Carte importée", "Marge par plat", "Factures scannées", "Commandes fournisseurs", "Gaspillage", "Caisse", "Uber Eats", "Stock", "Tableau de bord", "Finances", "Pennylane", "Pointeuse", "Planning", "Consignes", "Passation de service", "Journal des actions", "Accès temporaires", "Fidélité"]
+    words = ["Relevés de températures", "Sondes sans fil", "Étiquettes DLC", "Réception", "Plan de nettoyage", "PMS", "Mode contrôle", "Rappel de lot", "14 allergènes", "Process HACCP", "Formation", "Réservations", "Plan de salle", "Prise de commande", "Écran cuisine", "Menu QR", "Carte importée", "Marge par plat", "Factures scannées", "Commandes fournisseurs", "Gaspillage", "Caisse", "Uber Eats", "Stock", "Tableau de bord", "Finances", "Pennylane", "Pointeuse", "Planning", "Planning intelligent", "Consignes", "Passation de service", "Journal des actions", "Accès temporaires", "Fidélité"]
     mq = '<div class="mq" aria-hidden="true"><div class="mq-t">' + "".join(f"<span>{w}</span>" for w in words * 2) + "</div></div>"
     body = hero([("/", "Accueil"), ("/fonctionnalites", "Fonctionnalités")], "Fonctionnalités",
                 'Tout le restaurant, <span class="hl">une seule app.</span>',

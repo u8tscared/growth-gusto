@@ -394,8 +394,9 @@ VIEWS.planning = {
       <div class="glass ${st.alerts ? (st.alBad ? "rh-kbad" : "rh-kwarn") : "rh-kok"}${mgr ? " rh-ktap" : ""}"${mgr && st.alerts ? ` data-act="rhHrJump" role="button" tabindex="0"` : ""}><span class="lbl">Règles HCR</span><b class="mono">${st.alerts ? `${st.alerts}` : "OK"}</b><em>${st.alerts ? `personne${st.alerts > 1 ? "s" : ""} à vérifier` : "repos et durées respectés"}</em></div>
     </div>`;
     const nav = `<div class="rh-bar st" style="--i:1"><div class="hstack rh-wnav"><button class="iconbtn" data-act="rhPlanWeek" data-v="-7" aria-label="Semaine précédente">${ico("back")}</button><div class="rh-wl"><b>${rhWeekLbl(mon)}</b><em>${thisW ? "cette semaine" : mon < rhMonday() ? "semaine passée" : "à venir"}</em></div><button class="iconbtn" data-act="rhPlanWeek" data-v="7" aria-label="Semaine suivante">${ico("rhfwd")}</button>${thisW ? "" : `<button class="chip" data-act="rhPlanWeek" data-v="0">Aujourd'hui</button>`}</div>
+      ${mgr && VIEWS.planif ? `<button class="btn acc sm rh-propb" data-act="rhPropose" aria-label="Proposer la semaine">${ico("pfWand")}<span>Proposer la semaine</span></button>` : ""}
       ${mgr ? `<button class="btn soft sm rh-copyb" data-act="rhCopyWeek" aria-label="Copier la semaine d'avant" title="Copier la semaine d'avant">${ico("rhcopy")}<span>Copier la semaine d'avant</span></button>` : ""}</div>`;
-    const hint = !st.tot && mgr ? `<div class="banner rh-hint st" style="--i:3">${ico("sparkle")}<span>${wide ? "Cliquez sur une case pour ajouter un créneau, glissez-le pour le déplacer (Alt pour le copier)." : "Touchez « + » à côté d'un prénom pour ajouter un créneau."} Ou reprenez la semaine d'avant en un geste.</span></div>` : "";
+    const hint = !st.tot && mgr ? `<div class="banner rh-hint st" style="--i:3">${ico("sparkle")}<span>${wide ? "Cliquez sur une case pour ajouter un créneau, glissez-le pour le déplacer (Alt pour le copier)." : "Touchez « + » à côté d'un prénom pour ajouter un créneau."} Ou laissez l'app proposer la semaine d'après les couverts prévus.</span></div>` : "";
     let body;
     if (wide) {
       const head = `<div class="rh-g-h"><span></span>${days.map((d, i) => `<span class="${d === today ? "today" : ""}"><b>${RH_DSHORT[i]}</b> ${parseDay(d).getDate()}</span>`).join("")}<span>Total</span></div>`;
@@ -801,6 +802,7 @@ Object.assign(ACT, {
     for (const [id, doc] of u.restore || []) await DB.set("shifts", id, doc).catch(() => {});
     SFX.close();
   },
+  rhPropose: () => { const mon = S.ui.rhPlanWeek || rhMonday(); SFX.tap(); if (!S.ui.pf || S.ui.pf.mon !== mon) S.ui.pf = { mon, cov: {} }; go("planif"); },
   rhCopyWeek: () => {
     const mon = S.ui.rhPlanWeek || rhMonday(); const prev = addDays(mon, -7); const src = S.shifts.filter((s) => s.day >= prev && s.day <= addDays(prev, 6));
     if (!src.length) { SFX.err(); toast("La semaine d'avant est vide.", "err"); return; }
