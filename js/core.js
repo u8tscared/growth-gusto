@@ -167,10 +167,13 @@ const DB = {
   clean: (d) => JSON.parse(JSON.stringify(d ?? {})),
   /* a Firestore write promise only settles when the server acknowledges it, which never happens offline (the kitchen cellar):
      the local cache already has the write, so callers wait at most 1.5 s online, not at all offline. A late refusal still shows. */
-  dbw(p) {
+  dbw(p, m) {
     let late = false;
+    /* js/horsligne.js: every write joins the visible « en attente » queue until the server acknowledges it */
+    if (typeof NET !== "undefined" && m) NET.track(p, m);
     p.catch((e) => { console.warn("db write", e); if (late) { SFX.err(); toast(e && e.code === "permission-denied" ? "Modification refusée : votre rôle ne le permet pas." : "Une modification n'a pas pu être enregistrée.", "err"); } });
-    const wait = typeof navigator !== "undefined" && navigator.onLine === false ? 0 : 1500;
+    /* NET.off also knows the Wi-Fi that is connected but reaches nothing (js/horsligne.js probes it) */
+    const wait = (typeof navigator !== "undefined" && navigator.onLine === false) || (typeof NET !== "undefined" && NET.off) ? 0 : 1500;
     return Promise.race([p, new Promise((r) => setTimeout(() => { late = true; r(); }, wait))]);
   },
   watch(col, opts, cb) {
@@ -231,21 +234,22 @@ const DB = {
     const path = this.path(col); const g = this.gate(col); if (g) return g;
     if (col === "restos" && !(this.mode === "db" ? S.restos.find((r) => r.id === id) : (this.local[path] || {})[id]) && data && typeof data === "object") Object.assign(data, this.restoDefaults(data));
     if (this.mode === "db") {
-      if (this.uid && col === "restos" && !S.restos.find((r) => r.id === id)) return this.dbw(this.createResto(id, data));
+      const m = { col, id, op: "set", data };
+      if (this.uid && col === "restos" && !S.restos.find((r) => r.id === id)) return this.dbw(this.createResto(id, data), m);
       /* members: merge, so an area writing {role, name, color} keeps the account's e-mail and photo */
       const ref = this.db.collection(path).doc(id);
-      return this.dbw(this.uid && col === "members" ? ref.set(this.clean(data), { merge: true }) : ref.set(this.clean(data)));
+      return this.dbw(this.uid && col === "members" ? ref.set(this.clean(data), { merge: true }) : ref.set(this.clean(data)), m);
     }
     (this.local[path] ||= {})[id] = JSON.parse(JSON.stringify(data)); this.emit(path);
   },
   async update(col, id, patch) {
     const path = this.path(col); const g = this.gate(col); if (g) return g;
-    if (this.mode === "db") return this.dbw(this.db.collection(path).doc(id).update(this.clean(patch)));
+    if (this.mode === "db") return this.dbw(this.db.collection(path).doc(id).update(this.clean(patch)), { col, id, op: "update", data: patch });
     const cur = (this.local[path] ||= {})[id] || {}; this.local[path][id] = { ...cur, ...JSON.parse(JSON.stringify(patch)) }; this.emit(path);
   },
   async del(col, id) {
     const path = this.path(col); const g = this.gate(col); if (g) return g;
-    if (this.mode === "db") return this.dbw(this.db.collection(path).doc(id).delete());
+    if (this.mode === "db") return this.dbw(this.db.collection(path).doc(id).delete(), { col, id, op: "del" });
     if (this.local[path]) delete this.local[path][id]; this.emit(path);
   },
 };
@@ -565,7 +569,7 @@ const isTopLevel = () => DESK_MQ.matches && !S.history.length && NAV.some((n) =>
 const topBar = (title, opts = {}) => `<div class="top st" style="--i:0">${opts.noBack || isTopLevel() ? "" : `<button class="iconbtn" data-act="back" aria-label="Retour">${ico("back")}</button>`}<span class="h2">${title}</span>${opts.right || ""}${typeof thTopBtn === "function" ? thTopBtn() : ""}${typeof bigBtn === "function" && !opts.noBig ? bigBtn() : ""}</div>`;
 try { DESK_MQ.addEventListener("change", () => { if (S.ready && S.resto) rerender(); }); } catch (e) {}
 /* banner(): nothing in the standalone build except, on Accueil, the one-time « Installer l'app » card. */
-const banner = () => (S.slow && DB.mode === "db" ? `<div class="banner st">${ico("clock")}<span>Connexion lente : les données affichées peuvent ne pas être à jour.</span></div>` : "") + (S.route === "home" ? installHint() : "");
+const banner = () => (S.slow && DB.mode === "db" ? (typeof NET !== "undefined" && NET.off ? `<div class="banner st tap" data-act="hlOpen">${ico("wifi")}<span>Hors ligne : vous voyez les dernières données de cet appareil. Tout ce que vous faites est gardé et partira au retour du réseau.</span></div>` : `<div class="banner st">${ico("clock")}<span>Connexion lente : les données affichées peuvent ne pas être à jour.</span></div>`) : "") + (S.route === "home" ? installHint() : "");
 
 /* ───────────────────────── views ───────────────────────── */
 const VIEWS = {};
@@ -857,7 +861,7 @@ function registerSW() {
    to the foreground. A new v means the code running here is old: with nothing in progress the app reloads silently (caches dropped,
    so the reload is guaranteed fresh); otherwise a toast offers « Mettre à jour ». sessionStorage guards against reload loops:
    one reload attempt per version per session, after which the version is simply adopted. */
-const APP_V = "2026-11-07.12";
+const APP_V = "2026-11-07.13";
 /* logos of the tools Growth Gusto connects to (img/logos/<id>.svg|png): caisses, réservations, comptabilité, banque, paiement */
 const BRAND_LOGOS = { sumup: "svg", zelty: "png", lightspeed: "svg", tiller: "svg", square: "svg", innovorder: "svg", popina: "png", zenchef: "svg", thefork: "png", sevenrooms: "png", guestonline: "png", resy: "svg", opentable: "svg", formitable: "svg", google: "svg", pennylane: "svg", qonto: "svg", quickbooks: "svg", sage: "svg", odoo: "svg", stripe: "svg", zebra: "svg" };
 const brandLogo = (id) => BRAND_LOGOS[id] ? `<img class="brand-logo" src="img/logos/${id}.${BRAND_LOGOS[id]}" alt="" loading="lazy" decoding="async" draggable="false">` : "";
