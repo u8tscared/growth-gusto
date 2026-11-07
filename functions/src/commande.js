@@ -4,7 +4,8 @@
  *   orderApi (callable, no account for the client ops)
  *     op "create"   { rid, mode:"table"|"emporter", table?, items:[{id,q,note?}], name?, phone?, slot?, note?, pay:"stripe"|"place", back, rq? }
  *                   rq: the client's request id (js/reseau-client.js): the same rq sent again answers with the same order (orderReqs/{rid}_{rq}).
- *                   → checks every dish and price against public/menu (the client's numbers are never trusted), numbers the order of the day,
+ *                   → checks every dish and price against public/menu (the client's numbers are never trusted; a running happy hour or
+ *                     plat du jour of public/menu.promos lowers the price, js/prix.js), numbers the order of the day,
  *                   writes restos/{rid}/clientOrders/{id} and its private key orderKeys/{rid_id}, and for « payer maintenant » opens a
  *                   Stripe Checkout on the restaurant's OWN Stripe account (Connect, direct charge) → { oid, k, order, url? }
  *     op "status"   { rid, oid, k, check?, cancel? } → { order } the client's own order (live status page). check=1 asks Stripe right away
@@ -70,6 +71,18 @@ const parisNow = () => { const p = Object.fromEntries(new Intl.DateTimeFormat("e
 const toMin = (t) => { const m = /^(\d{1,2}):(\d{2})$/.exec(t || ""); return m ? +m[1] * 60 + +m[2] : -1; };
 const same = (a, b) => typeof a === "string" && typeof b === "string" && a.length === b.length && crypto.timingSafeEqual(Buffer.from(a), Buffer.from(b));
 const okId = (x) => typeof x === "string" && /^[\w-]{1,64}$/.test(x);
+/* prix dynamiques (js/prix.js): public/menu.promos [{ k, t, days, day?, from?, to?, it:{ itemId: pct } }] — same rule as the app and the page */
+const pxMin = (t) => { const m = /^(\d{1,2}):(\d{2})$/.exec(t || ""); return m ? +m[1] * 60 + +m[2] : null; };
+function pxActive(r, now) {
+  if (!r || !r.it) return false; if (r.day ? r.day !== now.day : !(Array.isArray(r.days) && r.days.includes(now.wd))) return false;
+  const a = pxMin(r.from) ?? 0, b = pxMin(r.to) ?? 1440; return a <= b ? now.min >= a && now.min < b : now.min >= a || now.min < b;
+}
+function pxDeal(promos, id, now) {
+  let best = null; (Array.isArray(promos) ? promos : []).forEach((r) => { const v = r && r.it ? r.it[id] : undefined; const pc = +v;
+    if (v == null || !(pc >= 0 && pc <= 90) || !pxActive(r, now)) return; if (!best || pc > best.pct) best = { pct: pc, t: r.t || "", k: r.k || "", to: r.to || "" }; });
+  return best;
+}
+const pxPrice = (p, pct) => (pct > 0 ? Math.max(0.1, Math.round((+p || 0) * (100 - pct) / 10) / 10) : Math.round((+p || 0) * 100) / 100);
 
 /* what the client sees of an order (no phone, no Stripe ids) */
 const pubView = (id, o) => ({ id, n: o.n, mode: o.mode, table: o.table || "", slot: o.slot || "", name: o.name || "", items: (o.items || []).map((x) => ({ name: x.name, price: x.price, q: x.q, note: x.note || "" })),
@@ -103,7 +116,8 @@ async function create(d) {
   for (const x of raw) {
     const it = (P.items || []).find((i) => i.id === x.id); const q = Math.floor(+x.q || 0);
     if (!it || it.out || !(+it.p > 0) || q < 1 || q > 30) throw err("failed-precondition", "plat");
-    items.push({ id: it.id, name: clean(it.t, 80), price: r2(it.p), q, note: clean(x.note, 140) }); total += r2(it.p) * q; count += q;
+    const dl = pxDeal(P.promos, it.id, now); const price = dl && dl.pct > 0 ? pxPrice(it.p, dl.pct) : r2(it.p);
+    items.push({ id: it.id, name: clean(it.t, 80), price, q, note: clean(x.note, 140), ...(dl && dl.pct > 0 ? { full: r2(it.p), promo: clean(dl.t, 40) } : {}) }); total += price * q; count += q;
   }
   if (count > 80) throw err("invalid-argument", "plat");
   total = r2(total);
@@ -537,4 +551,4 @@ async function commandeTick() {
   if (rqs && !rqs.empty) { const b = db.batch(); rqs.docs.forEach((x) => b.delete(x.ref)); await b.commit().catch(() => {}); }
 }
 
-module.exports = { orderApi, commandeTick, _pubView: pubView, _billOf: billOf, _callView: callView, _onOrderEvent: onOrderEvent, _site: { htmlText, ldItems, links, imgs, priceLines, privIp } };
+module.exports = { orderApi, commandeTick, _pubView: pubView, _billOf: billOf, _callView: callView, _px: { pxDeal, pxPrice, pxActive }, _onOrderEvent: onOrderEvent, _site: { htmlText, ldItems, links, imgs, priceLines, privIp } };
