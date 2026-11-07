@@ -166,5 +166,7 @@ const t=async(name,p)=>{try{await p;pass++;console.log('ok  ',name)}catch(e){fai
  await t('member writes a handover',assertSucceeds(setDoc(doc(A,`restos/${rid}/handovers/h1`),{day:'2026-11-07',slot:'midi',items:[],ok:true,at:now,uid:'alice',reads:{}})));
  await t('member signs it read',assertSucceeds(updateDoc(doc(D,`restos/${rid}/handovers/h1`),{'reads.dan':now})));
  await t('stranger cannot read handovers',assertFails(getDoc(doc(Z,`restos/${rid}/handovers/h1`))));
+ await t('member closes a handover, then deletes it',(async()=>{await assertSucceeds(updateDoc(doc(D,`restos/${rid}/handovers/h1`),{closed:{at:now,by:'dan'}}));await setDoc(doc(A,`restos/${rid}/handovers/h2`),{day:'2026-11-07',slot:'soir',items:[],ok:true,at:now,uid:'alice',reads:{}});await assertSucceeds(deleteDoc(doc(D,`restos/${rid}/handovers/h2`)));})());
+ await t('only the gérant makes the handover required at clock-out',(async()=>{await assertFails(updateDoc(doc(D,'restos',rid),{paCfg:{force:true,who:[]}}));await assertSucceeds(updateDoc(doc(A,'restos',rid),{paCfg:{force:true,who:[]}}));})());
  console.log(`\n${pass} passed, ${fail} failed`);await env.cleanup();process.exit(fail?1:0);
 })();

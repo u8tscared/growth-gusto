@@ -666,14 +666,7 @@ function appHeight() {
 }
 appHeight();
 window.addEventListener("resize", appHeight); window.addEventListener("orientationchange", () => setTimeout(appHeight, 250));
-/* on-screen keyboard (iOS): lift the sheet above it and keep the focused field visible */
-(function kbLift() {
-  const vv = window.visualViewport; if (!vv) return;
-  const upd = () => { const de = document.documentElement; const kb = Math.max(0, (document.body.clientHeight || APPH.px || window.innerHeight) - vv.height - vv.offsetTop); const ae = document.activeElement; const typing = !!(ae && ae.matches && ae.matches("input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]),textarea,select,[contenteditable]")); const on = kb > 80 && typing; /* iOS 26 Safari also shrinks visualViewport when its toolbar moves: only a focused field means a keyboard */ de.style.setProperty("--kb", (on ? kb : 0) + "px"); de.style.setProperty("--vvh", vv.height + "px"); de.classList.toggle("kb", on); };
-  upd();
-  vv.addEventListener("resize", upd); vv.addEventListener("scroll", upd); document.addEventListener("focusin", () => setTimeout(upd, 50)); document.addEventListener("focusout", () => setTimeout(upd, 50));
-  document.addEventListener("focusin", (e) => { const t = e.target; if (t.matches && t.matches("input,textarea,select") && t.closest("#sheet")) setTimeout(() => { try { t.scrollIntoView({ block: "nearest", behavior: "smooth" }); } catch (x) {} }, 320); });
-})();
+/* on-screen keyboard (iPhone / iPad): js/clavier.js shrinks the app box above it and keeps the focused field in view */
 $("#scrim").addEventListener("click", () => closeSheet());
 document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeSheet(); });
 
@@ -875,7 +868,7 @@ function registerSW() {
    to the foreground. A new v means the code running here is old: with nothing in progress the app reloads silently (caches dropped,
    so the reload is guaranteed fresh); otherwise a toast offers « Mettre à jour ». sessionStorage guards against reload loops:
    one reload attempt per version per session, after which the version is simply adopted. */
-const APP_V = "2026-11-07.30";
+const APP_V = "2026-11-07.33";
 /* logos of the tools Growth Gusto connects to (img/logos/<id>.svg|png): caisses, réservations, comptabilité, banque, paiement */
 const BRAND_LOGOS = { sumup: "svg", zelty: "png", lightspeed: "svg", tiller: "svg", square: "svg", innovorder: "svg", popina: "png", zenchef: "svg", thefork: "png", sevenrooms: "png", guestonline: "png", resy: "svg", opentable: "svg", formitable: "svg", google: "svg", pennylane: "svg", qonto: "svg", quickbooks: "svg", sage: "svg", odoo: "svg", stripe: "svg", zebra: "svg" };
 const brandLogo = (id) => BRAND_LOGOS[id] ? `<img class="brand-logo" src="img/logos/${id}.${BRAND_LOGOS[id]}" alt="" loading="lazy" decoding="async" draggable="false">` : "";

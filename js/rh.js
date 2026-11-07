@@ -143,7 +143,18 @@ window.staffCost = staffCost;
 const rhIsNight = (p) => /veill/i.test(p?.role || "");
 function rhDayCap(p, cuis) { return rhIsNight(p) ? [720, "12 h max. pour un veilleur de nuit"] : cuis ? [660, "11 h max. en cuisine"] : [690, "11 h 30 max."]; }
 /* intervals of one person: planned shifts, or worked sessions from the time clock */
-function rhIvsPlan(sid, from, to) { return rhShiftsOf(sid, from, to).map(rhIv).sort((x, y) => x.s - y.s); }
+/* une personne sur plusieurs établissements (pack Chef, plusieurs restaurants) : la même fiche, avec le même id, dans chaque restaurant
+   (staff.sites = [rid…]). Ses créneaux prévus ailleurs comptent pour les repères HCR (48 h, repos, amplitude) et les heures sup. de la semaine. */
+const rhSitesOf = (sid) => { const p = rhStaff(sid); return (p && Array.isArray(p.sites) ? p.sites : []).filter((r) => r && r !== S.rid); };
+const rhSiteName = (rid) => ((S.restos || []).find((r) => r.id === rid) || {}).name || "un autre restaurant";
+function rhElsewhere(sid, from, to) {
+  const sites = rhSitesOf(sid); if (!sites.length || typeof mrBundle !== "function") return [];
+  const out = [];
+  sites.forEach((rid) => { let B = null; try { B = mrBundle(rid); } catch (e) {} if (!B || !Array.isArray(B.shifts)) return; B.shifts.filter((x) => x.staffId === sid && x.day >= from && x.day <= to && x.start && x.end).forEach((x) => out.push({ ...x, _rid: rid })); });
+  return out;
+}
+const rhIvAway = (x) => { const v = rhIv(x); v.away = x._rid; return v; };
+function rhIvsPlan(sid, from, to) { return [...rhShiftsOf(sid, from, to).map(rhIv), ...rhElsewhere(sid, from, to).map(rhIvAway)].sort((x, y) => x.s - y.s); }
 function rhLegalOf(sid, mon, ivs) {
   const days = rhWeekDays(mon); const out = { day: {}, week: [] }; const add = (d, lvl, t, k) => (out.day[d] ||= []).push({ lvl, t, k });
   let total = 0, worked = 0; const p = rhStaff(sid); const defPost = p?.post;
@@ -176,6 +187,7 @@ function rhWeekPlan(sid, mon) {
   const ivs = [];
   Object.values(dm).forEach((v) => v.sessions.forEach((x) => { const e = x.open ? Date.now() : x.out; if (e) ivs.push({ s: x.in / 60000, e: e / 60000, w: x.w / 60000, day: x.day, sh: {} }); }));
   sh.filter((x) => keep(x.day)).forEach((x) => ivs.push(rhIv(x)));
+  rhElsewhere(sid, addDays(mon, -1), sun).forEach((x) => ivs.push(rhIvAway(x)));
   return { ivs: ivs.sort((a, b) => a.s - b.s), dm, sh, has, keep };
 }
 function rhWeekHours(sid, mon) {
@@ -184,7 +196,8 @@ function rhWeekHours(sid, mon) {
   const punch = days.reduce((x, d) => x + (W.dm[d]?.min || 0), 0);
   const used = W.ivs.filter((v) => v.day >= mon).reduce((x, v) => x + v.w, 0);
   const src = !W.has ? "prévu" : days[6] < today ? "pointé" : "pointé + prévu";
-  return { plan, punch, has: W.has, used, src, days: new Set(W.ivs.filter((v) => v.day >= mon).map((v) => v.day)).size, ivs: W.ivs };
+  const away = W.ivs.filter((v) => v.away && v.day >= mon).reduce((x, v) => x + v.w, 0);
+  return { plan, punch, has: W.has, used, away, src, days: new Set(W.ivs.filter((v) => v.day >= mon).map((v) => v.day)).size, ivs: W.ivs };
 }
 /* 46 h on average over 12 consecutive weeks (the weeks with hours; the shown week is the last one) */
 function rhAvg12(sid, mon) {
@@ -607,7 +620,7 @@ VIEWS.planning = {
       const strip = `<div class="rh-strip st" style="--i:3">${days.map((x, i) => `<button class="${i === di ? "on" : ""}${x === today ? " today" : ""}" data-act="rhDay" data-v="${i}" aria-label="${rhDayLbl(x, true)}"><em>${RH_DSHORT[i]}</em><b>${parseDay(x).getDate()}</b><i class="mono">${st.dayMin[i] ? rhHh(st.dayMin[i]) : "·"}</i>${per.some((r) => (r.legal.day[x] || []).some((l) => l.lvl === "bad")) ? `<span class="rh-sdot"></span>` : ""}</button>`).join("")}</div>`;
       const list = per.map((r) => {
         const l = r.sh.filter((s) => s.day === d); const lg = r.legal.day[d] || []; const dm = l.reduce((x, s) => x + rhShiftMin(s), 0);
-        return `<div class="rh-dr${l.length ? "" : " off"}"><div class="rh-dr-top"><span class="rh-dr-p">${rhAva(r.p, 40)}<span><b>${esc(rhFirst(r.p))}</b><em>${l.length ? rhHh(dm) : "Repos"} · semaine ${rhHh(r.min)}</em></span></span>
+        return `<div class="rh-dr${l.length ? "" : " off"}"><div class="rh-dr-top"><span class="rh-dr-p">${rhAva(r.p, 40)}<span><b>${esc(rhFirst(r.p))}</b><em>${l.length ? rhHh(dm) : "Repos"} · semaine ${rhHh(r.min)}${r.h.away ? ` <span class="rh-away" title="Prévu dans les autres établissements">+ ${rhHh(r.h.away)} ailleurs</span>` : ""}</em></span></span>
           ${mgr ? `<button class="rh-plus" data-act="rhCell" data-id="${esc(r.p.id)}" data-v="${d}" aria-label="Ajouter un créneau à ${esc(rhFirst(r.p))}">${ico("plus")}</button>` : ""}</div>
           ${l.length ? `<div class="rh-dr-s">${l.map((s) => rhShiftChip(s)).join("")}</div>` : ""}
           ${lg.map((x) => `<div class="rh-lgl ${x.lvl}">${ico("alert")}${esc(x.t)}</div>`).join("")}</div>`;
@@ -703,6 +716,7 @@ function rhHrSheet(sid) {
   return `<div class="rh-hrs-s">
     <div class="rh-act-hd">${rhAva(p, 52)}<div><div class="h2">${esc(p.name)}</div><div class="sub">Semaine du ${rhWeekLbl(mon)} · contrat ${rhHh(c)}</div></div></div>
     <div class="rh-act-kpi"><span><b class="mono">${rhHh(h.plan)}</b>prévu</span><span><b class="mono">${h.has ? rhHh(h.punch) : "–"}</b>pointé</span><span><b class="mono">${h.a12.n ? rhHh(h.a12.avg) : "–"}</b>moy. ${h.a12.n || 12} sem.</span></div>
+    ${h.away ? `<p class="note rh-awayn">${ico("users")}<span>Plus <b class="mono">${rhHh(h.away)}</b> prévues ${esc(rhSitesOf(sid).map((r) => (typeof mrA === "function" ? mrA : (n) => "à " + n)(rhSiteName(r))).join(" et "))}, comptées dans les heures sup. et les repères HCR.</span></p>` : ""}
     <div><div class="lbl">Heures sup. (sur le ${h.src})</div><div class="rh-bands">${band("+10 %", h.ot.b10)}${band("+20 %", h.ot.b20)}${band("+50 %", h.ot.b50)}</div>${boss && rhRate(p) && h.ot.h ? `<p class="note">Majoration estimée : ${rhEur(h.ot.bonus * rhRate(p), 2)} brut.</p>` : ""}</div>
     ${h.alerts.length ? `<div><div class="lbl">Repères HCR</div>${h.alerts.map((a) => `<div class="rh-lgl ${a.lvl}">${ico("alert")}<span>${a.d ? `<b>${rhDayLbl(a.d, true)}</b> · ` : ""}${esc(a.t)} <em>(${esc(a.src)})</em></span></div>`).join("")}</div>` : `<div class="rh-allok">${ico("check")}<span>Durées, repos et jours off dans les clous.</span></div>`}
     <p class="note">Indicatif, jamais bloquant. Max. ${rhDayCap(p, p.post === "cuisine")[1].replace(" max.", "").replace("max. ", "")} par jour, 11 h de repos entre deux journées, 48 h par semaine, 46 h en moyenne sur 12 semaines, 2 jours de repos.</p>
@@ -715,7 +729,7 @@ function rhPayWeeks(m0) {
 }
 function rhPayCsv(m0) {
   const boss = rhIsBoss(); const weeks = rhPayWeeks(m0); const d = parseDay(m0); const ml = `${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
-  const head = ["Employé", "Contrat", "Heures contrat / sem.", "Semaine du", "au", "Heures prévues", "Heures pointées", "Heures retenues", "Source", "HS +10 % (h)", "HS +20 % (h)", "HS +50 % (h)", "Jours travaillés", "Moyenne 12 sem. (h)", "Repères HCR", ...(boss ? ["Taux horaire brut", "Brut estimé"] : [])];
+  const head = ["Employé", "Contrat", "Heures contrat / sem.", "Semaine du", "au", "Heures prévues", "Heures pointées", "Heures retenues", "Dont autres établissements", "Source", "HS +10 % (h)", "HS +20 % (h)", "HS +50 % (h)", "Jours travaillés", "Moyenne 12 sem. (h)", "Repères HCR", ...(boss ? ["Taux horaire brut", "Brut estimé"] : [])];
   const rows = [[`Heures et heures supplémentaires · ${ml} · ${S.resto?.name || ""}`], [], head];
   const totals = [];
   rhPeople({ all: true }).forEach((p) => {
@@ -723,13 +737,14 @@ function rhPayCsv(m0) {
     weeks.forEach((mon) => {
       const h = rhHoursOf(p, mon); if (!h.plan && !h.punch) return; any = true; const g = rhWeekGross(h.used, p);
       tP += h.plan; tC += h.punch; tU += h.used; t10 += h.ot.b10; t20 += h.ot.b20; t50 += h.ot.b50; tG += g;
-      rows.push([p.name, RH_CONTRACTS[p.contract] || p.contract || "", fmt(rhNum(p.weeklyHours, 35), 2), `${shortDate(mon)}/${mon.slice(0, 4)}`, `${shortDate(addDays(mon, 6))}/${addDays(mon, 6).slice(0, 4)}`, rhDec(h.plan), h.has ? rhDec(h.punch) : "", rhDec(h.used), h.src, fmt(h.ot.b10, 2), fmt(h.ot.b20, 2), fmt(h.ot.b50, 2), h.days, h.a12.n ? rhDec(h.a12.avg) : "", h.alerts.map((a) => `${a.d ? shortDate(a.d) + " " : ""}${a.t} (${a.src})`).join(" ; "), ...(boss ? [rhRate(p) ? fmt(rhRate(p), 2) : "", rhRate(p) ? fmt(g, 2) : ""] : [])]);
+      rows.push([p.name, RH_CONTRACTS[p.contract] || p.contract || "", fmt(rhNum(p.weeklyHours, 35), 2), `${shortDate(mon)}/${mon.slice(0, 4)}`, `${shortDate(addDays(mon, 6))}/${addDays(mon, 6).slice(0, 4)}`, rhDec(h.plan), h.has ? rhDec(h.punch) : "", rhDec(h.used), h.away ? rhDec(h.away) : "", h.src, fmt(h.ot.b10, 2), fmt(h.ot.b20, 2), fmt(h.ot.b50, 2), h.days, h.a12.n ? rhDec(h.a12.avg) : "", h.alerts.map((a) => `${a.d ? shortDate(a.d) + " " : ""}${a.t} (${a.src})`).join(" ; "), ...(boss ? [rhRate(p) ? fmt(rhRate(p), 2) : "", rhRate(p) ? fmt(g, 2) : ""] : [])]);
     });
     if (any) totals.push([p.name, RH_CONTRACTS[p.contract] || p.contract || "", rhDec(tP), rhDec(tC), rhDec(tU), fmt(t10, 2), fmt(t20, 2), fmt(t50, 2), ...(boss ? [rhRate(p) ? fmt(tG, 2) : ""] : [])]);
   });
   return [...rows, [], [`Total ${ml}`], ["Employé", "Contrat", "Heures prévues", "Heures pointées", "Heures retenues", "HS +10 % (h)", "HS +20 % (h)", "HS +50 % (h)", ...(boss ? ["Brut estimé"] : [])], ...totals, [],
     ["Semaines complètes rattachées au mois de leur dimanche. Heures retenues = pointées dès qu'il existe un pointage dans la semaine, sinon prévues."],
-    ["Heures supplémentaires (convention HCR) : +10 % de la 36e à la 39e heure, +20 % de la 40e à la 43e, +50 % au-delà. Repères indicatifs à valider par le cabinet de paie."]];
+    ["Heures supplémentaires (convention HCR) : +10 % de la 36e à la 39e heure, +20 % de la 40e à la 43e, +50 % au-delà. Repères indicatifs à valider par le cabinet de paie."],
+    ...(rhPeople({ all: true }).some((p) => rhSitesOf(p.id).length) ? [["Personnes partagées entre plusieurs établissements : les heures prévues ailleurs sont additionnées pour les heures sup. de la semaine. Le même total figure dans l'export de chaque établissement : à ne payer qu'une fois."]] : [])];
 }
 
 /* send / print */
@@ -799,7 +814,7 @@ VIEWS.staff = {
         <span class="rh-emp-t"><b>${esc(p.name)}</b><em>${esc(p.role || "Poste à préciser")} · ${RH_CONTRACTS[p.contract] || esc(p.contract)} · ${fmt(rhNum(p.weeklyHours, 35), 0)} h/sem.</em>
         ${boss ? (rate ? `<span class="rh-emp-m"><span><b class="mono">${fmt(rate, 2)} €</b>brut / h</span><span><b class="mono">${fmt(lr, 2)} €</b>chargé / h</span><span><b class="mono">${rhEur(mg)}</b>brut / mois</span><span><b class="mono">${rhEur(mg * (1 + rhCh(p) / 100))}</b>chargé / mois</span></span>` : `<span class="pill warn">Taux horaire à saisir</span>`) : ""}</span>${ico("chev")}</button>`;
     };
-    return `<div class="inner rh-staff">${topBar("Employés", { right: rhCanEdit() ? `<button class="btn acc sm" data-act="rhEmpNew">${ico("plus")}Ajouter</button>` : "" })}
+    return `<div class="inner rh-staff">${topBar("Employés", { right: rhCanEdit() ? `<button class="btn soft sm" data-act="rhBulk" aria-label="Ajouter plusieurs personnes">${ico("users")}<span class="rh-bt">Plusieurs</span></button><button class="btn acc sm" data-act="rhEmpNew">${ico("plus")}Ajouter</button>` : "" })}
       ${money}
       ${act.length ? `<div class="rh-emps">${act.map(card).join("")}</div>` : `<div class="glass empty st" style="--i:3"><span class="ic">${ico("rhid")}</span><b>Aucun employé</b>Créez une fiche par personne : poste, contrat, heures et taux horaire. Le planning et la pointeuse s'en servent.</div>`}
       ${old.length ? `<div class="lbl st" style="--i:30">Anciens employés</div><div class="rh-emps">${old.map((p, i) => card(p, i + 30)).join("")}</div>` : ""}
@@ -808,11 +823,17 @@ VIEWS.staff = {
     </div>`;
   },
 };
+function rhSitesPick(F) {
+  const others = (S.restos || []).filter((r) => r.id !== S.rid); if (!others.length || !rhCanEdit() || (typeof abHas === "function" && !abHas("sites"))) return "";
+  const on = new Set((F.sites || []).filter((r) => r !== S.rid));
+  return `<div class="field rh-sites"><span>Travaille aussi dans</span><div class="chips" style="flex-wrap:wrap">${others.map((r) => `<button class="chip ${on.has(r.id) ? "on" : ""}" data-act="rhESite" data-v="${esc(r.id)}" aria-pressed="${on.has(r.id)}">${esc(r.name || "Restaurant")}</button>`).join("")}</div>
+    <p class="note" style="margin-top:6px">${on.size ? `Une seule fiche : ${esc(firstName(F.name || "Cette personne"))} apparaît au planning et à la pointeuse de chaque établissement coché, avec le même code. Ses heures s'additionnent pour les repères HCR et les heures sup.` : "Pour une personne partagée entre vos restaurants : ses heures s'additionnent pour les repères HCR et les heures sup."}</p></div>`;
+}
 function rhEmpSheet() {
   const F = S.ui.rhE; const boss = rhIsBoss(); const linkable = S.members.filter((m) => !S.staff.some((s) => s.memberId === m.id && s.id !== F.id));
   return `<div class="rh-es">
     <div class="rh-act-hd"><span id="rhEava">${rhAva({ name: F.name || "?", color: F.color }, 60)}</span><div><div class="h2">${F.id && !F._new ? "Fiche employé" : F._virtual ? "Compléter la fiche" : "Nouvel employé"}</div><div class="sub">${F.memberId ? "Compte lié : même code pour pointer" : "Pointe avec un code à 4 chiffres"}</div></div></div>
-    <label class="field"><span>Prénom et nom</span><input class="input" id="rhEn" value="${esc(F.name || "")}" maxlength="40" placeholder="Ex. Léa Martin" autocomplete="off"></label>
+    <label class="field"><span>Prénom et nom</span><input class="input" id="rhEn" autocapitalize="words" autocorrect="off" spellcheck="false" value="${esc(F.name || "")}" maxlength="40" placeholder="Ex. Léa Martin" autocomplete="off"></label>
     <label class="field"><span>Poste</span><input class="input" id="rhEr" value="${esc(F.role || "")}" list="rhRoles" maxlength="40" placeholder="Ex. Commis de cuisine"><datalist id="rhRoles">${RH_ROLES.map((r) => `<option value="${esc(r)}">`).join("")}</datalist></label>
     <div class="field"><span>Poste habituel au planning</span><div class="rh-posts">${Object.entries(RH_POSTS).map(([k, v]) => `<button class="${F.post === k ? "on" : ""}" style="--pc:${v.c};--pb:${v.bg};--pi:${v.ink}" data-act="rhEPost" data-v="${k}"><i></i>${v.t}</button>`).join("")}</div></div>
     <div class="field"><span>Contrat</span><div class="rh-opts">${Object.entries(RH_CONTRACTS).map(([k, v]) => `<button class="${F.contract === k ? "on" : ""}" data-act="rhEContract" data-v="${k}">${v}</button>`).join("")}</div></div>
@@ -822,6 +843,7 @@ function rhEmpSheet() {
       <div class="grid2"><label class="field"><span>Taux horaire brut (€)</span><input class="input mono" id="rhEw" inputmode="decimal" value="${esc(String(F.hourlyGross ?? "").replace(".", ","))}" placeholder="Ex. 12,50"></label>
       <label class="field"><span>Charges patronales (%)</span><input class="input mono" id="rhEc" inputmode="decimal" value="${esc(String(F.chargesPct ?? 42).replace(".", ","))}"></label></div>
       <div class="rh-sum" id="rhEsum">${rhESum()}</div>${F.contract === "apprenti" ? `<p class="note">Apprenti : charges très réduites (souvent moins de 10 %), à ajuster.</p>` : ""}</div>` : ""}
+    ${rhSitesPick(F)}
     <div class="grid2"><label class="field"><span>Entrée</span><input class="input" type="date" id="rhEs" value="${esc(F.start || "")}"></label><label class="field"><span>${F.contract === "CDD" ? "Fin du CDD" : "Sortie"}</span><input class="input" type="date" id="rhEe" value="${esc(F.end || "")}"></label></div>
     <label class="field"><span>Compte de l'app</span><select class="input" id="rhEm"><option value="">Aucun</option>${linkable.map((m) => `<option value="${esc(m.id)}" ${F.memberId === m.id ? "selected" : ""}>${esc(m.name || "Sans nom")} · ${ROLES[m.role] || "Équipe"}</option>`).join("")}</select></label>
     ${F.id && (!F._new || F._virtual) ? `<div class="hstack rh-esx">${F.pinHash ? `<button class="btn soft sm" data-act="rhEPinReset">${ico("lock")}Effacer le code de pointage</button>` : ""}${F._virtual ? "" : `<button class="btn soft sm" data-act="rhEArchive">${F.active === false ? "Réactiver" : "Départ de l'entreprise"}</button>`}</div>` : ""}
@@ -856,7 +878,7 @@ document.addEventListener("input", (e) => {
     const r1 = VIEWS.equipe.render;
     VIEWS.equipe.render = function () {
       const h = r1.apply(this, arguments); if (h.includes("rh-eqlink")) return h;
-      const link = `<div class="glass pad rh-eqlink st" style="--i:3">${rhCanStaff() ? `<div class="li tap" data-go="staff"><span class="ic">${ico("rhid")}</span><div class="tx"><b>Fiches employés et salaires</b><em>Contrats, heures, coût chargé</em></div>${ico("chev")}</div>` : ""}<div class="li tap" data-go="planning"><span class="ic">${ico("cal")}</span><div class="tx"><b>Planning</b><em>Créneaux de la semaine</em></div>${ico("chev")}</div><div class="li tap" data-go="pointeuse"><span class="ic">${ico("clock")}</span><div class="tx"><b>Pointeuse</b><em>Arrivées, pauses, départs</em></div>${ico("chev")}</div></div>`;
+      const link = `<div class="glass pad rh-eqlink st" style="--i:3">${rhCanStaff() ? `<div class="li tap" data-go="staff"><span class="ic">${ico("rhid")}</span><div class="tx"><b>${rhPaid() ? "Fiches employés et salaires" : "Fiches employés"}</b><em>${rhPaid() ? "Contrats, heures, coût chargé" : "Contrats, heures, postes"}</em></div>${ico("chev")}</div>` : ""}${rhCanEdit() ? `<div class="li tap" data-act="rhBulk"><span class="ic">${ico("users")}</span><div class="tx"><b>Ajouter des extras ou saisonniers</b><em>Collez une liste de noms, en une fois</em></div>${ico("chev")}</div>` : ""}<div class="li tap" data-go="planning"><span class="ic">${ico("cal")}</span><div class="tx"><b>Planning</b><em>Créneaux de la semaine</em></div>${ico("chev")}</div><div class="li tap" data-go="pointeuse"><span class="ic">${ico("clock")}</span><div class="tx"><b>Pointeuse</b><em>Arrivées, pauses, départs</em></div>${ico("chev")}</div></div>`;
       const i = h.lastIndexOf("</div>"); return i > 0 ? h.slice(0, i) + link + h.slice(i) : h + link;
     };
   }
@@ -1063,6 +1085,7 @@ Object.assign(ACT, {
   },
   rhEPost: (a, id, v) => { rhERead(); S.ui.rhE.post = S.ui.rhE.post === v ? "" : v; SFX.tick(); openSheet(rhEmpSheet()); },
   rhEContract: (a, id, v) => { rhERead(); const F = S.ui.rhE; F.contract = v; if (v === "extra" && rhNum(F.weeklyHours, 35) === 35) F.weeklyHours = 0; if (v === "apprenti" && rhNum(F.chargesPct, 42) === 42) F.chargesPct = 10; SFX.tick(); openSheet(rhEmpSheet()); },
+  rhESite: (a, id, v) => { rhERead(); const F = S.ui.rhE; const l = new Set((F.sites || []).filter((r) => r !== S.rid)); l.has(v) ? l.delete(v) : l.add(v); F.sites = [...l]; SFX.tick(); const y = ($("#sheetBody") || {}).scrollTop; openSheet(rhEmpSheet()); const b = $("#sheetBody"); if (b && y) b.scrollTop = y; },
   rhEColor: (a, id, v) => { rhERead(); S.ui.rhE.color = v; SFX.tick(); openSheet(rhEmpSheet()); },
   rhEPinReset: () => rhOnce("rhPinR", async () => { const F = S.ui.rhE; await safe(DB.update("staff", F.id, { pinHash: "" })); F.pinHash = ""; SFX.ok(); toast(`${firstName(F.name)} choisira un nouveau code au prochain pointage`); openSheet(rhEmpSheet()); }),
   rhEArchive: () => rhOnce("rhArch", async () => { rhERead(); const F = S.ui.rhE; const on = F.active === false; await safe(DB.update("staff", F.id, { active: on, end: on ? "" : (F.end || dayKey()) })); closeSheet(true); SFX.ok(); toast(on ? "Employé réactivé" : `${firstName(F.name)} est passé dans les anciens employés`); }),
@@ -1070,10 +1093,62 @@ Object.assign(ACT, {
     rhERead(); const F = S.ui.rhE; const name = (F.name || "").trim(); if (!name) { const i = $("#rhEn"); if (i) { i.classList.remove("shake"); void i.offsetWidth; i.classList.add("shake"); i.focus(); } SFX.err(); toast("Indiquez le prénom.", "err"); return; }
     const doc = { name, role: (F.role || "").trim(), post: F.post || "", color: F.color, contract: F.contract || "CDI", weeklyHours: rhNum(F.weeklyHours, 35), chargesPct: rhNum(F.chargesPct, 42), start: F.start || "", end: F.end || "", active: F.active !== false, memberId: F.memberId || "" };
     if (rhIsBoss()) doc.hourlyGross = rhNum(F.hourlyGross, null);
+    const was = (rhStaff(F.id) || {}).sites || []; const want = (F.sites || []).filter((r) => r !== S.rid && (S.restos || []).some((x) => x.id === r));
+    if (want.length || was.length) { doc.sites = want.length ? [S.rid, ...want] : []; if (!F.id) F.id = typeof mrNewId === "function" ? mrNewId() : Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
     if (F.id && !F._new) await safe(DB.update("staff", F.id, doc));
     else if (F.id) await safe(DB.set("staff", F.id, { ...doc, createdAt: Date.now() }));
     else await safe(DB.add("staff", { ...doc, createdAt: Date.now(), by: S.me.id }));
+    if ((want.length || was.length) && typeof mrPut === "function") {
+      const copy = { ...doc, pinHash: F.pinHash || "", sharedFrom: { rid: S.rid, name: (S.resto && S.resto.name) || "" } };
+      for (const rid of want) await mrPut(rid, "staff", F.id, { ...copy, active: doc.active, createdAt: Date.now() }, true).catch(() => toast(`${rhSiteName(rid)} : fiche pas partagée, réessayez.`, "err"));
+      for (const rid of was.filter((r) => r !== S.rid && !want.includes(r))) await mrPut(rid, "staff", F.id, { sites: [], active: false, end: dayKey() }, true).catch(() => {});
+    }
     const isNew = F._new && !F._virtual; closeSheet(true); SFX.done(); buzz([8, 30, 8]); toast(isNew ? `${firstName(name)} a rejoint l'équipe` : "Fiche enregistrée");
     logEvent("rh", isNew ? `a créé la fiche de ${firstName(name)}` : `a modifié la fiche de ${firstName(name)}`);
+  }),
+});
+
+/* ───────────── ajout groupé : extras et saisonniers (trouvé par la simulation de 15 restaurants : une crêperie qui embauche 8 saisonniers d'un coup) ───────────── */
+const rhBulkNames = (t) => { const seen = new Set(); return String(t || "").split(/[\n;]+|,(?=\s*[A-ZÀ-Ý])/).map((x) => x.replace(/^[\s\-•*\d.)]+/, "").replace(/\s+/g, " ").trim().slice(0, 40)).filter((x) => x.length > 1 && !seen.has(x.toLowerCase()) && seen.add(x.toLowerCase())); };
+function rhBulkSheet() {
+  const B = S.ui.rhB; const n = rhBulkNames(B.text); const have = new Set(rhPeople({ all: true }).map((p) => p.name.toLowerCase())); const dup = n.filter((x) => have.has(x.toLowerCase()));
+  return `<div class="rh-es rh-bulk">
+    <div class="h2">Ajouter plusieurs personnes</div>
+    <p class="sub">Un nom par ligne, ou collez la liste reçue par SMS ou e-mail. Chacun a sa fiche, apparaît au planning et pointe avec son code.</p>
+    <label class="field"><span>Les noms</span><textarea class="input" id="rhBt" rows="6" placeholder="Léa Martin&#10;Hugo Bernard&#10;Inès Diallo">${esc(B.text)}</textarea></label>
+    <p class="note" id="rhBn">${n.length ? `${n.length} personne${n.length > 1 ? "s" : ""}${dup.length ? ` · déjà dans l'équipe : ${esc(dup.slice(0, 3).join(", "))}${dup.length > 3 ? "…" : ""} (ignoré${dup.length > 1 ? "s" : ""})` : ""}` : "Aucun nom pour l'instant."}</p>
+    <div class="field"><span>Contrat</span><div class="rh-opts">${[["extra", "Extra"], ["CDD", "Saisonnier (CDD)"]].map(([k, v]) => `<button class="${B.contract === k ? "on" : ""}" data-act="rhBC" data-v="${k}">${v}</button>`).join("")}</div></div>
+    <div class="field"><span>Poste habituel au planning</span><div class="rh-posts">${Object.entries(RH_POSTS).map(([k, v]) => `<button class="${B.post === k ? "on" : ""}" style="--pc:${v.c};--pb:${v.bg};--pi:${v.ink}" data-act="rhBP" data-v="${k}"><i></i>${v.t}</button>`).join("")}</div></div>
+    <div class="grid2"><label class="field"><span>Poste</span><input class="input" id="rhBr" value="${esc(B.role)}" list="rhRoles" maxlength="40" placeholder="Ex. Serveur"><datalist id="rhRoles">${RH_ROLES.map((r) => `<option value="${esc(r)}">`).join("")}</datalist></label>
+      <label class="field"><span>Heures / semaine</span><input class="input mono" id="rhBh" inputmode="decimal" value="${esc(String(B.weeklyHours).replace(".", ","))}"></label></div>
+    <div class="grid2"><label class="field"><span>Début</span><input class="input" type="date" id="rhBs" value="${esc(B.start)}"></label><label class="field"><span>${B.contract === "CDD" ? "Fin de saison" : "Fin (facultatif)"}</span><input class="input" type="date" id="rhBe" value="${esc(B.end)}"></label></div>
+    ${rhIsBoss() ? `<label class="field"><span>Taux horaire brut (€), le même pour tous</span><input class="input mono" id="rhBw" inputmode="decimal" value="${esc(String(B.hourlyGross || "").replace(".", ","))}" placeholder="Ex. 12,10"></label>` : ""}
+    <button class="btn acc block" data-act="rhBulkSave" ${n.length - dup.length > 0 ? "" : "disabled"}>${ico("check")}${n.length - dup.length > 0 ? `Ajouter ${n.length - dup.length} personne${n.length - dup.length > 1 ? "s" : ""}` : "Ajouter"}</button>
+  </div>`;
+}
+function rhBRead() { const B = S.ui.rhB; if (!B) return; const g = (id) => $("#" + id)?.value; B.text = g("rhBt") ?? B.text; B.role = g("rhBr") ?? B.role; B.weeklyHours = g("rhBh") ?? B.weeklyHours; B.start = g("rhBs") ?? B.start; B.end = g("rhBe") ?? B.end; B.hourlyGross = g("rhBw") ?? B.hourlyGross; }
+const rhBRedraw = () => { const y = ($("#sheetBody") || {}).scrollTop; openSheet(rhBulkSheet()); const b = $("#sheetBody"); if (b && y) b.scrollTop = y; };
+document.addEventListener("input", (e) => { if (e.target && e.target.id === "rhBt" && S.ui.rhB) { rhBRead(); const n = $("#rhBn"), btn = $("[data-act=rhBulkSave]"); if (!n || !btn) return; const tmp = document.createElement("div"); tmp.innerHTML = rhBulkSheet(); n.innerHTML = $("#rhBn", tmp).innerHTML; btn.outerHTML = $("[data-act=rhBulkSave]", tmp).outerHTML; } });
+Object.assign(ACT, {
+  rhBulk: () => { if (!rhCanEdit()) { toast("Seul le gérant ajoute des fiches.", "info"); return; } SFX.tap(); const t = dayKey(); S.ui.rhB = S.ui.rhB && S.ui.rhB.text ? S.ui.rhB : { text: "", contract: "extra", post: "salle", role: "", weeklyHours: 0, start: t, end: "", hourlyGross: "" }; openSheet(rhBulkSheet()); },
+  rhBC: (a, id, v) => { const B = S.ui.rhB; if (!B) return; rhBRead(); B.contract = v; if (v === "CDD" && !rhNum(B.weeklyHours, 0)) B.weeklyHours = 35; if (v === "extra" && rhNum(B.weeklyHours, 0) === 35) B.weeklyHours = 0; SFX.tick(); rhBRedraw(); },
+  rhBP: (a, id, v) => { const B = S.ui.rhB; if (!B) return; rhBRead(); B.post = B.post === v ? "" : v; if (!B.role) B.role = { cuisine: "Commis", salle: "Serveur", plonge: "Plongeur", bar: "Barman" }[B.post] || ""; SFX.tick(); rhBRedraw(); },
+  rhBulkSave: () => rhOnce("rhBulkSave", async () => {
+    rhBRead(); const B = S.ui.rhB; if (!B || !rhCanEdit()) return;
+    const have = new Set(rhPeople({ all: true }).map((p) => p.name.toLowerCase())); const names = rhBulkNames(B.text).filter((x) => !have.has(x.toLowerCase()));
+    if (!names.length) { toast("Ajoutez au moins un nom.", "err"); return; }
+    if (B.end && B.start && B.end < B.start) { toast("La fin est avant le début.", "err"); return; }
+    const used = rhPeople().map((p) => p.color); const free = PALETTE.filter((c) => !used.includes(c)); const pal = free.length ? free : PALETTE;
+    const role = (B.role || "").trim() || (B.contract === "CDD" ? "Saisonnier" : "Extra");
+    let i = 0;
+    for (const name of names) {
+      const doc = { name, role, post: B.post || "", color: pal[i % pal.length], contract: B.contract === "CDD" ? "CDD" : "extra", weeklyHours: rhNum(B.weeklyHours, 0), chargesPct: 42, start: B.start || "", end: B.end || "", active: true, memberId: "", createdAt: Date.now(), by: S.me.id, bulk: true };
+      if (rhIsBoss() && rhNum(B.hourlyGross, 0)) doc.hourlyGross = rhNum(B.hourlyGross, 0);
+      await safe(DB.add("staff", doc)); i++;
+    }
+    S.ui.rhB = null; closeSheet(true); SFX.done(); buzz([8, 30, 8]);
+    toast(`${i} personne${i > 1 ? "s" : ""} ajoutée${i > 1 ? "s" : ""} à l'équipe`);
+    try { Promise.resolve(logEvent("staff", `a ajouté ${i} ${B.contract === "CDD" ? "saisonnier" : "extra"}${i > 1 ? "s" : ""} : ${names.slice(0, 4).join(", ")}${names.length > 4 ? "…" : ""}`)).catch(() => {}); } catch (e) {}
+    rerender();
   }),
 });

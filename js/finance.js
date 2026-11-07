@@ -383,7 +383,7 @@ function finExpSheet(e) {
       <label class="fin-amtin"><span class="lbl">Montant HT</span><span class="w"><input class="input mono" id="finXAmt" inputmode="decimal" value="${esc(x.amount)}" placeholder="0,00" autocomplete="off" enterkeyhint="done"><b>€</b></span></label>
       <div class="seg fin-recseg"><button class="${x.recurring ? "" : "on"}" data-act="finXRec" data-v="0">Une fois</button><button class="${x.recurring ? "on" : ""}" data-act="finXRec" data-v="1">${ico("finRepeat")}Chaque mois</button><span class="knob" style="width:calc(50% - 4px);transform:translateX(${x.recurring ? "100%" : "0"})"></span></div>
       <div class="grid2"><label class="field"><span>${x.recurring ? "À partir de" : "Date"}</span><input class="input" type="date" id="finXDay" value="${esc(x.day)}"></label>
-        <label class="field"><span>Fournisseur <i class="fin-opt">facultatif</i></span><input class="input" id="finXSup" value="${esc(x.supplier)}" placeholder="Ex. EDF" autocomplete="off"></label></div>
+        <label class="field"><span>Fournisseur <i class="fin-opt">facultatif</i></span><input class="input" id="finXSup" enterkeyhint="done" value="${esc(x.supplier)}" placeholder="Ex. EDF" autocomplete="off"></label></div>
       <label class="field"><span>Libellé <i class="fin-opt">facultatif</i></span><input class="input" id="finXLab" value="${esc(x.label)}" placeholder="${esc(cat.t)}" autocomplete="off" enterkeyhint="done"></label>
       ${x.receptionId ? `<p class="note" style="margin:0">Liée à une réception : le montant est aussi mis à jour dans l'historique des livraisons.</p>` : ""}
       <button class="btn acc block" data-act="finXSave">${ico("check")}${x.id ? "Enregistrer" : "Ajouter"}</button>

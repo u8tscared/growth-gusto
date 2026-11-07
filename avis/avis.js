@@ -118,7 +118,7 @@
         ${up ? `<button class="av-wand" data-a="wand">${svg.wand}<span>${st.text ? "Une autre phrase" : "Écrire pour moi"}</span></button>` : ""}
         ${low ? `<div class="av-priv">${svg.lock}<span>Votre message va directement au responsable du restaurant. Il n'est pas publié.</span></div>
           <button class="av-check${st.recontact ? " on" : ""}" data-a="recontact" role="checkbox" aria-checked="${st.recontact}"><span class="av-box"></span><span>Je veux bien qu'on me recontacte</span></button>
-          ${ANON && st.recontact ? `<div class="av-anon"><label class="rv-f"><input id="avName" maxlength="60" placeholder="Votre prénom" value="${esc(st.name)}" autocomplete="given-name"></label><label class="rv-f"><input id="avContact" maxlength="120" placeholder="Téléphone ou e-mail" value="${esc(st.contact)}" inputmode="email" autocomplete="email"></label></div>` : ""}` : ""}
+          ${ANON && st.recontact ? `<div class="av-anon"><label class="rv-f"><input id="avName" maxlength="60" autocapitalize="words" autocorrect="off" enterkeyhint="done" placeholder="Votre prénom" value="${esc(st.name)}" autocomplete="given-name"></label><label class="rv-f"><input id="avContact" maxlength="120" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Téléphone ou e-mail" value="${esc(st.contact)}" inputmode="email" autocomplete="email"></label></div>` : ""}` : ""}
         <button class="rv-btn big" data-a="send"${st.sending ? " disabled" : ""}>${st.sending ? `<span class="rv-spin"></span>Envoi…` : up ? "Continuer" : "Envoyer au responsable"}</button>
       </div>` : `<p class="av-hint">Un geste suffit. Dix secondes, promis.</p>`}
     </section>${foot()}`;

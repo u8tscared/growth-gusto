@@ -64,7 +64,7 @@ const TP_COLORS = ["#1F7AE0", "#5B2BFF", "#E0752F", "#0E8C9E"];
 const TP_DEF = [{ id: "salle", t: "Salle", pct: 60, posts: ["salle", "bar"], mode: "egal", c: "#1F7AE0" }, { id: "cuisine", t: "Cuisine", pct: 40, posts: ["cuisine", "plonge"], mode: "egal", c: "#5B2BFF" }];
 const TP_POSTS = [["salle", "Salle"], ["bar", "Bar"], ["cuisine", "Cuisine"], ["plonge", "Plonge"]];
 const TP_PRESETS = [[60, 40], [50, 50], [70, 30]];
-const TP = { rid: null, rows: null, cfg: null, cfgSeen: false, months: {}, off: 0, day: null, all: false, anim: "", ed: null, add: null, bill: null, seeded: null };
+const TP = { rid: null, rows: null, cfg: null, cfgSeen: false, months: {}, per: "mois", yr: 0, off: 0, day: null, all: false, anim: "", ed: null, add: null, bill: null, seeded: null };
 
 const tpR2 = (v) => Math.round((+v || 0) * 100) / 100;
 const tpEur = (v, d = 2) => `${(+v || 0).toLocaleString("fr-FR", { minimumFractionDigits: d, maximumFractionDigits: d })} €`;
@@ -78,6 +78,10 @@ const tpPl = (n, w, p) => `${n} ${n > 1 ? p || w + "s" : w}`;
 const tpBoss = () => { try { return typeof PERMS === "undefined" || !PERMS.isAdmin || PERMS.isAdmin(); } catch (e) { return myRole() === "gerant"; } };
 const tpDayOf = (r) => r.day || dayKey(new Date(r.at || Date.now()));
 const tpMethod = (r) => (TP_METHODS[r.method] ? r.method : r.src === "qr" ? "ligne" : r.src === "caisse" ? "cb" : "especes");
+/* month offset (0 = this month) of a "YYYY-MM" key */
+const tpOffOf = (mk) => { const n = new Date(); return (+mk.slice(0, 4) - n.getFullYear()) * 12 + +mk.slice(5, 7) - 1 - n.getMonth(); };
+const tpYearRows = (y) => (TP.rows || []).filter((r) => tpDayOf(r).slice(0, 4) === String(y));
+const tpDayLbl = (d) => (d === dayKey() ? "Aujourd'hui" : d === addDays(dayKey(), -1) ? "Hier" : tpCap(new Date(parseDay(d)).toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", ...(d.slice(0, 4) !== String(new Date().getFullYear()) ? { year: "numeric" } : {}) })));
 const tpCap = (t) => String(t || "").replace(/^./, (c) => c.toUpperCase());
 const tpOpen = () => !$("#sheet").classList.contains("open");
 
@@ -227,11 +231,82 @@ const tpMethLegend = (rows, total) => { const s = { cb: 0, ligne: 0, especes: 0 
   return { s, bar: `<div class="tp-mbar">${["cb", "ligne", "especes"].map((m) => (s[m] ? `<i class="m-${m}" style="flex:${s[m]}"></i>` : "")).join("") || `<i class="m-none" style="flex:1"></i>`}</div>`,
     keys: `<div class="tp-mkeys">${["cb", "ligne", "especes"].map((m) => `<span class="${s[m] ? "" : "zero"}"><i class="m-${m}"></i>${TP_METHODS[m][0]}<b class="mono">${tpEur0(s[m])}</b>${total > 0 && s[m] ? `<em>${Math.round((s[m] / total) * 100)} %</em>` : ""}</span>`).join("")}</div>` }; };
 
+/* ───────── the period: Jour / Mois / Année (like the Finances screen), arrows, and a picker on the label ───────── */
+const TP_PERS = [["jour", "Jour"], ["mois", "Mois"], ["annee", "Année"]];
+function tpYears() { const yNow = new Date().getFullYear(); let y0 = yNow; (TP.rows || []).forEach((r) => { const y = +tpDayOf(r).slice(0, 4); if (y > 1999 && y < y0) y0 = y; }); const a = []; for (let y = yNow; y >= Math.max(y0, yNow - 9); y--) a.push(y); return a; }
+function tpNav(per, mk, today) {
+  const yNow = new Date().getFullYear(); const cur = tpMk();
+  const lbl = per === "jour" ? tpDayLbl(TP.day) : per === "annee" ? String(TP.yr) : tpCap(tpMonthLbl(mk));
+  const atEnd = per === "jour" ? TP.day >= today : per === "annee" ? TP.yr >= yNow : TP.off >= 0;
+  const pick = per === "jour" ? `<input type="date" id="tpPick" max="${today}" value="${esc(TP.day)}" aria-label="Choisir un jour">`
+    : per === "mois" ? `<input type="month" id="tpPick" max="${cur}" value="${mk}" aria-label="Choisir un mois">`
+    : `<select id="tpPick" aria-label="Choisir une année">${tpYears().map((y) => `<option value="${y}"${y === TP.yr ? " selected" : ""}>${y}</option>`).join("")}</select>`;
+  const i = TP_PERS.findIndex((x) => x[0] === per);
+  return `<div class="tp-ctl st" style="--i:1"><div class="seg tp-per" role="tablist">${TP_PERS.map(([k, t]) => `<button class="${per === k ? "on" : ""}" data-act="tpPer" data-v="${k}" role="tab" aria-selected="${per === k}">${t}</button>`).join("")}<span class="knob" style="width:calc(33.33% - 2.67px);transform:translateX(${i * 100}%)"></span></div>
+    <div class="tp-mnav"><button class="iconbtn" data-act="tpStep" data-v="-1" aria-label="Précédent">${ico("tpL")}</button><label class="tp-pick"><b>${esc(lbl)}</b>${ico("cal")}${pick}</label><button class="iconbtn" data-act="tpStep" data-v="1" aria-label="Suivant" ${atEnd ? "disabled" : ""}>${ico("tpR")}</button></div></div>`;
+}
+/* one day: its total, midi / soir, how it was paid; the month bars stay to jump to another day */
+function tpDayHero(rows, monthRows, mk, today) {
+  const total = tpR2(rows.reduce((a, r) => a + +r.amount, 0)); const L = tpMethLegend(rows, total);
+  const sv = (k) => tpR2(rows.filter((r) => (r.service || (new Date(r.at).getHours() < 16 ? "midi" : "soir")) === k).reduce((a, r) => a + +r.amount, 0));
+  const wk = addDays(TP.day, -7); const wkT = tpR2((TP.rows || []).filter((r) => tpDayOf(r) === wk).reduce((a, r) => a + +r.amount, 0));
+  return `<section class="tp-hero wall st" style="--i:2">
+      <div class="tp-hero-t"><span class="tp-kick">${ico("tpJar")}Pourboires du jour</span>${TP.day === today ? `<span class="tp-st live"><i></i>En cours</span>` : ""}</div>
+      <div class="tp-big mono" data-to="${total}" data-k="${TP.day}:${total}">${tpEur(total)}</div>
+      <p class="tp-sub">${rows.length ? tpPl(rows.length, "pourboire") : "Aucun pourboire ce jour-là"}${wkT > 0 ? ` · ${esc(DAYS[parseDay(wk).getDay()])} précédent : <b>${tpEur0(wkT)}</b>` : ""}</p>
+      <div class="tp-svs"><span><em>Midi</em><b class="mono">${tpEur0(sv("midi"))}</b></span><span><em>Soir</em><b class="mono">${tpEur0(sv("soir"))}</b></span></div>
+      ${L.bar}${L.keys}
+      ${tpBars(mk, monthRows, today)}
+    </section>`;
+}
+/* one year: 12 bars, month by month, and what each person received */
+function tpYearHtml(nav, boss) {
+  const y = TP.yr, yNow = new Date().getFullYear(), mNow = new Date().getMonth(); const rows = tpYearRows(y);
+  const total = tpR2(rows.reduce((a, r) => a + +r.amount, 0)); const prev = tpR2(tpYearRows(y - 1).reduce((a, r) => a + +r.amount, 0));
+  const L = tpMethLegend(rows, total); const mks = Array.from({ length: 12 }, (_, i) => `${y}-${pad(i + 1)}`);
+  const by = {}; rows.forEach((r) => { const k = tpDayOf(r).slice(0, 7); const m = tpMethod(r); (by[k] ||= { cb: 0, ligne: 0, especes: 0, t: 0, n: 0 }); by[k][m] += +r.amount; by[k].t += +r.amount; by[k].n++; });
+  const max = Math.max(1, ...Object.values(by).map((x) => x.t));
+  const bars = `<div class="tp-bars yr" role="group" aria-label="Pourboires par mois">${mks.map((k, i) => { const x = by[k], fut = y > yNow || (y === yNow && i > mNow);
+    const segs = x ? ["especes", "ligne", "cb"].map((m) => (x[m] ? `<i class="m-${m}" style="height:${(x[m] / max) * 100}%"></i>` : "")).join("") : "";
+    return `<button class="tp-bar${fut ? " fut" : ""}${y === yNow && i === mNow ? " now" : ""}" data-act="tpOpenM" data-v="${k}" style="--j:${i}" aria-label="${MONTHS[i]} : ${x ? tpEur(x.t) : "rien"}" ${fut ? "disabled" : ""}><span class="tp-bc">${segs}</span><em>${MONTHS[i].slice(0, 1).toUpperCase()}</em></button>`; }).join("")}</div>`;
+  const diff = prev > 0 && total > 0 && y < yNow ? Math.round(((total - prev) / prev) * 100) : null;
+  const hero = `<section class="tp-hero wall st" style="--i:2">
+      <div class="tp-hero-t"><span class="tp-kick">${ico("tpJar")}Cagnotte ${y}</span>${y === yNow ? `<span class="tp-st live"><i></i>En cours</span>` : ""}</div>
+      <div class="tp-big mono" data-to="${total}" data-k="y${y}:${total}">${tpEur(total)}</div>
+      <p class="tp-sub">${rows.length ? tpPl(rows.length, "pourboire") : "Aucun pourboire cette année"}${diff != null ? ` · <b class="${diff >= 0 ? "up" : "down"}">${diff >= 0 ? "+" : ""}${diff} %</b> par rapport à ${y - 1}` : prev > 0 ? ` · ${y - 1} : <b>${tpEur0(prev)}</b>` : ""}</p>
+      ${L.bar}${L.keys}${bars}
+    </section>`;
+  /* the shares, month by month (frozen when closed) */
+  const R = tpRule(); const me = tpMe(); const seeAll = boss || R.showAll; const people = {};
+  const used = mks.filter((k) => by[k]);
+  used.forEach((k) => { tpView(k).shares.forEach((s) => { const p = (people[s.id] ||= { id: s.id, name: s.name, amt: 0, n: 0 }); p.amt = tpR2(p.amt + s.amt); p.n++; }); });
+  const mine = me && people[me.id];
+  const myCard = me && (mine || !boss) ? `<section class="glass tp-me st" style="--i:3">${tpAva(me, 48)}<div class="tx"><em>Ma part en ${y}</em>${mine ? `<b class="mono" data-to="${mine.amt}">${tpEur(mine.amt)}</b><span>Sur ${tpPl(mine.n, "mois", "mois")}</span>` : `<b class="sm">Pas encore de part</b><span>Elle apparaît dès que vous avez travaillé.</span>`}</div></section>` : "";
+  const months = used.slice().reverse().map((k, i) => { const F = TP.months[k]; const st = F ? (F.paid ? "versé" : "clôturé, à verser") : k === tpMk() ? "en cours" : "à clôturer";
+    return `<button class="tp-j tp-ym" data-act="tpOpenM" data-v="${k}" style="--j:${Math.min(i, 12)}"><span class="tp-ji m-cb">${ico("cal")}</span><span class="tx"><b>${tpCap(MONTHS[+k.slice(5) - 1])}</b><em>${tpPl(by[k].n, "pourboire")} · ${st}</em></span><b class="mono">${tpEur(by[k].t)}</b></button>`; }).join("");
+  const journal = `<section class="glass tp-jr st" style="--i:5"><div class="tp-sh"><span class="h3">Mois par mois</span></div>
+      ${months || `<div class="tp-empty">${ico("tpJar")}<b>Rien en ${y}</b><span>Les pourboires apparaissent ici mois par mois.</span></div>`}
+      <button class="tp-add" data-act="tpAdd">${ico("plus")}<span>Ajouter un pourboire<em>Bocal à espèces, terminal de carte…</em></span></button></section>`;
+  const list = Object.values(people).sort((a, b) => b.amt - a.amt || a.name.localeCompare(b.name, "fr")); const top = list.length ? list[0].amt : 1;
+  const shown = seeAll ? list : list.filter((p) => me && p.id === me.id);
+  const ppl = Object.fromEntries(tpPeople().map((p) => [p.id, p]));
+  const split = `<section class="glass tp-split st" style="--i:4"><div class="tp-sh"><span class="h3">${ico("tpSplit")}Par personne en ${y}</span></div>
+      ${shown.length ? `<div class="tp-ppl">${shown.map((p) => `<div class="tp-p${me && p.id === me.id ? " me" : ""}">${tpAva(ppl[p.id] || { id: p.id, name: p.name, color: colorFor(p.id) }, 36)}<span class="nm"><span class="l1"><b>${esc(p.name)}</b><em>${tpPl(p.n, "mois", "mois")}</em></span><span class="tp-pbar"><i style="width:${Math.max(4, (p.amt / top) * 100)}%"></i></span></span><b class="mono">${tpEur(p.amt)}</b></div>`).join("")}</div>` : `<p class="tp-gempty">Aucune part cette année.</p>`}
+      ${!seeAll && list.length > shown.length ? `<p class="tp-hid">${tpPl(list.length - shown.length, "autre personne")} dans l'équipe</p>` : ""}
+      ${boss && total > 0 ? `<div class="tp-acts"><button class="btn soft" data-act="tpCsvY">${ico("download")}Export de l'année</button></div>` : ""}
+    </section>`;
+  return `<div class="inner wide tp">${topBar("Pourboires", { right: `<button class="btn acc sm tp-plus" data-act="tpAdd" aria-label="Ajouter un pourboire">${ico("plus")}<span>Ajouter</span></button>` })}
+      ${nav}<div class="tp-cols"><div class="tp-c1">${hero}${myCard}${journal}</div><div class="tp-c2">${split}</div></div></div>`;
+}
+
 /* ───────── the screen ───────── */
 VIEWS.pourboires = {
   render() {
     tpWatch();
-    const boss = tpBoss(), mk = tpMk(TP.off), cur = tpMk(), today = dayKey(), past = mk < cur;
+    const today = dayKey(), yNow = new Date().getFullYear(); const per = ["jour", "mois", "annee"].includes(TP.per) ? TP.per : (TP.per = "mois");
+    if (per === "jour") { if (!TP.day || TP.day > today) TP.day = today; TP.off = Math.min(0, tpOffOf(TP.day.slice(0, 7))); }
+    if (per === "annee" && !(TP.yr > 1999 && TP.yr <= yNow)) TP.yr = yNow;
+    const boss = tpBoss(), mk = tpMk(TP.off), cur = tpMk(), past = mk < cur;
     if (TP.rows == null) return `<div class="inner wide tp">${topBar("Pourboires")}<div class="glass pad st tp-load" style="--i:1"><span class="tp-spin"></span>Chargement de la cagnotte…</div></div>`;
     const V = tpView(mk), R = tpRule(), prev = tpMonthTotal(tpMk(TP.off - 1)), F = V.frozen;
     if (TP.day && TP.day.slice(0, 7) !== mk) TP.day = null;
@@ -240,9 +315,10 @@ VIEWS.pourboires = {
     const dLeft = mk === cur ? +tpRange(mk)[1].slice(8) - +today.slice(8) : 0;
     const status = F ? (F.paid ? `<span class="tp-st paid">${ico("tpPaid")}Versé${F.paidAt ? " le " + shortDate(dayKey(new Date(F.paidAt))) : ""}</span>` : `<span class="tp-st closed">${ico("tpLock")}Clôturé, à verser</span>`)
       : mk === cur ? `<span class="tp-st live"><i></i>En cours${dLeft > 0 ? ` · encore ${tpPl(dLeft, "jour")}` : ""}</span>` : past && V.total > 0 ? `<span class="tp-st todo">${ico("tpLock")}À clôturer</span>` : "";
-    const nav = `<div class="tp-mnav st" style="--i:1"><button class="iconbtn" data-act="tpMonth" data-v="-1" aria-label="Mois précédent">${ico("tpL")}</button>
-      <b>${tpMonthLbl(mk).replace(/^./, (c) => c.toUpperCase())}</b><button class="iconbtn" data-act="tpMonth" data-v="1" aria-label="Mois suivant" ${TP.off >= 0 ? "disabled" : ""}>${ico("tpR")}</button></div>`;
-    const hero = `<section class="tp-hero wall st" style="--i:2">
+    const nav = tpNav(per, mk, today);
+    if (per === "annee") return tpYearHtml(nav, boss);
+    const DR = per === "jour" ? V.rows.filter((r) => tpDayOf(r) === TP.day) : null;
+    const hero = DR ? tpDayHero(DR, V.rows, mk, today) : `<section class="tp-hero wall st" style="--i:2">
       <div class="tp-hero-t"><span class="tp-kick">${ico("tpJar")}Cagnotte ${tpDe(mk)}</span>${status}</div>
       <div class="tp-big mono" data-to="${V.total}" data-k="${mk}:${V.total}">${tpEur(V.total)}</div>
       <p class="tp-sub">${V.rows.length ? `${tpPl(V.rows.length, "pourboire")}` : "Aucun pourboire pour l'instant"}${diff != null && mk === cur ? "" : diff != null ? ` · <b class="${diff >= 0 ? "up" : "down"}">${diff >= 0 ? "+" : ""}${diff} %</b> par rapport à ${tpMonthName(tpMk(TP.off - 1))}` : ""}${mk === cur && prev > 0 ? ` · ${tpMonthName(tpMk(-1))} : <b>${tpEur0(prev)}</b>` : ""}${V.late > 0 ? ` · <b class="up">+${tpEur(V.late)}</b> arrivés après la clôture` : ""}</p>
@@ -294,7 +370,7 @@ VIEWS.pourboires = {
       return `${head}<button class="tp-j" data-act="tpRow" data-id="${esc(r.id)}" style="--j:${Math.min(i, 12)}"><span class="tp-ji m-${m}">${ico(r.src === "qr" ? "tpPhone" : r.src === "caisse" ? "tpPos" : TP_METHODS[m][1])}</span><span class="tx"><b>${t}</b><em>${hm(r.at)} · ${s}</em></span><b class="mono">+${tpEur(r.amount)}</b></button>`;
     }).join("");
     const journal = `<section class="glass tp-jr st" style="--i:5">
-      <div class="tp-sh"><span class="h3">${TP.day ? esc(tpCap(new Date(parseDay(TP.day)).toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" }))) : "Derniers pourboires"}</span>${TP.day ? `<button class="btn ghost sm" data-act="tpDay" data-v="${TP.day}">Tout le mois</button>` : ""}</div>
+      <div class="tp-sh"><span class="h3">${TP.day ? esc(tpDayLbl(TP.day)) : "Derniers pourboires"}</span>${TP.day ? `<button class="btn ghost sm" data-act="tpPer" data-v="mois">Tout le mois</button>` : ""}</div>
       ${rowsH || `<div class="tp-empty">${ico("tpJar")}<b>${TP.day ? "Rien ce jour-là" : "La cagnotte est vide"}</b><span>${TP.day ? "Restaurant fermé, ou pourboires pas encore notés." : "Touchez le pourboire en libérant une table, ou ajoutez le bocal du soir avec le +."}</span></div>`}
       ${!TP.all && !TP.day && list.length > shown.length ? `<button class="btn ghost block" data-act="tpAll">Voir les ${list.length} pourboires</button>` : ""}
       ${!F ? `<button class="tp-add" data-act="tpAdd">${ico("plus")}<span>Ajouter un pourboire<em>Bocal à espèces, terminal de carte…</em></span></button>` : ""}
@@ -318,6 +394,13 @@ VIEWS.pourboires = {
       ${nav}<div class="tp-cols"><div class="tp-c1">${hero}${myCard}${journal}</div><div class="tp-c2">${split}${srcs}</div></div></div>`;
   },
   after(v) {
+    const pk = $("#tpPick", v);
+    if (pk && pk.tagName === "INPUT") pk.addEventListener("click", () => { try { pk.showPicker(); } catch (e) {} }); /* a computer opens the calendar on any click, not only on its icon */
+    if (pk) pk.addEventListener("change", () => { const x = pk.value; if (!x) return; const P = TP.per;
+      if (P === "jour" && /^\d{4}-\d{2}-\d{2}$/.test(x) && x <= dayKey()) TP.day = x;
+      else if (P === "mois" && /^\d{4}-\d{2}$/.test(x) && x <= tpMk()) { TP.off = Math.min(0, tpOffOf(x)); TP.day = null; TP.all = false; }
+      else if (P === "annee" && +x > 1999) TP.yr = +x; else return;
+      SFX.tick(); buzz(4); rerender(); });
     /* the totals roll up once per month and per amount (not on every refresh) */
     const big = $(".tp-big", v); if (!big) return; const k = big.dataset.k;
     if (TP.anim === k) return; TP.anim = k;
@@ -351,7 +434,8 @@ function tpAddPaint(first) {
   const i = $("#tpAmt"); const fit = () => { if (i) i.style.width = Math.max(3.2, (i.value || "0,00").length * 0.62 + 0.4) + "em"; }; fit();
   if (i) { i.addEventListener("input", () => { A.v = i.value.replace(/[^\d,.]/g, ""); fit(); const b = $("[data-act=tpAddOk]"); const n2 = num(A.v); if (b) { b.disabled = !(n2 > 0 && n2 <= 5000) || !!TP.months[A.day.slice(0, 7)]; b.innerHTML = `${ico("check")}Ajouter ${n2 > 0 ? tpEur(n2) : ""} à la cagnotte`; } $$(".tp-quick .chip").forEach((c) => c.classList.toggle("on", +c.dataset.v === n2)); }); if (first) setTimeout(() => { try { i.focus(); } catch (e) {} }, 320); }
   const n = $("#tpAddNote"); if (n) n.addEventListener("input", () => { A.note = n.value; });
-  const d = $("#tpAddDay"); if (d) d.addEventListener("change", () => { if (d.value && d.value <= today) { A.day = d.value; tpAddPaint(); } });
+  const d = $("#tpAddDay"); if (d) d.addEventListener("click", () => { try { d.showPicker(); } catch (e) {} });
+  if (d) d.addEventListener("change", () => { if (d.value && d.value <= today) { A.day = d.value; tpAddPaint(); } });
 }
 
 /* the rule editor (gérant) */
@@ -422,7 +506,27 @@ if (typeof ACT.slClose === "function") {
 /* ───────── actions ───────── */
 Object.assign(ACT, {
   tpMonth: (a, id, v) => { const n = Math.min(0, TP.off + +v); if (n === TP.off) return; TP.off = n; TP.day = null; TP.all = false; SFX.tick(); buzz(4); rerender(); },
-  tpDay: (a, id, v) => { TP.day = TP.day === v ? null : v; SFX.tick(); buzz(3); refresh(true); },
+  tpDay: (a, id, v) => { if (TP.per === "jour") { if (TP.day === v) return; TP.day = v; SFX.tick(); buzz(3); rerender(); return; } TP.day = TP.day === v ? null : v; SFX.tick(); buzz(3); refresh(true); },
+  tpPer: (a, id, v) => { if (!TP_PERS.some((x) => x[0] === v)) return; const was = TP.per; if (was === v && !(v === "mois" && TP.day)) return;
+    if (v === "jour") TP.day = TP.off === 0 ? dayKey() : TP.day && TP.day.slice(0, 7) === tpMk(TP.off) ? TP.day : tpRange(tpMk(TP.off))[1];
+    else if (v === "mois") { if (was === "annee") TP.off = TP.yr === new Date().getFullYear() ? 0 : Math.min(0, tpOffOf(`${TP.yr}-12`)); TP.day = null; TP.all = false; }
+    else TP.yr = +tpMk(TP.off).slice(0, 4);
+    TP.per = v; SFX.tick(); buzz(4); rerender(); },
+  tpStep: (a, id, v) => { const d = +v, P = TP.per;
+    if (P === "jour") { const n = addDays(TP.day || dayKey(), d); if (n > dayKey()) return; TP.day = n; }
+    else if (P === "annee") { const n = TP.yr + d; if (n > new Date().getFullYear() || n < 2000) return; TP.yr = n; }
+    else { const n = Math.min(0, TP.off + d); if (n === TP.off) return; TP.off = n; TP.day = null; TP.all = false; }
+    SFX.tick(); buzz(4); rerender(); },
+  tpOpenM: (a, id, v) => { if (!/^\d{4}-\d{2}$/.test(v || "") || v > tpMk()) return; TP.per = "mois"; TP.off = Math.min(0, tpOffOf(v)); TP.day = null; TP.all = false; SFX.tick(); buzz(4); rerender(); },
+  tpCsvY: () => {
+    const y = TP.yr; const people = {}; const mks = Array.from({ length: 12 }, (_, i) => `${y}-${pad(i + 1)}`).filter((k) => tpRowsOf(k).length);
+    mks.forEach((k) => tpView(k).shares.forEach((s) => { (people[s.id] ||= { name: s.name, m: {} }).m[k] = s.amt; }));
+    const rows = [[`Pourboires ${y} · ${S.resto ? S.resto.name : ""}`], [], ["Employé", ...mks.map((k) => tpCap(MONTHS[+k.slice(5) - 1])), "Total (€)"],
+      ...Object.values(people).map((p) => [p.name, ...mks.map((k) => fmt(p.m[k] || 0, 2)), fmt(Object.values(p.m).reduce((a, x) => a + x, 0), 2)]), [],
+      ["Cagnotte", ...mks.map((k) => fmt(tpRowsOf(k).reduce((a, r) => a + +r.amount, 0), 2)), fmt(tpYearRows(y).reduce((a, r) => a + +r.amount, 0), 2)]];
+    const slug = (S.resto?.name || "resto").normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/gi, "-").toLowerCase();
+    SFX.tap(); saveCsv(`pourboires-${slug}-${y}.csv`, rows);
+  },
   tpAll: () => { TP.all = true; SFX.tap(); refresh(true); },
   tpRow: (a, id) => { const r = (TP.rows || []).find((x) => x.id === id); if (!r) return; SFX.sheet ? SFX.sheet() : SFX.tap(); tpRowSheet(r); },
   tpDel: async (a, id) => {
@@ -431,7 +535,7 @@ Object.assign(ACT, {
     S.ui.undo = () => DB.set("tips", id, doc); toastUndo(`Pourboire de ${tpEur(r.amount)} retiré`);
     if (typeof logEvent === "function") try { logEvent("pourboires", `a retiré un pourboire de ${tpEur(r.amount)} (${tpLabel(r)[0].replace(/&[^;]+;/g, "")})`); } catch (e) {}
   },
-  tpAdd: () => { SFX.sheet ? SFX.sheet() : SFX.tap(); TP.add = { v: "", method: "especes", day: TP.off === 0 ? dayKey() : tpRange(tpMk(TP.off))[1], sv: new Date().getHours() < 16 ? "midi" : "soir", note: "" }; tpAddPaint(true); },
+  tpAdd: () => { SFX.sheet ? SFX.sheet() : SFX.tap(); TP.add = { v: "", method: "especes", day: TP.per === "jour" && TP.day ? TP.day : TP.per === "annee" ? (TP.yr === new Date().getFullYear() ? dayKey() : `${TP.yr}-12-31`) : TP.off === 0 ? dayKey() : tpRange(tpMk(TP.off))[1], sv: new Date().getHours() < 16 ? "midi" : "soir", note: "" }; tpAddPaint(true); },
   tpAddQ: (a, id, v) => { TP.add.v = String(v); SFX.tick(); tpAddPaint(); },
   tpAddM: (a, id, v) => { TP.add.method = v; SFX.tick(); tpAddPaint(); },
   tpAddD: (a, id, v) => { TP.add.day = v; SFX.tick(); tpAddPaint(); },
@@ -441,7 +545,8 @@ Object.assign(ACT, {
     const d = parseDay(A.day); if (A.day === dayKey()) d.setTime(Date.now()); else d.setHours(A.sv === "midi" ? 15 : 23, 0, 0, 0);
     closeSheet(); SFX.done ? SFX.done() : SFX.ok(); buzz([10, 30, 10]);
     await safe(DB.add("tips", { at: d.getTime(), day: A.day, amount: amt, method: A.method, src: "bocal", service: A.sv, note: (A.note || "").trim().slice(0, 60), uid: S.me.id, by: (typeof esActorName === "function" && esActorName()) || S.me.name || "" }));
-    if (A.day.slice(0, 7) !== tpMk(TP.off)) { TP.off = Math.min(0, (+A.day.slice(0, 4) - new Date().getFullYear()) * 12 + +A.day.slice(5, 7) - 1 - new Date().getMonth()); }
+    if (A.day.slice(0, 7) !== tpMk(TP.off)) TP.off = Math.min(0, tpOffOf(A.day.slice(0, 7)));
+    if (TP.per === "jour") TP.day = A.day; else if (TP.per === "annee") TP.yr = +A.day.slice(0, 4);
     toast(`${tpEur(amt)} ajoutés à la cagnotte`); try { burst(); } catch (e) {}
     if (typeof logEvent === "function") try { logEvent("pourboires", `a ajouté ${tpEur(amt)} de pourboires (${TP_METHODS[A.method][0].toLowerCase()})`); } catch (e) {}
   },
