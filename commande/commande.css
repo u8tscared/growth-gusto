@@ -438,3 +438,15 @@ html:not([data-acc="violet"]) .qm-k,html:not([data-acc="violet"]) .qm-hn p{color
 [data-look="elegant"] .qm-it-ph:not(:has(img)){order:5;width:auto;height:auto;background:none}
 [data-look="elegant"].noph .qm-it-ph{order:5;width:auto;height:auto;margin-top:2px}
 [data-look="elegant"].noph .qm-add,[data-look="elegant"].noph .qm-step{position:static;transform:none}
+
+/* « Comment c'était ? » after the meal: each star opens the avis/ page with that note */
+.qm-av{display:flex;flex-direction:column;align-items:center;gap:4px;text-align:center;background:var(--saffron-tint);border-radius:22px;padding:16px 14px 12px;animation:qmAvIn .6s .2s cubic-bezier(.3,1.3,.5,1) both}
+.qm-av b{font-family:var(--d);font-size:19px;font-weight:760;letter-spacing:-.025em;color:var(--ink)}
+.qm-av span{font-size:13.5px;color:var(--saffron-ink)}
+.qm-av-s{display:flex;gap:4px;margin-top:6px}
+.qm-av-s a{width:50px;height:50px;display:grid;place-items:center;border-radius:14px;color:var(--saffron);transition:transform .25s var(--spring);animation:qmAvStar .5s calc(.3s + var(--i) * 60ms) var(--spring) both}
+.qm-av-s a svg{width:40px;height:40px;fill:currentColor;stroke:none;filter:drop-shadow(0 3px 0 var(--saffron-edge))}
+.qm-av-s a:active{transform:scale(.85)}
+@media (hover:hover){.qm-av-s:hover a{color:var(--saffron)}.qm-av-s a:hover~a{color:#E6D7B5}}
+@keyframes qmAvIn{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+@keyframes qmAvStar{from{opacity:0;transform:scale(.5) rotate(-25deg)}to{opacity:1;transform:none}}

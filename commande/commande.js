@@ -397,10 +397,20 @@
         <div class="qm-tk-l">${(o.items || []).map((x) => `<div><span><b>${x.q}×</b> ${esc(x.name)}${x.note ? `<em>${esc(x.note)}</em>` : ""}</span><span class="mono">${eur(x.price * x.q)}</span></div>`).join("")}</div>
         <div class="qm-tk-t"><span>Total</span><b class="mono">${eur(o.total)}</b></div>
         <div class="qm-tk-s ${o.paid ? "ok" : ""}">${o.paid ? `${svg.check}Payé en ligne` : o.pay === "stripe" && o.status === "apayer" ? "Paiement en cours" : take ? "À régler au retrait" : "À régler sur place"}</div></div>
-      ${o.status === "abandonnee" || o.status === "servie" || (take && o.status === "prete") ? `<button class="qm-btn" data-a="again">Nouvelle commande</button>` : ""}
+      ${avisCard(o, take)}
+      ${o.status === "abandonnee" || o.status === "servie" || (take && o.status === "prete") ? `<button class="qm-btn${o.status === "abandonnee" ? "" : " soft"}" data-a="again">Nouvelle commande</button>` : ""}
       ${o.status === "apayer" && o.payUrl ? `<a class="qm-btn" href="${esc(o.payUrl)}">${svg.lock}Reprendre le paiement</a>` : ""}
       ${p.phone ? `<a class="qm-link" href="tel:${esc(String(p.phone).replace(/[^\d+]/g, ""))}">Une question ? ${esc(p.phone)}</a>` : ""}
     </section>${foot()}`;
+  }
+  /* « Comment c'était ? » once the order is served (or ready to take away): each star opens the avis/ page with that note picked
+     (functions/src/avisclient.js checks the order's private key; the restaurant hears at once about a note of 3 or less) */
+  function avisCard(o, take) {
+    if (!(o.status === "servie" || (take && o.status === "prete"))) return "";
+    const q = DEMO ? "?r=demo" : st.oid && st.okey ? `?r=${encodeURIComponent(RID)}&o=${encodeURIComponent(st.oid)}&k=${encodeURIComponent(st.okey)}` : ""; if (!q) return "";
+    const star = '<svg viewBox="0 0 24 24"><path d="m12 2.6 2.9 5.9 6.5.95-4.7 4.6 1.1 6.45L12 17.45l-5.8 3.05 1.1-6.45-4.7-4.6 6.5-.95z"/></svg>';
+    return `<div class="qm-av"><b>${take ? "Comment c'était ?" : "Vous avez terminé ? Comment c'était ?"}</b><span>Touchez une étoile, c'est fait en dix secondes.</span>
+      <div class="qm-av-s">${[1, 2, 3, 4, 5].map((n) => `<a href="../avis/${q}&n=${n}" aria-label="${n} sur 5" style="--i:${n}">${star}</a>`).join("")}</div></div>`;
   }
   async function poll(first) {
     clearTimeout(st.pollT);
