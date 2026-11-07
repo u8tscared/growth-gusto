@@ -561,3 +561,23 @@ html:not([data-acc="violet"]) .qm-k,html:not([data-acc="violet"]) .qm-hn p{color
 @media (hover:hover){.qm-av-s:hover a{color:var(--saffron)}.qm-av-s a:hover~a{color:#E6D7B5}}
 @keyframes qmAvIn{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
 @keyframes qmAvStar{from{opacity:0;transform:scale(.5) rotate(-25deg)}to{opacity:1;transform:none}}
+/* ───────── l'addition plat par plat (2026-11-07) : chacun touche ses plats, ce qui est payé est coché pour tous ───────── */
+.qm-still *{animation:none!important}
+.qm-pd{display:inline-flex;align-items:center;gap:3px;margin-left:7px;padding:1px 7px;border-radius:99px;background:var(--ok-tint);color:var(--ok);font-style:normal;font-size:11.5px;font-weight:800;vertical-align:.1em;white-space:nowrap}
+.qm-pd svg{width:12px;height:12px;stroke-width:3}.qm-pd.hold{background:var(--saffron-tint);color:var(--saffron-ink)}
+.qm-tk-l .pdl{color:var(--muted)}.qm-tk-l .pdl .mono{text-decoration:line-through;text-decoration-thickness:2px;text-decoration-color:color-mix(in srgb,var(--ok) 50%,transparent)}
+.qm-ticket.pick .qm-tk-l{gap:6px;padding:14px 10px 6px}
+.qm-pk{display:flex;flex-direction:column;border-radius:14px;transition:background .2s,box-shadow .2s}
+.qm-pk>.qm-pkb,.qm-pk.off{all:unset;box-sizing:border-box;width:100%;display:flex;align-items:center;gap:10px;padding:10px 8px;font-size:14.5px;cursor:pointer;border-radius:14px;-webkit-tap-highlight-color:transparent}
+.qm-pk.off{cursor:default;color:var(--muted);padding:10px 8px}
+.qm-pk span:nth-of-type(1){flex:1;min-width:0}
+.qm-pk.on{background:var(--tint);box-shadow:0 0 0 1.5px color-mix(in srgb,var(--accent) 35%,transparent) inset}
+.qm-ck{flex:none;width:24px;height:24px;border-radius:8px;display:grid;place-items:center;box-shadow:0 0 0 1.5px var(--rim-2) inset;color:transparent;transition:background .2s,transform .25s var(--spring,ease-out)}
+.qm-ck svg{width:15px;height:15px;stroke-width:3}.qm-ck b{font-size:12.5px;color:#fff!important}
+.qm-pk.on .qm-ck{background:var(--accent,#5B2BFF);box-shadow:none;color:#fff;transform:scale(1.06)}
+.qm-pk.off .qm-ck{background:var(--ok-tint);box-shadow:none;color:var(--ok)}
+.qm-pkb:active .qm-ck{transform:scale(.9)}
+.qm-pkq{display:flex;align-items:center;gap:10px;padding:0 8px 10px 42px;font-size:13.5px;font-weight:650;color:var(--ink-2)}
+.qm-pkq em{font-style:normal;color:var(--muted)}
+.qm-pkh{margin:0;text-align:center;font-size:14.5px;font-weight:650;color:var(--ink-2)}
+.qm-lnk{all:unset;cursor:pointer;margin-left:6px;color:var(--accent-ink);text-decoration:underline;text-underline-offset:3px;font-weight:700}

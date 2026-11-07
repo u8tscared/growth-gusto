@@ -76,7 +76,7 @@ function slWatch() {
   if (SL.rid === S.rid) return; SL.rid = S.rid; SL.tabs = null; SL.stockSeen = null; SL.st = new Map(); SL.stInit = false; SL.mine = new Set();
   const rid = S.rid;
   if (DB.mode === "demo") slSeedDemo();
-  DB.watch("salleTabs", { order: "openedAt", dir: "desc", limit: 300 }, (rows) => { if (S.rid !== rid) return; SL.tabs = rows; slStockSync(); onData(); });
+  DB.watch("salleTabs", { order: "openedAt", dir: "desc", limit: 300 }, (rows) => { if (S.rid !== rid) return; SL.tabs = rows; slStockSync(); onData(); slBillLive(); });
   try { localStorage.setItem("gg-sl-on-" + rid, "1"); } catch (e) {}
 }
 /* a waiter who already uses this screen keeps getting « c'est prêt » on any screen after a restart */
@@ -517,31 +517,86 @@ function slItemPaint(first) {
   const html = `<div class="sl-sh ed m-${e.mode}">${head}${body}</div>`;
   const cur = $(".sl-sh.ed"); if (cur && !first) { cur.outerHTML = html; } else openSheet(html);
 }
+/* ───────── payer plat par plat (2026-11-07) ─────────
+   Chaque client peut régler ses plats. Une ligne payante de l'addition = un plat à un prix (clé « rk » = nom|prix unitaire, la même que
+   functions/src/commande.js billOf). Ce qui est payé :
+     - à la caisse, noté par l'équipe : salleTabs/{id}.parts [{ id, at, by, byName, how: cb|especes|tr|autre, amount, lines:[{ rk, q }], tip? }]
+     - en ligne par le client (QR de l'écran client) : billPays/{id}.lines [{ rk, q }] (serveur seul) ; « apayer » de moins de 31 min = plats retenus
+   Le reste à payer = total − parts − paiements en ligne, pour tout le monde (feuille du serveur, écran client, page du client), en direct. */
+const SL_HOLD = 31 * 6e4;
+const slR2 = (v) => Math.round((+v || 0) * 100) / 100;
+const slRk = (name, u) => `${String(name || "").trim().slice(0, 80)}|${slR2(u).toFixed(2)}`;
+const SL_HOW = [["cb", "Carte"], ["especes", "Espèces"], ["tr", "Titre-resto"], ["autre", "Autre"]];
+const slHowT = (k) => (SL_HOW.find((h) => h[0] === k) || [0, "Payé"])[1];
+const slOnlinePays = (tabId) => (typeof AP !== "undefined" && Array.isArray(AP.pays) ? AP.pays : []).filter((p) => p.tabId === tabId);
+const slPartsPaid = (tab) => slR2((tab.parts || []).reduce((a, p) => a + (+p.amount || 0), 0));
+const slOnlinePaid = (tab) => slR2(slOnlinePays(tab.id).filter((p) => p.status === "paye").reduce((a, p) => a + (+p.amount || 0), 0));
+const slPaidAll = (tab) => slR2(slPartsPaid(tab) + slOnlinePaid(tab));
+const slBillLeft = (tab) => Math.max(0, slR2(slTotal(slItemsOk(tab)) - slPaidAll(tab)));
+function slBillRows(tab) {
+  const P = new Map(), add = (L, f) => (Array.isArray(L) ? L : []).forEach((l) => { if (!l || !l.rk) return; const a = P.get(l.rk) || { paid: 0, hold: 0 }; a[f] += Math.max(0, Math.floor(+l.q || 0)); P.set(l.rk, a); });
+  (tab.parts || []).forEach((p) => add(p.lines, "paid"));
+  const now = Date.now();
+  slOnlinePays(tab.id).forEach((p) => { if (p.status === "paye") add(p.lines, "paid"); else if (p.status === "apayer" && now - (p.at || 0) < SL_HOLD) add(p.lines, "hold"); });
+  const agg = new Map(), free = new Map();
+  slItemsOk(tab).forEach((x) => {
+    const q = Math.max(0, Math.floor(+x.q || 0)); if (!q) return; const M = x.free ? free : agg, u = x.free ? 0 : slR2(slUnit(x)), k = x.free ? "f|" + slRk(x.name, 0) : slRk(x.name, u);
+    const a = M.get(k) || { rk: k, name: x.name, u, free: !!x.free, extras: [], q: 0 }; a.q += q; (x.extras || []).forEach((e) => { if (e && e.t && !a.extras.includes(e.t)) a.extras.push(e.t); }); M.set(k, a);
+  });
+  const rows = [...agg.values()].map((a) => { const p = P.get(a.rk) || { paid: 0, hold: 0 }, paid = Math.min(a.q, p.paid), hold = Math.min(a.q - paid, p.hold); return { ...a, paid, hold, left: a.q - paid - hold }; });
+  return { rows, free: [...free.values()] };
+}
+/* what changes the bill for everyone: lines, parts, online payments */
+const slPaySig = (tab) => JSON.stringify([slTotal(slItemsOk(tab)), (tab.parts || []).map((p) => p.id), slOnlinePays(tab.id).map((p) => p.id + p.status), tab.status]);
 function slBillSheet(tab) {
-  SL.bill = SL.bill && SL.bill.tab === tab.id ? SL.bill : { tab: tab.id, mode: "tout", n: Math.max(1, +tab.covers || 1), sel: [] };
+  SL.bill = SL.bill && SL.bill.tab === tab.id ? SL.bill : { tab: tab.id, mode: (tab.parts || []).length ? "plats" : "tout", n: Math.max(1, +tab.covers || 1), sel: {}, how: "cb" };
   slBillPaint(true);
 }
 function slBillPaint(first) {
   const b = SL.bill, tab = slTabOf(b.tab); if (!tab) { closeSheet(); return; }
-  const items = slItemsOk(tab), agg = new Map();
-  items.forEach((x) => { const k = [x.name, slUnit(x), x.free ? 1 : 0, (x.extras || []).map((e) => e.t).join("+")].join("|"); const a = agg.get(k) || { k, name: x.name, unit: slUnit(x), free: !!x.free, extras: x.extras || [], q: 0 }; a.q += +x.q || 0; agg.set(k, a); });
-  const rows = [...agg.values()], tot = slTotal(items), cov = +tab.covers || 0, held = slTickets(tab.id).filter((o) => o.status === "attente").length, cook = slTickets(tab.id).filter((o) => ["nouvelle", "prep", "prete"].includes(o.status)).length;
-  const freeRows = rows.filter((a) => a.free), paid = rows.filter((a) => !a.free), sel = new Set(b.sel), selT = paid.filter((a) => sel.has(a.k)).reduce((s, a) => s + a.unit * a.q, 0);
-  const line = (a, pick) => `<div class="${pick ? "pick" + (sel.has(a.k) ? " on" : "") : ""}"${pick ? ` data-act="slBillPick" data-v="${esc(a.k)}" role="button"` : ""}>${pick ? `<i class="sl-ck">${ico("check")}</i>` : ""}<b class="mono">${a.q}</b><span>${esc(a.name)}${a.extras.length ? `<small>${esc(a.extras.map((e) => "+ " + e.t).join(", "))}</small>` : ""}</span><em class="mono">${a.free ? "0,00 €" : slEur(a.unit * a.q)}</em></div>`;
-  const seg = `<div class="sl-segs sm">${[["tout", "Tout"], ["pers", "Par personne"], ["plats", "Au détail"]].map(([k, t]) => `<button class="${b.mode === k ? "on" : ""}" data-act="slBillMode" data-v="${k}">${t}</button>`).join("")}</div>`;
-  const split = b.mode === "pers" ? `<div class="sl-split"><span>En</span><div class="cm-step"><button data-act="slBillN" data-v="-1" aria-label="Moins">${ico("minus")}</button><b class="mono">${b.n}</b><button data-act="slBillN" data-v="1" aria-label="Plus">${ico("plus")}</button></div><span>parts de</span><b class="mono sl-big">${slEur(Math.ceil((tot / b.n) * 100) / 100)}</b></div>`
-    : b.mode === "plats" ? `<div class="sl-split"><span>Sélection</span><b class="mono sl-big">${slEur(selT)}</b>${sel.size ? `<button class="btn ghost sm" data-act="slBillClear">Effacer</button>` : `<em>Touchez ce que règle ce client</em>`}</div>` : "";
+  if (!b.sel || Array.isArray(b.sel)) b.sel = {};
+  const { rows, free: freeRows } = slBillRows(tab), items = slItemsOk(tab), tot = slTotal(items), cov = +tab.covers || 0;
+  const held = slTickets(tab.id).filter((o) => o.status === "attente").length, cook = slTickets(tab.id).filter((o) => ["nouvelle", "prep", "prete"].includes(o.status)).length;
+  rows.forEach((a) => { if ((b.sel[a.rk] || 0) > a.left) b.sel[a.rk] = a.left; if (!b.sel[a.rk]) delete b.sel[a.rk]; });
+  Object.keys(b.sel).forEach((k) => { if (!rows.some((a) => a.rk === k)) delete b.sel[k]; });
+  const paidAll = slPaidAll(tab), left = slBillLeft(tab), selN = Object.values(b.sel).reduce((s, q) => s + q, 0);
+  const selT = Math.min(left, slR2(rows.reduce((s, a) => s + a.u * (b.sel[a.rk] || 0), 0)));
+  const pick = b.mode === "plats" && left > 0.004;
+  b.sig = slPaySig(tab);
+  const line = (a, can) => {
+    const s = b.sel[a.rk] || 0, done = !a.free && a.left <= 0 && !a.hold, cls = [can && a.left > 0 ? "pick" : "", s ? "on" : "", done ? "done" : ""].filter(Boolean).join(" ");
+    const tag = a.free ? "" : [a.paid ? `<i class="sl-pd">${ico("check")}${a.paid === a.q ? "Payé" : `${a.paid} payé${a.paid > 1 ? "s" : ""}`}</i>` : "", a.hold ? `<i class="sl-pd hold">${a.hold} en cours en ligne</i>` : ""].join("");
+    return `<div class="${cls}"${can && a.left > 0 ? ` data-act="slBillPick" data-v="${esc(a.rk)}" role="button" aria-pressed="${!!s}"` : ""}>${can ? `<i class="sl-ck">${s && a.q > 1 ? `<b class="mono">${s}</b>` : ico("check")}</i>` : ""}<b class="mono">${s && a.q > 1 ? `${s}/${a.left}` : a.q}</b><span>${esc(a.name)}${a.extras.length ? `<small>${esc(a.extras.map((e) => "+ " + e).join(", "))}</small>` : ""}${tag}</span>${can && s && a.left > 1 ? `<button class="sl-bm" data-act="slBillLess" data-v="${esc(a.rk)}" aria-label="Un de moins">${ico("minus")}</button>` : ""}<em class="mono">${a.free ? "0,00 €" : slEur(a.u * (s && a.q > 1 ? s : a.q))}</em></div>`;
+  };
+  const seg = `<div class="sl-segs sm">${[["tout", "Tout"], ["pers", "Par personne"], ["plats", "Plat par plat"]].map(([k, t]) => `<button class="${b.mode === k ? "on" : ""}" data-act="slBillMode" data-v="${k}">${t}</button>`).join("")}</div>`;
+  const base = paidAll > 0 ? left : tot;
+  const split = left <= 0.004 && tot > 0 ? `<div class="sl-split ok">${ico("check")}<span>Tout est réglé</span><em>Libérez la table quand les clients partent.</em></div>`
+    : b.mode === "pers" ? `<div class="sl-split"><span>${paidAll > 0 ? "Le reste en" : "En"}</span><div class="cm-step"><button data-act="slBillN" data-v="-1" aria-label="Moins">${ico("minus")}</button><b class="mono">${b.n}</b><button data-act="slBillN" data-v="1" aria-label="Plus">${ico("plus")}</button></div><span>parts de</span><b class="mono sl-big">${slEur(Math.ceil((base / b.n) * 100) / 100)}</b></div>`
+    : b.mode === "plats" ? `<div class="sl-split"><span>Ce client règle</span><b class="mono sl-big">${slEur(selT)}</b>${selN ? `<button class="btn ghost sm" data-act="slBillClear">Effacer</button>` : `<em>Touchez ses plats</em>`}</div>
+      ${selN ? `<div class="sl-how">${SL_HOW.map(([k, t]) => `<button class="chip${b.how === k ? " on" : ""}" data-act="slBillHow" data-v="${k}">${t}</button>`).join("")}</div>
+      <button class="btn acc block sl-partb" data-act="slBillPart">${ico("check")}Payé · ${selN} plat${selN > 1 ? "s" : ""} · ${slEur(selT)}</button>` : ""}` : "";
+  const parts = [...(tab.parts || []).map((p) => ({ ...p, k: "salle" })), ...slOnlinePays(tab.id).filter((p) => p.status === "paye").map((p) => ({ ...p, k: "ligne" }))].sort((x, y) => (x.at || 0) - (y.at || 0));
+  const partsH = parts.length ? `<div class="sl-parts"><div class="lbl">Déjà réglé</div>${parts.map((p) => { const n = (p.lines || []).reduce((s, l) => s + (+l.q || 0), 0);
+    return `<div class="sl-part"><span class="sl-pi">${ico(p.k === "ligne" ? "check" : "slBill")}</span><span class="sl-pt"><b>${p.k === "ligne" ? "En ligne, par le client" : slHowT(p.how)}${n ? ` · ${n} plat${n > 1 ? "s" : ""}` : ""}</b><em>${hm(p.paidAt || p.at)}${p.byName ? ` · ${esc(firstName(p.byName))}` : ""}${+p.tip > 0 ? ` · pourboire ${slEur(p.tip)}` : ""}</em></span><b class="mono">${slEur(p.amount)}</b>${p.k === "salle" ? `<button class="iconbtn sm" data-act="slBillUnpart" data-v="${esc(p.id)}" aria-label="Annuler ce paiement">${ico("x")}</button>` : ""}</div>`; }).join("")}</div>` : "";
   const html = `<div class="sl-sh bill"><div class="sl-shh"><span class="h2">Addition · Table ${esc(tab.table)}</span><button class="iconbtn" data-act="sheetClose" aria-label="Fermer">${ico("x")}</button></div>
     ${seg}
-    <div class="sl-bill">${paid.map((a) => line(a, b.mode === "plats")).join("")}
+    <div class="sl-bill">${rows.map((a) => line(a, pick)).join("")}
       ${freeRows.length ? `<div class="sl-bgrp">${ico("slGift")}Offert</div>${freeRows.map((a) => line(a, false)).join("")}` : ""}
-      <div class="sl-btot"><span>Total TTC</span><b class="mono">${slEur(tot)}</b></div>${cov ? `<p>${cov} couvert${cov > 1 ? "s" : ""} · ${slEur(tot / cov)} par personne</p>` : ""}</div>
-    ${split}
-    <div class="sl-bk">${ico("slBill")}<span>Encaissez sur votre caisse habituelle : c'est elle qui édite la note et le ticket.${freeRows.length ? " Passez les plats offerts en « offert » sur la caisse." : ""}</span></div>
+      <div class="sl-btot"><span>Total TTC</span><b class="mono">${slEur(tot)}</b></div>
+      ${paidAll > 0 ? `<div class="sl-btot paid"><span>Déjà réglé</span><b class="mono">− ${slEur(paidAll)}</b></div><div class="sl-btot left"><span>Reste à payer</span><b class="mono">${slEur(left)}</b></div>` : cov ? `<p>${cov} couvert${cov > 1 ? "s" : ""} · ${slEur(tot / cov)} par personne</p>` : ""}</div>
+    ${split}${partsH}
+    <div class="sl-bk">${ico("slBill")}<span>Encaissez sur votre caisse habituelle : c'est elle qui édite la note et le ticket.${b.mode === "plats" ? " Ici, vous notez qui a payé quoi : le reste se met à jour pour toute la table, sur l'écran client et sur le téléphone des clients." : ""}${freeRows.length ? " Passez les plats offerts en « offert » sur la caisse." : ""}</span></div>
     ${held || cook ? `<div class="sl-clash">${ico("slWarn")}<span>${held ? `${held} suite${held > 1 ? "s" : ""} pas encore envoyée${held > 1 ? "s" : ""} : elle${held > 1 ? "s" : ""} sera annulée${held > 1 ? "s" : ""} en cuisine.` : `Un bon est encore en cuisine.`}</span></div>` : ""}
     <button class="btn acc block" data-act="slClose">${ico("check")}Table réglée, libérer la table</button>
   </div>`;
   const cur = $(".sl-sh.bill"); if (cur && !first) cur.outerHTML = html; else openSheet(html);
+}
+/* a payment lands (the waiter's colleague, the customer's phone): the open bill follows, without stealing a field being typed in */
+function slBillLive() {
+  const b = SL.bill, sh = document.querySelector(".sl-sh.bill"); if (!b || !sh) return;
+  const tab = slTabOf(b.tab); if (!tab || slPaySig(tab) === b.sig) return;
+  const a = document.activeElement; if (a && sh.contains(a) && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)) { clearTimeout(SL.billT); SL.billT = setTimeout(slBillLive, 1500); return; }
+  const sc = $("#sheetBody"), y = sc ? sc.scrollTop : 0; slBillPaint(false); if (sc) sc.scrollTop = y;
 }
 
 /* ───────── kitchen tickets ───────── */
@@ -909,8 +964,34 @@ Object.assign(ACT, {
   slBill: () => { const tab = slCurTab(); if (!tab) return; SFX.sheet ? SFX.sheet() : SFX.tap(); SL.bill = null; slBillSheet(tab); },
   slBillMode: (a, id, v) => { SL.bill.mode = v; SFX.tick(); slBillPaint(); },
   slBillN: (a, id, v) => { SL.bill.n = Math.max(1, Math.min(30, SL.bill.n + +v)); SFX.tick(); slBillPaint(); },
-  slBillPick: (a, id, v) => { const s = SL.bill.sel, i = s.indexOf(v); i >= 0 ? s.splice(i, 1) : s.push(v); SFX.tick(); buzz(3); slBillPaint(); },
-  slBillClear: () => { SL.bill.sel = []; SFX.tap(); slBillPaint(); },
+  /* plat par plat: a tap adds one more of that dish, up to what is left to pay, then back to none */
+  slBillPick: (a, id, v) => { const tab = slTabOf(SL.bill.tab), row = tab && slBillRows(tab).rows.find((r) => r.rk === v); if (!row) return; const s = SL.bill.sel, n = (s[v] || 0) + 1; if (n > row.left) delete s[v]; else s[v] = n; SFX.tick(); buzz(3); slBillPaint(); },
+  slBillLess: (a, id, v) => { const s = SL.bill.sel; s[v] = (s[v] || 0) - 1; if (s[v] <= 0) delete s[v]; SFX.tick(); buzz(3); slBillPaint(); },
+  slBillClear: () => { SL.bill.sel = {}; SFX.tap(); slBillPaint(); },
+  slBillHow: (a, id, v) => { SL.bill.how = v; SFX.tick(); slBillPaint(); },
+  slBillPart: async (a) => {
+    const b = SL.bill, tab = b && slTabOf(b.tab); if (!tab || a.disabled) return;
+    const { rows } = slBillRows(tab), lines = rows.filter((r) => (b.sel[r.rk] || 0) > 0).map((r) => ({ rk: r.rk, q: Math.min(r.left, b.sel[r.rk]) })).filter((l) => l.q > 0); if (!lines.length) return;
+    const amount = Math.min(slBillLeft(tab), slR2(lines.reduce((s, l) => s + rows.find((r) => r.rk === l.rk).u * l.q, 0)));
+    const id = "p" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), who = (typeof esActorName === "function" && esActorName()) || S.me.name || "";
+    const tip = typeof tpTakeBillTip === "function" ? await tpTakeBillTip(tab, id) : 0;
+    const part = { id, at: Date.now(), by: S.me.id, byName: who, how: b.how || "cb", amount, lines, ...(tip ? { tip } : {}) };
+    a.disabled = true; tab.parts = [...(tab.parts || []), part]; b.sel = {};
+    try { await safe(DB.update("salleTabs", tab.id, { parts: tab.parts, updatedAt: Date.now() })); } catch (e) { a.disabled = false; return; }
+    SFX.ok(); buzz([10, 30, 10]); slBillPaint(false);
+    logEvent && logEvent("salle", `a noté ${slEur(amount)} réglés (${slHowT(part.how).toLowerCase()}) pour ${lines.reduce((s, l) => s + l.q, 0)} plat(s), table ${tab.table}`, { ref: tab.id, k: "part", amt: amount });
+    const left = slBillLeft(tab);
+    S.ui.undo = async () => { const t = slTabOf(tab.id); if (!t) return; await DB.update("salleTabs", t.id, { parts: (t.parts || []).filter((p) => p.id !== id), updatedAt: Date.now() }); if (tip && typeof tpDropBillTip === "function") tpDropBillTip(id); };
+    toastUndo(left > 0.004 ? `${slEur(amount)} réglés · reste ${slEur(left)}` : `${slEur(amount)} réglés · tout est payé`);
+  },
+  slBillUnpart: async (a, id, v) => {
+    const b = SL.bill, tab = b && slTabOf(b.tab); if (!tab) return; const p = (tab.parts || []).find((x) => x.id === v); if (!p) return;
+    tab.parts = (tab.parts || []).filter((x) => x.id !== v); SFX.tap();
+    await safe(DB.update("salleTabs", tab.id, { parts: tab.parts, updatedAt: Date.now() }));
+    if (+p.tip > 0 && typeof tpDropBillTip === "function") tpDropBillTip(p.id);
+    logEvent && logEvent("salle", `a annulé un paiement de ${slEur(p.amount)} (table ${tab.table})`, { ref: tab.id, k: "part-annul", amt: p.amount });
+    slBillPaint(false); toast(`Paiement de ${slEur(p.amount)} annulé`);
+  },
   slClose: async () => {
     const tab = slCurTab(); if (!tab) return;
     for (const o of slTickets(tab.id)) { if (o.status === "attente") await safe(DB.update("clientOrders", o.id, { status: "annulee", cancelledAt: Date.now(), cancelledBy: S.me.id })); }

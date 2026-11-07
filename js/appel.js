@@ -200,8 +200,9 @@ function apState(scr) {
   if (scr.show === "bill" && scr.tabId) {
     const tab = typeof slTabOf === "function" ? slTabOf(scr.tabId) : null;
     if (tab && tab.status === "open") {
-      const items = slItemsOk(tab), total = slTotal(items), paid = apPaidOf(tab.id), left = Math.max(0, Math.round((total - paid) * 100) / 100);
-      if (total > 0 && left <= 0.004) return { k: "merci", tab, paid, at: Math.max(...apPaysOf(tab.id).map((p) => p.paidAt || p.at || 0)) };
+      /* paid = online (billPays) + noted by the team dish by dish (salleTabs.parts, js/salle.js) */
+      const items = slItemsOk(tab), total = slTotal(items), paid = typeof slPaidAll === "function" ? slPaidAll(tab) : apPaidOf(tab.id), left = Math.max(0, Math.round((total - paid) * 100) / 100);
+      if (total > 0 && left <= 0.004) return { k: "merci", tab, paid, at: Math.max(0, ...apPaysOf(tab.id).map((p) => p.paidAt || p.at || 0), ...(tab.parts || []).map((p) => p.at || 0)) };
       return { k: "bill", tab, items, total, paid, left };
     }
     if (tab && now - (tab.closedAt || scr.at || 0) < 90e3) return { k: "merci", tab, paid: apPaidOf(tab.id), at: tab.closedAt || scr.at };
@@ -225,18 +226,18 @@ function apIdle() {
     </div></div>`;
 }
 function apBillD(st, scr) {
-  const { tab, items, total, paid, left } = st, agg = new Map();
-  items.forEach((x) => { const u = slUnit(x), k = [x.name, u, x.free ? 1 : 0].join("|"); const a = agg.get(k) || { name: x.name, u, free: !!x.free, q: 0 }; a.q += +x.q || 0; agg.set(k, a); });
-  const rows = [...agg.values()], split = +scr.split > 1 ? +scr.split : 0, part = split ? Math.ceil((total / split) * 100) / 100 : 0;
+  const { tab, total, paid, left } = st;
+  /* the same rows as the waiter's bill: a dish someone already paid is ticked, the rest is what is left */
+  const R = slBillRows(tab), rows = [...R.rows, ...R.free], split = +scr.split > 1 ? +scr.split : 0, part = split ? Math.ceil((total / split) * 100) / 100 : 0;
   const online = apOnline(), rv = apReview(), cov = +tab.covers || 0;
   const pay = online ? `<div class="ap-pay"><span class="ap-k">${ico("apPhone")}Payer avec votre téléphone</span><div class="ap-qr big">${apQr(apPayUrl(tab, scr))}</div>
-      <p>Scannez, puis Apple Pay, Google Pay ou carte.${split ? ` Chacun peut payer sa part.` : ""}</p></div>`
+      <p>Scannez, choisissez vos plats ou payez tout : Apple Pay, Google Pay ou carte.</p></div>`
     : `<div class="ap-pay off"><span class="ap-k">${ico("cmCard")}Votre serveur arrive</span><p class="ap-big">Carte, espèces ou titre-restaurant</p></div>`;
   return `<div class="ap-d bill">
     <div class="ap-bl"><div class="ap-bh"><span class="ap-k">Votre addition</span><h1>Table ${esc(tab.table)}</h1>${cov ? `<em>${cov} couvert${cov > 1 ? "s" : ""}</em>` : ""}</div>
-      <div class="ap-lines">${rows.map((a, i) => `<div style="--i:${i}"><b class="mono">${a.q}</b><span>${esc(a.name)}</span><em class="mono">${a.free ? "offert" : apEur(a.u * a.q)}</em></div>`).join("")}</div>
+      <div class="ap-lines">${rows.map((a, i) => `<div class="${!a.free && a.paid >= a.q ? "pd" : ""}" style="--i:${i}"><b class="mono">${a.q}</b><span>${esc(a.name)}${!a.free && a.paid ? `<i>${ico("check")}${a.paid >= a.q ? "payé" : `${a.paid} payé${a.paid > 1 ? "s" : ""}`}</i>` : ""}</span><em class="mono">${a.free ? "offert" : apEur(a.u * a.q)}</em></div>`).join("")}</div>
       <div class="ap-tot"><span>Total</span><b class="mono">${apEur(total)}</b></div>
-      ${paid ? `<div class="ap-paid"><span>${ico("check")}Déjà payé en ligne</span><b class="mono">− ${apEur(paid)}</b></div><div class="ap-tot left"><span>Reste à régler</span><b class="mono">${apEur(left)}</b></div>` : ""}
+      ${paid ? `<div class="ap-paid"><span>${ico("check")}Déjà payé</span><b class="mono">− ${apEur(paid)}</b></div><div class="ap-tot left"><span>Reste à régler</span><b class="mono">${apEur(left)}</b></div>` : ""}
       ${split ? `<div class="ap-split"><span>${split} parts de</span><b class="mono">${apEur(part)}</b></div>` : ""}</div>
     <div class="ap-br">${pay}${rv ? `<div class="ap-rv"><div class="ap-qr">${apQr(rv)}</div><div><b>Un petit avis ?</b><em>Ça nous aide énormément.</em></div></div>` : ""}</div></div>`;
 }
@@ -272,7 +273,7 @@ VIEWS.ecran = {
           <section class="glass pad"><div class="lbl">Afficher</div>
             <div class="ap-acts"><button class="btn ${st.k === "idle" ? "acc" : "soft"} sm" data-act="apShowIdle">${ico("home")}Accueil</button><button class="btn soft sm" data-act="apShowMerci">${ico("apStar")}Merci + avis</button></div>
             <div class="lbl" style="margin-top:14px">L'addition d'une table</div>${sideTabs}
-            ${DB.mode === "demo" && st.k === "bill" && apOnline() ? `<button class="btn ghost sm ap-sim" data-act="apDemoPay">${ico("apPhone")}Démo : le client paie sa part</button>` : ""}</section>
+            ${DB.mode === "demo" && st.k === "bill" && apOnline() ? `<button class="btn ghost sm ap-sim" data-act="apDemoPay">${ico("apPhone")}Démo : un client paie ses plats</button>` : ""}</section>
           <section class="glass pad"><div class="lbl">Cet appareil</div>
             <button class="btn acc block" data-act="apMakeScreen">${ico("apScreen")}Faire de cette tablette l'écran client</button>
             <button class="btn soft block" data-act="bigTog">${ico("bigIn")}Plein écran sans verrouiller</button>
@@ -307,7 +308,7 @@ function apOnPays() {
     if (S.route === "ecran") { AP.flash = { amount: p.amount, at: Date.now() }; try { SFX.done(); } catch (e) {} }
     else if (!apQuiet()) { try { SFX.ok(); buzz([20, 40, 20]); } catch (e) {} toast(`Table ${p.table || ""} · ${apEur(p.amount)} payés en ligne`); }
   });
-  AP.payInit = true; onData();
+  AP.payInit = true; onData(); if (typeof slBillLive === "function") slBillLive();
 }
 
 /* ───────── the waiter's bill sheet: « Montrer sur l'écran client », what was paid online ───────── */
@@ -332,8 +333,8 @@ if (typeof slBillPaint === "function") {
     try {
       const sh = document.querySelector(".sl-sh.bill"), tab = SL.bill && slTabOf(SL.bill.tab); if (!sh || !tab) return r;
       const paid = apPaidOf(tab.id), shown = apScreens().some((s) => s.show === "bill" && s.tabId === tab.id) || (DB.mode === "demo" && apScr("demo").show === "bill" && apScr("demo").tabId === tab.id);
-      const total = slTotal(slItemsOk(tab));
-      const html = `${paid ? `<div class="ap-bpaid">${ico("check")}<span><b>${apEur(paid)} payés en ligne</b> par le client · reste ${apEur(Math.max(0, total - paid))}. Saisissez-les sur la caisse en « CB en ligne ».</span></div>` : ""}
+      const left = typeof slBillLeft === "function" ? slBillLeft(tab) : Math.max(0, slTotal(slItemsOk(tab)) - paid);
+      const html = `${paid ? `<div class="ap-bpaid">${ico("check")}<span><b>${apEur(paid)} payés en ligne</b> par le client · reste ${apEur(left)}. Saisissez-les sur la caisse en « CB en ligne ».</span></div>` : ""}
         <button class="btn soft block ap-showb${shown ? " on" : ""}" data-act="apShowBill">${ico("apScreen")}${shown ? "Sur l'écran client · actualiser" : "Montrer sur l'écran client"}</button>`;
       const close = sh.querySelector('[data-act="slClose"]'); if (close) close.insertAdjacentHTML("beforebegin", html);
     } catch (e) { console.warn("appel", e); }
@@ -407,7 +408,9 @@ Object.assign(ACT, {
   },
   apDemoPay: async () => {
     const st = apState(apScr()); if (st.k !== "bill") return;
-    const amt = Math.min(st.left, Math.ceil((st.total / Math.max(2, +st.tab.covers || 2)) * 100) / 100);
-    await DB.set("billPays", "dp" + Date.now().toString(36), { tabId: st.tab.id, table: st.tab.table, amount: amt, status: "paye", at: Date.now(), paidAt: Date.now() });
+    /* a guest pays their own dishes: one of each of the first two dishes still to pay */
+    const lines = slBillRows(st.tab).rows.filter((r) => r.left > 0).slice(0, 2).map((r) => ({ rk: r.rk, q: 1, u: r.u }));
+    const amt = lines.length ? Math.min(st.left, Math.round(lines.reduce((s, l) => s + l.u, 0) * 100) / 100) : Math.min(st.left, Math.ceil((st.total / Math.max(2, +st.tab.covers || 2)) * 100) / 100);
+    await DB.set("billPays", "dp" + Date.now().toString(36), { tabId: st.tab.id, table: st.tab.table, amount: amt, status: "paye", at: Date.now(), paidAt: Date.now(), lines: lines.map(({ rk, q }) => ({ rk, q })) });
   },
 });

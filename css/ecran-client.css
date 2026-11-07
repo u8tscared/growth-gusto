@@ -107,3 +107,7 @@
 .ap-tag{margin:0;max-width:16em;font-size:clamp(24px,4.4cqw,56px);font-weight:800;letter-spacing:-.035em;line-height:1.05;color:#fff;background:linear-gradient(100deg,#fff 20%,#C9BFFF 50%,#fff 80%) 0 0/200% 100%;-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;animation:apIn .9s .1s var(--spring-soft) both,apShine 7s 1s linear infinite}
 @keyframes apShine{to{background-position:-200% 0}}
 @media (prefers-reduced-motion:reduce){.ap-tag{animation:none}}
+/* plat par plat : ce qui est déjà payé est coché */
+.ap-lines span i{display:inline-flex;align-items:center;gap:4px;margin-left:8px;padding:1px 8px;border-radius:99px;background:#E3F6EC;color:#0B6E4B;font-style:normal;font-size:.72em;font-weight:800;vertical-align:.12em}
+.ap-lines span i .ico{width:.95em;height:.95em;stroke-width:3}
+.ap-lines>div.pd{color:#8A8072}.ap-lines>div.pd em{text-decoration:line-through;text-decoration-thickness:2px;text-decoration-color:rgba(11,110,75,.45)}.ap-lines>div.pd b{color:#0B6E4B}
