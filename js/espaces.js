@@ -9,7 +9,7 @@
      start: "auto" | espace }. Appareil du restaurant = seulement « En service », jamais « Mon espace » ; un équipier « prend la
      main » (avec son code s'il en a un) et son prénom signe les commandes. Station = l'écran ouvert au lancement.
    Ce compte sur cet appareil (localStorage gg-es-<rid>-<memberId>) : { sp, poste, tiles: { cuisine: [route…] } }.
-   Données : collection esRequests (demandes : congé, absence, échange, disponibilités), règles « membres » génériques.
+   Données : collection esRequests (demandes RH : congé, arrêt maladie, absence, échange, indisponibilité ; circuit et réglages dans js/demandes.js).
    Démo : « Voir comme » (bouton dans la barre démo, le menu Plus et Vues & appareils) : on devient Camille, Thomas, Sarah,
    Lucas, Hugo ou un appareil partagé (tablette cuisine, téléphone de salle, pointeuse murale), et tout l'app suit. */
 "use strict";
@@ -52,7 +52,8 @@ const ES_MOI = ["moiPlanning", "moiHeures", "moiActivite", "moiDemandes"];
 const ES_MOI_SET = ["home", ...ES_MOI, "pointeuse", "consignes", "notifs", "frais", "formation", "avis", "espaces", "reglages"];
 const ES_TABS_MOI = [["moiPlanning", "cal", "Planning"], ["pointeuse", "clock", "Pointer"], ["moiHeures", "esHist", "Heures"]];
 /* request kinds: [id, icon, title, verb] */
-const ES_REQ = [["conge", "esSun", "Congé", "un congé"], ["absence", "esBand", "Absence", "une absence"], ["echange", "esSwap", "Échange de service", "un échange"], ["dispo", "esHand", "Disponibilités", "mes disponibilités"]];
+/* the kinds of HR requests (js/demandes.js: rules per kind, approval steps, documents) */
+const ES_REQ = [["conge", "esSun", "Congé", "un congé"], ["maladie", "drMed", "Arrêt maladie", "un arrêt maladie"], ["absence", "esBand", "Absence", "une absence"], ["echange", "esSwap", "Échange de service", "un échange"], ["dispo", "esHand", "Indisponibilité", "une indisponibilité"]];
 const ES_REQ_OF = Object.fromEntries(ES_REQ.map((r) => [r[0], r]));
 /* demo personas: [memberId, what they see, device preset] */
 const ES_PERSONAS = [
@@ -526,7 +527,6 @@ const esStAva = (s, sz = 26) => `<span class="es-sa" style="--s:${sz}px;backgrou
 function esWeekMin(sid, mon) { if (typeof rhDayMin !== "function") return 0; return Object.values(rhDayMin(sid, mon, addDays(mon, 6))).reduce((a, v) => a + (v.min || 0), 0); }
 function esPlanMin(sid, from, to) { return typeof rhShiftsOf === "function" ? rhShiftsOf(sid, from, to).reduce((a, s) => a + rhShiftMin(s), 0) : 0; }
 function esMyReqs() { return (ES_REQS() || []).filter((r) => r.memberId === S.me.id).sort((a, b) => (b.at || 0) - (a.at || 0)); }
-function esLeaveOn(day, mid = S.me.id) { return (ES_REQS() || []).find((r) => r.memberId === mid && r.status === "ok" && (r.kind === "conge" || r.kind === "absence") && r.from <= day && (r.to || r.from) >= day) || null; }
 function esMyEvents(days = 30) { const t0 = Date.now() - days * 864e5; return (S.events || []).filter((e) => (e.uid === S.me.id || (e.actorId && e.actorId === S.me.id)) && (e.at || 0) >= t0); }
 const ES_EVK = { reading: ["therm", "Relevés", "w-vi"], reception: ["truck", "Réceptions", "w-sa"], chore: ["spray", "Ménage", "w-sk"], lot: ["tag", "Étiquettes", "w-to"], open: ["tag", "Étiquettes", "w-to"], out: ["tag", "Étiquettes", "w-to"], lost: ["tag", "Étiquettes", "w-to"], move: ["move", "Mise en place", "w-mi"], ticket: ["receipt", "Caisse", "w-nd"], note: ["book", "Recettes", "w-to"], salle: ["slPad", "Service en salle", "w-vi"], request: ["esSun", "Demandes", "w-sa"] };
 const esEvK = (t) => ES_EVK[t] || ["activity", "Divers", "w-nd"];
@@ -560,7 +560,7 @@ function esMoiView() {
   const mon = esMonday(); const days = [0, 1, 2, 3, 4, 5, 6].map((i) => addDays(mon, i)); const planW = esPlanMin(st.id, mon, addDays(mon, 6));
   const week = `<section class="glass es-week st" style="--i:3" data-go="moiPlanning" role="button" tabindex="0" aria-label="Ma semaine">
     <div class="row"><span class="lbl">Ma semaine</span><span class="pill neu mono">${esH(planW)} prévues</span></div>
-    <div class="es-wk">${days.map((d, i) => { const sh = esShiftsMine(d, d); const lv = esLeaveOn(d); return `<div class="es-wd${d === today ? " today" : ""}${d < today ? " past" : ""}" style="--j:${i}"><span class="es-wdn">${esDow(d)}</span><b class="mono">${parseDay(d).getDate()}</b><div class="es-wbars">${lv ? `<i class="leave" title="Congé"></i>` : sh.map((s) => { const a = rhT2m(s.start) || 0; let b = rhT2m(s.end) || a; if (b <= a) b += 1440; return `<i style="--a:${Math.max(0, (a - 360) / 1080)};--b:${Math.min(1, (b - 360) / 1080)}"></i>`; }).join("")}</div><em class="mono">${lv ? "congé" : sh.length ? esc(sh[0].start) : "repos"}</em></div>`; }).join("")}</div>
+    <div class="es-wk">${days.map((d, i) => { const sh = esShiftsMine(d, d); const lv = esLeaveOn(d); return `<div class="es-wd${d === today ? " today" : ""}${d < today ? " past" : ""}" style="--j:${i}"><span class="es-wdn">${esDow(d)}</span><b class="mono">${parseDay(d).getDate()}</b><div class="es-wbars">${lv ? `<i class="leave" title="Congé"></i>` : sh.map((s) => { const a = rhT2m(s.start) || 0; let b = rhT2m(s.end) || a; if (b <= a) b += 1440; return `<i style="--a:${Math.max(0, (a - 360) / 1080)};--b:${Math.min(1, (b - 360) / 1080)}"></i>`; }).join("")}</div><em class="mono">${lv ? esc(drShort(lv)) : sh.length ? esc(sh[0].start) : "repos"}</em></div>`; }).join("")}</div>
   </section>`;
   /* hours */
   const p = typeof rhStaff === "function" ? rhStaff(st.id) : st; const wMin = esWeekMin(st.id, mon); const target = (+((p && p.weeklyHours) || 35)) * 60;
@@ -589,21 +589,8 @@ function esMoiQuick() {
   const csN = esTry(() => csUnread(), 0);
   return `<nav class="es-quick st" style="--i:5" aria-label="Raccourcis">${q.map(([r, i, t, w, a]) => `<button class="es-q ${w}" ${a ? `data-act="${a}"` : `data-go="${r}"`}><span class="ic">${ico(IC[i] ? i : "grid")}${r === "consignes" && csN ? `<i class="es-tb mono">${csN}</i>` : ""}</span><span class="t">${esc(t)}</span></button>`).join("")}</nav>`;
 }
-function esReqPill(r) { return r.status === "ok" ? `<span class="pill ok">Accepté</span>` : r.status === "refus" ? `<span class="pill bad">Refusé</span>` : `<span class="pill warn"><span class="dot"></span>En attente</span>`; }
 const ES_MS = ["janv.", "févr.", "mars", "avr.", "mai", "juin", "juil.", "août", "sept.", "oct.", "nov.", "déc."];
 function esReqDates(r) { const a = parseDay(r.from), b = parseDay(r.to || r.from); if (!a) return ""; const f = (d) => `${d.getDate()} ${ES_MS[d.getMonth()]}`; return r.to && r.to !== r.from ? `du ${f(a)} au ${f(b)}` : `le ${f(a)}`; }
-function esReqRow(r, mgr) {
-  const k = ES_REQ_OF[r.kind] || ES_REQ[0]; const n = r.to && r.to !== r.from ? Math.round((parseDay(r.to) - parseDay(r.from)) / 864e5) + 1 : 1;
-  return `<div class="es-rq k-${esc(r.kind)}"><span class="es-rqi">${ico(k[1])}</span><div class="es-rqt"><b>${mgr ? `${esc(firstName(r.name))} · ` : ""}${esc(k[2])}</b><em>${esc(esReqDates(r))}${r.kind === "conge" || r.kind === "absence" ? ` · ${esPl(n, "jour")}` : ""}${r.note ? ` · ${esc(r.note)}` : ""}</em>${r.answer ? `<em class="es-rqa">« ${esc(r.answer)} »</em>` : ""}</div>
-    ${mgr && r.status === "attente" ? `<div class="es-rqb"><button class="btn sm soft" data-act="esReqAns" data-id="${esc(r.id)}" data-v="refus" aria-label="Refuser">${ico("x")}</button><button class="btn sm acc" data-act="esReqAns" data-id="${esc(r.id)}" data-v="ok">${ico("check")}Accepter</button></div>` : esReqPill(r)}</div>`;
-}
-function esReqCard() {
-  const mine = esMyReqs();
-  return `<section class="glass es-reqc st" style="--i:6"><div class="row"><span class="lbl">Mes demandes</span><button class="btn ghost sm" data-act="esReqNew">${ico("plus")}Demander</button></div>
-    ${mine.length ? `<div class="es-rql">${mine.slice(0, 3).map((r) => esReqRow(r)).join("")}</div>${mine.length > 3 ? `<button class="btn ghost sm" data-go="moiDemandes">Tout voir</button>` : ""}`
-      : `<div class="es-rqe">${ES_REQ.map(([k, i, t]) => `<button class="es-rqk" data-act="esReqNew" data-v="${k}">${ico(i)}<span>${esc(t)}</span></button>`).join("")}</div>`}
-  </section>`;
-}
 
 /* ── requests: data ── */
 const ES_RQ = { rid: null, rows: null };
@@ -615,20 +602,9 @@ function ES_REQS() {
   }
   return ES_RQ.rows || [];
 }
-function esReqPending() { return ES_REQS().filter((r) => r.status === "attente"); }
 function esPilotStrip() {
-  if (!esIsMgr() || !VIEWS.esDemandes) return ""; const n = esReqPending().length; if (!n) return "";
-  return `<button class="es-pstrip st" style="--i:1" data-go="esDemandes"><span class="es-rqi">${ico("esInbox")}</span><span><b>${esPl(n, "demande")} de l'équipe</b><em>${esc(esReqPending().slice(0, 2).map((r) => `${firstName(r.name)} : ${(ES_REQ_OF[r.kind] || ES_REQ[0])[2].toLowerCase()}`).join(" · "))}</em></span>${ico("chev")}</button>`;
-}
-function esReqSheet() {
-  const F = ES.F; const k = ES_REQ_OF[F.kind] || ES_REQ[0]; const team = (S.staff || []).filter((s) => s.active !== false && s.memberId !== S.me.id);
-  openSheet(`<div class="es-sh"><div class="es-shh"><span class="h2">Demander ${esc(k[3])}</span><button class="iconbtn" data-act="sheetClose" aria-label="Fermer">${ico("x")}</button></div>
-    <div class="es-kinds">${ES_REQ.map(([id, i, t]) => `<button class="${id === F.kind ? "on" : ""}" data-act="esReqKind" data-v="${id}">${ico(i)}<span>${esc(t)}</span></button>`).join("")}</div>
-    <div class="grid2"><label class="field"><span class="lbl">${F.kind === "dispo" || F.kind === "echange" ? "Le" : "Du"}</span><input class="input" type="date" id="esRf" value="${esc(F.from)}"></label>
-    ${F.kind === "echange" ? `<label class="field"><span class="lbl">Avec</span><select class="input" id="esRw"><option value="">Quelqu'un</option>${team.map((s) => `<option value="${esc(s.name)}"${F.with === s.name ? " selected" : ""}>${esc(s.name)}</option>`).join("")}</select></label>` : `<label class="field"><span class="lbl">Au</span><input class="input" type="date" id="esRt" value="${esc(F.to)}"></label>`}</div>
-    <label class="field"><span class="lbl">Un mot pour le gérant</span><input class="input" id="esRn" maxlength="140" value="${esc(F.note || "")}" placeholder="${F.kind === "conge" ? "Mariage de ma sœur" : F.kind === "dispo" ? "Libre les lundis midi" : F.kind === "absence" ? "Rendez-vous médical" : "Je prends son soir, il prend mon midi"}"></label>
-    <button class="btn acc block" data-act="esReqSend">${ico("check")}Envoyer la demande</button>
-    <p class="es-fine">Le gérant reçoit la demande dans Pilotage. Vous voyez sa réponse ici.</p></div>`);
+  if (!VIEWS.esDemandes) return ""; const n = esReqPending().length; if (!n) return "";
+  return `<button class="es-pstrip st" style="--i:1" data-go="${esIsMgr() ? "esDemandes" : "moiDemandes"}"><span class="es-rqi">${ico("esInbox")}</span><span><b>${esPl(n, "demande")} de l'équipe</b><em>${esc(esReqPending().slice(0, 2).map((r) => `${firstName(r.name)} : ${(ES_REQ_OF[r.kind] || ES_REQ[0])[2].toLowerCase()}`).join(" · "))}</em></span>${ico("chev")}</button>`;
 }
 
 /* ═══════════════════════════ pages of « Mon espace » ═══════════════════════════ */
@@ -643,7 +619,7 @@ VIEWS.moiPlanning = {
       const cells = []; for (let i = 0; i < 42; i++) { const d = addDays(mon, i); if (i >= 35 && d.slice(0, 7) !== m0.slice(0, 7)) break; cells.push(d); }
       const tot = esPlanMin(st.id, m0, addDays(addDays(m0, 31).slice(0, 7) + "-01", -1));
       body = `<div class="es-nav st" style="--i:2"><button class="iconbtn" data-act="esPlStep" data-v="-1" aria-label="Mois précédent">${ico("back")}</button><b>${esc(ml.replace(/^./, (c) => c.toUpperCase()))}</b><span class="pill neu mono">${esH(tot)}</span><button class="iconbtn r" data-act="esPlStep" data-v="1" aria-label="Mois suivant">${ico("back")}</button></div>
-        <div class="glass es-cal st" style="--i:3"><div class="es-calh">${["L", "M", "M", "J", "V", "S", "D"].map((x) => `<span>${x}</span>`).join("")}</div><div class="es-calg">${cells.map((d, i) => { const sh = esShiftsMine(d, d); const lv = esLeaveOn(d); const out = d.slice(0, 7) !== m0.slice(0, 7); return `<button class="es-cd${d === today ? " today" : ""}${out ? " out" : ""}${sh.length ? " on" : ""}${lv ? " leave" : ""}" style="--j:${i}" data-act="esDay" data-v="${d}"><b class="mono">${parseDay(d).getDate()}</b>${lv ? `<em>congé</em>` : sh.length ? `<em class="mono">${esc(sh[0].start)}</em><i></i>` : ""}</button>`; }).join("")}</div></div>`;
+        <div class="glass es-cal st" style="--i:3"><div class="es-calh">${["L", "M", "M", "J", "V", "S", "D"].map((x) => `<span>${x}</span>`).join("")}</div><div class="es-calg">${cells.map((d, i) => { const sh = esShiftsMine(d, d); const lv = esLeaveOn(d); const out = d.slice(0, 7) !== m0.slice(0, 7); return `<button class="es-cd${d === today ? " today" : ""}${out ? " out" : ""}${sh.length ? " on" : ""}${lv ? " leave" : ""}" style="--j:${i}" data-act="esDay" data-v="${d}"><b class="mono">${parseDay(d).getDate()}</b>${lv ? `<em>${esc(drShort(lv))}</em>` : sh.length ? `<em class="mono">${esc(sh[0].start)}</em><i></i>` : ""}</button>`; }).join("")}</div></div>`;
     } else {
       const mon = addDays(esMonday(), ES.wk * 7); const days = [0, 1, 2, 3, 4, 5, 6].map((i) => addDays(mon, i)); const tot = esPlanMin(st.id, mon, addDays(mon, 6));
       const lbl = typeof rhWeekLbl === "function" ? rhWeekLbl(mon) : esDayLbl(mon);
@@ -703,26 +679,6 @@ VIEWS.moiActivite = {
       ${kinds.length > 1 ? `<div class="es-filt st" style="--i:2"><button class="chip${ES.act === "all" ? " on" : ""}" data-act="esActF" data-v="all">Tout</button>${kinds.map((k) => `<button class="chip${ES.act === k ? " on" : ""}" data-act="esActF" data-v="${esc(k)}">${esc(k)}</button>`).join("")}</div>` : ""}
       ${days.length ? days.slice(0, 30).map((d, i) => `<section class="glass es-avd st" style="--i:${3 + Math.min(i, 8)}"><span class="lbl">${esc(d === dayKey() ? "Aujourd'hui" : d === addDays(dayKey(), -1) ? "Hier" : esDayLbl(d))}</span>${byDay[d].map((e) => `<div class="es-ev"><span class="es-evi ${esEvK(e.type)[2]}">${ico(esEvK(e.type)[0])}</span><span>${esc(String(e.text || "").replace(/^a /, "J'ai ").replace(/^./, (c) => c.toUpperCase()))}</span><em class="mono">${hm(e.at)}</em></div>`).join("")}</section>`).join("")
         : `<div class="glass empty st" style="--i:3"><div class="ic">${ico("activity")}</div><b>Rien pour l'instant</b>Chaque relevé, réception, tâche ou commande que vous faites s'ajoute ici.</div>`}</div>`;
-  },
-};
-VIEWS.moiDemandes = {
-  render() {
-    const mine = esMyReqs();
-    return `<div class="inner narrow es-rqp">${topBar("Mes demandes")}
-      <div class="es-rqe big st" style="--i:1">${ES_REQ.map(([k, i, t]) => `<button class="es-rqk" data-act="esReqNew" data-v="${k}">${ico(i)}<span>${esc(t)}</span></button>`).join("")}</div>
-      ${mine.length ? `<section class="glass es-rql pad st" style="--i:2">${mine.map((r) => esReqRow(r)).join("")}</section>` : `<div class="glass empty st" style="--i:2"><div class="ic">${ico("esSun")}</div><b>Aucune demande</b>Un congé, une absence, un échange de service : le gérant répond ici.</div>`}</div>`;
-  },
-};
-VIEWS.esDemandes = {
-  render() {
-    if (!esIsMgr()) return VIEWS.noaccess ? VIEWS.noaccess.render({ route: "esDemandes" }) : "";
-    const all = ES_REQS().slice().sort((a, b) => (a.status === "attente" ? 0 : 1) - (b.status === "attente" ? 0 : 1) || (b.at || 0) - (a.at || 0));
-    const pend = all.filter((r) => r.status === "attente"), done = all.filter((r) => r.status !== "attente");
-    return `<div class="inner narrow es-rqp">${topBar("Demandes de l'équipe")}
-      <p class="sub st" style="--i:1">Congés, absences, échanges et disponibilités. Votre réponse s'affiche aussitôt dans « Mon espace » de la personne.</p>
-      ${pend.length ? `<span class="lbl st" style="--i:2">À traiter · ${pend.length}</span><section class="glass es-rql pad st" style="--i:3">${pend.map((r) => esReqRow(r, true)).join("")}</section>` : `<div class="glass empty st" style="--i:2"><div class="ic">${ico("esInbox")}</div><b>Rien à traiter</b>Les demandes de l'équipe arrivent ici.</div>`}
-      ${done.length ? `<span class="lbl st" style="--i:4">Déjà répondu</span><section class="glass es-rql pad st" style="--i:5">${done.slice(0, 30).map((r) => esReqRow(r, true)).join("")}</section>` : ""}
-      ${VIEWS.planning ? `<button class="btn soft block st" style="--i:6" data-go="planning">${ico("cal")}Ouvrir le planning</button>` : ""}</div>`;
   },
 };
 
@@ -868,24 +824,6 @@ Object.assign(ACT, {
     if (P.code.length === 4) { const ok = typeof ccVerifyPin === "function" ? ccVerifyPin(P.id, P.code) : true; if (ok) { const m = esMember(P.id); ES.pin = null; return esTookOver(m); } P.err = "Ce n'est pas le bon code"; P.code = ""; SFX.err(); buzz([20, 40, 20]); }
     esPinSheet();
   },
-  esReqNew: (a, id, v) => { const t = addDays(dayKey(), 14); ES.F = { kind: ES_REQ_OF[v] ? v : "conge", from: t, to: t, note: "", with: "" }; SFX.tap(); esReqSheet(); },
-  esReqKind: (a, id, v) => { const F = ES.F; if (!F) return; esReqRead(); F.kind = v; SFX.tick(); esReqSheet(); },
-  esReqSend: async (a) => {
-    const F = ES.F; if (!F) return; esReqRead(); if (!F.from) { SFX.err(); toast("Choisissez une date.", "err"); return; }
-    if (F.to && F.to < F.from) { const x = F.to; F.to = F.from; F.from = x; }
-    const st = esStaff(); a.disabled = true;
-    const doc = { kind: F.kind, from: F.from, to: F.kind === "echange" || F.kind === "dispo" ? F.from : F.to || F.from, note: [F.with ? `avec ${F.with}` : "", F.note].filter(Boolean).join(" · ").slice(0, 160), memberId: S.me.id, name: S.me.name || "", staffId: st ? st.id : "", status: "attente", at: Date.now(), uid: S.me.id };
-    try { await safe(DB.add("esRequests", doc)); } catch (e) { a.disabled = false; return; }
-    ES.F = null; closeSheet(); SFX.done ? SFX.done() : SFX.ok(); buzz([10, 40, 10]); try { burst(); } catch (e) {} toast("Demande envoyée au gérant");
-    logEvent("request", `a demandé ${(ES_REQ_OF[doc.kind] || ES_REQ[0])[3]} (${esReqDates(doc)})`);
-  },
-  esReqAns: async (a, id, v) => {
-    const r = ES_REQS().find((x) => x.id === id); if (!r || !esIsMgr()) return; a.disabled = true;
-    const row = a.closest(".es-rq"); if (row) row.classList.add(v === "ok" ? "yes" : "no");
-    await safe(DB.update("esRequests", id, { status: v === "ok" ? "ok" : "refus", answeredBy: S.me.id, answeredByName: S.me.name || "", answeredAt: Date.now() }));
-    v === "ok" ? (SFX.ok(), buzz(10)) : SFX.close(); toast(v === "ok" ? `Accepté pour ${firstName(r.name)}` : `Refusé pour ${firstName(r.name)}`);
-    logEvent("request", `a ${v === "ok" ? "accepté" : "refusé"} la demande de ${firstName(r.name)}`);
-  },
   esPlView: (a, id, v) => { ES.view = v === "month" ? "month" : "week"; SFX.tick(); rerender(); },
   esPlStep: (a, id, v) => { if (ES.view === "month") ES.mo += +v; else ES.wk += +v; SFX.tick(); rerender(); },
   esHrStep: (a, id, v) => { ES.hm = Math.min(0, ES.hm + (+v || 0)); ES.wOpen = null; SFX.tick(); rerender(); },
@@ -896,7 +834,7 @@ Object.assign(ACT, {
     openSheet(`<div class="es-sh"><div class="es-shh"><span class="h2">${esc(esDayLbl(v))}</span><button class="iconbtn" data-act="sheetClose" aria-label="Fermer">${ico("x")}</button></div>
       ${lv ? `<div class="es-shp leave big">${ico("esSun")}${esc((ES_REQ_OF[lv.kind] || ES_REQ[0])[2])} accepté</div>` : sh.length ? sh.map((s) => `<div class="es-shp big"><b class="mono">${esc(s.start)} → ${esc(s.end)}</b>${s.post ? `<em>${esc(s.post)}</em>` : ""}</div>`).join("") : `<p class="sub">Repos.</p>`}
       ${co.length ? `<span class="lbl">Aussi ce jour-là</span><div class="es-cowl">${co.map((s) => { const x = rhShiftsDay(s.id, v)[0]; return `<div class="es-cow">${esStAva(s, 32)}<b>${esc(s.name)}</b><em class="mono">${x ? `${esc(x.start)} → ${esc(x.end)}` : ""}</em></div>`; }).join("")}</div>` : ""}
-      ${v >= dayKey() ? `<button class="btn soft block" data-act="esReqNew" data-v="${sh.length ? "echange" : "dispo"}">${ico(sh.length ? "esSwap" : "esHand")}${sh.length ? "Demander un échange" : "Proposer ma disponibilité"}</button>` : ""}</div>`);
+      ${v >= dayKey() ? `<button class="btn soft block" data-act="esReqNew" data-v="${sh.length ? "echange" : "dispo"}" data-id="${v}">${ico(sh.length ? "esSwap" : "esHand")}${sh.length ? "Demander un échange" : "Signaler une indisponibilité"}</button>` : ""}</div>`);
   },
   esIcs: () => esIcs(),
   esCf: () => { const ps = esPoste(); SFX.tap(); buzz(8); if (typeof cfEnter === "function") { try { return cfEnter(ps === "salle" || ps === "bar" ? ps : "cuisine", false); } catch (e) {} } go("coupdefeu"); },
@@ -938,7 +876,6 @@ Object.assign(ACT, {
     esMorph("service", e, () => { const tb = $("#tabbar"); if (tb) delete tb.dataset.built; $$(".es-sw").forEach((w) => w.remove()); S.history = []; go(K.route, {}, { replace: true, tab: true }); renderChrome(); }, { ic: K.ic, t: K.t, d: `Verrouillé. Pour sortir : ${K.exit}.`, c: "#1B1530", c2: K.kiosk ? "#EF5A3C" : "#F6B93B", hold: 900 });
   },
 });
-function esReqRead() { const F = ES.F; if (!F) return; const g = (i) => { const el = $("#" + i); return el ? el.value : null; }; F.from = g("esRf") ?? F.from; F.to = g("esRt") ?? F.to; F.note = g("esRn") ?? F.note; F.with = g("esRw") ?? F.with; }
 
 /* live clock on the service home */
 setInterval(() => { const c = $("[data-es-clock]"); if (c) { const d = new Date(); c.textContent = `${pad(d.getHours())}:${pad(d.getMinutes())}`; } }, 15000);

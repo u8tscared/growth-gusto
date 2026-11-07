@@ -123,7 +123,7 @@ service cloud.firestore {
                     && !request.resource.data.keys().hasAny(billKeys());
       allow update: if isGerant(rid) && unchanged(['owner', 'createdAt', 'server', 'alertMail', 'alertState']) && unchanged(billKeys())
                        && (unchanged(['plan', 'trialEnds']) || trialStamp())
-                    || isMember(rid) && unchanged(['owner', 'createdAt', 'server', 'alertMail', 'alertState', 'alertCfg', 'resaCfg', 'csCfg', 'trainingRequired', 'paCfg', 'chorePhotoStaff', 'uiDefault', 'modsOff', 'profil', 'name', 'plan', 'pack', 'trialEnds']) && unchanged(billKeys())
+                    || isMember(rid) && unchanged(['owner', 'createdAt', 'server', 'alertMail', 'alertState', 'alertCfg', 'resaCfg', 'csCfg', 'trainingRequired', 'paCfg', 'chorePhotoStaff', 'uiDefault', 'modsOff', 'profil', 'name', 'plan', 'pack', 'trialEnds', 'drCfg']) && unchanged(billKeys())
                     || isAdmin() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(adminKeys());
       allow delete: if signedIn() && resource.data.owner == me();
 
@@ -173,8 +173,18 @@ service cloud.firestore {
 
       // ── everything else (fridges, readings, lots, stock, tickets, staff, finances…): members only ──
       match /{col}/{doc} {
-        allow read: if !(col in ['members', 'sensorKeys', 'pennylane', 'plSent', 'plInv', 'qrPay', 'bankTx', 'bank', 'push', 'consignes', 'chatGroups', 'events', 'billPays', 'notifs']) && isMember(rid);
-        allow create, update, delete: if !(col in ['members', 'sensorKeys', 'pennylane', 'plSent', 'plInv', 'qrPay', 'bankTx', 'bank', 'push', 'consignes', 'chatGroups', 'events', 'billPays', 'tipCfg', 'tipMonths', 'notifs']) && isMemberAfter(rid);
+        allow read: if !(col in ['members', 'sensorKeys', 'pennylane', 'plSent', 'plInv', 'qrPay', 'bankTx', 'bank', 'push', 'consignes', 'chatGroups', 'events', 'billPays', 'notifs', 'rhDocs']) && isMember(rid);
+        allow create, update, delete: if !(col in ['members', 'sensorKeys', 'pennylane', 'plSent', 'plInv', 'qrPay', 'bankTx', 'bank', 'push', 'consignes', 'chatGroups', 'events', 'billPays', 'tipCfg', 'tipMonths', 'notifs', 'rhDocs']) && isMemberAfter(rid);
+      }
+      // justificatifs des demandes RH (js/demandes.js: arrêt maladie, absence): medical papers, so never the whole team.
+      // Read one by one (get) by the person it belongs to, a gérant, or the people of the request's circuit (readers);
+      // written by the person (or by a gérant who enters the request for them), never changed afterwards; removed by the person or a gérant.
+      match /rhDocs/{id} {
+        allow get: if isMember(rid) && (resource.data.uid == me() || isGerant(rid) || me() in resource.data.get('readers', []));
+        allow create: if isMemberAfter(rid) && request.resource.data.uid is string && request.resource.data.readers is list
+                      && request.resource.data.readers.size() <= 40 && request.resource.data.data is string && request.resource.data.data.size() < 1000000
+                      && (request.resource.data.uid == me() || isGerant(rid) || existsAfter(/databases/$(database)/documents/restos/$(rid)/members/$(request.resource.data.uid)));
+        allow delete: if isMember(rid) && (resource.data.uid == me() || isGerant(rid));
       }
       // pourboires (js/pourboires.js): everyone reads the split and the closed months; only the gérant changes the split or closes a month
       match /tipCfg/{doc} {

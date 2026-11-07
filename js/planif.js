@@ -9,7 +9,7 @@
      3. la moyenne des tickets Z, sinon rien (le gérant tape ses couverts jour par jour).
    Données : restos/{rid}.pfCfg = { posts: { cuisine: { per, min, midi:[début, fin], soir:[début, fin] }, … }, split } ;
              staff.off = { "<getDay>": ["midi","soir"] } (indisponible), staff.alsoPosts = ["plonge", …] (peut aussi faire) ;
-             congés et absences acceptés : esRequests (js/espaces.js). Les créneaux publiés portent src:"auto". */
+             congés, arrêts, absences et indisponibilités acceptés : esRequests (js/demandes.js). Les créneaux publiés portent src:"auto". */
 "use strict";
 
 TAB_OF.planif = "more";
@@ -100,18 +100,19 @@ function pfForecast(k, mon) {
 }
 
 /* ───────────── availability ───────────── */
-function pfLeave(p, k) { /* an approved leave / absence that day → its label; a pending one → "attente:<label>" */
+function pfLeave(p, k, svc) { /* an approved leave, sick leave, absence or unavailability that day (js/demandes.js) → its label; a pending one → "attente:<label>" */
   const rows = typeof ES_REQS === "function" ? ES_REQS() : [];
   for (const r of rows) {
-    if (!["conge", "absence"].includes(r.kind) || !r.from || k < r.from || k > (r.to || r.from)) continue;
+    if (!["conge", "absence", "maladie", "dispo"].includes(r.kind) || !r.from) continue;
+    if (typeof drCovers === "function" ? !drCovers(r, k, svc) : k < r.from || k > (r.to || r.from)) continue;
     if (!(r.staffId === p.id || (p.memberId && r.memberId === p.memberId))) continue;
-    const t = r.kind === "conge" ? "congé" : "absence";
+    const t = typeof drShort === "function" ? drShort(r) : r.kind === "conge" ? "congé" : "absence";
     if (r.status === "ok") return t; if (r.status === "attente") return "attente:" + t;
   }
   return "";
 }
 const pfOffOf = (p, k) => ((p.off && p.off[String(pfDow(k))]) || []);
-function pfCanWork(p, k, svc) { const l = pfLeave(p, k); if (l && !l.startsWith("attente")) return false; return !pfOffOf(p, k).includes(svc); }
+function pfCanWork(p, k, svc) { const l = pfLeave(p, k, svc); if (l && !l.startsWith("attente")) return false; return !pfOffOf(p, k).includes(svc); }
 /* the team that can be planned: active files, minus temporary accesses that have ended (js/relais.js members.until) */
 function pfPeople() { const now = Date.now(); return rhPeople().filter((p) => { const m = p.memberId && (S.members || []).find((x) => x.id === p.memberId); return !(m && m.until && m.until < now); }); }
 const pfPostsOf = (p) => [p.post || "", ...(Array.isArray(p.alsoPosts) ? p.alsoPosts : [])].filter(Boolean);
