@@ -151,3 +151,7 @@ html:not(.vr-locked) #app{transition:filter .45s var(--ease)}
 .vr-glyph .vr-fp{stroke-width:1.7}
 @media (min-width:700px) and (min-height:700px){.vr-pad{margin-top:28px}.vr-pinbox{margin-top:12vh}.vr-foot.row{max-width:380px}.vr-foot{max-width:380px}}
 .vr-link{white-space:nowrap}
+.vr-sensor{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:2px 4px;font-weight:600;font-size:14.5px;color:var(--ink-2)}
+.vr-seg{display:flex;gap:6px}
+.vr-seg .chip{display:inline-flex;align-items:center;gap:6px}
+.vr-seg .chip .ico{width:18px;height:18px}

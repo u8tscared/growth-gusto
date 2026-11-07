@@ -27,11 +27,23 @@ const VR_DELAYS = [[0, "Dès que je quitte l'app", "Dès la sortie"], [1, "Aprè
 const vrDelayTx = (d) => (VR_DELAYS.find((x) => x[0] === d) || VR_DELAYS[2])[2];
 
 /* ── which sensor this device has (only for the words and the drawing: the system shows its own prompt) ── */
+/* Apple doesn't tell a web page which sensor it has: the screen size does (iPhones with a home button, iPad Pro = Face ID),
+   and the person can correct it once per device (localStorage gg-vr-sensor = "face" | "touch"), never synced between devices */
+const VR_FID = { t: "Face ID", with: "avec Face ID", ic: "vrFace", face: true, btn: "Déverrouiller avec Face ID" };
+const VR_TID = { t: "Touch ID", with: "avec Touch ID", ic: "vrFinger", face: false, btn: "Déverrouiller avec Touch ID" };
+const vrApple = () => { const ua = navigator.userAgent || ""; return /iPhone|iPod/.test(ua) ? "iPhone" : /iPad/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1) ? "iPad" : ""; };
+function vrSensorGuess(dev) {
+  let a = 0, b = 0; try { a = Math.min(screen.width, screen.height); b = Math.max(screen.width, screen.height); } catch (e) {}
+  const is = (l) => l.some(([x, y]) => x === a && y === b);
+  if (dev === "iPhone") return is([[320, 480], [320, 568], [375, 667], [414, 736]]) ? "touch" : "face";
+  /* iPad Pro 11" and 13" (2018 →) have Face ID; every other iPad (Air, mini, iPad 10, older Pro 12.9") has Touch ID */
+  return is([[834, 1194], [834, 1210], [1032, 1376]]) ? "face" : "touch";
+}
+const vrSensor = (dev) => { let o = null; try { o = localStorage.getItem("gg-vr-sensor"); } catch (e) {} return o === "face" || o === "touch" ? o : vrSensorGuess(dev); };
 function vrKind() {
-  const ua = navigator.userAgent || ""; const iPad = /iPad/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
-  if (/iPhone|iPod/.test(ua)) return { t: "Face ID", with: "avec Face ID", ic: "vrFace", face: true, dev: "iPhone", btn: "Déverrouiller avec Face ID" };
-  if (iPad) return { t: "Face ID", with: "avec Face ID ou Touch ID", ic: "vrFace", face: true, dev: "iPad", btn: "Déverrouiller avec Face ID" };
-  if (/Macintosh/.test(ua)) return { t: "Touch ID", with: "avec Touch ID", ic: "vrFinger", face: false, dev: "Mac", btn: "Déverrouiller avec Touch ID" };
+  const ua = navigator.userAgent || ""; const ap = vrApple();
+  if (ap) return { ...(vrSensor(ap) === "face" ? VR_FID : VR_TID), dev: ap, apple: true };
+  if (/Macintosh/.test(ua)) return { ...VR_TID, dev: "Mac" };
   if (/Android/.test(ua)) return { t: "Empreinte", with: "avec votre empreinte ou votre visage", ic: "vrFinger", face: false, dev: "téléphone", btn: "Déverrouiller avec l'empreinte" };
   if (/Windows/.test(ua)) return { t: "Windows Hello", with: "avec Windows Hello", ic: "vrFace", face: true, dev: "ordinateur", btn: "Déverrouiller avec Windows Hello" };
   return { t: "Face ID ou empreinte", with: "avec Face ID ou l'empreinte", ic: "vrFace", face: true, dev: "appareil", btn: "Déverrouiller" };
@@ -332,6 +344,7 @@ VIEWS.verrou = {
       <div class="vr-hg ${on ? "on" : ""}">${vrGlyph(on ? "done" : "idle")}</div>
       <div class="vr-ht"><b>${local ? `${esc(k.t)} pour votre profil` : `Verrouiller avec ${esc(k.t)}`}</b>
       <span>${local ? "Sur cet appareil, votre profil s'ouvre d'un regard ou d'un doigt, sans taper votre code." : `Si quelqu'un prend votre ${esc(k.dev)}, il tombe sur l'écran verrouillé. Vous, ${k.face ? "un regard suffit" : "un doigt suffit"}.`}</span></div></div>`;
+    const sensor = k.apple ? `<div class="vr-sensor st" style="--i:2"><span>Votre ${esc(k.dev)} se déverrouille avec</span><div class="vr-seg">${[["touch", "Touch ID"], ["face", "Face ID"]].map(([v, t]) => `<button class="chip ${vrSensor(k.dev) === v ? "on" : ""}" data-act="vrSensor" data-v="${v}" aria-pressed="${vrSensor(k.dev) === v}">${ico(v === "face" ? "vrFace" : "vrFinger")}${t}</button>`).join("")}</div></div>` : "";
     const demoNote = demo ? `<div class="banner st" style="--i:2">${ico("sparkle")}<span>Démo : ${esc(k.t)} est simulé ici et rien n'est enregistré. Dans votre compte, c'est le vrai ${esc(k.t)}.</span></div>` : "";
     const noBio = !canBio && av === false ? `<div class="banner st" style="--i:2">${ico("alert")}<span>${vrSupported() ? `${esc(k.t)} n'est pas réglé sur cet appareil. Activez-le dans les réglages du ${esc(k.dev)}, ou verrouillez avec un code.` : "Ce navigateur ne permet pas la biométrie. Le verrouillage par code fonctionne quand même."}</span></div>` : "";
     let body = "";
@@ -365,7 +378,7 @@ VIEWS.verrou = {
       <div><span class="ic w-mi">${ico("shield")}</span><p><b>Votre ${k.face ? "visage" : "empreinte"} reste dans le ${esc(k.dev)}.</b> Growth Gusto reçoit seulement « c'est bien la personne ».</p></div>
       <div><span class="ic w-sk">${ico("download")}</span><p><b>Marche aussi depuis l'écran d'accueil,</b> sans application à télécharger.</p></div>
       <div><span class="ic w-sa">${ico("users")}</span><p><b>Chaque appareil a son réglage.</b> Le téléphone d'un équipier n'est pas touché.</p></div></div>`;
-    return `<div class="inner cc-wide vr-page">${topBar(local ? esc(k.t) : "Verrouillage")}${hero}${demoNote}${noBio}${body}${facts}</div>`;
+    return `<div class="inner cc-wide vr-page">${topBar(local ? esc(k.t) : "Verrouillage")}${hero}${sensor}${demoNote}${noBio}${body}${facts}</div>`;
   },
 };
 
@@ -395,6 +408,7 @@ function vrSimScan(then) {
 }
 
 Object.assign(ACT, {
+  vrSensor: (a, id, v) => { try { localStorage.setItem("gg-vr-sensor", v === "face" ? "face" : "touch"); } catch (e) {} SFX.tick(); buzz(6); toast(v === "face" ? "Face ID sur cet appareil" : "Touch ID sur cet appareil"); rerender(); renderChrome(); },
   vrBio: () => vrBioGo(false),
   vrUsePin: () => { SFX.tap(); try { if (VR.abort) VR.abort.abort(); } catch (e) {} VR.busy = false; VR.mode = "pin"; VR.code = ""; VR.err = ""; vrPaint(); vrWaitTick(); },
   vrBackMain: () => { SFX.tap(); VR.mode = "main"; VR.code = ""; VR.err = ""; vrPaint(); },
