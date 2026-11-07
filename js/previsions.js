@@ -103,7 +103,7 @@ function pvWatch() {
   if (typeof tkEnsure === "function") { try { tkEnsure(); } catch (e) {} }
   if (DB.mode === "demo") pvSeedDemo();
   if (pvAlive()) return;
-  const rid = S.rid; const cb = (rows) => { if (S.rid !== rid) return; PV.hist = rows; PV.ix = null; PV.fc = {}; if (S.route === "previsions" || S.route === "dashboard" || S.route === "achats") onData(); };
+  const rid = S.rid; const cb = (rows) => { if (S.rid !== rid) return; PV.hist = rows; PV.ix = null; PV.fc = {}; onData(); };
   const n = DB.subs.length; DB.watch("history", {}, cb);
   PV.sub = DB.mode === "db" ? DB.subs[DB.subs.length - 1] || DB.subs[n] : { cb };
 }
@@ -266,6 +266,9 @@ function pvSeedDemo() {
     out[k] = { day: k, ttc, ht: Math.round((ttc / 1.1) * 100) / 100, covers, n: Math.round(covers / 2.1), src: "sumup", at: Date.now() - i * 864e5 };
   }
   DB.local[p] = out;
+  /* the history listener may already be open (another screen asked first): give it the rows now */
+  PV.hist = Object.entries(out).map(([id, d]) => ({ id, ...d })); PV.ix = null; PV.fc = {};
+  if ((DB.listeners[p] || []).length) setTimeout(() => DB.emit(p), 0);
 }
 
 /* ───────── views ───────── */
