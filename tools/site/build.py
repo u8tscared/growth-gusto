@@ -63,7 +63,7 @@ def tag(t):
     return f'<span class="tag {cls}">{e(t)}</span>'
 
 def phone(img, alt="", cls=""):
-    return f'<div class="phone {cls}"><img src="/img/{img}.jpg" alt="{e(alt)}" width="600" height="1382" loading="lazy" decoding="async"></div>'
+    return f'<div class="phone {cls}"><img src="/img/{img}.jpg" alt="{e(alt)}" width="600" height="1301" loading="lazy" decoding="async"></div>'
 
 def btn_try(cls="v", label="Essayer 14 jours gratuits", plan=None):
     q = "?signup=1" + (f"&amp;plan={plan}" if plan else "")

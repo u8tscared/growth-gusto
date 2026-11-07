@@ -116,7 +116,7 @@ def feat(fid):
 
 def phone(img, alt, eager=False):
     load = 'fetchpriority="high"' if eager else 'loading="lazy"'
-    return f'<div class="phone"><div class="scr"><img src="img/{img}.jpg" alt="{alt}" width="600" height="1382" {load} decoding="async"></div></div>'
+    return f'<div class="phone"><div class="scr"><img src="img/{img}.jpg" alt="{alt}" width="600" height="1301" {load} decoding="async"></div></div>'
 
 out, chips, n = [], [], 0
 for gi, (gid, col, kick, title, lede, rev, feats) in enumerate(GROUPS):
