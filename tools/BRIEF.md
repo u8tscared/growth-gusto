@@ -99,3 +99,15 @@ Cross-area helpers (define in your own file; callers guard with `typeof x === "f
 - marge.js: `mgDishCost(noteId)` → `{ portion, batch, margin, fc, coef, ht, ttc, complete }`, `mgPriceOf(productId, day?)` → € HT per stock unit on a day, `mgPriceAlerts(days=30)` → price changes with their effect on each dish. Recipes may carry `vat` (sale VAT, default 10) and `targetFc` (%); products may carry `aliases` and `packs` (invoice unit → stock units).
 
 Routes already in NAV/TAB_OF (core): `dashboard`, `finance` (js/finance.js), `obligations` (js/oblig.js), `pointeuse`, `planning` (js/rh.js; employee files and salaries can live at route `staff` in rh.js too, add `TAB_OF.staff="more"`), `avis` (js/avis.js). Icons `dash`, `euro`, `calcheck`, `clock`, `cal`, `star` exist.
+
+## Prise en main : chaque module arrive avec sa leçon (2026-11-07)
+
+L'onboarding du patron (js/onboard.js + js/parcours.js) fait choisir les fonctionnalités, puis lance la « Prise en main » ; chaque
+personne ajoutée reçoit sa formation selon son rôle, son poste, ses droits, ses vues et son appareil. Tout part du menu (NAV).
+
+- **Un nouvel écran dans NAV doit avoir sa leçon**, sinon `tools/lecons-test.js` (lancé par `tools/ci.js`) bloque la mise en ligne.
+  Dans le fichier du module, à côté du `NAV.splice` : `if (typeof PC_LECONS === "object") PC_LECONS.maRoute = { t, d, steps, q, sc, who? }`
+  (modèle et liste des scènes en tête de `js/lecons.js`).
+- Le choix des fonctionnalités (`PC_FAMILLES` dans js/lecons.js) suit aussi le menu : un écran hors famille apparaît seul sous « Autres ».
+  Pour le ranger avec d'autres, ajoutez sa route à une famille.
+- Une fonctionnalité coupée (`restos/{rid}.modsOff`) disparaît partout via `PERMS.routeAllowed` : rien à faire dans le module.
