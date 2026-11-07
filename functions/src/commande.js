@@ -10,6 +10,13 @@
  *                   Stripe Checkout on the restaurant's OWN Stripe account (Connect, direct charge) → { oid, k, order, url? }
  *     op "status"   { rid, oid, k, check?, cancel? } → { order } the client's own order (live status page). check=1 asks Stripe right away
  *                   when the payment is still pending (back from Checkout); cancel=1 (« retour » from Checkout) expires the session.
+ *     op "call"     { rid, table, kind:"serveur"|"addition"|"eau"|"pain", pay? } → the guest calls the waiter or asks for the bill from the QR menu:
+ *                   writes restos/{rid}/tableCalls/t{table}-{kind} (one live call per table and kind, a second tap rings again) → { cid, k, call }
+ *     op "callSt"   { rid, cid, k, cancel? } → { call } its state (« Sarah arrive »); cancel=1 withdraws a call nobody took yet
+ *     op "bill"     { rid, tid, k, bp? } → { bill } the bill of a table, from the customer screen's QR (k = salleTabs/{tid}.payKey, set by the app
+ *                   when the waiter shows the bill): lines, total, what was already paid online, what is left. bp = a payment back from Stripe.
+ *     op "billPay"  { rid, tid, k, amount, back } → { url } Stripe Checkout on the restaurant's own account for the whole bill or a share.
+ *                   The amount is checked against the table's own lines (never the client's numbers). restos/{rid}/billPays/{id} keeps it.
  *   and, for the restaurant's team (signed in, member):
  *     op "connect"  gérant → { url } Stripe onboarding link for the restaurant's own Stripe account (created once, type Standard)
  *     op "check"    gérant → refreshes restos/{rid}/qrPay/link from Stripe → { link }
@@ -32,6 +39,11 @@
  *   orderSeq/{rid}                  { day, n, min, cnt }           order numbers of the day + a per-minute flood cap
  *   qrAccts/{acct}                  { rid, at }                    connected accounts we created (filters the shared webhook)
  *   payPending/{rid_id}             { rid, oid, acct, sid, at }    online payments not confirmed yet: the 15-min tick asks Stripe
+ *                                   ({ rid, bp, … } for a bill payment, id {rid}_bp_{id})
+ *   restos/{rid}/tableCalls/{id}    { table, kind, pay, at, again?, n, day, status: new|vu|fait|annule, k, seenAt?, by?, byName?, doneAt? }
+ *                                   (members read and move it on: « J'y vais », « C'est fait »)
+ *   restos/{rid}/billPays/{id}      { tabId, table, amount, status: apayer|paye|abandonnee, at, paidAt?, sid, acct, pi? }   (members read)
+ *   callSeq/{rid}                   { min, cnt }                   a per-minute cap on the calls of one restaurant
  *   siteSeq/{rid}                   { day, n }                     website reads for the menu import (25 a day)
  * Cost: Stripe's fee per payment, paid by the restaurant on its own account. A few function calls per order. */
 "use strict";
@@ -208,6 +220,11 @@ async function onOrderEvent(ev) {
     await saveLink(a.data().rid, o); return;
   }
   const md = o.metadata || {};
+  if (ev.type.startsWith("checkout.session.") && md.kind === "order" && md.app === "growth-gusto" && okId(md.rid) && okId(md.bp || "")) {
+    const s = await db.doc(`restos/${md.rid}/billPays/${md.bp}`).get(); if (!s.exists) return;
+    if (ev.account && s.data().acct && s.data().acct !== ev.account) return;
+    await settleBill(md.rid, md.bp, o); return;
+  }
   if (ev.type.startsWith("checkout.session.")) {
     if (md.kind !== "order" || md.app !== "growth-gusto" || !okId(md.rid) || !okId(md.oid)) return;
     const s = await db.doc(`restos/${md.rid}/clientOrders/${md.oid}`).get(); if (!s.exists) return;
@@ -363,6 +380,117 @@ async function readSite(req, d) {
   return { ...best, title, cover };
 }
 
+/* ───────── at the table: call the waiter, ask for the bill (QR menu) ───────── */
+const CALL_KINDS = ["serveur", "addition", "eau", "pain"];
+const CALL_PAY = ["carte", "especes", "titre", "telephone"];
+const CALLS_PER_MIN = 40;
+const callView = (id, c) => ({ id, table: c.table, kind: c.kind, pay: c.pay || "", status: c.status, at: c.at, again: c.again || null, n: c.n || 1,
+  seenAt: c.seenAt || null, byName: String(c.byName || "").trim().split(/\s+/)[0] || "", doneAt: c.doneAt || null });
+async function callTable(d) {
+  const rid = String(d.rid || ""); if (!okId(rid)) throw err("invalid-argument", "lien");
+  const ps = await db.doc(`restos/${rid}/public/menu`).get(); if (!ps.exists) throw err("not-found", "ferme");
+  const c = ps.data().cfg || {}; if (!c.table || c.calls === false) throw err("failed-precondition", "appel");
+  const table = clean(d.table, 4).replace(/\D/g, ""); if (!table) throw err("invalid-argument", "table");
+  const kind = CALL_KINDS.includes(d.kind) ? d.kind : "serveur";
+  const pay = kind === "addition" && CALL_PAY.includes(d.pay) ? d.pay : "";
+  const at = Date.now(), minute = Math.floor(at / 6e4), seq = db.doc(`callSeq/${rid}`), ref = db.doc(`restos/${rid}/tableCalls/t${table}-${kind}`);
+  return db.runTransaction(async (t) => {
+    const q = await t.get(seq), s = await t.get(ref); const v = q.exists ? q.data() : {};
+    const cnt = v.min === minute ? (v.cnt || 0) + 1 : 1; if (cnt > CALLS_PER_MIN) throw err("resource-exhausted", "trop");
+    t.set(seq, { min: minute, cnt });
+    const o = s.exists ? s.data() : null;
+    /* the same call still waiting: it rings again (no duplicate) */
+    if (o && ["new", "vu"].includes(o.status) && at - (o.again || o.at || 0) < 20 * 6e4) {
+      if (at - (o.again || o.at || 0) < 20000) return { cid: ref.id, k: o.k, call: callView(ref.id, o) }; /* a double tap */
+      const p = { again: at, n: (o.n || 1) + 1, status: "new", ...(pay ? { pay } : {}) }; t.update(ref, p); return { cid: ref.id, k: o.k, call: callView(ref.id, { ...o, ...p }) };
+    }
+    const k = crypto.randomBytes(16).toString("hex");
+    const n = { table, kind, pay, at, n: 1, day: parisNow().day, status: "new", k, src: "qr" };
+    t.set(ref, n); return { cid: ref.id, k, call: callView(ref.id, n) };
+  });
+}
+async function callState(d) {
+  const rid = String(d.rid || ""), cid = String(d.cid || ""), k = String(d.k || "");
+  if (!okId(rid) || !/^t\d{1,4}-[a-z]{2,10}$/.test(cid) || !/^[a-f0-9]{32}$/.test(k)) throw err("invalid-argument", "lien");
+  const ref = db.doc(`restos/${rid}/tableCalls/${cid}`); const s = await ref.get(); if (!s.exists || !same(s.get("k"), k)) throw err("permission-denied", "lien");
+  let o = s.data();
+  if (d.cancel && o.status === "new") { await ref.update({ status: "annule", doneAt: Date.now() }); o = { ...o, status: "annule", doneAt: Date.now() }; }
+  return { call: callView(cid, o) };
+}
+
+/* ───────── the bill of a table, paid from the customer screen's QR ───────── */
+/* the same sums as js/salle.js slTotal: lines not cancelled, not offered, price + paid extras */
+function billOf(tab) {
+  const L = (Array.isArray(tab.items) ? tab.items : []).filter((x) => x && !x.off), agg = new Map();
+  let total = 0;
+  for (const x of L) {
+    const unit = r2((+x.price || 0) + (Array.isArray(x.extras) ? x.extras : []).reduce((a, e) => a + (+(e && e.p) || 0), 0)), q = Math.max(0, Math.floor(+x.q || 0));
+    if (!q) continue; const free = !!x.free; if (!free) total += unit * q;
+    const key = [x.name, unit, free ? 1 : 0].join("|"); const a = agg.get(key) || { name: clean(x.name, 80), unit, q: 0, free }; a.q += q; agg.set(key, a);
+  }
+  return { lines: [...agg.values()].slice(0, 120).map((a) => ({ name: a.name, q: a.q, amount: a.free ? 0 : r2(a.unit * a.q), free: a.free })), total: r2(total) };
+}
+async function billTab(d) {
+  const rid = String(d.rid || ""), tid = String(d.tid || ""), k = String(d.k || "");
+  if (!okId(rid) || !okId(tid) || !/^[a-f0-9]{32}$/.test(k)) throw err("invalid-argument", "lien");
+  const s = await db.doc(`restos/${rid}/salleTabs/${tid}`).get(); if (!s.exists || !same(s.get("payKey"), k)) throw err("permission-denied", "lien");
+  return { rid, tid, tab: s.data() };
+}
+async function billPays(rid, tid) {
+  const q = await db.collection(`restos/${rid}/billPays`).where("tabId", "==", tid).limit(40).get().catch(() => null);
+  return q ? q.docs.map((x) => ({ id: x.id, ...x.data() })) : [];
+}
+async function billView(rid, tid, tab, P) {
+  const b = billOf(tab), pays = await billPays(rid, tid), paid = r2(pays.filter((p) => p.status === "paye").reduce((a, p) => a + (+p.amount || 0), 0));
+  const c = (P && P.cfg) || {}; const link = c.payOnline ? await linkOf(rid) : null;
+  return { table: tab.table || "", covers: +tab.covers || 0, open: tab.status === "open", lines: b.lines, total: b.total, paid, left: r2(Math.max(0, b.total - paid)),
+    payOnline: !!(c.payOnline && canCharge(link)), pays: pays.filter((p) => p.status !== "abandonnee").map((p) => ({ id: p.id, amount: p.amount, status: p.status, at: p.at, paidAt: p.paidAt || null })) };
+}
+async function settleBill(rid, bp, ses) {
+  const ref = db.doc(`restos/${rid}/billPays/${bp}`);
+  const paid = ses.payment_status === "paid" || ses.payment_status === "no_payment_required", dead = ses.status === "expired";
+  await db.runTransaction(async (t) => {
+    const s = await t.get(ref); if (!s.exists) return; const o = s.data(); if (o.sid && ses.id && o.sid !== ses.id) return;
+    if (paid && o.status !== "paye") t.update(ref, { status: "paye", paidAt: Date.now(), pi: typeof ses.payment_intent === "string" ? ses.payment_intent : (ses.payment_intent && ses.payment_intent.id) || null });
+    else if (dead && o.status === "apayer") t.update(ref, { status: "abandonnee" });
+  });
+  if (paid || dead) await db.doc(`payPending/${rid}_bp_${bp}`).delete().catch(() => {});
+}
+async function askStripeBill(rid, bp, o) {
+  if (!o || !o.sid || !o.acct) return;
+  try { const ses = await S._stripeCall("/checkout/sessions/" + encodeURIComponent(o.sid), { account: o.acct }); await settleBill(rid, bp, ses); }
+  catch (e) { logger.warn("bill ask stripe", rid, bp, e.message); }
+}
+async function billPay(d) {
+  const { rid, tid, tab } = await billTab(d); if (tab.status !== "open") throw err("failed-precondition", "regle");
+  const ps = await db.doc(`restos/${rid}/public/menu`).get(); const P = ps.exists ? ps.data() : {}; const c = P.cfg || {};
+  const link = await linkOf(rid); if (!c.payOnline || !canCharge(link)) throw err("failed-precondition", "paiement");
+  const v = await billView(rid, tid, tab, P);
+  const amount = r2(Math.min(v.left, Math.max(0, +d.amount || 0))); if (!(amount >= 1)) throw err("invalid-argument", "montant");
+  const ref = db.collection(`restos/${rid}/billPays`).doc(), at = Date.now(), exp = Math.floor(at / 1000) + 31 * 60, cents = Math.round(amount * 100);
+  await ref.set({ tabId: tid, table: tab.table || "", amount, status: "apayer", at });
+  const back = BACKS.some((re) => re.test(String(d.back || ""))) ? String(d.back) : PAGE;
+  const q = `?r=${encodeURIComponent(rid)}&b=${encodeURIComponent(tid)}&k=${d.k}&bp=${ref.id}`;
+  const part = amount < v.left - 0.004;
+  try {
+    const ses = await S._stripeCall("/checkout/sessions", { method: "POST", account: link.acct, idem: "gg-bill-" + ref.id, body: {
+      mode: "payment", locale: "fr", expires_at: exp, client_reference_id: ref.id,
+      line_items: [{ quantity: 1, price_data: { currency: "eur", unit_amount: cents, product_data: { name: `${clean(P.name, 60) || "Restaurant"} · table ${tab.table || ""}${part ? " · votre part" : " · addition"}`.slice(0, 120) } } }],
+      metadata: { kind: "order", rid, bp: ref.id, tab: tid, app: "growth-gusto" },
+      payment_intent_data: { description: `Addition table ${tab.table || ""}${part ? " (part)" : ""}`, metadata: { kind: "order", rid, bp: ref.id, tab: tid, app: "growth-gusto" },
+        ...(FEE_BPS ? { application_fee_amount: Math.floor((cents * FEE_BPS) / 10000) } : {}) },
+      success_url: back + q + "&paid=1", cancel_url: back + q + "&cancel=1",
+    } });
+    await ref.update({ sid: ses.id, acct: link.acct });
+    await db.doc(`payPending/${rid}_bp_${ref.id}`).set({ rid, bp: ref.id, acct: link.acct, sid: ses.id, at });
+    return { url: ses.url, bp: ref.id };
+  } catch (e) {
+    logger.error("bill checkout", rid, e.message);
+    await ref.update({ status: "abandonnee" }).catch(() => {});
+    throw err("failed-precondition", "paiement");
+  }
+}
+
 /* ───────── callable ───────── */
 const orderApi = onCall({ region: REGION, cors: true, secrets: S.STRIPE_SECRETS, timeoutSeconds: 60, maxInstances: 10, memory: "256MiB" }, async (req) => {
   const d = req.data || {}; const op = String(d.op || "");
@@ -382,6 +510,15 @@ const orderApi = onCall({ region: REGION, cors: true, secrets: S.STRIPE_SECRETS,
       }
       return { order: pubView(oid, o) };
     }
+    if (op === "call") return await callTable(d);
+    if (op === "callSt") return await callState(d);
+    if (op === "bill") {
+      const { rid, tid, tab } = await billTab(d);
+      if (okId(String(d.bp || ""))) { const bs = await db.doc(`restos/${rid}/billPays/${d.bp}`).get(); if (bs.exists && bs.get("tabId") === tid && bs.get("status") === "apayer") await askStripeBill(rid, d.bp, bs.data()); }
+      const ps = await db.doc(`restos/${rid}/public/menu`).get();
+      return { bill: await billView(rid, tid, tab, ps.exists ? ps.data() : {}) };
+    }
+    if (op === "billPay") return await billPay(d);
     if (op === "connect") return await connect(req, String(d.rid || ""));
     if (op === "site") return await readSite(req, d);
     if (op === "check") {
@@ -411,6 +548,7 @@ async function commandeTick() {
   for (const doc of q.docs) {
     const p = doc.data();
     if (Date.now() - p.at > 26 * 3600e3) { await doc.ref.delete().catch(() => {}); continue; }
+    if (p.bp) { const b = await db.doc(`restos/${p.rid}/billPays/${p.bp}`).get(); if (!b.exists || b.get("status") !== "apayer") { await doc.ref.delete().catch(() => {}); continue; } await askStripeBill(p.rid, p.bp, b.data()); continue; }
     const s = await db.doc(`restos/${p.rid}/clientOrders/${p.oid}`).get(); if (!s.exists) { await doc.ref.delete().catch(() => {}); continue; }
     const o = s.data(); if (o.status !== "apayer") { await doc.ref.delete().catch(() => {}); continue; }
     await askStripe(p.rid, p.oid, o);
@@ -423,4 +561,4 @@ async function commandeTick() {
   if (rqs && !rqs.empty) { const b = db.batch(); rqs.docs.forEach((x) => b.delete(x.ref)); await b.commit().catch(() => {}); }
 }
 
-module.exports = { orderApi, commandeTick, _pubView: pubView, _px: { pxDeal, pxPrice, pxActive }, _onOrderEvent: onOrderEvent, _site: { htmlText, ldItems, links, imgs, priceLines, privIp } };
+module.exports = { orderApi, commandeTick, _pubView: pubView, _billOf: billOf, _callView: callView, _px: { pxDeal, pxPrice, pxActive }, _onOrderEvent: onOrderEvent, _site: { htmlText, ldItems, links, imgs, priceLines, privIp } };

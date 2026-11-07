@@ -10,7 +10,7 @@
 const fs = require('fs'); const path = require('path');
 const M = require('../js/sombre-map.js');
 const MARK = '/* th-built */';
-const SKIP_FILES = new Set(['sombre.css']);
+const SKIP_FILES = new Set(['sombre.css', 'ecran-client.css']); /* ecran-client.css: the customer screen keeps the brand colours (QR codes black on white) */
 /* tells js/theme.js the sheets are ready (no work left in the browser) */
 const BUILT = ':root{--th-built:1}';
 

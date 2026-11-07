@@ -134,10 +134,11 @@ function cmPubDoc() {
   let size = JSON.stringify(items).length; items.slice().sort((a, b) => (b.ph || "").length - (a.ph || "").length).forEach((it) => { if (size > 700000 && it.ph && it.ph.startsWith("data:")) { size -= it.ph.length; delete it.ph; } });
   const rs = typeof rsCfg === "function" ? rsCfg() : {};
   return { v: 1, name: (S.resto && S.resto.name) || "", logo: cmLogo(), address: rs.address || "", phone: rs.phone || "", msg: c.msg || "",
-    cfg: { on: !!c.on, table: !!c.table, takeaway: !!c.takeaway, payOnline: !!(c.payOnline && CM.link && CM.link.charges), payPlace: c.payPlace !== false || !(CM.link && CM.link.charges), tablePay: cmTablePay(c), tips: c.tips !== false, prepMin: c.prepMin, tables: cmTablesN(), pickup: c.pickup },
+    cfg: { on: !!c.on, table: !!c.table, calls: c.calls !== false, takeaway: !!c.takeaway, payOnline: !!(c.payOnline && CM.link && CM.link.charges), payPlace: c.payPlace !== false || !(CM.link && CM.link.charges), tablePay: cmTablePay(c), tips: c.tips !== false, prepMin: c.prepMin, tables: cmTablesN(), pickup: c.pickup },
     cats: SECS.map(({ id, t }) => ({ id, t })), items, day: today, look: cmLookPub(c.look),
     /* prix dynamiques (js/prix.js): happy hours and the plat du jour, discounts already capped by the margin floor */
-    promos: (() => { try { return typeof pxPubPromos === "function" ? pxPubPromos(items) : []; } catch (e) { return []; } })() };
+    promos: (() => { try { return typeof pxPubPromos === "function" ? pxPubPromos(items) : []; } catch (e) { return []; } })(),
+    review: (typeof rsGoogleUrl === "function" && rsGoogleUrl(rs.googleReview)) || "" };
 }
 const cmLookPub = (l) => ({ style: CM_STYLES.some((x) => x[0] === l.style) ? l.style : "moderne", acc: CM_ACCS.some((x) => x[0] === l.acc) ? l.acc : "violet", photos: l.photos !== false, cover: typeof l.cover === "string" && (/^https:\/\//.test(l.cover) && l.cover.length < 2000 || /^data:image\//.test(l.cover) && l.cover.length <= 170000) ? l.cover : "" });
 const cmSig = (d) => { if (!d) return ""; const { updatedAt, ...x } = d; return JSON.stringify(x); };
