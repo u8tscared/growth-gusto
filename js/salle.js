@@ -182,6 +182,12 @@ function slGone() {
 }
 
 /* ── the floor ── */
+/* QR orders at a table not paid yet (pay at the end of the meal): the waiter sees them on the floor until « Réglé » */
+function slDueHtml() {
+  if (typeof cmDue !== "function" || typeof cmDueBand !== "function") return "";
+  const L = (CM.orders || []).filter((o) => cmDue(o) && o.day === dayKey()).sort((a, b) => (a.at || 0) - (b.at || 0));
+  return L.length ? `<div class="sl-due-l st" style="--i:2">${L.map((o) => cmDueBand(o)).join("")}</div>` : "";
+}
 function slFloor() {
   const { plan, cfg, T } = slTables(), open = slOpenTabs(), by = slTabMap();
   const ready = slKitchen().filter((o) => o.src === "salle" && o.status === "prete").sort((a, b) => (a.waiter === S.me.id ? -1 : 0) - (b.waiter === S.me.id ? -1 : 0) || (a.readyAt || 0) - (b.readyAt || 0));
@@ -208,7 +214,7 @@ function slFloor() {
   return `<div class="inner wide sl">${topBar("Prise de commande", { right })}
     <div class="sl-kpi st" style="--i:1"><div><b class="mono">${open.length}</b><span>table${open.length > 1 ? "s" : ""}</span></div><div><b class="mono">${covers}</b><span>couvert${covers > 1 ? "s" : ""}</span></div><div><b class="mono">${cook}</b><span>en cuisine</span></div>${ready.length ? `<div class="hot"><b class="mono">${ready.length}</b><span>prêt${ready.length > 1 ? "s" : ""}</span></div>` : ""}</div>
     ${slStockBar()}
-    ${readyHtml}
+    ${readyHtml}${slDueHtml()}
     ${floor}
     ${list.length ? `<div class="lbl st" style="--i:4">Tables ouvertes</div><div class="glass sl-open st" style="--i:4">${list.map((t) => { const s = slTabState(t); return `<button class="sl-or k-${s.k}" data-go="salle" data-id="${esc(t.id)}"><b class="sl-ort mono">${esc(t.table)}</b><span class="sl-ortx"><b>${esc(s.t)}</b><em>${slCovers(t)} · ${slItemsOk(t).reduce((a, x) => a + (+x.q || 0), 0)} articles · <span class="sl-ago" data-at="${t.openedAt}">${slAgo(t.openedAt)}</span>${t.byName && t.by !== S.me.id ? ` · ${esc(firstName(t.byName))}` : ""}</em></span><b class="mono sl-ortot">${slEur(slTotal(t.items || []))}</b>${ico("chev")}</button>`; }).join("")}</div>` : `<p class="note sl-pnote st" style="--i:4">${ico("slPad")}<span>Touchez une table pour prendre la commande. Elle part en cuisine d'un geste, et vous êtes prévenu quand c'est prêt.</span></p>`}
   </div>`;
@@ -609,10 +615,11 @@ function slKCard(o, i) {
   const later = salle ? slTickets(o.tabId).filter((x) => x.status === "attente" && x.id !== o.id) : [];
   const head = salle ? `<b class="sl-ktab">Table <span class="mono">${esc(o.table)}</span></b><span class="sl-kcrs">${esc(o.courseT || "")}</span>`
     : `<b class="sl-ktab">${o.mode === "table" ? `Table <span class="mono">${esc(o.table)}</span>` : `${ico("cmBag")}<span class="mono">${esc(o.slot || "")}</span>`}</b><span class="sl-kcrs qr">${o.mode === "table" ? "Commande QR" : `À emporter n° ${o.n}`}</span>`;
-  const meta = [salle && o.waiterName ? firstName(o.waiterName) : "", salle && o.covers ? `${o.covers} couv.` : "", !salle && o.name ? o.name : "", !salle ? (o.paid ? "payée" : "à encaisser") : ""].filter(Boolean);
+  const meta = [salle && o.waiterName ? firstName(o.waiterName) : "", salle && o.covers ? `${o.covers} couv.` : "", !salle && o.name ? o.name : "", !salle ? (o.paid ? "payée" : o.settled ? "réglée" : o.mode === "table" ? "" : "à encaisser") : ""].filter(Boolean);
   const flags = [o.rush ? `<span class="sl-flag rush">${ico("slBolt")}Prioritaire</span>` : "", o.items && o.items.some((x) => x.refire) ? `<span class="sl-flag refire">${ico("slRedo")}À refaire</span>` : "", modNew ? `<span class="sl-flag mod">${ico("slWarn")}Modifié</span>` : "", o.add ? `<span class="sl-add">Ajout</span>` : "", o.status === "prep" ? `<span class="sl-fire">${ico("slFire")}Sur le feu</span>` : ""].join("");
   return `<article class="sl-kcard s-${o.status}${m >= 20 ? " late" : m >= 10 ? " warm" : ""}${CM.fresh.has(o.id) ? " fresh" : ""}${o.station === "bar" ? " bar" : ""}${o.rush ? " rush" : ""}" style="--i:${Math.min(i, 10)}" data-id="${esc(o.id)}">
     <header>${head}<span class="sl-kt mono" data-at="${t0}">${slAgo(t0)}</span></header>
+    ${!salle && typeof cmDue === "function" && cmDue(o) ? cmDueBand(o, true) : ""}
     <div class="sl-kmeta">${flags}${meta.map((x) => `<span>${esc(x)}</span>`).join("")}</div>
     <ul class="sl-kit">${(o.items || []).map((x, j) => `<li class="${x.ok ? "ok" : ""}${x.off ? " off" : ""}" data-act="slKItem" data-id="${esc(o.id)}" data-v="${j}"><b class="mono">${x.q}</b><span><span class="sl-kn">${esc(x.name)}${x.seat ? ` <i class="sl-tag seat">P${x.seat}</i>` : ""}${x.rush && !o.rush ? ` <i class="sl-tag rush">${ico("slBolt")}</i>` : ""}${typeof brLineTag === "function" ? brLineTag(o, x) : ""}${typeof rpBtn === "function" ? rpBtn(o, x, j) : ""}</span>${x.off ? `<i class="sl-ial">ANNULÉ${x.offReason ? ` · ${esc(x.offReason)}` : ""}</i>` : ""}${x.refire ? `<i class="sl-tag refire">${ico("slRedo")}À refaire · ${esc(x.refire)}</i>` : ""}${(x.without || []).map((w) => `<em class="m-w">SANS ${esc(String(w).toUpperCase())}</em>`).join("")}${(x.extras || []).map((e) => `<em class="m-x">+ ${esc(e.t)}</em>`).join("")}${x.note ? `<em>${esc(x.note)}</em>` : ""}${(x.allergy || []).length ? `<i class="sl-ial clash">${ico("slWarn")}ALLERGIE ${esc(x.allergy.map((a) => slAl(a).t).join(", ").toUpperCase())}</i>` : ""}</span></li>`).join("")}</ul>
     ${o.note ? `<div class="cm-onote">${ico("rsNote")}<span>${esc(o.note)}</span></div>` : ""}

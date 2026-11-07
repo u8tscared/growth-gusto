@@ -220,6 +220,8 @@ function hlSheetHTML() {
     <div class="lbl hl-lbl">Attend le retour du réseau</div>
     <div class="hl-waits">${HL_WAITS.map((t) => `<span>${t}</span>`).join("")}</div>
     <div class="hl-tip"><span class="ic">${ico("sparkle")}</span><p><b>Les autres appareils</b> reçoivent tout dès que celui-ci retrouve le réseau. Pendant une coupure, l'écran cuisine affiche aussitôt les commandes prises sur le même appareil. Astuce : un téléphone en 4G garde le service relié.</p></div>
+    <div class="hl-tip hl-cli" style="margin-top:0"><span class="ic">${ico("users")}</span><p><b>Vos clients aussi sont rassurés.</b> Si leur réseau coupe pendant une commande au QR code, un paiement ou une réservation, un message leur dit de patienter, puis tout repart tout seul, sans jamais rien envoyer deux fois.</p></div>
+    <a class="btn soft block" href="commande/?r=demo&amp;t=12&amp;coupure=1" target="_blank" rel="noopener">${ico("qr")}Voir ce que voit le client</a>
     <div id="hlAct"></div>
   </div>`;
 }

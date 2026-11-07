@@ -444,7 +444,7 @@ VIEWS.journal = {
     const days = Object.keys(byDay).sort().reverse(); let k = 0;
     return `<div class="inner wide jr">${topBar("Journal des actions", { right: `<button class="btn soft sm" data-act="jrCsv">${ico("download" in IC ? "download" : "upload")}Exporter</button>` })}
       <p class="sub jr-lede st" style="--i:1">Tout ce qui se fait dans l'app, signé et à la minute. Rien ne s'efface : une action annulée reste ici, barrée.</p>
-      <div class="jr-ctl st" style="--i:1"><div class="seg jr-per" role="tablist">${JR_P.map(([v, t]) => `<button role="tab" class="${JR.p === v ? "on" : ""}" aria-selected="${JR.p === v}" data-act="jrP" data-v="${v}">${t}</button>`).join("")}</div>
+      <div class="jr-ctl st" style="--i:1"><div class="seg jr-per" role="tablist"><span class="knob" style="width:calc(${100 / JR_P.length}% - ${8 / JR_P.length}px);transform:translateX(${Math.max(0, JR_P.findIndex((x) => x[0] === JR.p)) * 100}%)"></span>${JR_P.map(([v, t]) => `<button role="tab" class="${JR.p === v ? "on" : ""}" aria-selected="${JR.p === v}" data-act="jrP" data-v="${v}">${t}</button>`).join("")}</div>
         <label class="jr-q">${ico("jrSearch")}<input id="jrQ" class="input" type="search" placeholder="Chercher : table 4, entrecôte, Sarah…" value="${esc(JR.q)}" autocomplete="off" enterkeyhint="search"></label></div>
       <div class="jr-kpis st" style="--i:2">${kpi}</div>
       <div class="jr-cols"><div class="jr-main">

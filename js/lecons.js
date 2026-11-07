@@ -193,7 +193,7 @@ const PC_LECONS = {
     q: ["Un client appelle pour réserver. Le plus rapide ?", ["« Nouvelle réservation » pendant l'appel", "Un post-it", "Le rappeler demain"], 0],
     sc: { k: "list", t: "Ce soir · 48 couverts", rows: [["resa", "19:30 · Martin", "4 pers.", "ok"], ["resa", "20:00 · Leroy", "2 pers.", "acc"], ["resa", "20:15 · Dubois", "6 pers.", "warn"]] } },
   commandes: { t: "Commandes en ligne", d: "Le menu QR à table et la vente à emporter : les commandes arrivent en cuisine, payées ou à régler sur place.", who: ["salle", "cuisine", "boss"],
-    steps: ["Une commande arrive avec un carillon", "Faites-la avancer d'un geste", "Prête : le client est prévenu"],
+    steps: ["Une commande arrive avec un carillon", "Faites-la avancer d'un geste", "Pas encore payée : « À régler » en rouge, touchez « Réglé » après l'encaissement", "Prête : le client est prévenu"],
     q: ["D'où vient la carte du menu QR ?", ["Des recettes marquées « à la carte »", "D'un PDF", "D'internet"], 0],
     sc: { k: "board", t: "Commandes en ligne", cols: [["Nouvelles", ["#41 · À emporter"]], ["En préparation", ["#39 · Table 3"]], ["Prêtes", ["#38 · À emporter"]]] } },
   clients: { t: "Clients & fidélité", d: "Le fichier clients se remplit seul avec les réservations et les commandes : habitués, allergies, préférences.", who: ["salle", "boss"],
