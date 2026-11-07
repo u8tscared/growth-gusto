@@ -48,10 +48,15 @@
     bell: '<svg viewBox="0 0 24 24"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>',
     note: '<svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>',
     lock: '<svg viewBox="0 0 24 24"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>',
+    bill: '<svg viewBox="0 0 24 24"><path d="M6 2.5h12v19l-2.5-1.6L13 21.5l-2.5-1.6L8 21.5l-2-1.3Z"/><path d="M9 7.5h6M9 11.5h6M9 15.5h3"/></svg>',
+    drop: '<svg viewBox="0 0 24 24"><path d="M12 2.7s6 6.3 6 11.3a6 6 0 0 1-12 0c0-5 6-11.3 6-11.3Z"/></svg>',
+    bread: '<svg viewBox="0 0 24 24"><path d="M5 11a3.5 3.5 0 0 1 1-6.8C8 3 10 3 12 3s4 0 6 1.2A3.5 3.5 0 0 1 19 11v8a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2Z"/><path d="M9 11v6M15 11v6"/></svg>',
+    ticket: '<svg viewBox="0 0 24 24"><path d="M3 8a2 2 0 0 0 2-2h14a2 2 0 0 0 2 2v8a2 2 0 0 0-2 2H5a2 2 0 0 0-2-2Z"/><path d="M13 6v12" stroke-dasharray="2 2"/></svg>',
+    star: '<svg viewBox="0 0 24 24"><path d="m12 2.8 2.8 5.8 6.3.9-4.6 4.4 1.1 6.3L12 17.2l-5.6 3 1.1-6.3L2.9 9.5l6.3-.9Z"/></svg>',
   };
 
   const st = { pub: null, mode: null, table: "", cart: [], al: new Set(), cat: "", view: "menu", sending: false, err: "",
-    name: "", phone: "", slot: "", note: "", pay: "", order: null, oid: OID, okey: KEY, pollT: 0, sheet: null };
+    name: "", phone: "", slot: "", note: "", pay: "", order: null, oid: OID, okey: KEY, pollT: 0, sheet: null, call: null, callT: 0 };
   /* "fruits_coque" is the old spelling of "fruitscoque" (js/notes.js noteAlId): read both */
   const alId = (k) => (k === "fruits_coque" ? "fruitscoque" : String(k || ""));
   try { const a = JSON.parse(localStorage.getItem("gg-qm-al") || "[]"); if (Array.isArray(a)) a.forEach((x) => st.al.add(alId(x))); } catch (e) {}
@@ -95,7 +100,7 @@
   /* ───────── demo restaurant ───────── */
   const DEMO_PH = (h1, h2, e) => `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120"><defs><radialGradient id="g" cx=".35" cy=".3" r=".9"><stop offset="0" stop-color="${h1}"/><stop offset="1" stop-color="${h2}"/></radialGradient></defs><rect width="120" height="120" fill="url(#g)"/><text x="60" y="76" font-size="46" text-anchor="middle">${e}</text></svg>`)}`;
   function demoPub() {
-    return { name: "Le Bistrot Démo", address: "8 place du Marché, Lyon 2e", phone: "04 78 42 18 90", logo: "", msg: "Produits frais du marché, cuisinés sur place.", look: { style: "moderne", acc: "violet", photos: true, cover: "" },
+    return { name: "Le Bistrot Démo", review: "https://g.page/r/CbistrotDemoGG/review", address: "8 place du Marché, Lyon 2e", phone: "04 78 42 18 90", logo: "", msg: "Produits frais du marché, cuisinés sur place.", look: { style: "moderne", acc: "violet", photos: true, cover: "" },
       cfg: { on: true, table: true, takeaway: true, payOnline: true, payPlace: true, prepMin: 20, tables: 18, pickup: { days: [0, 1, 2, 3, 4, 5, 6], windows: [{ from: "11:30", to: "14:00" }, { from: "18:30", to: "22:00" }], step: 15 }, tipNote: "" },
       cats: [{ id: "partage", t: "À partager" }, { id: "entree", t: "Entrées" }, { id: "plat", t: "Plats" }, { id: "dessert", t: "Desserts" }, { id: "boisson", t: "Boissons" }],
       items: [
@@ -131,6 +136,19 @@
       if (o.status === "prete" && o.mode === "table" && age > 16000) o.status = "servie";
       return { order: { ...o } };
     }
+    if (op === "call") {
+      const c = { id: "t" + d.table + "-" + d.kind, table: d.table, kind: d.kind, pay: d.pay || "", status: "new", at: Date.now(), n: 1, byName: "" };
+      demo.call = c; setTimeout(() => { if (demo.call === c && c.status === "new") { c.status = "vu"; c.byName = "Sarah"; c.seenAt = Date.now(); } }, 3000);
+      setTimeout(() => { if (demo.call === c && c.status === "vu") { c.status = "fait"; c.doneAt = Date.now(); } }, 16000);
+      return { cid: c.id, k: "0".repeat(32), call: { ...c } };
+    }
+    if (op === "callSt") { const c = demo.call; if (!c) throw new Error("lien"); if (d.cancel && c.status === "new") c.status = "annule"; return { call: { ...c } }; }
+    if (op === "bill") {
+      const lines = [{ name: "Limonade maison", q: 2, amount: 9 }, { name: "Velouté de potimarron", q: 2, amount: 17 }, { name: "Bœuf bourguignon", q: 2, amount: 44 }, { name: "Filet de bar, beurre blanc", q: 2, amount: 48 }, { name: "Mousse au chocolat", q: 1, amount: 0, free: true }];
+      const total = lines.reduce((a, l) => a + l.amount, 0), pays = demo.pays || (demo.pays = []), paid = pays.reduce((a, x) => a + x.amount, 0);
+      return { bill: { table: "3", covers: 4, open: true, lines, total, paid, left: Math.max(0, total - paid), payOnline: true, pays: pays.map((x) => ({ ...x })) } };
+    }
+    if (op === "billPay") { const id = "demo" + Date.now().toString(36); (demo.pays || (demo.pays = [])).push({ id, amount: +d.amount, status: "paye", at: Date.now(), paidAt: Date.now() }); return { bp: id, demo: true }; }
     throw new Error("op");
   }
 
@@ -246,7 +264,7 @@
       ${!st.mode ? `<p class="qm-msgline info st" style="--i:1">${svg.alert}<span>Vous consultez la carte. <button class="qm-link in" data-a="mode">Commander</button></span></p>` : ""}
       <nav class="qm-cats" id="qmCats" aria-label="Catégories"><div class="qm-cats-in">${C.map((c) => `<button class="qm-cat${c.id === st.cat ? " on" : ""}" data-a="cat" data-v="${esc(c.id)}">${esc(c.t)}</button>`).join("")}<span class="qm-cat-ind" id="qmInd"></span></div></nav>
       <section class="qm-list">${C.map((c) => { const L = items().filter((i) => i.c === c.id); return `<div class="qm-sec" id="sec-${esc(c.id)}" data-cat="${esc(c.id)}"><h2>${esc(c.t)}<span>${L.length}</span></h2>${L.map(itemCard).join("")}</div>`; }).join("") || `<div class="qm-none">La carte arrive bientôt.</div>`}</section>
-      ${foot()}${bar()}`;
+      ${foot()}${callFab()}${bar()}`;
     catInd(); spy();
   }
   /* sticky category bar: the violet pill slides under the active category, and follows the scroll */
@@ -272,6 +290,7 @@
     const old = $(`.qm-it[data-id="${CSS.escape(id)}"]`), it = itemOf(id);
     if (old && it) { const tmp = document.createElement("div"); tmp.innerHTML = itemCard(it, 0); const n = tmp.firstElementChild; n.classList.remove("st"); old.replaceWith(n); }
     const b = $("#qmBar"); if (b) { const was = b.classList.contains("on"); b.classList.toggle("on", count() > 0); $("#qmN").textContent = count(); $("#qmP").textContent = eur(total()); const nn = $("#qmN"); nn.classList.remove("bump"); void nn.offsetWidth; nn.classList.add("bump"); if (!was && count()) pop(520, 0.12); }
+    const f = $("#qmFab"); if (f) f.classList.toggle("up", count() > 0);
   }
   /* a small violet dot flies from the + to the cart bar */
   function fly(from) {
@@ -383,7 +402,7 @@
       ${o.status === "abandonnee" || o.status === "servie" || (take && o.status === "prete") ? `<button class="qm-btn" data-a="again">Nouvelle commande</button>` : ""}
       ${o.status === "apayer" && o.payUrl ? `<a class="qm-btn" href="${esc(o.payUrl)}">${svg.lock}Reprendre le paiement</a>` : ""}
       ${p.phone ? `<a class="qm-link" href="tel:${esc(String(p.phone).replace(/[^\d+]/g, ""))}">Une question ? ${esc(p.phone)}</a>` : ""}
-    </section>${foot()}`;
+    </section>${foot()}${callFab()}`;
   }
   async function poll(first) {
     clearTimeout(st.pollT);
@@ -397,6 +416,102 @@
     } catch (e) { console.warn(e); if (!st.order) return paintMsg("Commande introuvable", errText(e)); st.pollT = setTimeout(() => poll(false), 15000); }
   }
   document.addEventListener("visibilitychange", () => { if (!document.hidden && st.view === "order" && st.oid) poll(false); });
+
+  /* ───────── at the table: call the waiter, ask for the bill (orderApi op "call" / "callSt") ───────── */
+  const CALL_K = { serveur: ["Appeler le serveur", "Une question, un conseil, quelque chose à ajouter", "bell"], addition: ["L'addition, s'il vous plaît", "On vous l'apporte, ou elle s'affiche sur l'écran du comptoir", "bill"],
+    eau: ["Une carafe d'eau", "", "drop"], pain: ["Du pain", "", "bread"] };
+  const CALL_PAY = [["carte", "Carte bancaire", "card"], ["especes", "Espèces", "coins"], ["titre", "Titre-restaurant", "ticket"]];
+  const CALL_ST = { new: ["Demande envoyée", "L'équipe est prévenue. Quelqu'un arrive."], vu: ["On arrive !", "Votre demande a été vue."], fait: ["C'est fait", "Merci, bon appétit !"], annule: ["Demande annulée", ""] };
+  /* the table this phone sits at: the table QR code, the table chosen, or the one of the order */
+  const callTable = () => { const c = cfg(); if (!c.table || c.calls === false) return ""; if (st.mode === "table" && st.table) return st.table; if (st.order && st.order.mode === "table") return String(st.order.table || ""); return /^\d{1,4}$/.test(T0) ? T0 : ""; };
+  const callLive = () => st.call && st.call.call && ["new", "vu"].includes(st.call.call.status) && Date.now() - (st.call.call.at || 0) < 30 * 6e4;
+  function callFab() {
+    const t = callTable(); if (!t || PV) return "";
+    const live = callLive(), c = live && st.call.call, who = c && c.byName;
+    return `<button class="qm-fab${live ? " live " + c.status : ""}${count() ? " up" : ""}" id="qmFab" data-a="callOpen" aria-label="${live ? "Voir ma demande" : "Appeler le serveur ou demander l'addition"}">
+      <span class="qm-fab-ic">${live && c.status === "vu" ? svg.check : svg.bell}</span><span class="qm-fab-t">${live ? (c.status === "vu" ? (who ? `${esc(who)} arrive` : "On arrive") : "Demande envoyée") : "Serveur"}</span></button>`;
+  }
+  function refreshFab() { const f = $("#qmFab"); if (!f) return; const h = callFab(); if (!h) { f.remove(); return; } const d = document.createElement("div"); d.innerHTML = h; f.replaceWith(d.firstElementChild); }
+  let callPick = { kind: "", pay: "" };
+  function paintCall() {
+    const t = callTable(); if (!t) return;
+    if (callLive()) return paintCallState();
+    const tile = (k, i) => { const [h, s] = CALL_K[k]; return `<button class="qm-ct st${callPick.kind === k ? " on" : ""}" style="--i:${i}" data-a="callKind" data-v="${k}"><span class="qm-ct-ic ${k}">${k === "addition" ? svg.bill : svg.bell}</span><span class="qm-ct-tx"><b>${esc(h)}</b><em>${esc(s)}</em></span></button>`; };
+    const small = ["eau", "pain"].map((k) => `<button class="qm-cs${callPick.kind === k ? " on" : ""}" data-a="callKind" data-v="${k}">${k === "eau" ? svg.drop : svg.bread}${esc(CALL_K[k][0])}</button>`).join("");
+    const payQ = callPick.kind === "addition" ? `<div class="qm-blk qm-cpay"><div class="qm-bh">${svg.card}<b>Vous réglez comment ?</b><span class="qm-opt">facultatif</span></div><div class="qm-cpays">${CALL_PAY.map(([k, tx]) => `<button class="qm-cp${callPick.pay === k ? " on" : ""}" data-a="callPay" data-v="${k}">${svg[CALL_PAY.find((x) => x[0] === k)[2]]}${esc(tx)}</button>`).join("")}</div></div>` : "";
+    openSheet(`<div class="qm-sh-sc"><div class="qm-sh-h"><div><h3>On vient vous voir</h3><p>${svg.table}Table ${esc(t)}</p></div><button class="qm-x in" data-a="close" aria-label="Fermer">${svg.x}</button></div>
+      <div class="qm-cts">${tile("serveur", 0)}${tile("addition", 1)}</div>
+      <div class="qm-csl">${small}</div>${payQ}${st.err ? `<p class="qm-err">${svg.alert}${esc(st.err)}</p>` : ""}</div>
+      <div class="qm-sh-cta"><button class="qm-btn big grow" data-a="callSend" ${callPick.kind && !st.sending ? "" : "disabled"}>${st.sending ? `<span class="qm-spin"></span>Un instant…` : callPick.kind ? `${svg.bell}${callPick.kind === "addition" ? "Demander l'addition" : "Prévenir l'équipe"}` : "Choisissez une demande"}</button></div>`, "call");
+  }
+  function paintCallState() {
+    const c = st.call.call, [h, s] = CALL_ST[c.status] || CALL_ST.new, k = CALL_K[c.kind] || CALL_K.serveur;
+    const sub = c.status === "vu" && c.byName ? `${c.byName} a vu votre demande et arrive.` : s;
+    openSheet(`<div class="qm-sh-sc qm-cst"><button class="qm-x in" data-a="close" aria-label="Fermer">${svg.x}</button>
+      <div class="qm-cring ${c.status}" aria-hidden="true"><i></i><i></i><i></i><span>${c.status === "vu" || c.status === "fait" ? svg.check : c.kind === "addition" ? svg.bill : svg.bell}</span></div>
+      <h3>${esc(h)}</h3><p>${esc(sub)}</p>
+      <div class="qm-cchip">${c.kind === "addition" ? svg.bill : svg.bell}<b>${esc(k[0])}</b><span>Table ${esc(c.table)}${c.pay ? ` · ${esc((CALL_PAY.find((x) => x[0] === c.pay) || [0, ""])[1])}` : ""}</span></div>
+      ${c.status === "new" ? `<p class="qm-cwait"><span class="qm-dots"><i></i><i></i><i></i></span>Envoyé <span data-ago="${c.again || c.at}">${ago(c.again || c.at)}</span></p>` : ""}</div>
+      <div class="qm-sh-cta">${c.status === "new" ? `<button class="qm-btn soft" data-a="callCancel">Annuler</button><button class="qm-btn grow" data-a="callAgain">${svg.bell}Relancer</button>` : `<button class="qm-btn grow" data-a="close">Revenir à la carte</button>`}</div>`, "call");
+  }
+  const ago = (at) => { const s = Math.max(0, Math.round((Date.now() - (at || Date.now())) / 1000)); return s < 45 ? "à l'instant" : s < 3600 ? `il y a ${Math.max(1, Math.round(s / 60))} min` : "il y a longtemps"; };
+  const saveCall = () => { const s = store.get() || {}; s.call = st.call ? { cid: st.call.cid, k: st.call.k, at: Date.now() } : null; store.set(s); };
+  async function callPoll() {
+    clearTimeout(st.callT); if (!st.call) return;
+    try {
+      const r = await api("callSt", { cid: st.call.cid, k: st.call.k }); const was = st.call.call && st.call.call.status; st.call.call = r.call;
+      if (was !== r.call.status) { if (r.call.status === "vu") { chime(); vib([30, 40, 30]); } else if (r.call.status === "fait") { pop(880, 0.12); vib(15); } if (st.sheet === "call") keepScroll(paintCallState); }
+      refreshFab();
+      if (["fait", "annule"].includes(r.call.status) || Date.now() - (r.call.at || 0) > 30 * 6e4) { st.call = null; saveCall(); setTimeout(refreshFab, 2600); return; }
+    } catch (e) { console.warn(e); }
+    st.callT = setTimeout(callPoll, document.hidden ? 15000 : 4000);
+  }
+  document.addEventListener("visibilitychange", () => { if (!document.hidden && st.call) callPoll(); });
+  setInterval(() => { $$("[data-ago]").forEach((el) => { el.textContent = ago(+el.dataset.ago); }); }, 15000);
+
+  /* ───────── the bill of a table, from the customer screen's QR (?r=…&b=<tab>&k=<key>, orderApi op "bill" / "billPay") ───────── */
+  const BID = (Q.get("b") || "").trim(), BK = (Q.get("k") || "").trim().toLowerCase(), BP = (Q.get("bp") || "").trim(), BN = Math.max(1, Math.min(20, parseInt(Q.get("n") || "0", 10) || 0));
+  const bs = { back: BP, bill: null, how: BN > 1 ? "part" : "tout", parts: BN > 1 ? BN : 2, mine: 1, busy: false, err: "", pollN: 0 };
+  const billMine = () => { const b = bs.bill; if (!b) return 0; if (bs.how === "tout") return b.left; return Math.min(b.left, Math.ceil((b.total / bs.parts) * bs.mine * 100) / 100); };
+  function paintBill() {
+    const bp = bs.back, b = bs.bill, p = st.pub || {}, done = b && b.left <= 0.004 && b.total > 0, back = bp && b && b.pays.find((x) => x.id === bp);
+    document.title = `Addition · ${p.name || "Restaurant"}`;
+    if (!b) return;
+    const okNow = back && back.status === "paye", waiting = back && back.status === "apayer";
+    const lines = b.lines.map((l) => `<div><span><b>${l.q}×</b> ${esc(l.name)}</span><span class="mono">${l.free ? "offert" : eur(l.amount)}</span></div>`).join("");
+    const paidRows = b.pays.filter((x) => x.status === "paye").map((x) => `<div class="pd"><span>${svg.check}Payé en ligne</span><span class="mono">− ${eur(x.amount)}</span></div>`).join("");
+    const review = p.review ? `<a class="qm-btn soft qm-rev" href="${esc(p.review)}" target="_blank" rel="noopener">${svg.star}Laisser un avis sur Google</a>` : "";
+    let pay = "";
+    if (okNow || done) pay = `<div class="qm-bok st" style="--i:2"><div class="qm-ring prete" aria-hidden="true"><svg viewBox="0 0 120 120"><circle class="tr" cx="60" cy="60" r="52"/><circle class="pg" cx="60" cy="60" r="52" style="--p:1"/></svg><div class="qm-ring-c">${svg.check}</div>${Array.from({ length: 14 }, (_, k) => `<i style="--a:${k * 26}deg;--d:${(k % 5) * 40}ms"></i>`).join("")}</div>
+      <h2>${done ? "Tout est réglé" : "Merci, c'est payé"}</h2><p>${done ? "Merci pour votre visite, à très bientôt !" : `${eur(back.amount)} réglés. ${b.left > 0 ? `Il reste ${eur(b.left)} pour la table.` : ""}`}</p>${review}</div>`;
+    else if (waiting) pay = `<div class="qm-bok st"><span class="qm-spin big"></span><h2>Paiement en cours</h2><p>On attend la confirmation de votre banque.</p></div>`;
+    else if (!b.open) pay = `<p class="qm-msgline info">${svg.check}<span>Cette table est réglée. Merci et à bientôt !</span></p>${review}`;
+    else if (!b.payOnline) pay = `<p class="qm-msgline info">${svg.card}<span>Réglez auprès de votre serveur : carte, espèces ou titre-restaurant.</span></p>`;
+    else {
+      const amt = billMine();
+      pay = `<div class="qm-bpay st" style="--i:2"><div class="qm-segs">${[["tout", "Tout régler"], ["part", "Payer ma part"]].map(([k, t]) => `<button class="${bs.how === k ? "on" : ""}" data-a="billHow" data-v="${k}">${t}</button>`).join("")}</div>
+        ${bs.how === "part" ? `<div class="qm-parts"><div><span>On partage en</span><div class="qm-qty sm"><button data-a="billParts" data-v="-1" aria-label="Moins" ${bs.parts <= 2 ? "disabled" : ""}>${svg.minus}</button><b class="mono">${bs.parts}</b><button data-a="billParts" data-v="1" aria-label="Plus">${svg.plus}</button></div></div>
+          <div><span>Je paie pour</span><div class="qm-qty sm"><button data-a="billMine" data-v="-1" aria-label="Moins" ${bs.mine <= 1 ? "disabled" : ""}>${svg.minus}</button><b class="mono">${bs.mine}</b><button data-a="billMine" data-v="1" aria-label="Plus" ${bs.mine >= bs.parts - 1 ? "disabled" : ""}>${svg.plus}</button></div></div></div>` : ""}
+        ${bs.err ? `<p class="qm-err">${svg.alert}${esc(bs.err)}</p>` : ""}
+        <button class="qm-btn big block" data-a="billGo" ${bs.busy || amt < 1 ? "disabled" : ""}>${bs.busy ? `<span class="qm-spin"></span>Un instant…` : `${svg.lock}Payer ${eur(amt)}`}</button>
+        <p class="qm-fine">${svg.lock}Paiement sécurisé par Stripe, directement au restaurant. Carte, Apple Pay, Google Pay.</p></div>`;
+    }
+    app.innerHTML = `${hero(`Table ${b.table}`)}<section class="qm-card qm-billp">
+      <div class="qm-ticket st" style="--i:1"><div class="qm-tk-h">Votre addition · Table ${esc(b.table)}${b.covers ? ` · ${b.covers} couvert${b.covers > 1 ? "s" : ""}` : ""}</div>
+        <div class="qm-tk-l">${lines}</div><div class="qm-tk-t"><span>Total</span><b class="mono">${eur(b.total)}</b></div>
+        ${paidRows ? `<div class="qm-tk-l paid">${paidRows}</div><div class="qm-tk-t left"><span>Reste à payer</span><b class="mono">${eur(b.left)}</b></div>` : ""}</div>
+      ${pay}</section>${foot()}`;
+    if (okNow || done) { chime(); vib([20, 40, 20]); }
+  }
+  async function loadBill(first) {
+    clearTimeout(st.pollT);
+    try {
+      const r = await api("bill", { tid: BID, k: BK, bp: bs.back }); const was = bs.bill; bs.bill = r.bill;
+      const back = bs.back && r.bill.pays.find((x) => x.id === bs.back);
+      if (first || !was || JSON.stringify(was) !== JSON.stringify(r.bill)) paintBill();
+      if (back && back.status === "apayer" && bs.pollN++ < 20) st.pollT = setTimeout(() => loadBill(false), 3000);
+    } catch (e) { console.warn(e); if (!bs.bill) paintMsg("Addition introuvable", String((e && e.message) || "") === "lien" ? "Ce QR code n'est plus valide. Demandez au serveur d'afficher à nouveau l'addition." : errText(e), true); }
+  }
 
   /* ───────── actions ───────── */
   const ACT = {
@@ -416,7 +531,29 @@
     allergies: () => { pop(700, 0.06, 0.03); paintAllergies(); },
     alt: (el) => { const v = el.dataset.v; if (st.al.has(v)) st.al.delete(v); else st.al.add(v); el.classList.toggle("on", st.al.has(v)); el.setAttribute("aria-pressed", st.al.has(v)); try { localStorage.setItem("gg-qm-al", JSON.stringify([...st.al])); } catch (e) {} pop(st.al.has(v) ? 760 : 520, 0.06, 0.03); vib(8); },
     alclear: () => { st.al.clear(); try { localStorage.removeItem("gg-qm-al"); } catch (e) {} $$(".qm-alb").forEach((b) => b.classList.remove("on")); pop(480, 0.07, 0.03); },
-    close: () => { const was = st.sheet; closeSheet(); if (was === "al" || was === "cart") { st.view = "menu"; paintMenu(); } },
+    close: () => { const was = st.sheet; closeSheet(); if (was === "al" || was === "cart") { st.view = "menu"; paintMenu(); } else if (was === "call") refreshFab(); },
+    callOpen: () => { st.err = ""; pop(700, 0.06, 0.03); vib(8); if (!callLive()) callPick = { kind: "", pay: "" }; paintCall(); },
+    callKind: (el) => { callPick.kind = el.dataset.v; if (callPick.kind !== "addition") callPick.pay = ""; pop(760, 0.05, 0.03); vib(6); keepScroll(paintCall); },
+    callPay: (el) => { callPick.pay = callPick.pay === el.dataset.v ? "" : el.dataset.v; pop(760, 0.05, 0.03); vib(6); keepScroll(paintCall); },
+    callSend: async () => {
+      if (st.sending || !callPick.kind) return; st.sending = true; st.err = ""; keepScroll(paintCall);
+      try { const r = await api("call", { table: callTable(), kind: callPick.kind, pay: callPick.pay }); st.call = r; saveCall(); st.sending = false; chime(); vib([20, 40, 20]); keepScroll(paintCallState); refreshFab(); clearTimeout(st.callT); st.callT = setTimeout(callPoll, 3500); }
+      catch (e) { console.warn(e); st.sending = false; st.err = String((e && e.message) || "") === "appel" ? "Ce restaurant ne prend pas les appels par QR code. Faites signe au serveur." : errText(e); vib([30, 30, 30]); keepScroll(paintCall); }
+    },
+    callAgain: async () => { if (!st.call || st.sending) return; st.sending = true; try { const c = st.call.call; const r = await api("call", { table: c.table, kind: c.kind, pay: c.pay }); st.call = r; saveCall(); pop(); vib(12); keepScroll(paintCallState); } catch (e) { console.warn(e); } st.sending = false; },
+    callCancel: async () => { if (!st.call) return; try { const r = await api("callSt", { cid: st.call.cid, k: st.call.k, cancel: 1 }); st.call.call = r.call; } catch (e) { console.warn(e); } st.call = null; saveCall(); clearTimeout(st.callT); pop(480, 0.07, 0.03); closeSheet(); refreshFab(); },
+    billHow: (el) => { bs.how = el.dataset.v; bs.mine = Math.min(bs.mine, bs.parts - 1); pop(760, 0.05, 0.03); vib(6); paintBill(); },
+    billParts: (el) => { bs.parts = Math.max(2, Math.min(20, bs.parts + +el.dataset.v)); bs.mine = Math.min(bs.mine, bs.parts - 1); pop(640 + bs.parts * 20, 0.05, 0.03); vib(6); paintBill(); },
+    billMine: (el) => { bs.mine = Math.max(1, Math.min(bs.parts - 1, bs.mine + +el.dataset.v)); pop(640 + bs.mine * 20, 0.05, 0.03); vib(6); paintBill(); },
+    billGo: async () => {
+      if (bs.busy) return; bs.busy = true; bs.err = ""; paintBill();
+      try {
+        const r = await api("billPay", { tid: BID, k: BK, amount: billMine(), back: location.origin + location.pathname });
+        if (r.url) { location.href = r.url; return; }
+        /* the demo: no Stripe, the page comes back as from Stripe's success page */
+        history.replaceState(null, "", `?r=${encodeURIComponent(RID)}&b=${encodeURIComponent(BID)}&k=${BK}&bp=${encodeURIComponent(r.bp)}&paid=1`); bs.busy = false; bs.back = r.bp; loadBill(true);
+      } catch (e) { console.warn(e); bs.busy = false; const m = String((e && e.message) || ""); bs.err = m === "regle" ? "Cette table vient d'être réglée." : m === "montant" ? "Le montant n'est pas valable." : errText(e); vib([30, 30, 30]); paintBill(); }
+    },
     cart: () => { if (!count()) return; st.err = ""; pop(700, 0.06, 0.03); paintCart(); },
     lq: (el) => { const l = st.cart[+el.dataset.i]; if (!l) return; l.q = Math.max(0, Math.min(30, l.q + +el.dataset.v)); st.cart = st.cart.filter((x) => x.q > 0); saveCart(); pop(560, 0.05, 0.03); vib(6); if (!st.cart.length) { closeSheet(); st.view = "menu"; paintMenu(); return; } keepScroll(paintCart); },
     slot: (el) => { st.slot = el.dataset.v; pop(760, 0.05, 0.03); vib(6); keepScroll(paintCart); },
@@ -450,9 +587,11 @@
     if (!st.pub || !(st.pub.items || []).length) return paintMsg("Carte introuvable", "Ce restaurant n'a pas (encore) de carte en ligne.");
     st.pub.items.forEach((it) => { if (Array.isArray(it.al)) it.al = [...new Set(it.al.map(alId))]; });
     applyLook();
+    if (BID && BK) { await loadBill(true); return; }
     if (PV) { const c0 = cfg(); st.mode = DEMO && /^\d{1,4}$/.test(T0) && c0.on && c0.table ? "table" : null; /* a real menu is only browsed in the preview: no order can leave it */ st.table = st.mode ? T0 : ""; st.view = "menu"; paintMenu(); return; }
-    if (st.oid && st.okey) { poll(true); return; }
     const c = cfg(), saved = store.get();
+    if (saved && saved.call && saved.call.cid && Date.now() - (saved.call.at || 0) < 30 * 6e4) { st.call = { cid: saved.call.cid, k: saved.call.k, call: null }; setTimeout(callPoll, 300); }
+    if (st.oid && st.okey) { poll(true); return; }
     if (saved && Date.now() - (saved.at || 0) < 3 * 3600e3 && Array.isArray(saved.cart)) st.cart = saved.cart.filter((l) => itemOf(l.id) && !itemOf(l.id).out && l.q > 0);
     if (!c.on) { st.mode = null; paintMenu(); const m = $(".qm-msgline.info"); if (m) m.innerHTML = `${svg.alert}<span>La commande en ligne est fermée pour le moment. Voici la carte.</span>`; return; }
     if (T0 === "e" || T0 === "emporter") { if (c.takeaway) st.mode = "emporter"; }

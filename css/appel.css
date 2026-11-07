@@ -1,0 +1,201 @@
+/* Growth Gusto — appel serveur + écran client (js/appel.js). Prefix « ap ». */
+
+/* ── the bubble on the staff screens: a table calls ── */
+.ap-pill{all:unset;box-sizing:border-box;cursor:pointer;position:fixed;z-index:48;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translate(-50%,-160%) scale(.8);display:flex;align-items:center;gap:10px;max-width:min(92vw,420px);padding:7px 14px 7px 7px;border-radius:22px;background:#130C35;color:#fff;box-shadow:0 0 0 1px rgba(255,255,255,.08) inset,0 18px 40px -14px rgba(19,12,53,.75),0 4px 10px rgba(19,12,53,.25);transition:transform .6s var(--spring),opacity .3s;opacity:0}
+.ap-pill.on{transform:translate(-50%,0) scale(1);opacity:1}
+.ap-pill:active{transform:translate(-50%,2px) scale(.97)}
+.ap-pill.ring{animation:apWiggle .9s var(--spring)}
+.ap-pi{position:relative;width:38px;height:38px;flex:none;border-radius:14px;display:grid;place-items:center;background:#F6B93B;color:#130C35}
+.ap-pi svg{width:20px;height:20px;animation:apBell 2.2s ease-in-out infinite;transform-origin:50% 10%}
+.ap-pi::after{content:"";position:absolute;inset:-4px;border-radius:17px;box-shadow:0 0 0 2px #F6B93B;animation:apHalo 1.8s ease-out infinite}
+.ap-pill.vu .ap-pi{background:#1BB27C;color:#fff}.ap-pill.vu .ap-pi::after,.ap-pill.vu .ap-pi svg{animation:none;box-shadow:none}
+.ap-pt{display:flex;flex-direction:column;min-width:0;line-height:1.2}
+.ap-pt b{font-size:15px;font-weight:800;letter-spacing:-.01em}
+.ap-pt em{font-style:normal;font-size:12.5px;color:#C9C3E6;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ap-pn{margin-left:4px;padding:4px 8px;border-radius:10px;background:rgba(255,255,255,.14);font-size:12.5px;font-weight:800}
+@media (min-width:960px){.ap-pill{left:calc(50% + 130px);top:auto;bottom:24px;transform:translate(-50%,160%) scale(.8)}.ap-pill.on{transform:translate(-50%,0) scale(1)}html.gg-big .ap-pill{left:50%}}
+
+/* the calls: a card per table (sheet and the strip on the floor) */
+.ap-ccs{display:flex;flex-direction:column;gap:10px;margin-top:12px}
+.ap-ccs.ap-row{flex-direction:row;overflow-x:auto;scroll-snap-type:x mandatory;padding:2px 2px 6px;margin:8px -2px 0;scrollbar-width:none}
+.ap-ccs.ap-row::-webkit-scrollbar{display:none}
+.ap-ccs.ap-row .ap-cc{flex:0 0 min(360px,86%);scroll-snap-align:start;flex-wrap:wrap}
+.ap-ccs.ap-row .ap-cb{width:100%;justify-content:flex-end}
+.ap-cc{display:flex;align-items:center;gap:12px;padding:12px;border-radius:20px;background:var(--glass-hi);box-shadow:var(--sh);position:relative;overflow:hidden}
+.ap-cc.new::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:#F6B93B;animation:apBar 1.6s ease-in-out infinite}
+.ap-ct{flex:none;width:50px;height:50px;border-radius:16px;display:grid;place-items:center;background:#130C35;color:#fff;font-size:20px;font-weight:800}
+.ap-cc.new .ap-ct{background:#F6B93B;color:#130C35;animation:apPop .6s var(--spring)}
+.ap-cx{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
+.ap-cx b{display:flex;align-items:center;gap:6px;font-size:15px;font-weight:800}
+.ap-cx b svg{width:17px;height:17px;color:var(--accent)}
+.ap-cx em{font-style:normal;font-size:12.5px;color:var(--muted)}
+.ap-cb{display:flex;gap:6px;flex:none}
+.ap-cb .btn{white-space:nowrap}
+.ap-strip{margin:4px 0 12px;padding:12px 12px 8px;border-radius:24px;background:linear-gradient(135deg,rgba(246,185,59,.22),rgba(246,185,59,.06));box-shadow:0 0 0 1.5px rgba(246,185,59,.45) inset}
+.ap-sh-h{display:flex;align-items:center;gap:8px;font-size:15px;font-weight:800}
+.ap-sh-h svg{width:19px;height:19px;color:#B86C00;animation:apBell 2.2s ease-in-out infinite;transform-origin:50% 10%}
+.ap-sh .sub{margin:4px 0 0}
+
+/* the table that calls rings on the floor */
+.ap-ring{animation:apRing 1.6s ease-in-out infinite;position:relative}
+g.ap-ring{animation:apRingSvg 1.6s ease-in-out infinite}
+.ap-bdg{position:absolute;top:-7px;right:-7px;width:28px;height:28px;border-radius:10px;display:grid;place-items:center;background:#F6B93B;color:#130C35;box-shadow:0 3px 8px rgba(184,108,0,.4);font-style:normal}
+.ap-bdg svg{width:16px;height:16px;animation:apBell 2.2s ease-in-out infinite;transform-origin:50% 10%}
+
+/* the bill sheet */
+.ap-showb{margin-bottom:8px}
+.ap-showb.on{box-shadow:0 0 0 2px var(--accent) inset}
+.ap-bpaid{display:flex;gap:10px;align-items:flex-start;padding:12px 14px;border-radius:16px;background:var(--tint-ok);color:var(--ink);font-size:13.5px;line-height:1.4;margin-bottom:10px}
+.ap-bpaid svg{color:var(--ok);flex:none;margin-top:1px}
+
+/* ── the customer screen (always the brand look, whatever the theme) ── */
+.ap-scr{--cv:#130C35;--cv2:#2A1580;position:relative;overflow:hidden;width:100%;height:100%;min-height:420px;border-radius:inherit;background:radial-gradient(120% 90% at 0% 0%,#3B1BC9 0%,#1D0F5C 45%,#0E0828 100%);color:#fff;font-family:var(--f);isolation:isolate}
+.ap-aur{position:absolute;inset:-20%;z-index:-1;filter:blur(60px);opacity:.8}
+.ap-aur i{position:absolute;width:55%;height:55%;border-radius:50%;mix-blend-mode:screen}
+.ap-aur i:nth-child(1){left:-5%;top:0;background:#7A4DFF;animation:apAur1 18s ease-in-out infinite alternate}
+.ap-aur i:nth-child(2){right:-8%;top:20%;background:#2F7BFF;opacity:.6;animation:apAur2 22s ease-in-out infinite alternate}
+.ap-aur i:nth-child(3){left:25%;bottom:-15%;background:#F6B93B;opacity:.35;animation:apAur3 26s ease-in-out infinite alternate}
+.ap-d{position:relative;z-index:1;height:100%;padding:clamp(18px,4cqw,48px);display:flex;flex-direction:column;gap:clamp(16px,3cqw,32px);animation:apIn .8s var(--spring-soft) both}
+.ap-k{display:inline-flex;align-items:center;gap:7px;font-size:clamp(12px,1.4cqw,15px);font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#C9BFFF}
+.ap-k svg{width:16px;height:16px}
+.ap-qr{background:#fff;border-radius:18px;padding:10px;width:clamp(96px,14cqw,150px);aspect-ratio:1;flex:none;box-shadow:0 20px 40px -18px rgba(0,0,0,.6)}
+.ap-qr svg{width:100%;height:100%;display:block}
+.ap-qr.big{width:clamp(150px,22cqw,250px);border-radius:24px;padding:14px;animation:apQr 3s ease-in-out infinite}
+/* idle: welcome */
+.ap-d.idle{justify-content:space-between}
+.ap-idh{display:flex;align-items:center;gap:clamp(14px,2.4cqw,26px)}
+.ap-idh>div{flex:1;min-width:0}
+.ap-idh h1{margin:4px 0 0;font-size:clamp(30px,5.6cqw,72px);font-weight:800;letter-spacing:-.04em;line-height:.98;overflow-wrap:anywhere}
+.ap-lg{width:clamp(64px,9cqw,110px);aspect-ratio:1;flex:none;border-radius:28%;background:#fff;display:grid;place-items:center;overflow:hidden;box-shadow:0 18px 40px -16px rgba(0,0,0,.6)}
+.ap-lg img{width:100%;height:100%;object-fit:contain;padding:12%}
+.ap-lg.ini{background:linear-gradient(140deg,#8B5CFF,#4A1FE6);color:#fff;font-size:clamp(22px,3cqw,40px);font-weight:800}
+.ap-clock{align-self:flex-start;font-size:clamp(20px,3cqw,40px);font-weight:700;color:#E7E2FF;opacity:.9}
+.ap-qrs{display:flex;gap:clamp(12px,2cqw,22px);flex-wrap:wrap}
+.ap-qc{flex:1 1 280px;display:flex;align-items:center;gap:16px;padding:clamp(12px,1.6cqw,18px);border-radius:26px;background:rgba(255,255,255,.08);box-shadow:0 0 0 1px rgba(255,255,255,.12) inset;-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);animation:apIn .9s var(--spring-soft) both}
+.ap-qc:nth-child(2){animation-delay:.12s}
+.ap-qc b,.ap-rv b{display:block;font-size:clamp(17px,2cqw,24px);font-weight:800;letter-spacing:-.02em;line-height:1.15}
+.ap-qc em,.ap-rv em{display:block;font-style:normal;margin-top:4px;font-size:clamp(13px,1.4cqw,16px);color:#CFC8F0;line-height:1.35}
+.ap-stars{display:flex;gap:3px;margin-top:8px}
+.ap-stars i{color:#F6B93B;animation:apStar 2.8s calc(var(--s) * .12s) ease-in-out infinite}
+.ap-stars svg{fill:#F6B93B;width:clamp(16px,2cqw,24px);height:clamp(16px,2cqw,24px)}
+/* bill */
+.ap-d.bill{flex-direction:row;align-items:stretch}
+.ap-bl{flex:1.25;min-width:0;display:flex;flex-direction:column;gap:12px;padding:clamp(14px,2cqw,26px);border-radius:28px;background:#FFFDF8;color:#1B1530;box-shadow:0 30px 60px -30px rgba(0,0,0,.7)}
+.ap-bh{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+.ap-bh .ap-k{color:#5B2BFF;width:100%}
+.ap-bh h1{margin:0;font-size:clamp(28px,4.2cqw,54px);font-weight:800;letter-spacing:-.04em;line-height:1}
+.ap-bh em{font-style:normal;color:#615B74;font-weight:700}
+.ap-lines{flex:1;min-height:0;overflow:auto;display:flex;flex-direction:column;gap:2px;margin:0 -6px;padding:0 6px;scrollbar-width:thin}
+.ap-lines>div{display:flex;align-items:baseline;gap:12px;padding:9px 0;border-bottom:1.5px dashed #E9DFCD;font-size:clamp(15px,1.7cqw,20px);animation:apLine .5s calc(var(--i) * 45ms + .15s) var(--spring-soft) both}
+.ap-lines b{min-width:26px;color:#5B2BFF}
+.ap-lines span{flex:1;min-width:0;font-weight:650}
+.ap-lines em{font-style:normal;font-weight:700}
+.ap-tot{display:flex;justify-content:space-between;align-items:baseline;padding-top:6px;font-size:clamp(17px,2cqw,22px);font-weight:800}
+.ap-tot b{font-size:clamp(28px,3.8cqw,48px);letter-spacing:-.03em}
+.ap-tot.left b{color:#5B2BFF}
+.ap-paid{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-radius:16px;background:#E2F5EC;color:#0E8A5F;font-weight:750}
+.ap-paid span{display:flex;align-items:center;gap:7px}.ap-paid svg{width:17px;height:17px;stroke-width:3}
+.ap-split{display:flex;justify-content:space-between;align-items:baseline;padding:12px 16px;border-radius:18px;background:#EFE9FF;color:#3A10D8;font-weight:750}
+.ap-split b{font-size:clamp(20px,2.6cqw,30px)}
+.ap-br{flex:1;min-width:0;display:flex;flex-direction:column;gap:14px}
+.ap-pay{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;text-align:center;padding:clamp(16px,2cqw,26px);border-radius:28px;background:rgba(255,255,255,.08);box-shadow:0 0 0 1px rgba(255,255,255,.14) inset;-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)}
+.ap-pay p{margin:0;font-size:clamp(14px,1.5cqw,18px);color:#DCD6FA;max-width:300px;line-height:1.4}
+.ap-pay .ap-big{font-size:clamp(20px,2.4cqw,30px);font-weight:800;color:#fff}
+.ap-rv{display:flex;align-items:center;gap:14px;padding:12px;border-radius:24px;background:rgba(255,255,255,.08);box-shadow:0 0 0 1px rgba(255,255,255,.12) inset}
+.ap-rv .ap-qr{width:clamp(76px,9cqw,110px);border-radius:14px;padding:7px}
+/* merci */
+.ap-d.merci{align-items:center;justify-content:center;text-align:center}
+.ap-mc{display:flex;flex-direction:column;align-items:center}
+.ap-ok{width:clamp(80px,10cqw,128px);aspect-ratio:1;border-radius:34%;display:grid;place-items:center;background:#1BB27C;box-shadow:0 0 0 12px rgba(27,178,124,.18),0 24px 50px -16px rgba(27,178,124,.7);animation:apPop .8s var(--spring)}
+.ap-ok svg{width:52%;height:52%;stroke-width:3;stroke-dasharray:30;stroke-dashoffset:30;animation:apTick .6s .35s ease-out forwards}
+.ap-mc h1{margin:22px 0 0;font-size:clamp(46px,8cqw,110px);font-weight:800;letter-spacing:-.05em;line-height:.95;animation:apIn .8s .15s var(--spring-soft) both}
+.ap-mc p{margin:8px 0 0;font-size:clamp(17px,2.2cqw,26px);color:#DCD6FA;animation:apIn .8s .25s var(--spring-soft) both}
+.ap-rv.big{max-width:620px;text-align:left;padding:18px;border-radius:28px;animation:apIn .9s .45s var(--spring-soft) both}
+.ap-rv.big .ap-qr{width:clamp(110px,13cqw,160px)}
+.ap-conf{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+.ap-conf i{position:absolute;top:-6%;left:calc(var(--x) * 1%);width:10px;height:16px;border-radius:3px;background:#F6B93B;transform:rotate(var(--r));animation:apFall 3.4s var(--d) cubic-bezier(.3,.5,.4,1) both}
+.ap-conf i:nth-child(3n){background:#9ED7FF;border-radius:50%;width:11px;height:11px}
+.ap-conf i:nth-child(3n+1){background:#B79CFF}
+.ap-conf i:nth-child(5n){background:#FF8A6B}
+/* a payment arrives */
+.ap-flash{position:absolute;z-index:5;left:50%;top:50%;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:10px;padding:28px 40px;border-radius:32px;background:rgba(14,138,95,.94);box-shadow:0 40px 80px -30px rgba(0,0,0,.7);animation:apFlash 5s var(--spring) both}
+.ap-flash span{width:72px;height:72px;border-radius:24px;background:#fff;color:#0E8A5F;display:grid;place-items:center}
+.ap-flash span svg{width:40px;height:40px;stroke-width:3}
+.ap-flash b{font-size:28px;font-weight:800}.ap-flash em{font-style:normal;font-size:22px;font-weight:700}
+/* portrait / phone: stack */
+@container apscr (max-width:640px){.ap-d.bill{flex-direction:column}.ap-br{flex-direction:row}.ap-pay{flex:1.3}.ap-rv{flex-direction:column;text-align:center;flex:1}}
+.ap-scr{container:apscr / inline-size}
+@media (max-width:640px){.ap-d.bill{flex-direction:column}.ap-qc{flex-basis:100%}}
+
+/* full screen (device mode or grand écran) */
+.ap-full{position:fixed;inset:0;z-index:45;background:#0E0828}
+.ap-full .ap-scr{border-radius:0;height:100%;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+.ap-exit{all:unset;cursor:pointer;position:absolute;z-index:6;right:calc(env(safe-area-inset-right,0px) + 12px);top:calc(env(safe-area-inset-top,0px) + 12px);width:40px;height:40px;border-radius:14px;display:grid;place-items:center;color:#fff;background:rgba(255,255,255,.08);opacity:.35;transition:opacity .2s}
+.ap-exit:hover,.ap-exit:focus-visible{opacity:1}
+
+/* the preview screen (route « ecran » outside the device mode) */
+.ap-lay{display:grid;grid-template-columns:minmax(0,1fr);gap:16px;margin-top:12px}
+@media (min-width:1100px){.ap-lay{grid-template-columns:minmax(0,1fr) 340px;align-items:start}}
+.ap-frame{display:flex;flex-direction:column;gap:10px}
+.ap-bezel{border-radius:34px;padding:12px;background:linear-gradient(160deg,#2A2D45,#0F1122);box-shadow:var(--sh-lg),0 0 0 1px rgba(255,255,255,.06) inset;aspect-ratio:4 / 3;max-height:72vh}
+.ap-bezel .ap-scr{border-radius:24px;min-height:0}
+@media (max-width:640px){.ap-bezel{aspect-ratio:3 / 4;max-height:none;padding:9px;border-radius:28px}.ap-bezel .ap-scr{border-radius:20px}}
+.ap-cap{display:flex;align-items:center;justify-content:center;gap:7px;font-size:13px;font-weight:700;color:var(--muted)}
+.ap-cap svg{width:16px;height:16px}
+.ap-side{display:flex;flex-direction:column;gap:12px}
+.ap-side .btn.block+.btn.block{margin-top:8px}
+.ap-acts{display:flex;gap:8px;flex-wrap:wrap}
+.ap-tabs{display:grid;grid-template-columns:repeat(auto-fill,minmax(86px,1fr));gap:8px;margin-top:8px}
+.ap-tb{all:unset;box-sizing:border-box;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px;padding:10px 6px;border-radius:16px;background:var(--well);transition:transform .2s var(--spring)}
+.ap-tb:active{transform:scale(.95)}
+.ap-tb b{font-size:20px;font-weight:800}.ap-tb span{font-size:12px;color:var(--muted);font-weight:700}
+.ap-tb.on{background:var(--accent);color:#fff;box-shadow:var(--sh-acc)}.ap-tb.on span{color:#E4DDFF}
+.ap-sim{margin-top:12px}
+.ap-tip{display:flex;gap:12px;align-items:flex-start}.ap-tip>svg{flex:none;color:var(--accent);margin-top:2px}.ap-tip .sub{margin:4px 0 0}
+
+/* device mode mock (Vues & appareils) */
+.es-mk.cl .mk-main{display:flex;gap:4px;background:linear-gradient(140deg,#3B1BC9,#130C35)}
+.mk-bill{flex:1.3;display:flex;flex-direction:column;gap:3px;padding:4px;border-radius:5px;background:#FFFDF8}
+.mk-bill i{height:3px;border-radius:2px;background:#DCCFB8}.mk-bill b{margin-top:auto;height:5px;width:60%;border-radius:2px;background:#5B2BFF}
+.mk-qr{flex:1;display:grid;place-items:center}.mk-qr i{width:70%;aspect-ratio:1;border-radius:4px;background:repeating-conic-gradient(#1B1530 0 25%,#fff 0 50%) 0 0/6px 6px;box-shadow:0 0 0 2px #fff}
+
+@keyframes apBell{0%,60%,100%{transform:rotate(0)}10%{transform:rotate(14deg)}20%{transform:rotate(-12deg)}30%{transform:rotate(9deg)}40%{transform:rotate(-6deg)}50%{transform:rotate(3deg)}}
+@keyframes apHalo{from{opacity:.9;transform:scale(1)}to{opacity:0;transform:scale(1.45)}}
+@keyframes apWiggle{0%{transform:translate(-50%,0) scale(1)}30%{transform:translate(-50%,0) scale(1.08)}50%{transform:translate(-50%,0) scale(.98)}100%{transform:translate(-50%,0) scale(1)}}
+@keyframes apBar{50%{opacity:.4}}
+@keyframes apPop{from{transform:scale(.5)}to{transform:none}}
+@keyframes apRing{0%,100%{box-shadow:0 0 0 0 rgba(246,185,59,0)}50%{box-shadow:0 0 0 6px rgba(246,185,59,.55)}}
+@keyframes apRingSvg{0%,100%{filter:drop-shadow(0 0 0 rgba(246,185,59,0))}50%{filter:drop-shadow(0 0 8px rgba(246,185,59,.95))}}
+@keyframes apAur1{to{transform:translate(30%,20%) scale(1.2)}}
+@keyframes apAur2{to{transform:translate(-25%,25%) scale(.85)}}
+@keyframes apAur3{to{transform:translate(20%,-30%) scale(1.25)}}
+@keyframes apIn{from{opacity:0;transform:translateY(18px) scale(.98)}to{opacity:1;transform:none}}
+@keyframes apLine{from{opacity:0;transform:translateX(-12px)}to{opacity:1;transform:none}}
+@keyframes apQr{0%,100%{box-shadow:0 20px 40px -18px rgba(0,0,0,.6),0 0 0 0 rgba(255,255,255,.35)}50%{box-shadow:0 20px 40px -18px rgba(0,0,0,.6),0 0 0 10px rgba(255,255,255,0)}}
+@keyframes apStar{0%,70%,100%{transform:none}80%{transform:scale(1.3) rotate(12deg)}}
+@keyframes apTick{to{stroke-dashoffset:0}}
+@keyframes apFall{0%{transform:translateY(0) rotate(var(--r));opacity:1}100%{transform:translateY(115vh) rotate(calc(var(--r) + 540deg));opacity:.9}}
+@keyframes apFlash{0%{opacity:0;transform:translate(-50%,-40%) scale(.7)}10%{opacity:1;transform:translate(-50%,-50%) scale(1)}85%{opacity:1;transform:translate(-50%,-50%) scale(1)}100%{opacity:0;transform:translate(-50%,-50%) scale(.95)}}
+@media (prefers-reduced-motion:reduce){.ap-pi svg,.ap-pi::after,.ap-ring,g.ap-ring,.ap-aur i,.ap-qr.big,.ap-stars i,.ap-conf i,.ap-sh-h svg,.ap-bdg svg,.ap-cc.new::before{animation:none!important}}
+/* layout fixes: the bill card hugs its lines; portrait screens stack; a phone preview grows with its content */
+.ap-d.bill{align-items:center}
+.ap-bl{max-height:100%;align-self:center}
+.ap-br{align-self:stretch;justify-content:center}
+.ap-pay{flex:0 1 auto;min-height:0}
+.ap-full .ap-d{padding-bottom:max(70px,calc(env(safe-area-inset-bottom,0px) + 60px))}
+@media (orientation:portrait){
+  .ap-full .ap-d.bill{flex-direction:column;align-items:stretch;justify-content:center}
+  .ap-full .ap-bl{flex:0 1 auto;align-self:stretch}
+  .ap-full .ap-br{flex:none;flex-direction:row;align-items:stretch}
+  .ap-full .ap-pay{flex:1.4}.ap-full .ap-rv{flex:1;flex-direction:column;text-align:center;justify-content:center}
+}
+@media (max-width:640px){
+  .ap-bezel{aspect-ratio:auto}
+  .ap-bezel .ap-scr{height:auto}
+  .ap-bezel .ap-d.bill{flex-direction:column;align-items:stretch}
+  .ap-bezel .ap-br{flex-direction:column}
+  .ap-bezel .ap-rv{flex-direction:row;text-align:left}
+}
+.ap-tag{margin:0;max-width:16em;font-size:clamp(24px,4.4cqw,56px);font-weight:800;letter-spacing:-.035em;line-height:1.05;color:#fff;background:linear-gradient(100deg,#fff 20%,#C9BFFF 50%,#fff 80%) 0 0/200% 100%;-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;animation:apIn .9s .1s var(--spring-soft) both,apShine 7s 1s linear infinite}
+@keyframes apShine{to{background-position:-200% 0}}
+@media (prefers-reduced-motion:reduce){.ap-tag{animation:none}}
