@@ -3,10 +3,10 @@
      · bookings (js/resa.js): visits (« arrivée »), no-shows, cancellations, the next table, the consent ticked on the booking page (optin);
      · takeaway orders with a phone number (js/commande.js, clientOrders): visits and money spent;
      · the file itself, restos/{rid}/clients/{key} (shared with js/resa.js, which writes name/phone/email/vip/notes):
-         { name, phone, email, vip, notes, allergens:[ALLERGENS id], bday:"MM-DD", optEmail?, optSms?, optAt, optSrc, unsubAt?,
-           passes:[ms] (visits noted by hand at the counter), used (stamps already spent on rewards), gifts:[{at,by}], createdAt, updatedAt }
+         { name, phone, email, vip (VIP by hand), vipOff (VIP taken off by hand), notes, allergens:[ALLERGENS id], bday:"MM-DD", optEmail?, optSms?, optAt, optSrc, unsubAt?,
+           passes:[ms] (visits noted by hand at the counter), used (stamps already spent on rewards), gifts:[{at,by,n?,t?}] (n stamps spent, t the gift), createdAt, updatedAt }
          key = the phone's last 9 digits (rsPk), or « m » + a hash of the e-mail for a client without phone.
-   Loyalty (restos/{rid}.fidCfg { on, goal, reward, orders, passes, bday, bdayMsg }): one stamp per visit, the reward once the card is full.
+   Loyalty (restos/{rid}.fidCfg { on, goal, reward, rewards:[text] (the restaurant's own gift list, editable), vipAuto, vipN (VIP on its own from N visits), orders, passes, bday, bdayMsg }): one stamp per visit, the reward once the card is full.
    Campaigns (restos/{rid}/campaigns/{id} { title, subject, body, ch:"email"|"sms", seg, n, to:[key], at, by, via:"server"|"mail"|"phone"|"demo",
      status:"envoi"|"envoyee", sent, done:[key] }): only to clients who said yes (RGPD), personalised with {prénom}.
      · e-mail: sent by the server (functions/src/clients.js, Brevo free plan, an unsubscribe link in every e-mail), or from the phone's
@@ -41,7 +41,7 @@ try { if (typeof PM_ROUTE !== "undefined") PM_ROUTE.clients = PM_ROUTE.clients |
 try { if (typeof AB_GATE !== "undefined" && !AB_GATE.clients) AB_GATE.clients = ["pro", "Fichier clients & fidélité"]; } catch (e) {}
 try { if (typeof AB_PACKS !== "undefined" && AB_PACKS.pro && !AB_PACKS.pro.feats.includes("Fichier clients & fidélité")) AB_PACKS.pro.feats.splice(2, 0, "Fichier clients & fidélité"); } catch (e) {}
 
-const FD = { rid: null, camps: [], tab: "list", q: "", seg: "tous", n: 40, ed: null, add: null, comp: null, sms: null, mail: null, pass: null, memo: null, cfgEd: null };
+const FD = { rid: null, camps: [], tab: "list", q: "", seg: "tous", n: 40, ed: null, add: null, comp: null, sms: null, mail: null, pass: null, memo: null, cfgEd: null, rwEd: null };
 const FD_DAY = 864e5;
 const fdPl = (n, s, p) => `${n} ${n > 1 ? p || s + "s" : s}`;
 const fdEur = (n) => (Math.round((+n || 0) * 100) / 100).toLocaleString("fr-FR", { minimumFractionDigits: n >= 100 ? 0 : 2, maximumFractionDigits: n >= 100 ? 0 : 2 }) + " €";
@@ -67,8 +67,15 @@ function fdAva(p, size = 44) {
 }
 
 /* ───────── loyalty settings ───────── */
-const fdDefCfg = () => ({ on: true, goal: 10, reward: "Le dessert offert", orders: true, passes: true, bday: false, bdayMsg: "Joyeux anniversaire {prénom} ! Pour fêter ça, le dessert vous est offert ce mois-ci. À très vite !" });
-function fdCfg() { const c = (S.resto && S.resto.fidCfg) || {}; const o = { ...fdDefCfg(), ...c }; o.goal = Math.min(20, Math.max(3, +o.goal || 10)); return o; }
+const fdDefCfg = () => ({ on: true, goal: 10, reward: "Le dessert offert", rewards: FD_REWARDS.slice(), vipAuto: false, vipN: 10, orders: true, passes: true, bday: false, bdayMsg: "Joyeux anniversaire {prénom} ! Pour fêter ça, le dessert vous est offert ce mois-ci. À très vite !" });
+function fdCfg() {
+  const c = (S.resto && S.resto.fidCfg) || {}; const o = { ...fdDefCfg(), ...c }; o.goal = Math.min(20, Math.max(3, +o.goal || 10)); o.vipN = Math.min(50, Math.max(2, +o.vipN || 10));
+  /* the gift list: the restaurant's own (add, rename, delete); the active gift is always in it */
+  const L = []; (Array.isArray(o.rewards) ? o.rewards : []).forEach((r) => { const t = String(r || "").trim().slice(0, 60); if (t && !L.some((x) => x.toLowerCase() === t.toLowerCase())) L.push(t); });
+  o.reward = String(o.reward || "").trim().slice(0, 60) || L[0] || "Le dessert offert"; if (!L.some((x) => x.toLowerCase() === o.reward.toLowerCase())) L.unshift(o.reward);
+  o.rewards = L.slice(0, FD_RW_MAX); return o;
+}
+const FD_RW_MAX = 12;
 const FD_REWARDS = ["Le dessert offert", "Un verre de vin offert", "Le café gourmand offert", "-10 % sur l'addition", "L'entrée offerte"];
 
 /* ───────── data ───────── */
@@ -112,8 +119,8 @@ function fdPeople() {
     (Array.isArray(d.gifts) ? d.gifts : []).forEach((g) => p.hist.push({ k: "gift", day: dayKey(new Date(g.at)), at: g.at, g }));
   });
   const list = Object.values(m).map((p) => {
-    const d = p.doc || {}; p.vip = !!d.vip; p.notes = d.notes || ""; p.allergens = Array.isArray(d.allergens) ? d.allergens : []; p.bday = d.bday || "";
-    p.visits = p.resa + p.orders + p.passes; p.used = +d.used || 0; p.stamps = Math.max(0, p.visits - p.used);
+    const d = p.doc || {}; p.notes = d.notes || ""; p.allergens = Array.isArray(d.allergens) ? d.allergens : []; p.bday = d.bday || "";
+    p.visits = p.resa + p.orders + p.passes; p.vipAuto = cfg.vipAuto === true && p.visits >= cfg.vipN; p.vip = !d.vipOff && (!!d.vip || p.vipAuto); p.used = +d.used || 0; p.stamps = Math.max(0, p.visits - p.used);
     /* consent: the choice noted in the file, unless the client ticked « oui » on a booking made after it (and after any unsubscribe) */
     const hasC = d.optEmail != null || d.optSms != null, newer = p.optB > Math.max(+d.optAt || 0, +d.unsubAt || 0);
     p.optEmail = newer || (!hasC && !!p.optB) || (hasC && d.optEmail === true);
@@ -232,14 +239,25 @@ function fdFidHTML(L) {
   const set = mgr ? `<div class="glass pad fd-set st" style="--i:5"><span class="lbl">Réglages du programme</span>
     <button class="rs-tog${off ? "" : " on"}" data-act="fdCfgTog" data-v="on" aria-pressed="${!off}"><span><b>Carte de fidélité</b><em>${off ? "En pause" : "Active pour tous vos clients"}</em></span><i></i></button>
     <div class="fd-goal"><span><b>Visites pour la récompense</b><em>Entre 3 et 20</em></span><div class="fd-step"><button class="ac-sb" data-act="fdGoal" data-v="-1" aria-label="Moins">${ico("minus")}</button><b class="mono">${cfg.goal}</b><button class="ac-sb" data-act="fdGoal" data-v="1" aria-label="Plus">${ico("plus")}</button></div></div>
-    <label class="field"><span>La récompense</span><input class="input" id="fdRw" maxlength="60" value="${esc(cfg.reward)}"></label>
-    <div class="fd-rws">${FD_REWARDS.map((r) => `<button class="chip${r === cfg.reward ? " on" : ""}" data-act="fdRwPick" data-v="${esc(r)}">${esc(r)}</button>`).join("")}</div>
+    ${fdRwListHTML(cfg)}
+    <button class="rs-tog${cfg.vipAuto ? " on" : ""}" data-act="fdCfgTog" data-v="vipAuto" aria-pressed="${!!cfg.vipAuto}"><span><b>VIP tout seul</b><em>${cfg.vipAuto ? `Un client devient VIP à sa ${cfg.vipN}e visite. Vous pouvez toujours mettre ou enlever VIP à la main sur sa fiche.` : "VIP seulement à la main, sur la fiche du client"}</em></span><i></i></button>
+    ${cfg.vipAuto ? `<div class="fd-goal"><span><b>Visites pour devenir VIP</b><em>${fdPl(L.filter((p) => p.vipAuto && !(p.doc || {}).vipOff).length, "client")} VIP de cette façon aujourd'hui</em></span><div class="fd-step"><button class="ac-sb" data-act="fdVipN" data-v="-1" aria-label="Moins">${ico("minus")}</button><b class="mono">${cfg.vipN}</b><button class="ac-sb" data-act="fdVipN" data-v="1" aria-label="Plus">${ico("plus")}</button></div></div>` : ""}
     <button class="rs-tog${cfg.orders !== false ? " on" : ""}" data-act="fdCfgTog" data-v="orders" aria-pressed="${cfg.orders !== false}"><span><b>Les commandes à emporter comptent</b><em>Une commande payée = un tampon</em></span><i></i></button>
-    <button class="rs-tog${cfg.passes !== false ? " on" : ""}" data-act="fdCfgTog" data-v="passes" aria-pressed="${cfg.passes !== false}"><span><b>Passages notés au comptoir</b><em>Pour les clients venus sans réserver</em></span><i></i></button>
+    <button class="rs-tog${cfg.passes !== false ? " on" : ""}" data-act="fdCfgTog" data-v="passes" aria-pressed="${cfg.passes !== false}"><span><b>Venues sans réservation</b><em>Notées au comptoir ou à l'ouverture d'une table</em></span><i></i></button>
     <button class="rs-tog${cfg.bday ? " on" : ""}" data-act="fdCfgTog" data-v="bday" aria-pressed="${!!cfg.bday}"><span><b>E-mail d'anniversaire automatique</b><em>${DB.mode === "db" ? "Le matin du jour J, aux clients qui ont accepté vos nouvelles" : "Avec un compte Growth Gusto"}</em></span><i></i></button>
     ${cfg.bday ? `<label class="field"><span>Le message d'anniversaire</span><textarea class="input" id="fdBdM" rows="3" maxlength="400">${esc(cfg.bdayMsg)}</textarea></label>` : ""}
     <button class="btn soft block" data-act="fdCfgSave">Enregistrer les réglages</button></div>` : "";
   return `<div class="cols"><div>${card}${giveH}</div><div>${topH}${set}</div></div>`;
+}
+
+/* the gift list in the settings: tap to choose the one on the card, pencil to rename, bin to delete, a field to add */
+function fdRwListHTML(cfg) {
+  const ed = FD.rwEd, L = cfg.rewards;
+  const row = (r, i) => ed === i
+    ? `<div class="fd-rw ed"><input class="input" id="fdRwE" maxlength="60" value="${esc(r)}" aria-label="Nom du cadeau" enterkeyhint="done"><button class="btn sm acc" data-act="fdRwOk" data-v="${i}">OK</button><button class="iconbtn" data-act="fdRwEdit" data-v="-1" aria-label="Annuler">${ico("x")}</button></div>`
+    : `<div class="fd-rw${r === cfg.reward ? " on" : ""}"><button class="fd-rwp" data-act="fdRwPick" data-v="${i}" aria-pressed="${r === cfg.reward}"><i class="fd-rwr"></i><span><b>${esc(r)}</b>${r === cfg.reward ? `<em>Sur la carte de fidélité</em>` : ""}</span></button><button class="iconbtn" data-act="fdRwEdit" data-v="${i}" aria-label="Modifier ${esc(r)}">${ico("edit")}</button><button class="iconbtn fd-rwx" data-act="fdRwDel" data-v="${i}" aria-label="Supprimer ${esc(r)}">${ico("trash")}</button></div>`;
+  return `<div class="fd-rwl"><span class="fd-rwh"><b>Vos cadeaux</b><em>Touchez celui qui est offert quand la carte est pleine</em></span>${L.map(row).join("")}
+    ${L.length < FD_RW_MAX ? `<div class="fd-rw add"><input class="input" id="fdRwN" maxlength="60" placeholder="Ajouter un cadeau, ex. Le digestif offert" aria-label="Nouveau cadeau" enterkeyhint="done"><button class="btn sm soft" data-act="fdRwAdd">${ico("plus")}Ajouter</button></div>` : ""}</div>`;
 }
 
 /* ── Campagnes ── */
@@ -276,7 +294,7 @@ function fdConsentHelp() {
 /* ───────── client sheet ───────── */
 function fdOpenSheet(k) {
   const p = fdById(k); if (!p) return;
-  FD.ed = { id: k, name: p.name, phone: p.phone, email: p.email, vip: p.vip, notes: p.notes, allergens: [...p.allergens], bday: p.bday, optEmail: !!p.optEmail, optSms: !!p.optSms, o0: [!!p.optEmail, !!p.optSms], del: false, all: false };
+  FD.ed = { id: k, name: p.name, phone: p.phone, email: p.email, vip: p.vip, vip0: p.vip, notes: p.notes, allergens: [...p.allergens], bday: p.bday, optEmail: !!p.optEmail, optSms: !!p.optSms, o0: [!!p.optEmail, !!p.optSms], del: false, all: false };
   fdPaint();
 }
 function fdPaint() {
@@ -285,14 +303,14 @@ function fdPaint() {
   const [bm, bdd] = /^(\d{2})-(\d{2})$/.test(e.bday || "") ? e.bday.split("-") : ["", ""];
   const H = p.hist.slice(0, e.all ? 40 : 6);
   const hrow = (h) => { const I = { resa: ["resa", "Réservation"], cmd: ["fdBag", "À emporter"], pass: ["fdStamp", "Passage au comptoir"], gift: ["fdGift", "Récompense offerte"] }[h.k];
-    const st = h.k === "resa" ? (RS_ST[h.b.status] || RS_ST.avenir) : null; const sub = h.k === "resa" ? `${+h.b.covers || 0} pers. · ${h.t}` : h.k === "cmd" ? (money ? fdEur(h.o.total) : `${(h.o.items || []).reduce((a, x) => a + (+x.q || 0), 0)} articles`) : h.k === "gift" ? esc(cfg.reward) : "";
-    return `<div class="fd-hi ${h.k}"><span class="fd-hii">${ico(I[0])}</span><div><b>${I[1]}</b><em>${shortDate(h.day)}${sub ? ` · ${sub}` : ""}</em></div>${st ? `<span class="rs-stp ${st.k}">${st.t}</span>` : ""}</div>`; };
+    const st = h.k === "resa" ? (RS_ST[h.b.status] || RS_ST.avenir) : null; const sub = h.k === "resa" ? `${+h.b.covers || 0} pers. · ${h.t}` : h.k === "cmd" ? (money ? fdEur(h.o.total) : `${(h.o.items || []).reduce((a, x) => a + (+x.q || 0), 0)} articles`) : h.k === "gift" ? esc(h.g.t || cfg.reward) + (h.g.by ? ` · par ${esc(h.g.by)}` : "") : "";
+    return `<div class="fd-hi ${h.k}"><span class="fd-hii">${ico(I[0])}</span><div><b>${I[1]}</b><em>${shortDate(h.day)}${sub ? ` · ${sub}` : ""}</em></div>${st ? `<span class="rs-stp ${st.k}">${st.t}</span>` : ""}${h.k === "gift" && fdMgr() ? `<button class="btn ghost sm fd-gdel" data-act="fdGiftDel" data-id="${esc(e.id)}" data-v="${+h.g.at || 0}" aria-label="Annuler ce cadeau">${ico("trash")}</button>` : ""}</div>`; };
   const consent = (k, ic, t) => { const on = e[k]; const at = p.optAt ? new Date(p.optAt) : null; const info = on ? (e.o0[k === "optEmail" ? 0 : 1] && at ? `Depuis le ${shortDate(dayKey(at))}${p.optSrc ? ` · ${p.optSrc}` : ""}` : "Accord donné aujourd'hui") : "Ne recevra pas vos campagnes";
     return `<button class="rs-tog fd-ctog${on ? " on" : ""}" data-act="fdOpt" data-v="${k}" aria-pressed="${on}"><span class="fd-cti">${ico(ic)}</span><span><b>${t}</b><em>${esc(info)}</em></span><i></i></button>`; };
   openSheet(`<div class="fd-sh">
     <div class="fd-shh">${fdAva({ name: e.name, vip: e.vip }, 58)}<div class="fd-shn"><input class="fd-nm" id="fdNm" value="${esc(e.name)}" maxlength="60" aria-label="Nom" placeholder="Nom du client"><span class="fd-tier ${p.tier[1]}">${p.tier[0]}</span></div><button class="iconbtn" data-act="sheetClose" aria-label="Fermer">${ico("x")}</button></div>
     <div class="fd-ct">${e.phone ? `<a class="btn soft sm" href="tel:${esc(fdTel(e.phone))}">${ico("rsPhone")}Appeler</a><a class="btn soft sm" href="sms:${esc(fdTel(e.phone))}">${ico("fdSms")}SMS</a>` : ""}${fdMailOk(e.email) ? `<a class="btn soft sm" href="mailto:${esc(e.email)}">${ico("fdMail")}E-mail</a>` : ""}
-      <button class="btn sm fd-vipb${e.vip ? " on" : ""}" data-act="fdVip" aria-pressed="${e.vip}">${ico("fdCrown")}VIP</button></div>
+      <button class="btn sm fd-vipb${e.vip ? " on" : ""}" data-act="fdVip" aria-pressed="${e.vip}" title="${e.vip === e.vip0 && p.vipAuto && e.vip ? `VIP tout seul : ${fdPl(p.visits, "visite")}` : "VIP"}">${ico("fdCrown")}VIP${e.vip && e.vip === e.vip0 && p.vipAuto && !(p.doc || {}).vip ? `<em class="fd-vipa">auto</em>` : ""}</button></div>
     <div class="fd-kpi"><div><b class="mono">${p.visits}</b><em>visite${p.visits > 1 ? "s" : ""}</em></div><div><b class="mono">${p.last ? shortDate(p.last) : "–"}</b><em>dernière</em></div><div class="${p.noshow ? "bad" : ""}"><b class="mono">${p.noshow}</b><em>no-show</em></div>${money && p.spent ? `<div><b class="mono">${fdEur(p.spent)}</b><em>à emporter</em></div>` : `<div><b class="mono">${p.cancel}</b><em>annulée${p.cancel > 1 ? "s" : ""}</em></div>`}</div>
     ${p.next ? `<div class="fd-next">${ico("resa")}<span>Prochaine table <b>${esc((rsRel(p.next.date) || rsLong(p.next.date)).toLowerCase())} à ${p.next.time}</b> · ${+p.next.covers || 0} pers.</span></div>` : ""}
     ${cfg.on !== false ? `<div class="fd-sec">${fdCardHTML(cfg, p.stamps, false)}<div class="fd-cact">${fdReward(p, cfg) ? `<button class="btn fd-gbtn" data-act="fdGive" data-id="${esc(e.id)}">${ico("fdGift")}Récompense offerte</button>` : ""}<button class="btn soft" data-act="fdPassOne" data-id="${esc(e.id)}">${ico("plus")}Un passage</button></div></div>` : ""}
@@ -456,7 +474,7 @@ Object.assign(ACT, {
   fdAll: () => { fdKeep(); if (FD.ed) { FD.ed.all = true; fdPaint(); } },
   fdSave: async (a) => {
     fdKeep(); const e = FD.ed; if (!e) return; if (e.email && !fdMailOk(e.email)) { SFX.err(); toast("Cette adresse e-mail semble incomplète.", "err"); return; }
-    const p = fdById(e.id) || {}; const patch = { name: e.name.slice(0, 60), phone: e.phone.slice(0, 25), email: e.email.slice(0, 120), vip: e.vip, notes: e.notes.slice(0, 300), allergens: e.allergens, bday: e.bday };
+    const p = fdById(e.id) || {}; const patch = { name: e.name.slice(0, 60), phone: e.phone.slice(0, 25), email: e.email.slice(0, 120), ...(e.vip !== e.vip0 ? { vip: e.vip, vipOff: !e.vip } : {}), notes: e.notes.slice(0, 300), allergens: e.allergens, bday: e.bday };
     if (e.optEmail !== !!p.optEmail || e.optSms !== !!p.optSms) { Object.assign(patch, { optEmail: e.optEmail, optSms: e.optSms, optAt: Date.now(), optSrc: `noté par ${firstName(S.me.name) || "l'équipe"}` }); if (!e.optEmail && p.optEmail) patch.unsubAt = Date.now(); }
     a.disabled = true; try { await fdWrite(e.id, patch); } catch (x) { a.disabled = false; return; }
     FD.ed = null; closeSheet(true); SFX.done(); buzz(8); toast("Fiche client enregistrée"); refresh(true);
@@ -506,16 +524,47 @@ Object.assign(ACT, {
   fdPassNew: () => { const q = FD.pass ? FD.pass.q.trim() : ""; FD.pass = null; FD.add = { name: "", phone: q, email: "", ok: false, pass: true }; fdAddPaint(); setTimeout(() => { const i = $("#fdAn"); i && i.focus(); }, 350); },
   fdGive: async (a, id) => {
     if (FD.ed) fdKeep(); const p = fdById(id); const cfg = fdCfg(); if (!p || !fdReward(p, cfg)) return; a.disabled = true;
-    const d = p.doc || {}; try { await fdWrite(id, { used: (+d.used || 0) + cfg.goal, gifts: (Array.isArray(d.gifts) ? d.gifts : []).concat({ at: Date.now(), by: S.me.name || "" }).slice(-30) }); } catch (x) { a.disabled = false; return; }
+    const d = p.doc || {}; try { await fdWrite(id, { used: (+d.used || 0) + cfg.goal, gifts: (Array.isArray(d.gifts) ? d.gifts : []).concat({ at: Date.now(), by: S.me.name || "", n: cfg.goal, t: cfg.reward }).slice(-30) }); } catch (x) { a.disabled = false; return; }
     logEvent("client", `a offert la récompense fidélité à ${p.name}`); SFX.done(); burst(); buzz([10, 50, 10]); toast(`${cfg.reward} pour ${firstName(p.name) || "le client"} · nouvelle carte`);
     if (FD.ed && FD.ed.id === id) fdPaint(); else refresh(true);
   },
   fdCfgTog: async (a, id, v) => {
-    const c = fdCfg(); const val = v === "on" ? c.on === false : v === "bday" ? !c.bday : c[v] === false; if (v === "bday" && val && DB.mode === "local") { SFX.err(); toast("Avec un compte Growth Gusto : les e-mails partent du serveur.", "info"); return; }
+    const c = fdCfg(); const val = v === "on" ? c.on === false : v === "bday" ? !c.bday : v === "vipAuto" ? !c.vipAuto : c[v] === false; if (v === "bday" && val && DB.mode === "local") { SFX.err(); toast("Avec un compte Growth Gusto : les e-mails partent du serveur.", "info"); return; }
     fdCfgKeep(); SFX[val ? "ok" : "tap"](); buzz(4); await fdCfgWrite({ [v]: val }); refresh(true);
   },
   fdGoal: async (a, id, v) => { fdCfgKeep(); const c = fdCfg(); const g = Math.min(20, Math.max(3, c.goal + +v)); if (g === c.goal) return; SFX.tick(); buzz(3); await fdCfgWrite({ goal: g }); refresh(true); },
-  fdRwPick: async (a, id, v) => { SFX.tick(); await fdCfgWrite({ reward: v }); refresh(true); },
+  fdVipN: async (a, id, v) => { fdCfgKeep(); const c = fdCfg(); const n = Math.min(50, Math.max(2, c.vipN + +v)); if (n === c.vipN) return; SFX.tick(); buzz(3); await fdCfgWrite({ vipN: n }); refresh(true); },
+  /* gift list */
+  fdRwPick: async (a, id, v) => { const c = fdCfg(); const r = c.rewards[+v]; if (!r || r === c.reward) return; fdCfgKeep(); SFX.tick(); buzz(3); FD.rwEd = null; await fdCfgWrite({ reward: r }); refresh(true); },
+  fdRwEdit: (a, id, v) => { fdCfgKeep(); FD.rwEd = +v >= 0 ? +v : null; SFX.tap(); refresh(true); if (FD.rwEd != null) setTimeout(() => { const i = $("#fdRwE"); if (i) { i.focus(); i.select(); } }, 60); },
+  fdRwOk: async (a, id, v) => {
+    const c = fdCfg(), i = +v, was = c.rewards[i], el = $("#fdRwE"); const t = el ? el.value.trim().slice(0, 60) : ""; if (was == null) { FD.rwEd = null; refresh(true); return; }
+    if (!t) { SFX.err(); toast("Donnez un nom au cadeau", "err"); return; }
+    if (c.rewards.some((x, j) => j !== i && x.toLowerCase() === t.toLowerCase())) { SFX.err(); toast("Ce cadeau est déjà dans la liste", "err"); return; }
+    const rewards = c.rewards.slice(); rewards[i] = t; FD.rwEd = null; if (el) el.blur(); fdCfgKeep(); SFX.ok(); buzz(4);
+    await fdCfgWrite({ rewards, ...(was === c.reward ? { reward: t } : {}) }); toast("Cadeau modifié"); refresh(true);
+  },
+  fdRwDel: async (a, id, v) => {
+    const c = fdCfg(), i = +v, r = c.rewards[i]; if (r == null) return;
+    if (c.rewards.length <= 1) { SFX.err(); toast("Gardez au moins un cadeau, ou mettez la carte en pause", "info"); return; }
+    if (!a.classList.contains("sure")) { SFX.tap(); buzz(4); a.classList.add("sure"); a.setAttribute("aria-label", `Toucher encore pour supprimer ${r}`); toast(`Touchez encore pour supprimer « ${r} »`, "info"); setTimeout(() => a.classList.remove("sure"), 3500); return; }
+    const rewards = c.rewards.filter((_, j) => j !== i); fdCfgKeep(); FD.rwEd = null; SFX.tap(); buzz(5);
+    await fdCfgWrite({ rewards, ...(r === c.reward ? { reward: rewards[0] } : {}) }); toast(r === c.reward ? `Cadeau supprimé · la carte offre maintenant « ${rewards[0]} »` : "Cadeau supprimé"); refresh(true);
+  },
+  fdRwAdd: async () => {
+    const c = fdCfg(), el = $("#fdRwN"); const t = el ? el.value.trim().slice(0, 60) : ""; if (!t) { SFX.err(); el && el.focus(); return; }
+    if (c.rewards.some((x) => x.toLowerCase() === t.toLowerCase())) { SFX.err(); toast("Ce cadeau est déjà dans la liste", "err"); return; }
+    if (c.rewards.length >= FD_RW_MAX) return; el.blur(); fdCfgKeep(); SFX.ok(); buzz(4); await fdCfgWrite({ rewards: c.rewards.concat(t) }); toast("Cadeau ajouté · touchez-le pour le mettre sur la carte"); refresh(true);
+  },
+  /* undo a gift noted by mistake: the stamps come back on the card */
+  fdGiftDel: async (a, id, v) => {
+    if (!fdMgr()) return; if (FD.ed) fdKeep(); const p = fdById(id); if (!p) return; const d = p.doc || {}; const G = Array.isArray(d.gifts) ? d.gifts : []; const g = G.find((x) => +x.at === +v); if (!g) return;
+    if (!a.classList.contains("sure")) { SFX.tap(); buzz(4); a.classList.add("sure"); a.innerHTML = `${ico("trash")}Annuler ?`; setTimeout(() => { if (a.isConnected) { a.classList.remove("sure"); a.innerHTML = ico("trash"); } }, 3500); return; }
+    a.disabled = true; const n = +g.n || fdCfg().goal;
+    try { await fdWrite(id, { used: Math.max(0, (+d.used || 0) - n), gifts: G.filter((x) => x !== g) }); } catch (x) { a.disabled = false; return; }
+    logEvent("client", `a annulé une récompense fidélité notée pour ${p.name}`); SFX.ok(); toast(`Cadeau annulé · ${fdPl(n, "tampon")} rendu${n > 1 ? "s" : ""} à ${firstName(p.name) || "ce client"}`);
+    if (FD.ed && FD.ed.id === id) fdPaint(); else refresh(true);
+  },
   fdCfgSave: async () => { fdCfgKeep(); await fdCfgWrite({}); SFX.done(); toast("Programme de fidélité enregistré"); refresh(true); },
   /* campaigns */
   fdNew: (a, id, v) => { const t = FD_TPL.find((x) => x.k === (v || "carte")) || FD_TPL[0]; SFX.tap(); FD.comp = { tpl: t.k, ch: "email", seg: t.seg, subj: t.subj, body: t.body, to: [] }; const L = fdPeople(); if (!L.some((p) => fdSeg(t.seg)[2](p) && fdReach(p, "email")) && L.some((p) => fdSeg(t.seg)[2](p) && fdReach(p, "sms"))) FD.comp.ch = "sms"; fdCompPaint(); },
@@ -542,7 +591,9 @@ Object.assign(ACT, {
   fdMailGo: (a, id, v) => { const M = FD.mail; if (!M) return; if (!M.done.includes(+v)) M.done.push(+v); SFX.tap(); setTimeout(fdMailPaint, 600); },
   fdMailFin: () => { const M = FD.mail; if (!M) return; DB.update("campaigns", M.cid, { status: "envoyee", sent: M.list.length }).catch(() => {}); FD.mail = null; closeSheet(true); SFX.done(); toast("Campagne notée comme envoyée"); FD.tab = "camp"; refresh(true); },
 });
-function fdCfgKeep() { const r = $("#fdRw"), m = $("#fdBdM"); FD.cfgEd = { ...(r && r.value.trim() ? { reward: r.value.trim().slice(0, 60) } : {}), ...(m ? { bdayMsg: m.value.trim().slice(0, 400) } : {}) }; }
+function fdCfgKeep() { const m = $("#fdBdM"); FD.cfgEd = { ...(m ? { bdayMsg: m.value.trim().slice(0, 400) } : {}) }; }
+/* Entrée valide le cadeau en cours (renommer ou ajouter) */
+document.addEventListener("keydown", (ev) => { if (ev.key !== "Enter" || !ev.target || !ev.target.id) return; const b = ev.target.id === "fdRwE" ? $("[data-act=fdRwOk]") : ev.target.id === "fdRwN" ? $("[data-act=fdRwAdd]") : null; if (b) { ev.preventDefault(); b.click(); } });
 async function fdCfgWrite(patch) {
   const fidCfg = DB.clean({ ...fdCfg(), ...(FD.cfgEd || {}), ...patch }); FD.cfgEd = null;
   try { await safe(DB.update("restos", S.rid, { fidCfg })); if (S.resto) S.resto.fidCfg = fidCfg; FD.memo = null; } catch (e) {}
