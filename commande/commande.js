@@ -78,10 +78,21 @@
     if (!firebase.apps.length) firebase.initializeApp(window.GG_FIREBASE);
     fs = firebase.firestore(); return fs;
   }
-  async function api(op, data) {
-    if (DEMO) return demoApi(op, data);
-    await fb(); if (!firebase.functions) await script(SDK + "firebase-functions-compat.js");
-    const r = await firebase.app().functions(REGION).httpsCallable("orderApi")({ op, rid: RID, ...(data || {}) }); return r.data || {};
+  /* every call goes through GGR.run (js/reseau-client.js): when the network drops, the client sees « Petit souci de réseau », then
+     « Nous renvoyons votre commande… », and the call leaves again by itself. A call that changes something carries one request id `rq`,
+     the same on every try, so the server never takes it twice (functions/src/commande.js). Reads (status…) retry quietly. */
+  const NET_KIND = { create: "commande", billPay: "paiement", call: "appel", status: "suivi", callSt: "suivi", bill: "suivi" };
+  const NET_READ = ["status", "callSt", "bill"];
+  const R = window.GGR || { run: (f) => f(), rid: () => Date.now().toString(36) + Math.random().toString(36).slice(2), back() {} };
+  async function api(op, data, net) {
+    const body = { op, rid: RID, ...(data || {}) }; const read = NET_READ.includes(op) && !(data && data.cancel);
+    if (!read && !body.rq) body.rq = R.rid();
+    const go = async () => {
+      if (DEMO) return demoApi(op, data);
+      await fb(); if (!firebase.functions) await script(SDK + "firebase-functions-compat.js");
+      const r = await firebase.app().functions(REGION).httpsCallable("orderApi", { timeout: 25000 })(body); return r.data || {};
+    };
+    return R.run(go, { kind: NET_KIND[op] || "lecture", pending: !read, stopable: op === "create" || op === "billPay", quiet: read && !!(net && net.quiet) });
   }
   const errText = (e) => {
     const m = String((e && e.message) || "");
@@ -197,7 +208,7 @@
       <div class="qm-hn"><span class="qm-k">${esc(kicker || "La carte")}</span><h1>${esc(p.name || "Restaurant")}</h1>${p.address ? `<p>${svg.pin}${esc(p.address)}</p>` : ""}</div>
     </div>${where ? `<div class="qm-hero-bar">${where}${st.al.size ? `<button class="qm-where al" data-a="allergies">${svg.leaf}<span>${st.al.size} allergie${st.al.size > 1 ? "s" : ""}</span></button>` : `<button class="qm-where ghost" data-a="allergies">${svg.leaf}<span>Allergies</span></button>`}</div>` : ""}</header>`;
   }
-  const foot = () => `<footer class="qm-foot">Commande en ligne par <a href="https://growthgusto.fr" target="_blank" rel="noopener">Growth Gusto</a></footer>`;
+  const foot = () => `<footer class="qm-foot">Commande en ligne par <a href="https://growthgusto.fr" target="_blank" rel="noopener">Growth Gusto</a>${DEMO && !PV ? `<br><button type="button" class="ggr-demo" data-a="netTest"><svg viewBox="0 0 24 24"><path d="M2 8.8a15 15 0 0 1 20 0M5.2 12.4a10 10 0 0 1 13.6 0M8.6 15.9a5 5 0 0 1 6.8 0"/><path d="M3 3l18 18"/></svg>Simuler une coupure réseau</button>` : ""}</footer>`;
   function paintMsg(title, text, retry) {
     closeSheet(true);
     app.innerHTML = `${st.pub ? hero() : `<header class="qm-hero slim"></header>`}<section class="qm-card qm-msg"><div class="qm-msg-ic">${svg.alert}</div><h2>${esc(title)}</h2><p>${esc(text)}</p>
@@ -388,13 +399,14 @@
   async function poll(first) {
     clearTimeout(st.pollT);
     try {
-      const r = await api("status", { oid: st.oid, k: st.okey, check: first ? 1 : 0 }); const o = r.order; if (!o) throw new Error("lien");
+      const r = await api("status", { oid: st.oid, k: st.okey, check: first ? 1 : 0 }, { quiet: !!st.order }); const o = r.order; if (!o) throw new Error("lien");
       const was = st.order && st.order.status; st.order = o;
       if (was && was !== o.status) { if (o.status === "prete") { chime(); vib([60, 40, 60]); } else { pop(600, 0.1); vib(15); } }
       if (!was || was !== o.status || first) paintOrder();
       const s = store.get() || {}; s.o = st.oid; s.k = st.okey; s.n = o.n; s.oAt = s.oAt || o.at || Date.now(); if (["servie", "annulee", "abandonnee"].includes(o.status)) { delete s.o; delete s.k; } store.set(s);
       if (!["servie", "annulee", "abandonnee"].includes(o.status) && !(o.mode === "emporter" && o.status === "prete" && Date.now() - (o.readyAt || Date.now()) > 3600e3)) st.pollT = setTimeout(() => poll(false), document.hidden ? 20000 : o.status === "apayer" ? 3000 : 6000);
-    } catch (e) { console.warn(e); if (!st.order) return paintMsg("Commande introuvable", errText(e)); st.pollT = setTimeout(() => poll(false), 15000); }
+      R.back();
+    } catch (e) { console.warn(e); if (!st.order) return paintMsg("Commande introuvable", errText(e)); st.pollT = setTimeout(() => poll(false), e && (e.ggNet || e.code === "unavailable" || navigator.onLine === false) ? 5000 : 15000); }
   }
   document.addEventListener("visibilitychange", () => { if (!document.hidden && st.view === "order" && st.oid) poll(false); });
 
@@ -421,17 +433,30 @@
     lq: (el) => { const l = st.cart[+el.dataset.i]; if (!l) return; l.q = Math.max(0, Math.min(30, l.q + +el.dataset.v)); st.cart = st.cart.filter((x) => x.q > 0); saveCart(); pop(560, 0.05, 0.03); vib(6); if (!st.cart.length) { closeSheet(); st.view = "menu"; paintMenu(); return; } keepScroll(paintCart); },
     slot: (el) => { st.slot = el.dataset.v; pop(760, 0.05, 0.03); vib(6); keepScroll(paintCart); },
     pay: (el) => { st.pay = el.dataset.v; pop(760, 0.05, 0.03); vib(6); keepScroll(paintCart); },
-    send: async () => {
-      if (st.sending) return; st.sending = true; st.err = ""; keepScroll(paintCart);
+    send: async (el, ev, resume) => {
+      if (st.sending) return;
+      /* the order being sent is kept on the phone (pend) with its request id: a page closed or reloaded during a network cut sends it
+         again on the next visit, and a second tap on « Envoyer » with the same cart reuses the same id — never two orders */
+      const body = resume ? resume.body : { mode: st.mode, table: st.mode === "table" ? st.table : "", items: st.cart.map((l) => ({ id: l.id, q: l.q, note: l.note || "" })), name: st.name.trim(), phone: st.phone.trim(), slot: st.slot, note: st.note.trim(), pay: st.pay,
+        back: location.origin + location.pathname };
+      const h = JSON.stringify({ ...body, back: "" }), s0 = store.get() || {};
+      const rq = resume ? resume.rq : s0.pend && s0.pend.h === h && Date.now() - (s0.pend.at || 0) < 3 * 3600e3 ? s0.pend.rq : R.rid();
+      s0.pend = { rq, h, body, at: (s0.pend && s0.pend.rq === rq && s0.pend.at) || Date.now() }; store.set(s0);
+      st.sending = true; st.err = ""; keepScroll(paintCart);
       try {
-        const r = await api("create", { mode: st.mode, table: st.mode === "table" ? st.table : "", items: st.cart.map((l) => ({ id: l.id, q: l.q, note: l.note || "" })), name: st.name.trim(), phone: st.phone.trim(), slot: st.slot, note: st.note.trim(), pay: st.pay,
-          back: location.origin + location.pathname });
-        st.oid = r.oid; st.okey = r.k; st.cart = []; const s = store.get() || {}; s.cart = []; s.o = r.oid; s.k = r.k; s.n = r.order && r.order.n; s.oAt = Date.now(); store.set(s);
+        const r = await api("create", { ...body, rq });
+        st.oid = r.oid; st.okey = r.k; st.cart = []; const s = store.get() || {}; delete s.pend; s.cart = []; s.o = r.oid; s.k = r.k; s.n = r.order && r.order.n; s.oAt = Date.now(); store.set(s);
         history.replaceState(null, "", `?r=${encodeURIComponent(RID)}&o=${encodeURIComponent(r.oid)}&k=${r.k}`);
         if (r.url) { location.href = r.url; return; }
         st.sending = false; chime(); vib([20, 40, 20]); st.order = r.order; paintOrder(); poll(false);
-      } catch (e) { console.warn(e); st.sending = false; st.err = errText(e); vib([30, 30, 30]); keepScroll(paintCart); }
+      } catch (e) {
+        console.warn(e); st.sending = false;
+        if (e && e.ggStop) st.err = "Envoi arrêté. Votre panier est gardé : renvoyez-le quand le réseau revient, ou commandez auprès de l'équipe.";
+        else { st.err = errText(e); const s = store.get() || {}; if (s.pend && s.pend.rq === rq) { delete s.pend; store.set(s); } }
+        vib([30, 30, 30]); keepScroll(paintCart);
+      }
     },
+    netTest: () => { if (!R.fake) return; pop(520, 0.08, 0.04); vib(12); R.fake(9000); },
     track: () => { const s = store.get(); if (!s || !s.o) return; st.oid = s.o; st.okey = s.k; poll(true); },
     again: () => { history.replaceState(null, "", `?r=${encodeURIComponent(RID)}${st.order && st.order.mode === "table" ? `&t=${encodeURIComponent(st.order.table)}` : "&t=e"}`); clearTimeout(st.pollT); st.order = null; st.oid = ""; st.view = "menu"; paintMenu(); window.scrollTo(0, 0); },
   };
@@ -445,7 +470,7 @@
     if (!RID) return paintMsg("Lien incomplet", "Ce lien n'est pas complet. Scannez à nouveau le QR code de votre table.");
     try {
       if (DEMO) st.pub = demoPub();
-      else { const db = await fb(); const snap = await db.doc(`restos/${RID}/public/menu`).get(); st.pub = snap.exists ? snap.data() : null; }
+      else { const snap = await R.run(async () => (await fb()).doc(`restos/${RID}/public/menu`).get(), { kind: "lecture" }); st.pub = snap.exists ? snap.data() : null; }
     } catch (e) { console.warn(e); return paintMsg("Connexion impossible", "Vérifiez votre connexion internet, puis réessayez.", true); }
     if (!st.pub || !(st.pub.items || []).length) return paintMsg("Carte introuvable", "Ce restaurant n'a pas (encore) de carte en ligne.");
     st.pub.items.forEach((it) => { if (Array.isArray(it.al)) it.al = [...new Set(it.al.map(alId))]; });
@@ -461,6 +486,9 @@
     if (st.mode === "emporter" && !takeawayOpen()) st.mode = null;
     if (!st.mode && (c.table || takeawayOpen())) { st.view = "mode"; paintMode(); return; }
     st.view = "menu"; paintMenu();
+    if (DEMO && Q.get("coupure") === "1") setTimeout(() => ACT.netTest(), 900);
+    /* an order that was still on its way when the page closed: send it again, with the same request id */
+    if (saved && saved.pend && saved.pend.body && Date.now() - (saved.pend.at || 0) < 3 * 3600e3 && st.cart.length) { setTimeout(() => { paintCart(); ACT.send(null, null, saved.pend); }, 400); return; }
     if (Q.get("cancel") === "1") setTimeout(() => { st.err = "Paiement annulé. Votre panier vous attend."; if (count()) paintCart(); }, 300);
   }
   load();
