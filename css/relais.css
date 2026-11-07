@@ -240,7 +240,9 @@
 .jr-lede{margin:-4px 0 12px;max-width:62ch}
 .jr-ctl{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:12px}
 .jr-per{flex:1 1 100%;max-width:440px}
-.jr-per button{flex:1 1 0;min-width:0;white-space:nowrap;padding-left:4px;padding-right:4px}
+.jr-per button{flex:1 1 0;min-width:0;white-space:nowrap;padding-left:2px;padding-right:2px}
+/* « Aujourd'hui » doit tenir en entier sur les petits téléphones (360 px) */
+@media (max-width:440px){.jr-per button{font-size:12.5px;letter-spacing:-.015em}}
 @media (min-width:960px){.jr-per{flex:0 1 400px}}
 .jr-q{flex:1 1 240px;position:relative;display:flex;align-items:center}
 .jr-q>.ico{position:absolute;left:13px;width:17px;height:17px;color:var(--muted);pointer-events:none}
@@ -312,6 +314,16 @@
   .jr-row.sens::before{grid-area:t}
 }
 .jr-moreb{margin-top:2px}
+/* rafale repliée : une ligne « pile de cartes », qu'on déplie au toucher */
+.jr-gr{position:relative}
+.jr-t i{display:block;font-style:normal;font-size:11px;font-weight:650;color:var(--faint);text-align:inherit}
+.jr-more{font-style:normal;display:inline-flex;align-items:center;gap:5px;margin-top:3px;align-self:flex-start;padding:3px 9px 3px 4px;border-radius:999px;background:var(--well);color:var(--ink-2);font-size:12px;font-weight:720}
+.jr-more b{display:inline-grid;place-items:center;min-width:22px;height:20px;padding:0 5px;box-sizing:border-box;border-radius:999px;background:var(--paper);box-shadow:0 0 0 1.5px var(--rim) inset;font-size:11.5px;font-weight:800;color:var(--ink)}
+.jr-more .ico{width:13px;height:13px;transform:rotate(90deg);transition:transform .3s var(--spring)}
+.jr-grp.open .jr-more .ico{transform:rotate(-90deg)}
+.jr-grp:not(.open) .jr-gr{box-shadow:0 5px 0 -2px var(--paper),0 5px 0 -.5px var(--rim),0 10px 0 -5px var(--paper),0 10px 0 -3.5px var(--rim);margin-bottom:10px;border-bottom:1.5px solid var(--rim)}
+.jr-sub{background:var(--well);padding:0 0 4px 14px;box-shadow:inset 3px 0 0 var(--rim)}
+.jr-sub .jr-row{border-top-color:rgba(27,21,48,.06)}
 .jr-lead{display:flex;flex-direction:column;gap:9px}
 .jr-lr{all:unset;cursor:pointer;display:grid;grid-template-columns:auto 72px 1fr auto;align-items:center;gap:9px;font-size:13.5px}
 .jr-lr b{font-weight:720;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}

@@ -956,6 +956,32 @@ function toastPlace(t) {
   if (noRoom || (hit(bottomBox) > 0 && hit(topBox) < hit(bottomBox))) { t.classList.add("top"); t.style.removeProperty("--toastB"); return; }
   if (edge < H) t.style.setProperty("--toastB", Math.round(H - edge + 10) + "px"); else t.style.removeProperty("--toastB");
 }
+/* Glisser pour effacer : une bulle (appel de table, notification) suit le doigt et part dès qu'on la lance assez loin.
+   Le clic qui suit un glissé est avalé, pour ne pas ouvrir ce qu'on vient de chasser. */
+function swipeAway(el, onAway, opt = {}) {
+  if (!el || el._swipe) return; el._swipe = true;
+  let x0 = null, y0 = 0, dx = 0, dy = 0, moved = false, id = null;
+  const set = (t, o) => { el.style.translate = t; el.style.opacity = o; };
+  el.addEventListener("pointerdown", (e) => { if (e.button > 0 || (e.target.closest && e.target.closest("[data-noswipe]"))) return; x0 = e.clientX; y0 = e.clientY; dx = dy = 0; moved = false; id = e.pointerId; el.style.transition = "none"; opt.hold && opt.hold(); });
+  el.addEventListener("pointermove", (e) => {
+    if (x0 == null || e.pointerId !== id) return; dx = e.clientX - x0; dy = e.clientY - y0;
+    if (!moved && Math.hypot(dx, dy) > 8) { moved = true; try { el.setPointerCapture(id); } catch (x) {} }
+    if (moved) { const ax = Math.abs(dx) >= Math.abs(dy); set(ax ? `${dx}px 0` : `0 ${dy}px`, String(Math.max(0.15, 1 - Math.hypot(dx, dy) / 260))); }
+  });
+  const end = (cancel) => {
+    if (x0 == null) return; x0 = null; el.style.transition = "";
+    const far = !cancel && moved && Math.hypot(dx, dy) > Math.min(90, el.offsetWidth * 0.3);
+    if (far) {
+      const ax = Math.abs(dx) >= Math.abs(dy); el.style.transition = "translate .28s cubic-bezier(.2,.7,.3,1),opacity .28s";
+      set(ax ? `${Math.sign(dx || 1) * (innerWidth + 40)}px 0` : `0 ${Math.sign(dy || -1) * 220}px`, "0");
+      try { SFX.close(); buzz(6); } catch (x) {}
+      setTimeout(() => { el.style.transition = ""; onAway(); }, 260);
+    } else { set("", ""); opt.release && opt.release(); }
+    if (moved) { el._ate = Date.now(); }
+  };
+  el.addEventListener("pointerup", () => end(false)); el.addEventListener("pointercancel", () => end(true));
+  el.addEventListener("click", (e) => { if (el._ate && Date.now() - el._ate < 400) { e.stopPropagation(); e.preventDefault(); } }, true);
+}
 function toast(msg, kind) { const t = $("#toast"); t.style.pointerEvents = ""; t.classList.toggle("info", kind === "info"); $(".check", t).innerHTML = TOAST_ICONS[kind] || TOAST_CHECK; $("#toastTx").textContent = msg; toastPlace(t); t.classList.toggle("err", kind === "err"); const c = $(".check", t); c.classList.remove("draw"); void c.offsetWidth; c.classList.add("draw"); t.classList.add("on"); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove("on"), kind === "err" ? 3800 : 2300); }
 function burst(x = window.innerWidth / 2, y = window.innerHeight / 3) {
   if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;

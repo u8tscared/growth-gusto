@@ -446,7 +446,7 @@ const JR_CAT = {
   autre: ["Autres", "activity", "c-nd", false],
 };
 const JR_P = [["jour", "Aujourd'hui"], ["7", "7 jours"], ["30", "30 jours"], ["tout", "Tout"]];
-const JR = { rid: null, rows: null, p: "7", who: "", cat: "", q: "", sens: false, n: 120 };
+const JR = { rid: null, rows: null, p: "7", who: "", cat: "", q: "", sens: false, n: 120, open: new Set() };
 function JR_ROWS() {
   if (!S.rid) return [];
   if (JR.rid !== S.rid) {
@@ -494,6 +494,36 @@ function jrRow(e, i) {
     <span class="jr-cat">${ico(C[1])}<span>${esc(C[0])}</span></span>
     <span class="jr-amt mono">${e.amt ? rlEur(e.amt) : ""}</span></button>`;
 }
+/* Rafales : au moins 4 actions de la même personne à moins d'une minute d'écart (ex. 30 ventes de caisse importées d'un coup).
+   Jamais un geste sensible ni une action annulée : ceux-là restent toujours en ligne, un par un. */
+const jrTpl = (e) => String(e.text || "").toLowerCase().replace(/\d+([.,:/]\d+)*/g, "#").replace(/\s+/g, " ").trim();
+const jrLone = (e) => e.cancelled || JR_CAT[jrCat(e)][3];
+function jrGroups(L) {
+  const out = []; let run = [];
+  const flush = () => { if (run.length >= 4) out.push(run); else run.forEach((e) => out.push([e])); run = []; };
+  L.forEach((e) => {
+    const p = run[run.length - 1];
+    if (jrLone(e)) { flush(); out.push([e]); return; }
+    if (p && jrWhoId(p) === jrWhoId(e) && Math.abs((p.at || 0) - (e.at || 0)) <= 60000) run.push(e);
+    else { flush(); run = [e]; }
+  });
+  flush(); return out;
+}
+function jrGrpRow(g, i) {
+  const key = `${g[0].id}~${g.length}`; const open = JR.open.has(key);
+  const fq = {}; g.forEach((e) => { const t = jrTpl(e); fq[t] = (fq[t] || 0) + 1; }); const top = Object.keys(fq).sort((a, b) => fq[b] - fq[a])[0];
+  const h = g.find((e) => jrTpl(e) === top) || g[0];
+  const cats = [...new Set(g.map(jrCat))]; const C = JR_CAT[cats[0]]; const wid = jrWhoId(h);
+  const tpls = [...new Set(g.map(jrTpl))].length;
+  const t0 = Math.min(...g.map((e) => e.at || 0)); const t1 = Math.max(...g.map((e) => e.at || 0));
+  return `<div class="jr-grp${open ? " open" : ""}"><button class="jr-row jr-gr ${C[2]}" style="--i:${Math.min(i, 14)}" data-act="jrGrp" data-id="${esc(key)}" aria-expanded="${open}">
+    <span class="jr-t mono">${hm(t1)}${hm(t0) !== hm(t1) ? `<i>${hm(t0)}</i>` : ""}</span>
+    <span class="jr-who">${wid && wid !== "sonde" ? avatar(wid, true) : `<span class="jr-sd">${ico("sdProbe" in IC ? "sdProbe" : "therm")}</span>`}<b>${esc(firstName(jrWhoName(h)))}</b></span>
+    <span class="jr-tx"><span>${esc(rlCap(String(h.text || "").replace(/^a /, "")))}</span><em class="jr-more"><b class="mono">+${g.length - 1}</b>${open ? "Replier" : tpls === 1 ? "du même genre" : "autres actions"}${ico("chev")}</em></span>
+    <span class="jr-cat">${ico(C[1])}<span>${esc(cats.length > 1 ? `${C[0]} +${cats.length - 1}` : C[0])}</span></span>
+    <span class="jr-amt mono"></span></button>
+    ${open ? `<div class="jr-sub">${g.map((e, j) => jrRow(e, j)).join("")}</div>` : ""}</div>`;
+}
 VIEWS.journal = {
   render() {
     if (!rlIsMgr() && !(typeof PERMS !== "undefined" && PERMS.isAdmin && PERMS.isAdmin())) return VIEWS.noaccess ? VIEWS.noaccess.render({ route: "journal" }) : `<div class="inner">${topBar("Journal des actions")}<div class="glass empty">Réservé au gérant et aux chefs.</div></div>`;
@@ -507,6 +537,8 @@ VIEWS.journal = {
     const lead = ins.arr.length ? `<section class="glass jr-lead st" style="--i:4"><span class="lbl">Annulations et offerts par personne</span>${ins.arr.slice(0, 5).map((o) => { const mx = ins.arr[0].n || 1; return `<button class="jr-lr" data-act="jrWho" data-id="${esc(o.id)}">${avatar(o.id, true)}<b>${esc(firstName(o.name))}</b><span class="jr-lb"><i class="a" style="--w:${(o.annul / mx) * 100}%"></i><i class="o" style="--w:${(o.offert / mx) * 100}%"></i></span><span class="mono">${o.n}</span></button>`; }).join("")}<div class="jr-leg"><span class="a">Annulations</span><span class="o">Offerts</span></div></section>` : "";
     const people = [...new Map(inP.filter((e) => jrWhoId(e) && jrWhoId(e) !== "sonde").map((e) => [jrWhoId(e), jrWhoName(e)])).entries()].slice(0, 16);
     const byDay = {}; shown.forEach((e) => { (byDay[dayKey(new Date(e.at))] ||= []).push(e); });
+    /* actions automatiques en rafale (ex. 30 ventes de caisse importées d'un coup) : une seule ligne repliée, qu'on déplie au toucher */
+    const dayHTML = (L) => jrGroups(L).map((g, i) => g.length < 4 ? g.map((e, j) => jrRow(e, i + j)).join("") : jrGrpRow(g, i)).join("");
     const days = Object.keys(byDay).sort().reverse(); let k = 0;
     return `<div class="inner wide jr">${topBar("Journal des actions", { right: `<button class="btn soft sm" data-act="jrCsv">${ico("download" in IC ? "download" : "upload")}Exporter</button>` })}
       <p class="sub jr-lede st" style="--i:1">Tout ce qui se fait dans l'app, signé et à la minute. Rien ne s'efface : une action annulée reste ici, barrée.</p>
@@ -518,7 +550,7 @@ VIEWS.journal = {
         <div class="jr-fil st" style="--i:4">${people.length > 1 ? `<div class="jr-ppl">${people.map(([id, n]) => `<button class="jr-pp${JR.who === id ? " on" : ""}" data-act="jrWho" data-id="${esc(id)}" aria-pressed="${JR.who === id}">${avatar(id, true)}<span>${esc(firstName(n))}</span></button>`).join("")}</div>` : ""}
           <div class="jr-chips"><button class="chip${!JR.cat && !JR.sens ? " on" : ""}" data-act="jrCat" data-v="">Tout</button><button class="chip jr-sens${JR.sens ? " on" : ""}" data-act="jrSens">${ico("jrFlag")}Gestes sensibles</button>${Object.entries(JR_CAT).filter(([c]) => cnt[c]).map(([c, C]) => `<button class="chip${JR.cat === c ? " on" : ""}" data-act="jrCat" data-v="${c}">${esc(C[0])}<span class="mono">${cnt[c]}</span></button>`).join("")}</div></div>
         ${JR.who || JR.cat || JR.q || JR.sens ? `<div class="jr-act st" style="--i:5"><span><b class="mono">${L.length}</b> ${L.length > 1 ? "actions" : "action"}${JR.who ? ` de ${esc(firstName(rlName(JR.who, people.find((p) => p[0] === JR.who)?.[1])))}` : ""}</span><button class="btn ghost sm" data-act="jrReset">${ico("x")}Tout afficher</button></div>` : ""}
-        ${days.length ? `<div class="jr-list">${days.map((d) => `<section class="jr-day st" style="--i:${Math.min(6 + k++, 12)}"><div class="jr-dh"><b>${esc(rlCap(rlDayRel(d)))}</b><span class="mono">${byDay[d].length}</span></div><div class="jr-head" aria-hidden="true"><span>Heure</span><span>Qui</span><span>Action</span><span>Type</span><span>Montant</span></div>${byDay[d].map(jrRow).join("")}</section>`).join("")}</div>
+        ${days.length ? `<div class="jr-list">${days.map((d) => `<section class="jr-day st" style="--i:${Math.min(6 + k++, 12)}"><div class="jr-dh"><b>${esc(rlCap(rlDayRel(d)))}</b><span class="mono">${byDay[d].length}</span></div><div class="jr-head" aria-hidden="true"><span>Heure</span><span>Qui</span><span>Action</span><span>Type</span><span>Montant</span></div>${dayHTML(byDay[d])}</section>`).join("")}</div>
           ${L.length > shown.length ? `<button class="btn soft block jr-moreb" data-act="jrMore">Voir ${Math.min(200, L.length - shown.length)} de plus</button>` : ""}`
           : `<div class="glass empty st" style="--i:6"><div class="ic">${ico("jrLog")}</div><b>Rien sur cette période</b>${JR.q ? "Essayez un autre mot." : "Chaque relevé, commande, annulation ou changement s'ajoute ici avec son auteur."}</div>`}
       </div><aside class="jr-side">${lead}<section class="glass jr-how st" style="--i:5"><span class="lbl">Comment c'est protégé</span><ul><li>Chaque action porte le nom de qui l'a faite, même sur la tablette partagée.</li><li>Personne ne peut modifier ou effacer une ligne, pas même un gérant.</li><li>Les annulations et les offerts gardent leur motif et leur montant.</li></ul></section></aside></div></div>`;
@@ -791,6 +823,7 @@ Object.assign(ACT, {
   jrSens: () => { JR.sens = !JR.sens; JR.cat = ""; JR.n = 120; SFX.tick(); buzz(4); rerender(); },
   jrWho: (a, id) => { const was = JR.who === id; closeSheet(true); JR.who = was ? "" : id; JR.n = 120; SFX.tick(); buzz(4); if (S.route !== "journal") go("journal"); else rerender(); },
   jrReset: () => { JR.who = ""; JR.cat = ""; JR.q = ""; JR.sens = false; JR.n = 120; SFX.close(); rerender(); },
+  jrGrp: (a, id) => { if (JR.open.has(id)) JR.open.delete(id); else JR.open.add(id); SFX.tap(); buzz(4); rerender(); },
   jrMore: () => { JR.n += 200; SFX.tap(); rerender(); },
   jrOpen: (a, id) => { SFX.tap(); jrSheet(id); },
   jrCsv: () => jrCsv(),

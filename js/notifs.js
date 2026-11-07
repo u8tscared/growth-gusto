@@ -214,12 +214,13 @@ function puBanner(n) {
   host.prepend(el); while (host.children.length > 3) host.lastElementChild.remove();
   requestAnimationFrame(() => el.classList.add("on"));
   try { SFX.init(); SFX.tone(1175, 0.12, "sine", 0.045); SFX.tone(1568, 0.28, "sine", 0.04, 0.09); buzz([12, 50, 12]); } catch (e) {}
-  const out = () => { if (el._out) return; el._out = true; el.classList.remove("on"); el.classList.add("out"); setTimeout(() => el.remove(), 420); };
-  let y0 = null; el._t = setTimeout(out, 6200);
-  el.addEventListener("pointerdown", (e) => { y0 = e.clientY; clearTimeout(el._t); });
-  el.addEventListener("pointermove", (e) => { if (y0 == null) return; const dy = Math.min(0, e.clientY - y0); el.style.transform = `translateY(${dy}px)`; });
-  el.addEventListener("pointerup", (e) => { const dy = y0 == null ? 0 : e.clientY - y0; y0 = null; el.style.transform = ""; if (dy < -24) { out(); return; } out(); const r = puRouteOf(n.url); if (r && VIEWS[r] && r !== S.route) go(r); });
-  el.addEventListener("pointercancel", () => { y0 = null; el.style.transform = ""; el._t = setTimeout(out, 3000); });
+  const out = () => { if (el._out) return; el._out = true; clearTimeout(el._t); el.classList.remove("on"); el.classList.add("out"); setTimeout(() => el.remove(), 420); };
+  el._t = setTimeout(out, 6200);
+  /* glisser (sur le côté ou vers le haut) ou la petite croix pour l'effacer ; toucher ailleurs ouvre l'écran concerné */
+  el.insertAdjacentHTML("beforeend", `<button class="pu-bx" data-noswipe aria-label="Effacer la notification">${ico("x")}</button>`);
+  $(".pu-bx", el).addEventListener("click", (e) => { e.stopPropagation(); try { SFX.close(); buzz(6); } catch (x) {} out(); });
+  swipeAway(el, () => { el._out = true; clearTimeout(el._t); el.remove(); }, { hold: () => clearTimeout(el._t), release: () => { clearTimeout(el._t); el._t = setTimeout(out, 3000); } });
+  el.addEventListener("click", () => { out(); const r = puRouteOf(n.url); if (r && VIEWS[r] && r !== S.route) go(r); });
   PU.log.unshift({ ...n, at: Date.now() }); PU.log = PU.log.slice(0, 30);
   if (S.route === "notifs") puPaintLog();
 }
