@@ -83,16 +83,29 @@
     if (!firebase.apps.length) firebase.initializeApp(window.GG_FIREBASE);
     fs = firebase.firestore(); return fs;
   }
-  async function api(op, data) {
-    if (DEMO) return demoApi(op, data);
-    await fb(); if (!firebase.functions) await script(SDK + "firebase-functions-compat.js");
-    const r = await firebase.app().functions(REGION).httpsCallable("orderApi")({ op, rid: RID, ...(data || {}) }); return r.data || {};
+  /* every call goes through GGR.run (js/reseau-client.js): when the network drops, the client sees « Petit souci de réseau », then
+     « Nous renvoyons votre commande… », and the call leaves again by itself. A call that changes something carries one request id `rq`,
+     the same on every try, so the server never takes it twice (functions/src/commande.js). Reads (status…) retry quietly. */
+  const NET_KIND = { create: "commande", billPay: "paiement", call: "appel", status: "suivi", callSt: "suivi", bill: "suivi" };
+  const NET_READ = ["status", "callSt", "bill"];
+  const R = window.GGR || { run: (f) => f(), rid: () => Date.now().toString(36) + Math.random().toString(36).slice(2), back() {} };
+  async function api(op, data, net) {
+    const body = { op, rid: RID, ...(data || {}) }; const read = NET_READ.includes(op) && !(data && data.cancel);
+    if (!read && !body.rq) body.rq = R.rid();
+    const go = async () => {
+      if (DEMO) return demoApi(op, data);
+      await fb(); if (!firebase.functions) await script(SDK + "firebase-functions-compat.js");
+      const r = await firebase.app().functions(REGION).httpsCallable("orderApi", { timeout: 25000 })(body); return r.data || {};
+    };
+    return R.run(go, { kind: NET_KIND[op] || "lecture", pending: !read, stopable: op === "create" || op === "billPay", quiet: read && !!(net && net.quiet) });
   }
   const errText = (e) => {
     const m = String((e && e.message) || "");
     const T = { ferme: "Le restaurant ne prend plus de commandes en ligne pour le moment.", plat: "Un plat de votre commande n'est plus disponible. Vérifiez votre panier.",
       prix: "La carte vient de changer. Vérifiez votre panier puis réessayez.", creneau: "Cet horaire n'est plus disponible. Choisissez-en un autre.",
-      paiement: "Le paiement en ligne n'est pas disponible pour le moment. Choisissez « payer sur place ».", trop: "Trop de commandes en même temps. Réessayez dans une minute.",
+      paiement: payModes().includes("place") ? "Le paiement en ligne ne répond pas pour le moment. Choisissez « payer sur place », ou réessayez dans un instant."
+        : "Le paiement en ligne ne répond pas pour le moment. Réessayez dans un instant : rien n'a été débité. Si ça continue, appelez le personnel.",
+      paiement_oblig: "Ce restaurant demande de payer au moment de commander. Choisissez « payer maintenant ».", trop: "Trop de commandes en même temps. Réessayez dans une minute.",
       lien: "Ce lien n'est plus valide.", table: "Indiquez le numéro de votre table.", contact: "Indiquez votre prénom et votre téléphone." };
     return T[m] || (navigator.onLine === false ? "Pas de connexion internet. Réessayez dans un instant." : "Ça n'a pas marché. Réessayez, ou demandez au personnel.");
   };
@@ -101,7 +114,7 @@
   const DEMO_PH = (h1, h2, e) => `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120"><defs><radialGradient id="g" cx=".35" cy=".3" r=".9"><stop offset="0" stop-color="${h1}"/><stop offset="1" stop-color="${h2}"/></radialGradient></defs><rect width="120" height="120" fill="url(#g)"/><text x="60" y="76" font-size="46" text-anchor="middle">${e}</text></svg>`)}`;
   function demoPub() {
     return { name: "Le Bistrot Démo", review: "https://g.page/r/CbistrotDemoGG/review", address: "8 place du Marché, Lyon 2e", phone: "04 78 42 18 90", logo: "", msg: "Produits frais du marché, cuisinés sur place.", look: { style: "moderne", acc: "violet", photos: true, cover: "" },
-      cfg: { on: true, table: true, takeaway: true, payOnline: true, payPlace: true, prepMin: 20, tables: 18, pickup: { days: [0, 1, 2, 3, 4, 5, 6], windows: [{ from: "11:30", to: "14:00" }, { from: "18:30", to: "22:00" }], step: 15 }, tipNote: "" },
+      cfg: { on: true, table: true, takeaway: true, payOnline: true, payPlace: true, tablePay: "choix", prepMin: 20, tables: 18, pickup: { days: [0, 1, 2, 3, 4, 5, 6], windows: [{ from: "11:30", to: "14:00" }, { from: "18:30", to: "22:00" }], step: 15 }, tipNote: "" },
       cats: [{ id: "partage", t: "À partager" }, { id: "entree", t: "Entrées" }, { id: "plat", t: "Plats" }, { id: "dessert", t: "Desserts" }, { id: "boisson", t: "Boissons" }],
       items: [
         { id: "d1", t: "Croquettes de jambon", d: "Béchamel crémeuse, jambon ibérique, chapelure maison. Par six.", p: 9, c: "partage", al: ["gluten", "lait", "oeufs"], ph: DEMO_PH("#F6C97A", "#C9822E", "🥘") },
@@ -179,7 +192,11 @@
     return [...new Set(out)].sort();
   }
   const takeawayOpen = () => !!cfg().takeaway && pickupSlots().length > 0;
-  const payModes = () => { const c = cfg(); const m = []; if (c.payOnline) m.push("stripe"); if (c.payPlace !== false || !c.payOnline) m.push("place"); return m; };
+  /* à table, the restaurant picks (cfg.tablePay): "avant" pay when ordering (required), "choix" the client picks, "apres" at the end of the meal.
+     Takeaway keeps payOnline / payPlace. An older menu doc without tablePay falls back on those two. */
+  const tablePay = () => { const c = cfg(); if (["avant", "choix", "apres"].includes(c.tablePay)) return !c.payOnline && c.tablePay !== "apres" ? "apres" : c.tablePay; return !c.payOnline ? "apres" : c.payPlace === false ? "avant" : "choix"; };
+  const payModes = () => { const c = cfg(); if (st.mode === "table") { const tp = tablePay(); return tp === "avant" ? ["stripe"] : tp === "apres" ? ["place"] : ["stripe", "place"]; }
+    const m = []; if (c.payOnline) m.push("stripe"); if (c.payPlace !== false || !c.payOnline) m.push("place"); return m; };
 
   /* ───────── the restaurant's look: style, colour, photos, cover (cmPubDoc look) ───────── */
   const LOOKS = ["moderne", "bistrot", "elegant"], ACCS = ["violet", "tomate", "safran", "sauge", "ocean", "encre"];
@@ -215,7 +232,7 @@
       <div class="qm-hn"><span class="qm-k">${esc(kicker || "La carte")}</span><h1>${esc(p.name || "Restaurant")}</h1>${p.address ? `<p>${svg.pin}${esc(p.address)}</p>` : ""}</div>
     </div>${where ? `<div class="qm-hero-bar">${where}${st.al.size ? `<button class="qm-where al" data-a="allergies">${svg.leaf}<span>${st.al.size} allergie${st.al.size > 1 ? "s" : ""}</span></button>` : `<button class="qm-where ghost" data-a="allergies">${svg.leaf}<span>Allergies</span></button>`}</div>` : ""}</header>`;
   }
-  const foot = () => `<footer class="qm-foot">Commande en ligne par <a href="https://growthgusto.fr" target="_blank" rel="noopener">Growth Gusto</a></footer>`;
+  const foot = () => `<footer class="qm-foot">Commande en ligne par <a href="https://growthgusto.fr" target="_blank" rel="noopener">Growth Gusto</a>${DEMO && !PV ? `<br><button type="button" class="ggr-demo" data-a="netTest"><svg viewBox="0 0 24 24"><path d="M2 8.8a15 15 0 0 1 20 0M5.2 12.4a10 10 0 0 1 13.6 0M8.6 15.9a5 5 0 0 1 6.8 0"/><path d="M3 3l18 18"/></svg>Simuler une coupure réseau</button>` : ""}</footer>`;
   function paintMsg(title, text, retry) {
     closeSheet(true);
     app.innerHTML = `${st.pub ? hero() : `<header class="qm-hero slim"></header>`}<section class="qm-card qm-msg"><div class="qm-msg-ic">${svg.alert}</div><h2>${esc(title)}</h2><p>${esc(text)}</p>
@@ -362,7 +379,7 @@
         <label class="qm-f"><span>Téléphone</span><input id="qmPhone" type="tel" autocomplete="tel" inputmode="tel" maxlength="20" value="${esc(st.phone)}" placeholder="06 12 34 56 78"></label></div>`
       : `<div class="qm-blk"><label class="qm-f"><span>Votre prénom <i>(facultatif)</i></span><input id="qmName" autocomplete="given-name" maxlength="40" value="${esc(st.name)}" placeholder="Pour qu'on vous reconnaisse"></label></div>`}
       <div class="qm-blk"><label class="qm-f"><span>Un mot pour l'équipe <i>(facultatif)</i></span><input id="qmNote" maxlength="200" value="${esc(st.note)}" placeholder="${st.mode === "table" ? "Les desserts plus tard, merci" : "Couverts, sauce à part…"}"></label></div>
-      ${modes.length ? `<div class="qm-blk"><div class="qm-bh">${svg.card}<b>Paiement</b></div><div class="qm-pays">${modes.map((m) => m === "stripe"
+      ${modes.length ? `<div class="qm-blk"><div class="qm-bh">${svg.card}<b>Paiement</b></div>${st.mode === "table" && modes.length === 1 ? `<p class="qm-payn">${modes[0] === "stripe" ? `${esc(st.pub.name || "Le restaurant")} demande de régler en commandant. La cuisine reçoit votre commande dès le paiement.` : "Vous réglez à la fin du repas, auprès du serveur. Rien à payer maintenant."}</p>` : ""}<div class="qm-pays">${modes.map((m) => m === "stripe"
         ? `<button class="qm-pay${st.pay === m ? " on" : ""}" data-a="pay" data-v="stripe"><span class="qm-radio"></span><span class="qm-pay-tx"><b>Payer maintenant</b><em>Carte bancaire, Apple Pay, Google Pay</em></span><span class="qm-cards"><i class="cb">CB</i><i class="vi">VISA</i><i class="mc"><s></s><s></s></i></span></button>`
         : `<button class="qm-pay${st.pay === m ? " on" : ""}" data-a="pay" data-v="place"><span class="qm-radio"></span><span class="qm-pay-tx"><b>${st.mode === "table" ? "Payer à la fin du repas" : "Payer au retrait"}</b><em>Carte, espèces ou titre-restaurant, sur place</em></span>${svg.coins}</button>`).join("")}</div></div>` : ""}
       <div class="qm-tot"><span>Total</span><b class="mono">${eur(t)}</b></div>
@@ -399,21 +416,32 @@
         <div class="qm-tk-l">${(o.items || []).map((x) => `<div><span><b>${x.q}×</b> ${esc(x.name)}${x.note ? `<em>${esc(x.note)}</em>` : ""}</span><span class="mono">${eur(x.price * x.q)}</span></div>`).join("")}</div>
         <div class="qm-tk-t"><span>Total</span><b class="mono">${eur(o.total)}</b></div>
         <div class="qm-tk-s ${o.paid ? "ok" : ""}">${o.paid ? `${svg.check}Payé en ligne` : o.pay === "stripe" && o.status === "apayer" ? "Paiement en cours" : take ? "À régler au retrait" : "À régler sur place"}</div></div>
-      ${o.status === "abandonnee" || o.status === "servie" || (take && o.status === "prete") ? `<button class="qm-btn" data-a="again">Nouvelle commande</button>` : ""}
+      ${avisCard(o, take)}
+      ${o.status === "abandonnee" || o.status === "servie" || (take && o.status === "prete") ? `<button class="qm-btn${o.status === "abandonnee" ? "" : " soft"}" data-a="again">Nouvelle commande</button>` : ""}
       ${o.status === "apayer" && o.payUrl ? `<a class="qm-btn" href="${esc(o.payUrl)}">${svg.lock}Reprendre le paiement</a>` : ""}
       ${p.phone ? `<a class="qm-link" href="tel:${esc(String(p.phone).replace(/[^\d+]/g, ""))}">Une question ? ${esc(p.phone)}</a>` : ""}
     </section>${foot()}${callFab()}`;
   }
+  /* « Comment c'était ? » once the order is served (or ready to take away): each star opens the avis/ page with that note picked
+     (functions/src/avisclient.js checks the order's private key; the restaurant hears at once about a note of 3 or less) */
+  function avisCard(o, take) {
+    if (!(o.status === "servie" || (take && o.status === "prete"))) return "";
+    const q = DEMO ? "?r=demo" : st.oid && st.okey ? `?r=${encodeURIComponent(RID)}&o=${encodeURIComponent(st.oid)}&k=${encodeURIComponent(st.okey)}` : ""; if (!q) return "";
+    const star = '<svg viewBox="0 0 24 24"><path d="m12 2.6 2.9 5.9 6.5.95-4.7 4.6 1.1 6.45L12 17.45l-5.8 3.05 1.1-6.45-4.7-4.6 6.5-.95z"/></svg>';
+    return `<div class="qm-av"><b>${take ? "Comment c'était ?" : "Vous avez terminé ? Comment c'était ?"}</b><span>Touchez une étoile, c'est fait en dix secondes.</span>
+      <div class="qm-av-s">${[1, 2, 3, 4, 5].map((n) => `<a href="../avis/${q}&n=${n}" aria-label="${n} sur 5" style="--i:${n}">${star}</a>`).join("")}</div></div>`;
+  }
   async function poll(first) {
     clearTimeout(st.pollT);
     try {
-      const r = await api("status", { oid: st.oid, k: st.okey, check: first ? 1 : 0 }); const o = r.order; if (!o) throw new Error("lien");
+      const r = await api("status", { oid: st.oid, k: st.okey, check: first ? 1 : 0 }, { quiet: !!st.order }); const o = r.order; if (!o) throw new Error("lien");
       const was = st.order && st.order.status; st.order = o;
       if (was && was !== o.status) { if (o.status === "prete") { chime(); vib([60, 40, 60]); } else { pop(600, 0.1); vib(15); } }
       if (!was || was !== o.status || first) paintOrder();
       const s = store.get() || {}; s.o = st.oid; s.k = st.okey; s.n = o.n; s.oAt = s.oAt || o.at || Date.now(); if (["servie", "annulee", "abandonnee"].includes(o.status)) { delete s.o; delete s.k; } store.set(s);
       if (!["servie", "annulee", "abandonnee"].includes(o.status) && !(o.mode === "emporter" && o.status === "prete" && Date.now() - (o.readyAt || Date.now()) > 3600e3)) st.pollT = setTimeout(() => poll(false), document.hidden ? 20000 : o.status === "apayer" ? 3000 : 6000);
-    } catch (e) { console.warn(e); if (!st.order) return paintMsg("Commande introuvable", errText(e)); st.pollT = setTimeout(() => poll(false), 15000); }
+      R.back();
+    } catch (e) { console.warn(e); if (!st.order) return paintMsg("Commande introuvable", errText(e)); st.pollT = setTimeout(() => poll(false), e && (e.ggNet || e.code === "unavailable" || navigator.onLine === false) ? 5000 : 15000); }
   }
   document.addEventListener("visibilitychange", () => { if (!document.hidden && st.view === "order" && st.oid) poll(false); });
 
@@ -558,17 +586,30 @@
     lq: (el) => { const l = st.cart[+el.dataset.i]; if (!l) return; l.q = Math.max(0, Math.min(30, l.q + +el.dataset.v)); st.cart = st.cart.filter((x) => x.q > 0); saveCart(); pop(560, 0.05, 0.03); vib(6); if (!st.cart.length) { closeSheet(); st.view = "menu"; paintMenu(); return; } keepScroll(paintCart); },
     slot: (el) => { st.slot = el.dataset.v; pop(760, 0.05, 0.03); vib(6); keepScroll(paintCart); },
     pay: (el) => { st.pay = el.dataset.v; pop(760, 0.05, 0.03); vib(6); keepScroll(paintCart); },
-    send: async () => {
-      if (st.sending) return; st.sending = true; st.err = ""; keepScroll(paintCart);
+    send: async (el, ev, resume) => {
+      if (st.sending) return;
+      /* the order being sent is kept on the phone (pend) with its request id: a page closed or reloaded during a network cut sends it
+         again on the next visit, and a second tap on « Envoyer » with the same cart reuses the same id — never two orders */
+      const body = resume ? resume.body : { mode: st.mode, table: st.mode === "table" ? st.table : "", items: st.cart.map((l) => ({ id: l.id, q: l.q, note: l.note || "" })), name: st.name.trim(), phone: st.phone.trim(), slot: st.slot, note: st.note.trim(), pay: st.pay,
+        back: location.origin + location.pathname };
+      const h = JSON.stringify({ ...body, back: "" }), s0 = store.get() || {};
+      const rq = resume ? resume.rq : s0.pend && s0.pend.h === h && Date.now() - (s0.pend.at || 0) < 3 * 3600e3 ? s0.pend.rq : R.rid();
+      s0.pend = { rq, h, body, at: (s0.pend && s0.pend.rq === rq && s0.pend.at) || Date.now() }; store.set(s0);
+      st.sending = true; st.err = ""; keepScroll(paintCart);
       try {
-        const r = await api("create", { mode: st.mode, table: st.mode === "table" ? st.table : "", items: st.cart.map((l) => ({ id: l.id, q: l.q, note: l.note || "" })), name: st.name.trim(), phone: st.phone.trim(), slot: st.slot, note: st.note.trim(), pay: st.pay,
-          back: location.origin + location.pathname });
-        st.oid = r.oid; st.okey = r.k; st.cart = []; const s = store.get() || {}; s.cart = []; s.o = r.oid; s.k = r.k; s.n = r.order && r.order.n; s.oAt = Date.now(); store.set(s);
+        const r = await api("create", { ...body, rq });
+        st.oid = r.oid; st.okey = r.k; st.cart = []; const s = store.get() || {}; delete s.pend; s.cart = []; s.o = r.oid; s.k = r.k; s.n = r.order && r.order.n; s.oAt = Date.now(); store.set(s);
         history.replaceState(null, "", `?r=${encodeURIComponent(RID)}&o=${encodeURIComponent(r.oid)}&k=${r.k}`);
         if (r.url) { location.href = r.url; return; }
         st.sending = false; chime(); vib([20, 40, 20]); st.order = r.order; paintOrder(); poll(false);
-      } catch (e) { console.warn(e); st.sending = false; st.err = errText(e); vib([30, 30, 30]); keepScroll(paintCart); }
+      } catch (e) {
+        console.warn(e); st.sending = false;
+        if (e && e.ggStop) st.err = "Envoi arrêté. Votre panier est gardé : renvoyez-le quand le réseau revient, ou commandez auprès de l'équipe.";
+        else { st.err = errText(e); const s = store.get() || {}; if (s.pend && s.pend.rq === rq) { delete s.pend; store.set(s); } }
+        vib([30, 30, 30]); keepScroll(paintCart);
+      }
     },
+    netTest: () => { if (!R.fake) return; pop(520, 0.08, 0.04); vib(12); R.fake(9000); },
     track: () => { const s = store.get(); if (!s || !s.o) return; st.oid = s.o; st.okey = s.k; poll(true); },
     again: () => { history.replaceState(null, "", `?r=${encodeURIComponent(RID)}${st.order && st.order.mode === "table" ? `&t=${encodeURIComponent(st.order.table)}` : "&t=e"}`); clearTimeout(st.pollT); st.order = null; st.oid = ""; st.view = "menu"; paintMenu(); window.scrollTo(0, 0); },
   };
@@ -582,7 +623,7 @@
     if (!RID) return paintMsg("Lien incomplet", "Ce lien n'est pas complet. Scannez à nouveau le QR code de votre table.");
     try {
       if (DEMO) st.pub = demoPub();
-      else { const db = await fb(); const snap = await db.doc(`restos/${RID}/public/menu`).get(); st.pub = snap.exists ? snap.data() : null; }
+      else { const snap = await R.run(async () => (await fb()).doc(`restos/${RID}/public/menu`).get(), { kind: "lecture" }); st.pub = snap.exists ? snap.data() : null; }
     } catch (e) { console.warn(e); return paintMsg("Connexion impossible", "Vérifiez votre connexion internet, puis réessayez.", true); }
     if (!st.pub || !(st.pub.items || []).length) return paintMsg("Carte introuvable", "Ce restaurant n'a pas (encore) de carte en ligne.");
     st.pub.items.forEach((it) => { if (Array.isArray(it.al)) it.al = [...new Set(it.al.map(alId))]; });
@@ -600,6 +641,9 @@
     if (st.mode === "emporter" && !takeawayOpen()) st.mode = null;
     if (!st.mode && (c.table || takeawayOpen())) { st.view = "mode"; paintMode(); return; }
     st.view = "menu"; paintMenu();
+    if (DEMO && Q.get("coupure") === "1") setTimeout(() => ACT.netTest(), 900);
+    /* an order that was still on its way when the page closed: send it again, with the same request id */
+    if (saved && saved.pend && saved.pend.body && Date.now() - (saved.pend.at || 0) < 3 * 3600e3 && st.cart.length) { setTimeout(() => { paintCart(); ACT.send(null, null, saved.pend); }, 400); return; }
     if (Q.get("cancel") === "1") setTimeout(() => { st.err = "Paiement annulé. Votre panier vous attend."; if (count()) paintCart(); }, 300);
   }
   load();

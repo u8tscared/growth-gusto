@@ -7,7 +7,7 @@
    calé sur les réservations du jour : 15 min avant la première résa du service, une fois par service et par appareil ; ou d'un
    geste (carte de l'Accueil, menu « Coup de feu »). Extinction : 45 min après la dernière résa du service, avec le bilan. Un service
    sans aucune résa garde ses horaires des Réservations. « Quitter » le coupe jusqu'au service suivant.
-   Rôle : d'après le poste de la personne (js/perms.js : salle / bar → Salle, cuisine / plonge / second → Cuisine, gérant → Pilotage),
+   Rôle : d'après le poste de la personne (js/perms.js : salle → Salle, bar → Bar (js/bar.js), cuisine / plonge / second → Cuisine, gérant → Pilotage),
    changeable d'un geste ; le choix est gardé sur l'appareil (la tablette de la cuisine reste en Cuisine).
    Data: none of its own. Reads js/salle.js (salleTabs + clientOrders), js/resa.js (bookings, services), the fridges and readings.
    Device prefs (localStorage): gg-cf-role-<rid>, gg-cf-auto-<rid> ("0" = no auto start), gg-cf-seen-<rid> (service already started). */
@@ -28,7 +28,7 @@ Object.assign(IC, {
 });
 
 const CF_PRE = 15, CF_POST = 45; /* minutes before the first seating / after the last one */
-const CF_ROLES = [["salle", "pmCloche", "Salle", "Tables et plats prêts"], ["cuisine", "pmToque", "Cuisine", "Bons, ruptures, frigos"], ["pilote", "cfGauge", "Pilotage", "Tout le service en direct"]];
+const CF_ROLES = [["salle", "pmCloche", "Salle", "Tables et plats prêts"], ["cuisine", "pmToque", "Cuisine", "Bons, ruptures, frigos"], ["bar", "slGlass", "Bar", "Boissons à préparer"], ["pilote", "cfGauge", "Pilotage", "Tout le service en direct"]];
 const CF = { tick: null, cur: null, ending: false, last: "" };
 const cfLS = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch (e) {} return null; };
 const cfMin = (t) => { const m = /^(\d{1,2}):(\d{2})/.exec(t || ""); return m ? +m[1] * 60 + +m[2] : 0; };
@@ -72,7 +72,8 @@ const cfCanPilot = () => DB.mode === "demo" || myRole() !== "equipe";
 function cfRoleDef() {
   let p = ""; try { p = (typeof PERMS !== "undefined" && PERMS.me && (PERMS.me() || {}).poste) || ""; } catch (e) {}
   if (!p) p = ((S.members || []).find((m) => m.id === S.me.id) || {}).poste || "";
-  if (p === "salle" || p === "bar") return "salle";
+  if (p === "bar") return "bar";
+  if (p === "salle") return "salle";
   if (["cuisine", "plonge", "second"].includes(p)) return "cuisine";
   return myRole() === "gerant" ? "pilote" : "cuisine";
 }
@@ -144,13 +145,14 @@ VIEWS.coupdefeu = {
     if (typeof slWatch === "function") slWatch();
     const s = cfSvc(), role = cfRole(); if (!CF.cur && s && S.params && S.params.svc === s.key) CF.cur = s;
     const roles = CF_ROLES.filter((r) => r[0] !== "pilote" || cfCanPilot()), ri = Math.max(0, roles.findIndex((r) => r[0] === role));
-    const body = role === "salle" ? cfSalle() : role === "pilote" ? cfPilote() : cfCuisine();
+    const body = role === "salle" ? cfSalle() : role === "pilote" ? cfPilote() : role === "bar" && typeof brCfBody === "function" ? brCfBody() : cfCuisine();
     return `<div class="inner wide cf cf-r-${role}">
       <header class="cf-head st" style="--i:0">
         <span class="cf-fl" aria-hidden="true"><i></i><i></i>${ico("cfFlame")}</span>
         <div class="cf-ht"><span class="cf-kick"><i class="cf-dot"></i>Coup de feu</span><b>${s ? esc(cfSvcT(s).replace(/^./, (c) => c.toUpperCase())) : "Hors service"}</b><em>${s ? `${cfSpanT(s)}${!s.live && s.inMin > 0 ? ` · dans ${s.inMin} min` : ""}` : "Allumé à la main"}</em></div>
         <span class="cf-clock mono" id="cfClock">${hm(Date.now())}</span>
         ${typeof bigBtn === "function" ? bigBtn("cf-big") : ""}
+        ${typeof thTopBtn === "function" ? thTopBtn().replace('class="iconbtn th-topbtn"', 'class="iconbtn cf-set th-topbtn"') : ""}
         <button class="iconbtn cf-set" data-act="cfSet" aria-label="Réglages du coup de feu" title="Réglages">${ico("sliders")}</button>
         <button class="btn soft cf-exit" data-act="cfExit">${ico("cfDoor")}<span>Quitter</span></button>
       </header>
@@ -204,7 +206,7 @@ function cfSoon() {
 
 /* ── Cuisine: the tickets, the 86s, the fridges ── */
 function cfKitchenData() {
-  const all = slKitchen(), today = dayKey();
+  const away = typeof brOn === "function" && brOn(), all = slKitchen().filter((o) => !(away && o.station === "bar")), today = dayKey();
   const live = all.filter((o) => ["nouvelle", "prep"].includes(o.status)).sort((a, b) => (b.rush ? 1 : 0) - (a.rush ? 1 : 0) || (a.firedAt || a.at || 0) - (b.firedAt || b.at || 0));
   const held = all.filter((o) => o.status === "attente"), ready = all.filter((o) => o.status === "prete");
   const done = (CM.orders || []).filter((o) => o.day === today && o.readyAt && ["prete", "servie"].includes(o.status));

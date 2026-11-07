@@ -2,7 +2,8 @@
  *
  * The public page commande/?r=<rid>&t=<table> reads restos/{rid}/public/menu (written by the app, js/commande.js) and calls:
  *   orderApi (callable, no account for the client ops)
- *     op "create"   { rid, mode:"table"|"emporter", table?, items:[{id,q,note?}], name?, phone?, slot?, note?, pay:"stripe"|"place", back }
+ *     op "create"   { rid, mode:"table"|"emporter", table?, items:[{id,q,note?}], name?, phone?, slot?, note?, pay:"stripe"|"place", back, rq? }
+ *                   rq: the client's request id (js/reseau-client.js): the same rq sent again answers with the same order (orderReqs/{rid}_{rq}).
  *                   → checks every dish and price against public/menu (the client's numbers are never trusted), numbers the order of the day,
  *                   writes restos/{rid}/clientOrders/{id} and its private key orderKeys/{rid_id}, and for « payer maintenant » opens a
  *                   Stripe Checkout on the restaurant's OWN Stripe account (Connect, direct charge) → { oid, k, order, url? }
@@ -108,20 +109,39 @@ async function create(d) {
   total = r2(total);
   let pay = d.pay === "stripe" ? "stripe" : "place";
   let link = null;
+  /* à table: the restaurant's choice (cfg.tablePay « avant » required when ordering, « choix », « apres » at the end of the meal);
+     takeaway, or an older menu doc: payOnline / payPlace */
+  const tp = mode === "table" && ["avant", "choix", "apres"].includes(c.tablePay) ? (c.payOnline ? c.tablePay : "apres") : "";
+  if (tp === "apres") pay = "place";
   if (pay === "stripe") { link = await linkOf(rid); if (!c.payOnline || !canCharge(link)) throw err("failed-precondition", "paiement"); if (total < 0.5) pay = "place"; }
-  if (pay === "place" && c.payPlace === false && c.payOnline) throw err("failed-precondition", "paiement");
+  if (pay === "place" && total >= 0.5 && (tp === "avant" || (!tp && c.payPlace === false && c.payOnline))) throw err("failed-precondition", "paiement_oblig");
+
+  /* the same request sent again (the client's network dropped before our answer reached it: js/reseau-client.js tries again with the
+     same `rq`): answer with the order already created, never a second one */
+  const rq = /^[a-f0-9]{12,40}$/.test(String(d.rq || "")) ? String(d.rq) : "";
+  const rqRef = rq ? db.doc(`orderReqs/${rid}_${rq}`) : null;
+  const again = async (prev) => {
+    const ref0 = db.doc(`restos/${rid}/clientOrders/${prev.oid}`); const o0 = (await ref0.get()).data(); if (!o0) throw err("not-found", "lien");
+    const pv = pubView(prev.oid, o0); return { oid: prev.oid, k: prev.k, order: pv, again: true, ...(pv.payUrl ? { url: pv.payUrl } : {}) };
+  };
+  if (rqRef) { const p0 = await rqRef.get(); if (p0.exists) return again(p0.data()); }
 
   /* number of the day + flood cap, in one transaction */
   const seqRef = db.doc(`orderSeq/${rid}`), ref = db.collection(`restos/${rid}/clientOrders`).doc(), k = crypto.randomBytes(16).toString("hex"), at = Date.now();
+  let dup = null;
   const n = await db.runTransaction(async (t) => {
+    dup = null;
+    if (rqRef) { const p1 = await t.get(rqRef); if (p1.exists) { dup = p1.data(); return 0; } }
     const s = await t.get(seqRef); const q = s.exists ? s.data() : {}; const minute = Math.floor(at / 6e4);
     const cnt = q.min === minute ? (q.cnt || 0) + 1 : 1; if (cnt > PER_MIN) throw err("resource-exhausted", "trop");
     const nn = q.day === now.day ? (q.n || 0) + 1 : 1;
     t.set(seqRef, { day: now.day, n: nn, min: minute, cnt });
     const o = { n: nn, day: now.day, at, mode, table, slot, name, phone, note, items, total, pay, paid: false, status: pay === "stripe" ? "apayer" : "nouvelle", src: "qr" };
     t.set(ref, o); t.set(db.doc(`orderKeys/${rid}_${ref.id}`), { k, rid, oid: ref.id, at });
+    if (rqRef) t.set(rqRef, { oid: ref.id, k, rid, at });
     return nn;
   });
+  if (dup) return again(dup);
   const order = (await ref.get()).data();
   if (pay !== "stripe") return { oid: ref.id, k, order: pubView(ref.id, order) };
 
@@ -512,6 +532,9 @@ async function commandeTick() {
   /* old private keys: the status link lives two days */
   const old = await db.collection("orderKeys").where("at", "<", Date.now() - 2 * 864e5).limit(300).get().catch(() => null);
   if (old && !old.empty) { const b = db.batch(); old.docs.forEach((x) => b.delete(x.ref)); await b.commit().catch(() => {}); }
+  /* request ids of orders sent again after a network cut: only useful for a few hours */
+  const rqs = await db.collection("orderReqs").where("at", "<", Date.now() - 864e5).limit(300).get().catch(() => null);
+  if (rqs && !rqs.empty) { const b = db.batch(); rqs.docs.forEach((x) => b.delete(x.ref)); await b.commit().catch(() => {}); }
 }
 
 module.exports = { orderApi, commandeTick, _pubView: pubView, _billOf: billOf, _callView: callView, _onOrderEvent: onOrderEvent, _site: { htmlText, ldItems, links, imgs, priceLines, privIp } };

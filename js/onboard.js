@@ -16,6 +16,8 @@
 const OB_STEPS = [
   { k: "resto", t: "Le restaurant", s: "Restaurant", opt: false },
   { k: "vous", t: "Vous", s: "Vous", opt: false },
+  { k: "maison", t: "Votre maison", s: "Maison", opt: true },
+  { k: "fonctions", t: "Vos fonctions", s: "Fonctions", opt: true },
   { k: "frigos", t: "Vos équipements", s: "Équipements", opt: true },
   { k: "etiquettes", t: "Vos étiquettes", s: "Étiquettes", opt: true },
   { k: "imprimante", t: "L'imprimante", s: "Imprimante", opt: true },
@@ -161,7 +163,7 @@ const OB = {
   printerName() { try { if (typeof lbPrinterCfg === "function" && S.resto) { const c = lbPrinterCfg(); return c.model ? c.name || OB_PRINTER : ""; } } catch (e) {} const p = S.resto && S.resto.printer; return typeof p === "string" ? p : p && p.model ? OB_PRINTER : ""; },
   labelSet() { return !!(S.resto && S.resto.labelStyle); },
   /* what each step has in place (summary, CTA wording, fiche) */
-  has(k) { const d = this.st.d; return k === "resto" ? !!d.name : k === "vous" ? !!d.me : k === "frigos" ? this.frList().length > 0 : k === "etiquettes" ? this.labelSet() : k === "imprimante" ? !!this.printerName() : k === "equipe" ? this.mates().length > 0 || !!d.inv : k === "outils" ? d.tools.length > 0 || Object.keys(d.ans || {}).length > 0 : true; },
+  has(k) { const d = this.st.d; if ((k === "maison" || k === "fonctions") && typeof PC !== "undefined") return PC.obHas(k, this.st); return k === "resto" ? !!d.name : k === "vous" ? !!d.me : k === "frigos" ? this.frList().length > 0 : k === "etiquettes" ? this.labelSet() : k === "imprimante" ? !!this.printerName() : k === "equipe" ? this.mates().length > 0 || !!d.inv : k === "outils" ? d.tools.length > 0 || Object.keys(d.ans || {}).length > 0 : true; },
   mark() { if (this.st && this.st.from === "boot" && S.rid && S.resto) obSS.set("gg-ob", `${S.rid}|${this.st.step}`); },
 
   /* ───────────── markup ───────────── */
@@ -190,7 +192,7 @@ const OB = {
     const skip = (tx = "Passer cette étape") => `<button class="onb-later" data-act="obSkip">${tx}</button>`;
     if (s.k === "frigos" && d.nw) return `${btn(`${OB_SVG.plus}Ajouter ${esc(d.nw.name || obKindName(d.nw.k))}`, "obFrSave")}<button class="onb-later" data-act="obFrCancel">Annuler</button>`;
     if (s.k === "frigos" && !this.frList().length) return btn("Passer cette étape", "obSkip", " light");
-    if (s.k === "pret") return btn(`Ouvrir Growth Gusto${OB_SVG.arrow}`, "obFinish");
+    if (s.k === "pret") return typeof PC !== "undefined" && PC.obPretHTML && PC.obPretHTML() ? `${btn(`Démarrer la prise en main${OB_SVG.arrow}`, "pcObStart")}<button class="onb-later" data-act="obFinish">Plus tard, ouvrir l'app</button>` : btn(`Ouvrir Growth Gusto${OB_SVG.arrow}`, "obFinish");
     if (s.k === "outils" && this.tqList().length) return this.tqCtaHTML(btn);
     const tx = s.k === "vous" && st.mode === "create" ? "Créer mon restaurant" : st.ret ? "Enregistrer" : "Continuer";
     const sec = s.k === "imprimante" && !this.has("imprimante") ? skip("Je n'ai pas encore l'imprimante") : s.opt && !this.has(s.k) ? skip() : "";
@@ -200,6 +202,7 @@ const OB = {
   field(id, label, value, attrs = "", i = 3, hint = "") { return `<label class="onb-f st" style="--i:${i}"><span class="onb-lbl">${label}</span><div class="onb-in"><input class="onb-input" id="${id}" value="${esc(value)}" ${attrs}></div>${hint ? `<em class="onb-hint">${hint}</em>` : ""}</label>`; },
   paneHTML() {
     const st = this.st, d = st.d, s = this.cur(), phone = !obDesk();
+    if ((s.k === "maison" || s.k === "fonctions") && typeof PC !== "undefined") return PC.obPane(s.k, st, this);
     if (s.k === "resto") {
       const dom = obDomain(d.site);
       return `${this.head(st.mode === "create" ? "Créons votre restaurant." : "Votre restaurant.", "Seul le nom est obligatoire.")}
@@ -269,6 +272,7 @@ const OB = {
       const sum = this.summary(), todo = sum.filter((r) => !r.ok).length;
       return `<div class="onb-seal st" style="--i:0">${OB_SVG.seal}</div>
         ${this.head(`C'est prêt${me ? ", " + esc(me) : ""}.`, todo ? `${esc(d.name || S.resto?.name || "Votre restaurant")} est en place. Touchez une ligne pour la finir.` : `${esc(d.name || S.resto?.name || "Votre restaurant")} est entièrement installé.`, 1)}
+        ${typeof PC !== "undefined" && PC.obPretHTML ? PC.obPretHTML() : ""}
         <div class="onb-sum st" style="--i:3">${sum.map((r) => { const tag = r.ok ? "div" : "button"; return `<${tag} class="onb-sumr ${r.ok ? "ok" : "later"}"${r.ok ? "" : ` type="button" data-act="obGoStep" data-v="${r.k}"`}><i>${r.ic}</i><b>${r.t}</b><span>${r.s}</span>${r.ok ? "" : `<em class="onb-sumgo">${d.skipped[r.k] ? "À faire" : "Ajouter"}${OB_SVG.chev}</em>`}</${tag}>`; }).join("")}</div>
         ${this.todoListHTML()}
         <section class="onb-feats st" style="--i:5" aria-labelledby="obFeatsT"><h3 class="onb-h3" id="obFeatsT">Ce que Growth Gusto fait pour vous</h3>${this.featsHTML("obOpen")}<p class="onb-fine">Tout se retrouve dans le menu, à tout moment.</p></section>`;
@@ -348,14 +352,16 @@ const OB = {
   summary() {
     const d = this.st.d, frs = this.frList(), mates = this.mates(), pr = this.printerName();
     const resto = [d.type ? this.typeLabel(d.type) : "", d.logo ? "logo" : "", d.address ? "adresse" : ""].filter(Boolean);
+    const pcF = typeof PC !== "undefined" && PC.obFiche ? PC.obFiche(this.st) : "";
     return [
+      ...(pcF ? [{ k: "fonctions", ic: OB_SVG.plus, t: "Fonctionnalités", s: pcF, ok: true }] : []),
       { k: "resto", ic: OB_SVG.store, t: d.name || "Restaurant", s: resto.length ? resto.join(" · ") : "Nom du restaurant", ok: !!d.name },
       { k: "vous", ic: OB_SVG.users, t: d.me ? `${firstName(d.me)} · gérant` : "Vous", s: d.photo ? "Prénom et photo" : "Prénom", ok: !!d.me },
       { k: "frigos", ic: OB_SVG.snow, t: "Équipements", s: frs.length ? `${obPl(frs.length, "équipement")} à relever` : "Aucun pour l'instant", ok: frs.length > 0 },
       { k: "etiquettes", ic: OB_SVG.tag, t: "Étiquettes", s: this.labelSet() ? "Design choisi" : "Design par défaut", ok: this.labelSet() },
       { k: "imprimante", ic: OB_SVG.printer, t: "Imprimante", s: pr || "Étiquettes à l'écran en attendant", ok: !!pr },
       { k: "equipe", ic: OB_SVG.userAdd, t: "Équipe", s: [mates.length ? obPl(mates.length, "personne") : "", (d.invs || []).length ? obPl(d.invs.length, "invitation") + " envoyée" + (d.invs.length > 1 ? "s" : "") : d.inv ? "code d'équipe prêt" : ""].filter(Boolean).join(" · ") || "Vous seul pour l'instant", ok: mates.length > 0 || !!d.inv || !!(d.invs || []).length },
-    ];
+    ].filter((r) => r.k === "fonctions" || this.stepOn(obIdx(r.k)));
   },
   /* the drawn kitchen under the fiche on desktop: the real equipment, or soft outlines before the first one */
   stageWallHTML() {
@@ -378,6 +384,7 @@ const OB = {
         ${row("etiquettes", OB_SVG.tag, "Étiquettes", this.labelSet() ? "Design choisi" : "", "Par défaut")}
         ${row("imprimante", OB_SVG.printer, "Imprimante", this.printerName(), "Plus tard")}
         <div class="onb-frow${s.k === "equipe" ? " cur" : ""} set" data-k="equipe"><span class="onb-fi">${OB_SVG.users}</span><span class="onb-ft">Équipe</span><span class="onb-fv onb-fteam">${team.slice(0, 5).map((n, i) => `<b style="--c:${esc(PALETTE[i % PALETTE.length])}" title="${esc(n)}">${esc(initials(n))}</b>`).join("")}${team.length > 5 ? `<span>+${team.length - 5}</span>` : ""}${d.inv ? `<span class="onb-fpill">invitation</span>` : ""}</span></div>
+        ${typeof PC !== "undefined" ? row("fonctions", OB_SVG.plus, "Fonctions", PC.obFiche(st), "À choisir") : ""}
         ${row("outils", OB_SVG.plus, "Outils", d.tools.map((k) => (obTool(k) || {}).n).filter(Boolean).join(", "), "Plus tard")}
       </div>
     </div>`;
@@ -581,6 +588,7 @@ const OB = {
     this.setBusy(true); let made = false;
     try {
       if (s.k === "resto" || s.k === "vous") await this.commit(s.k);
+      if ((s.k === "maison" || s.k === "fonctions") && typeof PC !== "undefined") await PC.obSave(s.k, st);
       if (s.k === "vous" && st.mode === "create") { made = true;
         const ok = await this.finish(); if (!ok) { this.setBusy(false); if (!d.name) this.goTo(0); return; }
         SFX.done(); buzz([10, 30, 10]); const b = $("#obGo"); if (b && !obReduce()) { const r = b.getBoundingClientRect(); burst(r.left + r.width / 2, r.top); }
@@ -588,8 +596,11 @@ const OB = {
     } catch (e) { this.setBusy(false); return; }
     this.setBusy(false); if (!made) { SFX.ok(); buzz(6); }
     if (st.ret || st.rush) { st.ret = st.rush = false; this.skipRest(); this.goTo(OB_LAST); return; }
-    this.goTo(st.step + 1);
+    this.goTo(this.stepFrom(st.step, 1));
   },
+  /* the next step that is switched on (js/parcours.js: Frigos / Étiquettes / Imprimante jump when their feature is off) */
+  stepOn(n) { const k = OB_STEPS[n] && OB_STEPS[n].k; return !k || typeof PC === "undefined" || !PC.obStepOn || PC.obStepOn(k); },
+  stepFrom(n, dir) { let j = n + dir; while (j > 0 && j < OB_LAST && !this.stepOn(j)) j += dir; return j; },
   skipRest() { const d = this.st.d; OB_STEPS.forEach((x) => { if (x.opt && !this.has(x.k)) d.skipped[x.k] = true; }); },
   /* « Tout passer »: straight to « C'est prêt » once the restaurant has a name and the gérant a first name */
   async skipAll() {
@@ -616,7 +627,7 @@ const OB = {
     if (n === obIdx("outils") && st.step !== n) { st.d.tq = 0; st.d.tp = "q"; this.tqEnter(); }
     st.dir = n >= st.step ? 1 : -1; st.step = n; st.d.pop = null; this._stay = null; this.paint(false);
   },
-  prev() { if (this.cur().k === "outils" && this.tqBack()) return; if (this.st.step === 0) return; this.collect(); SFX.tap(); buzz(4); this.st.ret = false; this.goTo(this.st.step - 1); },
+  prev() { if (this.cur().k === "outils" && this.tqBack()) return; if (this.st.step === 0) return; this.collect(); SFX.tap(); buzz(4); this.st.ret = false; this.goTo(this.stepFrom(this.st.step, -1)); },
   leave(to) {
     const st = this.st; SFX.tap(); buzz([8, 30, 8]); this.saveTools(true);
     const back = st.from === "reglages" ? "reglages" : "home", first = back === "home";

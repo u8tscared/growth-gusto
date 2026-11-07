@@ -43,7 +43,7 @@ const ES_ORDER = ["service", "moi", "pilotage"];
 const ES_POSTES = {
   cuisine: { t: "Cuisine", ic: "pmToque", tools: ["cuisine", "coupdefeu", "releve", "service", "scan", "reception", "notes", "menage", "gaspillage", "hygiene", "frigos", "stock"], tabs: [["cuisine", "slHat", "Bons"], ["scan", "scan", "Scanner"], ["releve", "therm", "Relevés"]], cta: ["cuisine", "slHat", "Ouvrir l'écran cuisine"] },
   salle: { t: "Salle", ic: "pmCloche", tools: ["salle", "plan", "resa", "coupdefeu", "commandes", "cuisine", "clients", "notes", "menage", "livraison"], tabs: [["plan", "plZone", "Salle"], ["salle", "slPad", "Commande"], ["resa", "resa", "Résas"]], cta: ["salle", "slPad", "Prendre une commande"] },
-  bar: { t: "Bar", ic: "pmGlass", tools: ["salle", "plan", "coupdefeu", "releve", "scan", "stock", "reception", "notes", "menage"], tabs: [["salle", "slPad", "Commandes"], ["scan", "scan", "Scanner"], ["stock", "box", "Stock"]], cta: ["salle", "slPad", "Prendre une commande"] },
+  bar: { t: "Bar", ic: "pmGlass", tools: ["bar", "salle", "plan", "coupdefeu", "releve", "scan", "stock", "reception", "notes", "menage"], tabs: [["bar", "slGlass", "Bar"], ["salle", "slPad", "Commandes"], ["stock", "box", "Stock"]], cta: ["bar", "slGlass", "Ouvrir l'écran bar"] },
   plonge: { t: "Plonge", ic: "pmDrop", tools: ["menage", "hygiene", "gaspillage", "releve", "notes", "scan"], tabs: [["menage", "spray", "Ménage"], ["scan", "scan", "Scanner"], ["hygiene", "hygPot", "Hygiène"]], cta: ["menage", "spray", "Cocher le ménage"] },
 };
 const ES_POSTE_OF = { cuisine: "cuisine", second: "cuisine", salle: "salle", bar: "bar", plonge: "plonge" };
@@ -77,12 +77,16 @@ const ES_ST = {
     d: "Les bons en grand écran, et rien d'autre.",
     sees: ["Les bons qui arrivent, en plein écran", "Le temps de chaque table et ce qui attend au passe"],
     hides: ["Le menu, la barre d'onglets et tout le reste de l'app"], exit: "le cadenas en bas de l'écran, puis le code du gérant" },
+  bar: { ic: "slGlass", t: "Écran bar", dev: "Tablette au comptoir", route: "bar", kiosk: true, mk: "bar",
+    d: "Les boissons à préparer en grand écran, et rien d'autre.",
+    sees: ["Les boissons de chaque table, en plein écran", "Les recettes des cocktails, pas à pas"],
+    hides: ["Le menu, la barre d'onglets et tout le reste de l'app"], exit: "le cadenas en bas de l'écran, puis le code du gérant" },
   pointeuse: { ic: "clock", t: "Pointeuse murale", dev: "Tablette à l'entrée", route: "pointeuse", kiosk: true, mk: "pt",
     d: "Chacun touche son prénom et pointe avec son code.",
     sees: ["Les prénoms de l'équipe, l'heure, qui est là"],
     hides: ["Le menu, les heures des autres et tout le reste de l'app"], exit: "le cadenas en bas de l'écran, puis le code du gérant" },
 };
-const ES_ST_ORDER = ["service", "salle", "cuisine", "pointeuse"];
+const ES_ST_ORDER = ["service", "salle", "cuisine", "bar", "pointeuse"];
 const ES_DEVICES = ES_ST_ORDER.map((k) => [k, ES_ST[k].ic, ES_ST[k].dev, ES_ST[k].d]);
 
 const ES = { sp: null, demoDev: null, devDraft: null, lk: null, kioskDone: false, edit: false, wk: 0, mo: 0, hm: 0, view: "week", act: "all", unlock: false, F: null, pin: null, tabs0: null };
@@ -119,7 +123,7 @@ function esAllowed() {
 }
 function esStaff(mid = S.me.id) { return (S.staff || []).find((s) => s.memberId === mid && s.active !== false) || null; }
 function esPoste() {
-  const d = esDev(); if (esShared() && (d.station === "salle" || d.station === "cuisine")) return d.station;
+  const d = esDev(); if (esShared() && (d.station === "salle" || d.station === "cuisine" || d.station === "bar")) return d.station;
   /* shared « outils du service »: the tools follow whoever took over with their code */
   if (esShared() && d.station === "service") { const a = esActor(); if (ES.pTap && ES.pTap.a === ((a && a.id) || "") && ES_POSTES[ES.pTap.p]) return ES.pTap.p; const am = a && esMember(a.id); const ap = am && ES_POSTE_OF[am.poste || ""]; if (ap) return ap; }
   const u = esUser(); if (ES_POSTES[u.poste]) return u.poste;
@@ -170,10 +174,10 @@ function esSet(sp = esCur()) {
 const esHomeLbl = (sp = esCur()) => (sp === "pilotage" ? null : ES_SP[sp].t);
 /* the groups of a space: [title, routes]; pilotage keeps NAV's own sections */
 function esPlan(sp = esCur()) {
-  if (sp === "moi") return [["Mon espace", [...ES_MOI, "pointeuse", "consignes", "frais", "formation", "avis"]], ["Réglages", ["espaces", "reglages"]]];
+  if (sp === "moi") return [["Mon espace", [...ES_MOI, "pointeuse", "consignes", "passation", "frais", "formation", "avis"]], ["Réglages", ["espaces", "reglages"]]];
   if (esKioskOn()) { const k = ES_ST[esStation()]; return [[k.t, [k.route]]]; }
   const ps = esPoste(); const u = esUser(); const tools = u.tiles && Array.isArray(u.tiles[ps]) ? u.tiles[ps] : ES_POSTES[ps].tools;
-  return [[`${esShared() ? "Outils" : "Mes outils"} · ${ES_POSTES[ps].t}`, [...ES_POSTES[ps].tabs.map((t) => t[0]), ...tools]], ["Équipe", ["consignes", "pointeuse"]], ...(esLocked() ? [] : [["Réglages", ["espaces", "reglages"]]])];
+  return [[`${esShared() ? "Outils" : "Mes outils"} · ${ES_POSTES[ps].t}`, [...ES_POSTES[ps].tabs.map((t) => t[0]), ...tools]], ["Équipe", ["consignes", "passation", "pointeuse"]], ...(esLocked() ? [] : [["Réglages", ["espaces", "reglages"]]])];
 }
 function esFilterNav(list) {
   const sp = esCur(); const out = [];
@@ -655,6 +659,7 @@ VIEWS.moiPlanning = {
   },
   after(v) { $$(".es-cd,.es-day", v).forEach((el) => el.classList.add("in")); },
 };
+Object.assign(ACT, { esHrPdf: (el, id, v) => { const st = esStaff(); const [a, b] = String(v || "").split("|"); if (st && a && b && typeof rhPdfGo === "function") rhPdfGo(st.id, a, b, true); } });
 VIEWS.moiHeures = {
   render() {
     const st = esStaff(); if (!st) return `<div class="inner narrow">${topBar("Mes heures")}${esNoStaff()}</div>`;
@@ -683,7 +688,8 @@ VIEWS.moiHeures = {
       </section>
       <div class="es-lgd st" style="--i:3"><span><i class="p"></i>Prévu</span><span><i></i>Pointé</span></div>
       ${wk}
-      <p class="es-fine st" style="--i:${5 + weeks.length}">Estimation indicative, d'après vos pointages. Votre fiche de paie fait foi. Une erreur ? Le gérant corrige un pointage dans la Pointeuse.</p></div>`;
+      ${typeof rhPdfGo === "function" ? `<div class="es-hrx st" style="--i:${5 + weeks.length}"><button class="btn acc block" data-act="esHrPdf" data-v="${m0}|${last}">${ico("download")}Exporter ${esc(MONTHS[d0.getMonth()])} en PDF</button><div class="hstack">${dm[today] && ES.hm === 0 ? `<button class="btn soft sm" data-act="rhTicket" data-id="${esc(st.id)}" data-v="${today}">${ico("printer")}Ticket du jour</button>` : ""}<button class="btn soft sm" data-act="rhPdf" data-id="${esc(st.id)}" data-v="self">${ico("cal")}Autre période</button></div></div>` : ""}
+      <p class="es-fine st" style="--i:${6 + weeks.length}">Estimation indicative, d'après vos pointages. Votre fiche de paie fait foi. Une erreur ? Le gérant corrige un pointage dans la Pointeuse.</p></div>`;
   },
 };
 VIEWS.moiActivite = {
@@ -730,6 +736,7 @@ function esMock(k) {
     service: `<span class="es-mk sc svc"><span class="mk-side">${rows(4, "ln")}</span><span class="mk-main"><span class="mk-hero"></span><span class="mk-g4"><i></i><i></i><i></i><i></i></span></span></span>`,
     salle: `<span class="es-mk sc sal"><span class="mk-side">${rows(4, "ln")}</span><span class="mk-main"><span class="mk-tables"><i></i><i class="on"></i><i></i><i></i><i class="on"></i><i></i></span></span></span>`,
     kds: `<span class="es-mk sc kds"><span class="mk-main"><span class="mk-bons"><i><b></b>${rows(3, "ln")}</i><i class="hot"><b></b>${rows(2, "ln")}</i><i><b></b>${rows(4, "ln")}</i></span></span></span>`,
+    bar: `<span class="es-mk sc kds bar"><span class="mk-main"><span class="mk-bons"><i><b></b>${rows(2, "ln")}</i><i class="hot"><b></b>${rows(3, "ln")}</i><i><b></b>${rows(2, "ln")}</i></span></span></span>`,
     pt: `<span class="es-mk sc pt"><span class="mk-main"><span class="mk-clk"></span><span class="mk-avs"><i></i><i class="on"></i><i></i><i></i><i class="on"></i><i></i></span></span></span>`,
   };
   return M[k] || "";
@@ -846,7 +853,7 @@ Object.assign(ACT, {
   esSpGo: (a, id, v, e) => esApply(v, e),
   esPoste: (a, id, v) => {
     if (!ES_POSTES[v] || v === esPoste()) return; if (esShared()) { const ac = esActor(); ES.pTap = { a: (ac && ac.id) || "", p: v }; } else esUserSet((u) => { u.poste = v; }); SFX.tick(); buzz(6);
-    try { localStorage.setItem("gg-cf-role-" + S.rid, v === "salle" || v === "bar" ? "salle" : "cuisine"); } catch (e) {}
+    try { localStorage.setItem("gg-cf-role-" + S.rid, v === "salle" || v === "bar" ? v : "cuisine"); } catch (e) {}
     const tb = $("#tabbar"); if (tb) delete tb.dataset.built; ES.edit = false; renderChrome(); rerender();
   },
   esEdit: () => { ES.edit = !ES.edit; SFX.tick(); buzz(5); rerender(); },
@@ -892,7 +899,7 @@ Object.assign(ACT, {
       ${v >= dayKey() ? `<button class="btn soft block" data-act="esReqNew" data-v="${sh.length ? "echange" : "dispo"}">${ico(sh.length ? "esSwap" : "esHand")}${sh.length ? "Demander un échange" : "Proposer ma disponibilité"}</button>` : ""}</div>`);
   },
   esIcs: () => esIcs(),
-  esCf: () => { const ps = esPoste(); SFX.tap(); buzz(8); if (typeof cfEnter === "function") { try { return cfEnter(ps === "salle" || ps === "bar" ? "salle" : "cuisine", false); } catch (e) {} } go("coupdefeu"); },
+  esCf: () => { const ps = esPoste(); SFX.tap(); buzz(8); if (typeof cfEnter === "function") { try { return cfEnter(ps === "salle" || ps === "bar" ? ps : "cuisine", false); } catch (e) {} } go("coupdefeu"); },
   esDevPick: (a, id, v) => {
     const D = ES.devDraft || (ES.devDraft = { kind: esDev().kind, station: esStation() });
     if (id === "kind") D.kind = v === "partage" ? "partage" : "perso"; else if (ES_ST[v]) D.station = v;

@@ -178,8 +178,8 @@ function vrLockHTML() {
       <div class="vr-foot row">${bio ? `<button class="vr-link" data-act="vrBackMain">${ico(k.ic)}${esc(k.t)}</button>` : `<span></span>`}${cancel || `<button class="vr-link" data-act="vrForgot">Code oublié ?</button>`}</div>
       ${fails >= 2 && !wait && !conf ? `<p class="vr-hint">${Math.max(0, 5 - (fails % 5))} essai${5 - (fails % 5) > 1 ? "s" : ""} avant une pause</p>` : ""}`;
   }
-  return `${brand}
-    <div class="vr-time st" style="--i:1"><b>${ck.t}</b><span>${esc(ck.d)}</span></div>
+  return `<div class="vr-time sm st" style="--i:1"><b>${ck.t}</b><span>${esc(ck.d)}</span></div>
+    <div class="vr-crest st" style="--i:1">${vrEmbHTML()}<div class="vr-rname">${esc(S.resto?.name || "Growth Gusto")}</div></div>
     <div class="vr-mid st" style="--i:2">
       <button class="vr-gbtn ${VR.busy ? "scan" : ""} ${VR.ok ? "ok" : ""}" id="vrGlyph" data-act="vrBio" aria-label="Déverrouiller ${esc(k.with)}">${vrGlyph()}</button>
       <div class="vr-h">${VR.ok ? `Bon retour${name ? ", " + esc(name) : ""}` : conf ? "Confirmez que c'est vous" : name ? `Bonjour ${esc(name)}` : "Verrouillé"}</div>
@@ -218,6 +218,7 @@ function vrWaitTick() {
 function vrSuccess() {
   VR.ok = true; VR.busy = false; VR.err = "";
   const g = $("#vrGlyph"); if (g) { g.classList.remove("scan"); g.classList.add("ok"); }
+  vrEmbCls("ok", "scan");
   const h = $(".vr-mid .vr-h"); const name = firstName((S.me && S.me.name) || ""); if (h && VR.mode === "main") h.textContent = VR.confirm ? "C'est bien vous" : `Bon retour${name ? ", " + name : ""}`;
   const m = $("#vrMsg"); if (m) m.textContent = "";
   SFX.init(); SFX.done(); buzz([8, 30, 8]);
@@ -228,13 +229,14 @@ async function vrBioGo(auto) {
   const c = vrCfg(); if (!c || VR.busy || VR.ok || (auto && c.sim)) return;
   VR.busy = true; VR.err = "";
   const g = $("#vrGlyph"); if (g) { g.classList.remove("err", "ok"); void g.offsetWidth; g.classList.add("scan"); }
+  vrEmbCls("scan", "ok");
   const m = $("#vrMsg"); if (m) m.textContent = vrDemo() ? `Démo : ${vrKind().t} simulé…` : (vrKind().face ? "Regardez l'écran…" : "Posez le doigt…");
   if (!auto) { SFX.init(); SFX.tap(); }
   if (c.sim) { vrHint(true); setTimeout(() => { vrHint(false); if (VR.locked) vrSuccess(); }, 1300); return; }
   try { await vrGet([c.cred]); if (VR.locked) vrSuccess(); }
   catch (e) {
     VR.busy = false; if (!VR.locked) return;
-    const why = vrErr(e); const g2 = $("#vrGlyph"); if (g2) g2.classList.remove("scan");
+    const why = vrErr(e); const g2 = $("#vrGlyph"); if (g2) g2.classList.remove("scan"); vrEmbCls("", "scan");
     const m2 = $("#vrMsg");
     if (auto && why === "cancel") { if (m2) m2.textContent = "Touchez pour déverrouiller"; return; }
     if (g2) { g2.classList.add("err"); setTimeout(() => g2.classList.remove("err"), 600); }
@@ -498,3 +500,104 @@ Object.assign(ACT, {
     } catch (e) { VR.busy = false; if (b) b.classList.remove("scan"); if (!(auto && vrErr(e) === "cancel")) { SFX.err(); buzz([30, 50, 30]); if (b) { b.classList.add("err"); setTimeout(() => b.classList.remove("err"), 600); } } }
   },
 });
+
+/* ═════════════ the restaurant's logo, drawn as a fingerprint (top of the lock screen) ═════════════
+   Each restaurant gets its own ridges (seeded by its name: a whorl, warped, with ridge endings), cut by the shape of its logo:
+   inside the logo the ridges are bright, around it they fade out, so it reads « an 8 made of a fingerprint » for Le Parc à 8.
+   The shape comes from the uploaded logo: its transparency, or else what differs from the colour of its border; it is cropped
+   and thickened a little so thin logos still hold ridges. No logo, a logo the browser may not read (another site without CORS),
+   or a photo that fills its whole square: the restaurant's initials. The mask is computed once and kept in localStorage gg-vr-emb.
+   The ridges draw in from the core outwards when the screen appears, a light sweeps the logo, faster while Face ID / Touch ID scans. */
+const VR_EMB = { k: "", m: null, wait: "" };
+function vrSeedRnd(s) { let h = 2166136261; for (const ch of String(s || "gg")) { h ^= ch.codePointAt(0); h = Math.imul(h, 16777619); } h = h || 1; return () => { h ^= h << 13; h ^= h >>> 17; h ^= h << 5; return (h >>> 0) / 4294967296; }; }
+function vrRidges(seed) {
+  const R = vrSeedRnd(seed); const cx = 100 + (R() - 0.5) * 16, cy = 94 + (R() - 0.5) * 14, tilt = (R() - 0.5) * 0.6;
+  const a1 = 3 + R() * 3, a2 = 2.5 + R() * 3, f1 = 0.032 + R() * 0.02, f2 = 0.028 + R() * 0.02, ph = R() * 6.283, SP = 6.3;
+  const f = (n) => n.toFixed(1); const out = [];
+  for (let i = 0; i < 25; i++) {
+    const r = 2.6 + i * SP, n = Math.max(12, Math.round(r * 1.5)), step = (2 * Math.PI * r) / n, pts = [];
+    for (let k = 0; k < n; k++) {
+      const t = (k / n) * Math.PI * 2, x = r * Math.cos(t) * 0.84, y = r * Math.sin(t) * 1.1;
+      const xr = x * Math.cos(tilt) - y * Math.sin(tilt), yr = x * Math.sin(tilt) + y * Math.cos(tilt);
+      pts.push([cx + xr + a1 * Math.sin(yr * f1 + ph), cy + yr + a2 * Math.sin(xr * f2 + ph * 1.3)]);
+    }
+    /* ridge endings: the 3 innermost ridges open at the bottom (the loop of the core), the others break 1 to 3 times */
+    const cut = new Array(n).fill(false);
+    const gaps = i < 3 ? [[Math.round(n * 0.25), Math.round(n * (0.2 - i * 0.04))]] : Array.from({ length: 1 + Math.floor(R() * 3) }, () => [Math.floor(R() * n), Math.max(1, Math.round((2.5 + R() * 4) / step))]);
+    gaps.forEach(([c, h]) => { for (let d = -h; d <= h; d++) cut[(c + d + n) % n] = true; });
+    const s0 = cut.indexOf(true); let run = [];
+    const flush = () => { if (run.length >= 3) { const p = run; let d = `M${f(p[0][0])} ${f(p[0][1])}`; for (let q = 1; q < p.length - 1; q++) d += `Q${f(p[q][0])} ${f(p[q][1])} ${f((p[q][0] + p[q + 1][0]) / 2)} ${f((p[q][1] + p[q + 1][1]) / 2)}`; d += `L${f(p[p.length - 1][0])} ${f(p[p.length - 1][1])}`; out.push({ d, i }); } run = []; };
+    for (let q = 1; q <= n; q++) { const k = (s0 + q) % n; if (cut[k]) flush(); else run.push(pts[k]); }
+    flush();
+  }
+  return out;
+}
+const vrEmbKey = (l) => l.length + ":" + l.slice(0, 80) + l.slice(-80);
+function vrEmbStore(k, m) { VR_EMB.k = k; VR_EMB.m = m; try { if (m && m.url) localStorage.setItem("gg-vr-emb", JSON.stringify({ k, ...m })); } catch (e) {} }
+/* the mask for the current logo: {url,w,h} ready, false (use the initials), undefined (being computed: `then` runs when ready) */
+function vrEmbMask(logo, then) {
+  const k = vrEmbKey(logo); if (VR_EMB.k === k) return VR_EMB.m;
+  try { const o = JSON.parse(localStorage.getItem("gg-vr-emb") || "null"); if (o && o.k === k && o.url) { VR_EMB.k = k; VR_EMB.m = { url: o.url, w: o.w, h: o.h }; return VR_EMB.m; } } catch (e) {}
+  if (VR_EMB.wait !== k) { VR_EMB.wait = k; vrEmbBuild(logo).then((m) => { VR_EMB.wait = ""; vrEmbStore(k, m || false); then && then(); }); }
+  return undefined;
+}
+function vrEmbBuild(src) {
+  return new Promise((done) => {
+    const img = new Image(); if (!src.startsWith("data:")) img.crossOrigin = "anonymous";
+    const t = setTimeout(() => done(null), 6000);
+    img.onerror = () => { clearTimeout(t); done(null); };
+    img.onload = () => { clearTimeout(t); try { done(vrEmbFromImg(img)); } catch (e) { done(null); } };
+    img.src = src;
+  });
+}
+function vrEmbFromImg(img) {
+  const W0 = img.naturalWidth || img.width, H0 = img.naturalHeight || img.height; if (!W0 || !H0) return null;
+  const sc = 256 / Math.max(W0, H0), w = Math.max(8, Math.round(W0 * sc)), h = Math.max(8, Math.round(H0 * sc));
+  const cv = document.createElement("canvas"); cv.width = w; cv.height = h; const g = cv.getContext("2d", { willReadFrequently: true });
+  g.imageSmoothingQuality = "high"; g.drawImage(img, 0, 0, w, h);
+  const px = g.getImageData(0, 0, w, h).data; /* throws on a logo from another site without CORS: initials then */
+  const N = w * h; let clear = 0; for (let i = 0; i < N; i++) if (px[i * 4 + 3] < 200) clear++;
+  const ink = new Uint8Array(N);
+  if (clear > N * 0.03) { for (let i = 0; i < N; i++) ink[i] = px[i * 4 + 3] > 110 ? 1 : 0; }
+  else {
+    /* opaque logo (a JPEG on white, a white mark on a black square…): the ink is what differs from the border colour */
+    const br = [[], [], []]; const add = (x, y) => { const o = (y * w + x) * 4; br[0].push(px[o]); br[1].push(px[o + 1]); br[2].push(px[o + 2]); };
+    for (let x = 0; x < w; x++) { add(x, 0); add(x, h - 1); } for (let y = 0; y < h; y++) { add(0, y); add(w - 1, y); }
+    const bg = br.map((a) => a.sort((p, q) => p - q)[a.length >> 1]);
+    for (let i = 0; i < N; i++) { const o = i * 4, d = Math.hypot(px[o] - bg[0], px[o + 1] - bg[1], px[o + 2] - bg[2]); ink[i] = d > 64 ? 1 : 0; }
+  }
+  let cov = 0, x0 = w, y0 = h, x1 = -1, y1 = -1;
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (ink[y * w + x]) { cov++; if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+  const box = (x1 - x0 + 1) * (y1 - y0 + 1);
+  if (cov < N * 0.01 || x1 < 0 || cov > box * 0.93) return null; /* nothing, or a full square (a photo): no shape to cut */
+  /* thicken: thin strokes must still hold two or three ridges */
+  const rad = cov / box < 0.18 ? 5 : cov / box < 0.35 ? 3 : 2; const tmp = new Uint8Array(N), dil = new Uint8Array(N);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { let v = 0; for (let d = -rad; d <= rad && !v; d++) { const xx = x + d; if (xx >= 0 && xx < w && ink[y * w + xx]) v = 1; } tmp[y * w + x] = v; }
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { let v = 0; for (let d = -rad; d <= rad && !v; d++) { const yy = y + d; if (yy >= 0 && yy < h && tmp[yy * w + x]) v = 1; } dil[y * w + x] = v; }
+  const X0 = Math.max(0, x0 - rad), Y0 = Math.max(0, y0 - rad), bw = Math.min(w - 1, x1 + rad) - X0 + 1, bh = Math.min(h - 1, y1 + rad) - Y0 + 1;
+  const oc = document.createElement("canvas"); oc.width = bw; oc.height = bh; const og = oc.getContext("2d"); const od = og.createImageData(bw, bh);
+  for (let y = 0; y < bh; y++) for (let x = 0; x < bw; x++) if (dil[(y + Y0) * w + x + X0]) { const o = (y * bw + x) * 4; od.data[o] = od.data[o + 1] = od.data[o + 2] = od.data[o + 3] = 255; }
+  og.putImageData(od, 0, 0);
+  return { url: oc.toDataURL("image/png"), w: bw, h: bh };
+}
+/* the emblem itself. `id` keeps the SVG ids unique when two are on screen. */
+function vrEmbHTML(id = "vrEmb", r) {
+  if (r === undefined) r = S.resto || {};
+  const name = (r && r.name) || "Growth Gusto"; const logo = restoLogo(r);
+  const m = logo ? vrEmbMask(logo, () => { const e = document.getElementById(id); if (e) e.outerHTML = vrEmbHTML(id, r); }) : false;
+  if (m === undefined) return `<div class="vr-emb wait" id="${id}" aria-hidden="true"></div>`;
+  const ini = (typeof restoIni === "function" ? restoIni(name) : initials(name)).replace(/[^\p{L}\p{N}]/gu, "").slice(0, 3) || "G";
+  const shape = m ? `<image href="${m.url}" x="22" y="22" width="156" height="156" preserveAspectRatio="xMidYMid meet"/>`
+    : `<text x="100" y="${ini.length > 1 ? 104 : 106}" text-anchor="middle" dominant-baseline="central" fill="#fff" font-weight="800" font-size="${ini.length > 2 ? 70 : ini.length > 1 ? 96 : 168}" letter-spacing="${ini.length > 1 ? -3 : 0}" style="font-family:var(--d)">${esc(ini)}</text>`;
+  const rid = vrRidges(name + "·" + (r && r.id || ""));
+  const paths = (cls) => rid.map((p) => `<path pathLength="1" d="${p.d}" style="--d:${p.i * 46}"/>`).join("");
+  return `<div class="vr-emb ${m ? "logo" : "ini"}" id="${id}" aria-hidden="true"><svg viewBox="0 0 200 200" fill="none">
+    <defs><mask id="${id}M" maskUnits="userSpaceOnUse" x="0" y="0" width="200" height="200">${shape}</mask>
+      <radialGradient id="${id}F"><stop offset=".25" stop-color="#fff" stop-opacity=".9"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>
+      <mask id="${id}O" maskUnits="userSpaceOnUse" x="0" y="0" width="200" height="200"><rect width="200" height="200" fill="url(#${id}F)"/></mask>
+      <linearGradient id="${id}S" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity="0"/><stop offset=".5" stop-color="#fff" stop-opacity=".85"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient></defs>
+    <g class="vr-er bk" mask="url(#${id}O)">${paths()}</g>
+    <g mask="url(#${id}M)"><rect class="vr-efill" width="200" height="200" fill="#fff"/><g class="vr-er fr">${paths()}</g><rect class="vr-esw" x="-20" y="-70" width="240" height="70" fill="url(#${id}S)"/></g>
+  </svg></div>`;
+}
+function vrEmbCls(add, rm) { const e = $("#vrEmb"); if (!e) return; if (rm) e.classList.remove(...rm.split(" ")); if (add) { void e.offsetWidth; e.classList.add(add); } }

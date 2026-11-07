@@ -2,7 +2,8 @@
 // 1) chaque fichier .js du dépôt (hors vendor/) se lit sans erreur de syntaxe ;
 // 2) chaque .json / .webmanifest se lit ;
 // 3) l'app s'ouvre dans un vrai navigateur, crée un restaurant, enregistre un relevé (tools/smoke.js) sans aucune erreur ;
-// 4) sur téléphone et tablette, chaque écran du menu ordinateur est aussi dans le menu « Plus » (tools/nav-test.js).
+// 4) sur téléphone et tablette, chaque écran du menu ordinateur est aussi dans le menu « Plus » (tools/nav-test.js) ;
+// 5) chaque écran du menu a sa leçon de « Prise en main » (tools/lecons-test.js, js/lecons.js).
 // Usage : node tools/ci.js  (code de sortie 1 au moindre problème)
 const {execFileSync,spawnSync}=require('child_process');const fs=require('fs');const path=require('path');
 const ROOT=path.resolve(__dirname,'..');process.chdir(ROOT);
@@ -24,4 +25,11 @@ for(const [nom,env] of [['téléphone',{}],['tablette',{TABLET:'1'}]]){
   const o=(n.stdout||'')+(n.stderr||'');console.log(nom+' : '+o.trim());
   const mm=o.match(/ERRORS: (\[[\s\S]*\])/);const ee=mm?JSON.parse(mm[1]):null;
   if(n.status!==0||/SCRIPT ERROR/.test(o)||!/NAV OK/.test(o)||!ee||ee.length){console.log("\nUn écran n'est pas accessible sur "+nom+" : voir ci-dessus.");process.exit(1);}
+}
+// 5) chaque écran du menu a sa leçon de « Prise en main » (js/lecons.js) : un nouveau module doit arriver avec sa formation
+{
+  const n=spawnSync(process.execPath,['tools/run.js','tools/lecons-test.js'],{encoding:'utf8',env:{...process.env,OUT:path.join(ROOT,'tools/out/ci')},timeout:180000});
+  const o=(n.stdout||'')+(n.stderr||'');console.log('prise en main : '+o.trim());
+  const mm=o.match(/ERRORS: (\[[\s\S]*\])/);const ee=mm?JSON.parse(mm[1]):null;
+  if(n.status!==0||/SCRIPT ERROR/.test(o)||!/LECONS OK/.test(o)||!ee||ee.length){console.log("\nUn écran du menu n'a pas sa leçon de prise en main (ou une leçon est mal formée) : voir ci-dessus et l'en-tête de js/lecons.js.");process.exit(1);}
 }

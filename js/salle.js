@@ -154,7 +154,7 @@ function slOnRows(rows) {
 }
 function slReady(o, recall) {
   if (slKRoute(true)) return;
-  if (o.waiter !== S.me.id && S.route !== "salle" && !(S.route === "coupdefeu" && typeof cfRole === "function" && cfRole() !== "cuisine")) return;
+  if (o.waiter !== S.me.id && S.route !== "salle" && !(S.route === "coupdefeu" && typeof cfRole === "function" && !["cuisine", "bar"].includes(cfRole()))) return;
   try { SFX.init(); SFX.tone(784, 0.18, "triangle", 0.06); SFX.tone(1175, 0.2, "triangle", 0.055, 0.12); SFX.tone(1568, 0.5, "sine", 0.05, 0.24); buzz(recall ? [80, 60, 80, 60, 160] : [60, 40, 60, 40, 120]); } catch (e) {}
   toast(`Table ${o.table} · ${o.courseT || "commande"} ${recall ? ": la cuisine vous appelle" : "prêt à servir"}`, "info");
   /* a recall also lands in the bell (Alertes) of the waiter who sent the ticket, so it is still there when the phone comes out of the pocket */
@@ -182,6 +182,12 @@ function slGone() {
 }
 
 /* ── the floor ── */
+/* QR orders at a table not paid yet (pay at the end of the meal): the waiter sees them on the floor until « Réglé » */
+function slDueHtml() {
+  if (typeof cmDue !== "function" || typeof cmDueBand !== "function") return "";
+  const L = (CM.orders || []).filter((o) => cmDue(o) && o.day === dayKey()).sort((a, b) => (a.at || 0) - (b.at || 0));
+  return L.length ? `<div class="sl-due-l st" style="--i:2">${L.map((o) => cmDueBand(o)).join("")}</div>` : "";
+}
 function slFloor() {
   const { plan, cfg, T } = slTables(), open = slOpenTabs(), by = slTabMap();
   const ready = slKitchen().filter((o) => o.src === "salle" && o.status === "prete").sort((a, b) => (a.waiter === S.me.id ? -1 : 0) - (b.waiter === S.me.id ? -1 : 0) || (a.readyAt || 0) - (b.readyAt || 0));
@@ -208,7 +214,7 @@ function slFloor() {
   return `<div class="inner wide sl">${topBar("Prise de commande", { right })}
     <div class="sl-kpi st" style="--i:1"><div><b class="mono">${open.length}</b><span>table${open.length > 1 ? "s" : ""}</span></div><div><b class="mono">${covers}</b><span>couvert${covers > 1 ? "s" : ""}</span></div><div><b class="mono">${cook}</b><span>en cuisine</span></div>${ready.length ? `<div class="hot"><b class="mono">${ready.length}</b><span>prêt${ready.length > 1 ? "s" : ""}</span></div>` : ""}</div>
     ${slStockBar()}
-    ${readyHtml}
+    ${readyHtml}${slDueHtml()}
     ${floor}
     ${list.length ? `<div class="lbl st" style="--i:4">Tables ouvertes</div><div class="glass sl-open st" style="--i:4">${list.map((t) => { const s = slTabState(t); return `<button class="sl-or k-${s.k}" data-go="salle" data-id="${esc(t.id)}"><b class="sl-ort mono">${esc(t.table)}</b><span class="sl-ortx"><b>${esc(s.t)}</b><em>${slCovers(t)} · ${slItemsOk(t).reduce((a, x) => a + (+x.q || 0), 0)} articles · <span class="sl-ago" data-at="${t.openedAt}">${slAgo(t.openedAt)}</span>${t.byName && t.by !== S.me.id ? ` · ${esc(firstName(t.byName))}` : ""}</em></span><b class="mono sl-ortot">${slEur(slTotal(t.items || []))}</b>${ico("chev")}</button>`; }).join("")}</div>` : `<p class="note sl-pnote st" style="--i:4">${ico("slPad")}<span>Touchez une table pour prendre la commande. Elle part en cuisine d'un geste, et vous êtes prévenu quand c'est prêt.</span></p>`}
   </div>`;
@@ -322,7 +328,7 @@ function slStockSeen() {
     const prev = SL.stockSeen; SL.stockSeen = cur; if (!prev) return;
     const news = Object.keys(cur).filter((id) => cur[id] !== prev[id]).map((id) => ({ id, out: cur[id] === "out", e: (c.left || {})[id] })).filter((x) => x.out || (x.e && x.e.by !== S.me.id));
     if (!news.length) return;
-    const waiter = S.route === "salle" || (S.route === "coupdefeu" && typeof cfRole === "function" && cfRole() !== "cuisine") || (!slKRoute(true) && SL.rid === S.rid && typeof cfRole === "function" && cfRole() === "salle");
+    const waiter = S.route === "salle" || (S.route === "coupdefeu" && typeof cfRole === "function" && !["cuisine", "bar"].includes(cfRole())) || (!slKRoute(true) && SL.rid === S.rid && typeof cfRole === "function" && cfRole() === "salle");
     if (!waiter) return;
     const name = (id) => ((slDishes().find((n) => n.id === id) || {}).title || "Un plat");
     const txt = news.map((x) => (x.out ? `${name(x.id)} : épuisé` : `${name(x.id)} : plus que ${slAvail(x.id)}`)).join(" · ");
@@ -557,7 +563,8 @@ VIEWS.cuisine = {
   render() {
     slWatch();
     const all = slKitchen(), st = SL.station, today = dayKey();
-    const inSt = (o) => st === "tout" || (st === "bar" ? o.station === "bar" : o.station !== "bar");
+    const barAway = typeof brOn === "function" && brOn(); /* the bar has its own screen (js/bar.js): its tickets leave « Tout » */
+    const inSt = (o) => (st === "tout" ? !(barAway && o.station === "bar") : st === "bar" ? o.station === "bar" : o.station !== "bar");
     const live = all.filter((o) => ["nouvelle", "prep"].includes(o.status) && inSt(o)).sort((a, b) => (b.rush ? 1 : 0) - (a.rush ? 1 : 0) || (a.firedAt || a.at || 0) - (b.firedAt || b.at || 0));
     const ready = all.filter((o) => o.status === "prete" && inSt(o)).sort((a, b) => (a.readyAt || 0) - (b.readyAt || 0));
     const held = all.filter((o) => o.status === "attente" && inSt(o)).sort((a, b) => (a.at || 0) - (b.at || 0));
@@ -578,7 +585,7 @@ VIEWS.cuisine = {
       ${sound ? "" : `<button class="sl-snd st" style="--i:1" data-act="slSound">${ico("sound")}<span><b>Touchez pour activer le carillon</b><em>La tablette sonne à chaque nouveau bon et à chaque changement.</em></span></button>`}
       <div class="sl-kbar st" style="--i:1"><div class="sl-segs sm">${[["tout", "Tout"], ["cuisine", "Cuisine"], ...(hasBar || st === "bar" ? [["bar", "Bar"]] : [])].map(([k, t]) => `<button class="${st === k ? "on" : ""}" data-act="slStation" data-v="${k}">${t}</button>`).join("")}</div>
         <div class="sl-kst"><span><b class="mono">${live.length}</b>en cours</span><span><b class="mono">${held.length}</b>à suivre</span><span class="${late ? "bad" : ""}"><b class="mono">${late}</b>en retard</span><span><b class="mono">${avg != null ? avg + "'" : "–"}</b>temps moyen</span><span><b class="mono">${done.length}</b>envoyés</span></div>
-        <button class="btn soft sm sl-86b" data-act="slOuts">${ico("slBan")}Ruptures${outs.length ? `<b class="mono">${outs.length}</b>` : ""}</button></div>
+        ${barAway ? `<button class="btn ghost sm sl-tobar" data-go="bar" title="Les boissons partent sur l'écran bar">${ico("slGlass")}Écran bar</button>` : ""}<button class="btn soft sm sl-86b" data-act="slOuts">${ico("slBan")}Ruptures${outs.length ? `<b class="mono">${outs.length}</b>` : ""}</button></div>
       <div class="sl-kwrap">
         <div class="sl-kgrid">${live.map((o, i) => slKCard(o, i)).join("") || `<div class="glass sl-empty sl-kempty st" style="--i:2"><div class="cm-rail-ill" aria-hidden="true"><i></i><i></i><i></i></div><b class="h3">Rien sur le feu</b><p class="sub">Les bons de la salle et du menu QR arrivent ici, le plus ancien en premier, les prioritaires devant.</p></div>`}</div>
         <aside class="sl-kside">
@@ -608,12 +615,13 @@ function slKCard(o, i) {
   const later = salle ? slTickets(o.tabId).filter((x) => x.status === "attente" && x.id !== o.id) : [];
   const head = salle ? `<b class="sl-ktab">Table <span class="mono">${esc(o.table)}</span></b><span class="sl-kcrs">${esc(o.courseT || "")}</span>`
     : `<b class="sl-ktab">${o.mode === "table" ? `Table <span class="mono">${esc(o.table)}</span>` : `${ico("cmBag")}<span class="mono">${esc(o.slot || "")}</span>`}</b><span class="sl-kcrs qr">${o.mode === "table" ? "Commande QR" : `À emporter n° ${o.n}`}</span>`;
-  const meta = [salle && o.waiterName ? firstName(o.waiterName) : "", salle && o.covers ? `${o.covers} couv.` : "", !salle && o.name ? o.name : "", !salle ? (o.paid ? "payée" : "à encaisser") : ""].filter(Boolean);
+  const meta = [salle && o.waiterName ? firstName(o.waiterName) : "", salle && o.covers ? `${o.covers} couv.` : "", !salle && o.name ? o.name : "", !salle ? (o.paid ? "payée" : o.settled ? "réglée" : o.mode === "table" ? "" : "à encaisser") : ""].filter(Boolean);
   const flags = [o.rush ? `<span class="sl-flag rush">${ico("slBolt")}Prioritaire</span>` : "", o.items && o.items.some((x) => x.refire) ? `<span class="sl-flag refire">${ico("slRedo")}À refaire</span>` : "", modNew ? `<span class="sl-flag mod">${ico("slWarn")}Modifié</span>` : "", o.add ? `<span class="sl-add">Ajout</span>` : "", o.status === "prep" ? `<span class="sl-fire">${ico("slFire")}Sur le feu</span>` : ""].join("");
   return `<article class="sl-kcard s-${o.status}${m >= 20 ? " late" : m >= 10 ? " warm" : ""}${CM.fresh.has(o.id) ? " fresh" : ""}${o.station === "bar" ? " bar" : ""}${o.rush ? " rush" : ""}" style="--i:${Math.min(i, 10)}" data-id="${esc(o.id)}">
     <header>${head}<span class="sl-kt mono" data-at="${t0}">${slAgo(t0)}</span></header>
+    ${!salle && typeof cmDue === "function" && cmDue(o) ? cmDueBand(o, true) : ""}
     <div class="sl-kmeta">${flags}${meta.map((x) => `<span>${esc(x)}</span>`).join("")}</div>
-    <ul class="sl-kit">${(o.items || []).map((x, j) => `<li class="${x.ok ? "ok" : ""}${x.off ? " off" : ""}" data-act="slKItem" data-id="${esc(o.id)}" data-v="${j}"><b class="mono">${x.q}</b><span><span class="sl-kn">${esc(x.name)}${x.seat ? ` <i class="sl-tag seat">P${x.seat}</i>` : ""}${x.rush && !o.rush ? ` <i class="sl-tag rush">${ico("slBolt")}</i>` : ""}</span>${x.off ? `<i class="sl-ial">ANNULÉ${x.offReason ? ` · ${esc(x.offReason)}` : ""}</i>` : ""}${x.refire ? `<i class="sl-tag refire">${ico("slRedo")}À refaire · ${esc(x.refire)}</i>` : ""}${(x.without || []).map((w) => `<em class="m-w">SANS ${esc(String(w).toUpperCase())}</em>`).join("")}${(x.extras || []).map((e) => `<em class="m-x">+ ${esc(e.t)}</em>`).join("")}${x.note ? `<em>${esc(x.note)}</em>` : ""}${(x.allergy || []).length ? `<i class="sl-ial clash">${ico("slWarn")}ALLERGIE ${esc(x.allergy.map((a) => slAl(a).t).join(", ").toUpperCase())}</i>` : ""}</span></li>`).join("")}</ul>
+    <ul class="sl-kit">${(o.items || []).map((x, j) => `<li class="${x.ok ? "ok" : ""}${x.off ? " off" : ""}" data-act="slKItem" data-id="${esc(o.id)}" data-v="${j}"><b class="mono">${x.q}</b><span><span class="sl-kn">${esc(x.name)}${x.seat ? ` <i class="sl-tag seat">P${x.seat}</i>` : ""}${x.rush && !o.rush ? ` <i class="sl-tag rush">${ico("slBolt")}</i>` : ""}${typeof brLineTag === "function" ? brLineTag(o, x) : ""}${typeof rpBtn === "function" ? rpBtn(o, x, j) : ""}</span>${x.off ? `<i class="sl-ial">ANNULÉ${x.offReason ? ` · ${esc(x.offReason)}` : ""}</i>` : ""}${x.refire ? `<i class="sl-tag refire">${ico("slRedo")}À refaire · ${esc(x.refire)}</i>` : ""}${(x.without || []).map((w) => `<em class="m-w">SANS ${esc(String(w).toUpperCase())}</em>`).join("")}${(x.extras || []).map((e) => `<em class="m-x">+ ${esc(e.t)}</em>`).join("")}${x.note ? `<em>${esc(x.note)}</em>` : ""}${(x.allergy || []).length ? `<i class="sl-ial clash">${ico("slWarn")}ALLERGIE ${esc(x.allergy.map((a) => slAl(a).t).join(", ").toUpperCase())}</i>` : ""}</span></li>`).join("")}</ul>
     ${o.note ? `<div class="cm-onote">${ico("rsNote")}<span>${esc(o.note)}</span></div>` : ""}
     ${later.length ? `<div class="sl-later">${ico("clock")}<span>À suivre : ${later.map((x) => `${esc(x.courseT)} (${(x.items || []).filter((y) => !y.off).reduce((a, y) => a + (+y.q || 0), 0)})`).join(", ")}</span></div>` : ""}
     <footer>${o.status === "nouvelle" ? `<button class="btn soft sl-kgo" data-act="slKNext" data-id="${esc(o.id)}" data-v="prep">${ico("slFire")}Lancer</button>` : ""}<button class="btn acc sl-kgo rdy" data-act="slKNext" data-id="${esc(o.id)}" data-v="prete">${ico("cmBell")}Prêt</button><button class="iconbtn sm" data-act="slPrintOne" data-id="${esc(o.id)}" aria-label="Imprimer le bon">${ico("printer")}</button></footer>
@@ -673,7 +681,9 @@ function slSeedDemo() {
   const tp = `restos/${S.rid}/salleTabs`; if (DB.local[tp]) return;
   const D = slDishes().filter((n) => num(n.price) > 0), by = (cat) => D.filter((n) => (n.carteCat || "plat") === cat);
   const pick = (cat, i, fb) => { const L = by(cat); const n = L[i]; return n ? { id: n.id, name: n.title, price: num(n.price), cat } : { id: "", name: fb[0], price: fb[1], cat }; };
-  const drink = pick("boisson", 0, ["Limonade maison", 4.5]), ent = pick("entree", 0, ["Velouté de potimarron", 8.5]), sh = pick("partage", 0, ["Croquettes de jambon", 9]), sh2 = pick("partage", 1, ["Planche de charcuterie", 18]);
+  const byT = (t, cat, fb) => { const n = D.find((x) => x.title === t); return n ? { id: n.id, name: n.title, price: num(n.price), cat: n.carteCat || cat } : pick(cat, 0, fb); };
+  const spritz = byT("Spritz maison", "boisson", ["Spritz maison", 9]), limo = byT("Limonade maison", "boisson", ["Limonade maison", 4.5]), moj = byT("Mojito sans alcool", "boisson", ["Mojito sans alcool", 7]), vin = byT("Verre de Côtes-du-Rhône", "boisson", ["Verre de Côtes-du-Rhône", 6]), cafe = byT("Café", "boisson", ["Café", 2.5]);
+  const drink = limo, ent = pick("entree", 0, ["Velouté de potimarron", 8.5]), sh = pick("partage", 0, ["Croquettes de jambon", 9]), sh2 = pick("partage", 1, ["Planche de charcuterie", 18]);
   const p1 = pick("plat", 0, ["Bœuf bourguignon", 22]), p2 = pick("plat", 1, ["Filet de bar, beurre blanc", 24]), ds = pick("dessert", 0, ["Mousse au chocolat", 7]);
   const me = S.me.id, meN = S.me.name || "Camille Laurent", sarah = ["demo-sarah", "Sarah Lemoine"];
   const now = Date.now(), day = dayKey(), tabs = {}, op = `restos/${S.rid}/clientOrders`; DB.local[op] = DB.local[op] || {};
@@ -690,12 +700,13 @@ function slSeedDemo() {
   };
   const mine = [me, meN];
   tab("dst3", "dt2", "3", "salle", 4, 41, mine, [it(drink, 2, 0), it(ent, 2, 1), it(p1, 2, 2, { note: "À point" }), it(p2, 2, 2)], [[0, "servie", 39], [1, "servie", 34], [2, "prete", 13, { readyAt: now - 50e3, prepAt: now - 11 * 6e4 }]]);
-  tab("dst7", "dt6", "7", "salle", 6, 14, sarah, [it(sh, 2, 1), it(sh2, 1, 1), it(p1, 4, 2), it(p2, 2, 2, { allergy: ["lait"], note: "Sans beurre blanc" })], [[1, "prep", 11, { prepAt: now - 6 * 6e4 }], [2, "attente", 12]]);
+  tab("dst7", "dt6", "7", "salle", 6, 14, sarah, [it(spritz, 2, 0), it(moj, 1, 0, { note: "Peu de sucre" }), it(vin, 2, 0), it(limo, 1, 0), it(sh, 2, 1), it(sh2, 1, 1), it(p1, 4, 2), it(p2, 2, 2, { allergy: ["lait"], note: "Sans beurre blanc" })], [[0, "nouvelle", 3], [1, "prep", 11, { prepAt: now - 6 * 6e4 }], [2, "attente", 12]]);
   tab("dst21", "dt10", "21", "terrasse", 2, 5, mine, [it(drink, 2, 0), it(ent, 1, 1), it(p2, 1, 2)], [[0, "prete", 4, { readyAt: now - 2 * 6e4 }], [1, "nouvelle", 3], [2, "attente", 3]]);
-  tab("dst5", "dt4", "5", "salle", 2, 58, sarah, [it(p1, 1, 2), it(p2, 1, 2), it(ds, 2, 3)], [[2, "servie", 50], [3, "servie", 9]]);
+  tab("dst5", "dt4", "5", "salle", 2, 58, sarah, [it(cafe, 2, 0), it(p1, 1, 2), it(p2, 1, 2), it(ds, 2, 3)], [[0, "nouvelle", 1], [2, "servie", 50], [3, "servie", 9]]);
+  tab("dst22", "dt11", "22", "terrasse", 3, 47, mine, [it(spritz, 3, 0), it(p1, 2, 2), it(p2, 1, 2), it(ds, 3, 3)], [[0, "servie", 45], [2, "servie", 24], [3, "prep", 4, { prepAt: now - 3 * 6e4 }]]);
   DB.local[tp] = tabs;
   /* a dish counted by the kitchen (12 croquettes at the start, 2 already sent: « plus que 10 » on every pad) */
-  try { const qp = `restos/${S.rid}/qrMenu`, c = DB.local[qp] && DB.local[qp].cfg; if (c && sh.id && !(c.left || {})[sh.id]) c.left = { ...(c.left || {}), [sh.id]: { d: day, n: 12, at: now - 30 * 6e4, by: "demo-chef" } }; DB.emit(qp); } catch (e) {}
+  try { const qp = `restos/${S.rid}/qrMenu`, c = DB.local[qp] && DB.local[qp].cfg; if (c && sh.id && !(c.left || {})[sh.id]) c.left = { ...(c.left || {}), [sh.id]: { d: day, n: 12, at: now - 30 * 6e4, by: "demo-chef" } }; if (c && c.barScreen == null) c.barScreen = true; DB.emit(qp); } catch (e) {}
   try { DB.emit(op); } catch (e) {}
 }
 /* demo: the kitchen launches and finishes what the visitor sends (so the « prêt » alert can be felt) */
@@ -800,15 +811,16 @@ Object.assign(ACT, {
   slEdDel: async () => { const { e, tab, x } = slEdItem(); if (!x || x.sent) return; const i = tab.items.indexOf(x); tab.items.splice(i, 1); S.ui.undo = () => { tab.items.splice(i, 0, x); slSaveTab(tab); }; SFX.tap(); closeSheet(); await slSaveTab(tab); toastUndo(`${x.name} retiré`); void e; },
   slEdCancel: async (a) => {
     const { e, tab, x } = slEdItem(); if (!x) return; if (!e.why) { SFX.err(); toast("Choisissez un motif.", "err"); return; }
-    a.disabled = true; const k0 = x.k, sent = x.sent, y = slSplit(tab, x, e.n); y.off = true; y.offReason = e.why; y.offBy = S.me.id; y.offAt = Date.now();
+    a.disabled = true; const k0 = x.k, sent = x.sent, amt = Math.round(slUnit(x) * e.n * 100) / 100, y = slSplit(tab, x, e.n); y.off = true; y.offReason = e.why; y.offBy = S.me.id; y.offAt = Date.now();
     if (sent) await slTicketOff({ k: k0, sent }, e.n, e.why);
+    logEvent && logEvent("salle", `a annulé ${e.n} × ${x.name} (table ${tab.table}, ${e.why}${sent ? ", déjà en cuisine" : ""})`, { ref: tab.id, k: "annul", ...(amt ? { amt } : {}) });
     SFX.close(); buzz([20, 40, 20]); await slAfterEd(tab, sent ? `${x.name} annulé, la cuisine est prévenue` : `${x.name} annulé`);
   },
   slEdOffer: async () => {
-    const { e, tab, x } = slEdItem(); if (!x) return; const y = slSplit(tab, x, e.n); y.free = { why: e.why || "Geste commercial", by: S.me.id, at: Date.now() };
-    SFX.done(); buzz([12, 30, 12]); logEvent && logEvent("salle", `a offert ${e.n} × ${x.name} (table ${tab.table}, ${y.free.why})`, { ref: tab.id }); await slAfterEd(tab, `${x.name} offert`);
+    const { e, tab, x } = slEdItem(); if (!x) return; const amt = Math.round(slUnit(x) * e.n * 100) / 100; const y = slSplit(tab, x, e.n); y.free = { why: e.why || "Geste commercial", by: S.me.id, at: Date.now() };
+    SFX.done(); buzz([12, 30, 12]); logEvent && logEvent("salle", `a offert ${e.n} × ${x.name} (table ${tab.table}, ${y.free.why})`, { ref: tab.id, k: "offert", ...(amt ? { amt } : {}) }); await slAfterEd(tab, `${x.name} offert`);
   },
-  slEdUnoffer: async () => { const { tab, x } = slEdItem(); if (!x) return; delete x.free; SFX.tap(); await slAfterEd(tab, `${x.name} n'est plus offert`); },
+  slEdUnoffer: async () => { const { tab, x } = slEdItem(); if (!x) return; delete x.free; SFX.tap(); logEvent && logEvent("salle", `a remis ${x.q} × ${x.name} sur l'addition (table ${tab.table}, n'est plus offert)`, { ref: tab.id, k: "modif" }); await slAfterEd(tab, `${x.name} n'est plus offert`); },
   slEdRefire: async (a) => {
     const { e, tab, x } = slEdItem(); if (!x) return; if (!e.why) { SFX.err(); toast("Choisissez un motif.", "err"); return; } a.disabled = true;
     const id = slId("sl"), now = Date.now(), k = slId("i"); SL.mine.add(id);
@@ -817,7 +829,7 @@ Object.assign(ACT, {
       items: [line], total: 0, n: slNextN(), day: dayKey(), at: now, firedAt: now, waiter: S.me.id, waiterName: (typeof esActorName === "function" && esActorName()) || S.me.name || "", status: "nouvelle", pay: "place", paid: false, name: "", phone: "", slot: "", note: "", rush: true, refire: true, add: true }));
     tab.items.splice(tab.items.indexOf(x) + 1, 0, { ...x, k, q: e.n, refire: e.why, rush: true, free: { why: "Refait" }, sent: id });
     if (DB.mode === "demo") slDemoCook(id);
-    SFX.done(); buzz([16, 40, 16]); logEvent && logEvent("salle", `a fait refaire ${e.n} × ${x.name} (table ${tab.table}, ${e.why})`, { ref: tab.id }); await slAfterEd(tab, `${x.name} : la cuisine refait, en priorité`);
+    SFX.done(); buzz([16, 40, 16]); logEvent && logEvent("salle", `a fait refaire ${e.n} × ${x.name} (table ${tab.table}, ${e.why})`, { ref: tab.id, k: "annul" }); await slAfterEd(tab, `${x.name} : la cuisine refait, en priorité`);
   },
   slEdMoveTo: async (a, id) => {
     const { e, tab, x } = slEdItem(), to = slTabOf(id); if (!x || !to) return; const y = slSplit(tab, x, e.n); tab.items.splice(tab.items.indexOf(y), 1);

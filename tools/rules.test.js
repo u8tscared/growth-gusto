@@ -1,4 +1,4 @@
-// Firestore rules test (89 cases) against the emulator. From a folder with firebase.json {"emulators":{"firestore":{"port":8085}}} and @firebase/rules-unit-testing installed
+// Firestore rules test (140 cases) against the emulator. From a folder with firebase.json {"emulators":{"firestore":{"port":8085}}} and @firebase/rules-unit-testing installed
 // (e.g. /tmp/gg/v4-fb): cp firestore.rules . && npx firebase emulators:exec --only firestore --project demo-gg "node rules.test.js"
 const {initializeTestEnvironment,assertSucceeds,assertFails}=require('@firebase/rules-unit-testing');
 const {doc,getDoc,setDoc,updateDoc,deleteDoc,writeBatch,collection,query,where,getDocs,arrayUnion,increment}=require('firebase/firestore');
@@ -133,5 +133,38 @@ const t=async(name,p)=>{try{await p;pass++;console.log('ok  ',name)}catch(e){fai
  await t('equipe writes sensors',assertSucceeds(setDoc(doc(D,`restos/${rid}/sensors/s1`),{name:'S'})));
  await t('nobody reads caisseTokens',assertFails(getDoc(doc(A,'caisseTokens/x'))));
  await t('nobody reads _meta',assertFails(getDoc(doc(A,'_meta/brevo'))));
+ // temporary access (js/relais.js): an extra/stagiaire whose until has passed reads and writes nothing; the join copies the invite's until
+ await t('gerant creates invite with until',assertSucceeds(setDoc(doc(A,'invites','TEMP0001'),{rid,restoName:'Bistrot',role:'equipe',createdBy:'alice',createdAt:now,expiresAt:now+864e5,uses:0,until:now+3*864e5,tmp:{why:'extra'}})));
+ const X=db('xena');
+ await t('join without the invite until fails',(()=>{const b=writeBatch(X);b.set(doc(X,`restos/${rid}/members/xena`),{name:'X',role:'equipe',joinedAt:now,invite:'TEMP0001'});return assertFails(b.commit())})());
+ await t('join with a longer until fails',(()=>{const b=writeBatch(X);b.set(doc(X,`restos/${rid}/members/xena`),{name:'X',role:'equipe',joinedAt:now,invite:'TEMP0001',until:now+30*864e5});return assertFails(b.commit())})());
+ await t('xena joins copying the invite until',(()=>{const b=writeBatch(X);b.set(doc(X,`restos/${rid}/members/xena`),{name:'X',role:'equipe',joinedAt:now,invite:'TEMP0001',until:now+3*864e5,tmp:{why:'extra'},tmpFrom:now});b.update(doc(X,'invites','TEMP0001'),{uses:increment(1),lastUsedAt:now});return assertSucceeds(b.commit())})());
+ await t('xena (in time) reads fridges',assertSucceeds(getDocs(collection(X,`restos/${rid}/fridges`))));
+ await t('xena cannot extend her own access',assertFails(updateDoc(doc(X,`restos/${rid}/members/xena`),{until:now+99*864e5})));
+ await t('xena cannot remove her own until',assertFails(updateDoc(doc(X,`restos/${rid}/members/xena`),{until:0})));
+ await t('gerant ends xena access now',assertSucceeds(updateDoc(doc(A,`restos/${rid}/members/xena`),{until:now-1000})));
+ await t('expired xena cannot read fridges',assertFails(getDocs(collection(X,`restos/${rid}/fridges`))));
+ await t('expired xena cannot write a reading',assertFails(setDoc(doc(X,`restos/${rid}/readings/xr`),{value:3})));
+ await t('expired xena cannot read the resto',assertFails(getDoc(doc(X,'restos',rid))));
+ await t('expired xena still reads her own member doc',assertSucceeds(getDoc(doc(X,`restos/${rid}/members/xena`))));
+ await t('gerant reopens xena',assertSucceeds(updateDoc(doc(A,`restos/${rid}/members/xena`),{until:now+864e5})));
+ await t('reopened xena reads fridges',assertSucceeds(getDocs(collection(X,`restos/${rid}/fridges`))));
+ // action log (journal des actions): append-only
+ await t('member logs an event signed by herself',assertSucceeds(setDoc(doc(X,`restos/${rid}/events/ev1`),{type:'salle',k:'offert',text:'a offert 1 café',amt:2,at:now,uid:'xena'})));
+ await t('member cannot sign an event as someone outside the resto',assertFails(setDoc(doc(X,`restos/${rid}/events/ev2`),{type:'salle',text:'x',at:now,uid:'zed'})));
+ await t('shared device logs for a kitchen profile of the resto',assertSucceeds(setDoc(doc(A,`restos/${rid}/events/ev3`),{type:'chore',text:'a fait les sols',at:now,uid:'m123'})));
+ await t('nobody rewrites an event text',assertFails(updateDoc(doc(A,`restos/${rid}/events/ev1`),{text:'rien'})));
+ await t('nobody changes an event amount',assertFails(updateDoc(doc(X,`restos/${rid}/events/ev1`),{amt:0})));
+ await t('member marks an event cancelled',assertSucceeds(updateDoc(doc(X,`restos/${rid}/events/ev1`),{cancelled:true,cancelledAt:now,cancelledBy:'xena'})));
+ await t('undo right after: delete own fresh event',assertSucceeds(deleteDoc(doc(X,`restos/${rid}/events/ev1`))));
+ await t('setup: an old event',assertSucceeds(setDoc(doc(X,`restos/${rid}/events/ev4`),{type:'salle',text:'a annulé',at:now-3600e3,uid:'xena'})));
+ await t('another member cannot delete an old event',assertFails(deleteDoc(doc(B,`restos/${rid}/events/ev4`))));
+ await t('author cannot delete her old event',assertFails(deleteDoc(doc(X,`restos/${rid}/events/ev4`))));
+ await t('stranger cannot read events',assertFails(getDocs(collection(Z,`restos/${rid}/events`))));
+ await t('expired member cannot log events',(async()=>{await updateDoc(doc(A,`restos/${rid}/members/xena`),{until:now-1000});await assertFails(setDoc(doc(X,`restos/${rid}/events/ev5`),{type:'x',text:'x',at:now,uid:'xena'}));})());
+ // passation de service: a member collection like the others
+ await t('member writes a handover',assertSucceeds(setDoc(doc(A,`restos/${rid}/handovers/h1`),{day:'2026-11-07',slot:'midi',items:[],ok:true,at:now,uid:'alice',reads:{}})));
+ await t('member signs it read',assertSucceeds(updateDoc(doc(D,`restos/${rid}/handovers/h1`),{'reads.dan':now})));
+ await t('stranger cannot read handovers',assertFails(getDoc(doc(Z,`restos/${rid}/handovers/h1`))));
  console.log(`\n${pass} passed, ${fail} failed`);await env.cleanup();process.exit(fail?1:0);
 })();

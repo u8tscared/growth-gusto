@@ -1,5 +1,30 @@
 /* Growth Gusto — demo seed (loaded only when someone taps « Essayer la démo »). « Le Bistrot Démo »: a full, realistic restaurant,
    dated relative to today, following the V3 data contract (tools/BRIEF.md). Kept in memory only: DB.mode = "demo" never persists. */
+/* demo pictures, drawn here (nothing is fetched): plates from above, glasses from the side. Used by the recipe cards and the
+   step-by-step screen of the kitchen and the bar (js/recette.js). */
+function demoArt(k) {
+  const W = (bg, body, defs = "") => "data:image/svg+xml;utf8," + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300"><defs><radialGradient id="v" cx=".5" cy=".42" r=".75"><stop offset="0" stop-color="#fff" stop-opacity=".22"/><stop offset="1" stop-color="#000" stop-opacity=".28"/></radialGradient><filter id="s" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="8" stdDeviation="9" flood-opacity=".35"/></filter>${defs}</defs><rect width="400" height="300" fill="${bg}"/>${body}<rect width="400" height="300" fill="url(#v)"/></svg>`);
+  const plate = (r = 118, c = "#FBF8F2") => `<circle cx="200" cy="152" r="${r}" fill="${c}" filter="url(#s)"/><circle cx="200" cy="152" r="${r - 26}" fill="none" stroke="#E9E3D8" stroke-width="2"/>`;
+  const dots = (L, c, r) => L.map(([x, y]) => `<circle cx="${x}" cy="${y}" r="${r}" fill="${c}"/>`).join("");
+  const glass = (fill, h, extra = "", shape = "ballon") => shape === "ballon"
+    ? `<g filter="url(#s)"><path d="M140 52h120c4 60-6 118-60 126-54-8-64-66-60-126z" fill="#fff" fill-opacity=".18" stroke="#fff" stroke-opacity=".7" stroke-width="3"/><path d="M${150 - h / 30} ${178 - h}h${100 + h / 15}c-4 ${h - 26}-20 ${h - 6}-50 ${h}-30-${6}-46-${26}-50-${h}z" fill="${fill}"/>${extra}<rect x="196" y="178" width="8" height="70" fill="#fff" fill-opacity=".6"/><ellipse cx="200" cy="252" rx="52" ry="9" fill="#fff" fill-opacity=".55"/></g>`
+    : `<g filter="url(#s)"><path d="M150 40h100l-8 214h-84z" fill="#fff" fill-opacity=".16" stroke="#fff" stroke-opacity=".7" stroke-width="3"/><path d="M${152 + (254 - h) * 0.0} ${254 - h}h${96}l-6 ${h - 4}h-84z" fill="${fill}"/>${extra}</g>`;
+  const A = {
+    bourgui: W("#2C2420", `${plate(124, "#F5EFE4")}<circle cx="200" cy="152" r="84" fill="#5B2416"/><circle cx="200" cy="152" r="84" fill="url(#v)" opacity=".5"/>${dots([[178, 134], [214, 128], [196, 168], [228, 162]], "#7A3A22", 19)}${dots([[160, 168], [240, 140], [206, 196], [170, 116]], "#E8822F", 10)}${dots([[188, 150], [222, 182], [236, 118], [158, 146]], "#C9A27A", 7)}${dots([[184, 128], [210, 150], [232, 168], [170, 182], [214, 112]], "#3E7A2E", 3.5)}`),
+    croq: W("#22262B", `<rect x="58" y="70" width="284" height="164" rx="14" fill="#33373D" filter="url(#s)"/>${dots([[118, 122], [176, 122], [118, 180], [176, 180], [147, 151]], "#C98A3A", 26)}${dots([[118, 122], [176, 122], [118, 180], [176, 180], [147, 151]], "#E3A955", 18)}<circle cx="268" cy="152" r="38" fill="#F4F1EA"/><circle cx="268" cy="152" r="28" fill="#E9C58A"/>${dots([[112, 116], [170, 117], [142, 146], [114, 175]], "#fff", 2)}`),
+    planche: W("#2A2521", `<rect x="40" y="62" width="320" height="176" rx="20" fill="#B9834F" filter="url(#s)"/><rect x="40" y="62" width="320" height="176" rx="20" fill="url(#v)" opacity=".4"/>${dots([[96, 112], [118, 100], [140, 112], [104, 134], [128, 132]], "#D9767A", 22)}${dots([[196, 104], [220, 100], [244, 106], [208, 126], [232, 128]], "#8E2F3A", 14)}<rect x="168" y="154" width="70" height="46" rx="6" fill="#9A5A3C"/><ellipse cx="292" cy="180" rx="30" ry="18" fill="#E4C9A3"/>${dots([[290, 108], [306, 120], [282, 128]], "#6E8B3D", 9)}<rect x="96" y="176" width="54" height="34" rx="8" fill="#E8C07A"/>`),
+    huitres: W("#1E2A33", `<circle cx="200" cy="152" r="128" fill="#DCEEF5" filter="url(#s)"/>${Array.from({ length: 12 }, (_, i) => { const a = (i / 12) * Math.PI * 2, x = 200 + Math.cos(a) * 88, y = 152 + Math.sin(a) * 88; return `<ellipse cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" rx="26" ry="17" transform="rotate(${((a * 180) / Math.PI).toFixed(0)} ${x.toFixed(1)} ${y.toFixed(1)})" fill="#8C8F86"/><ellipse cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" rx="17" ry="10" transform="rotate(${((a * 180) / Math.PI).toFixed(0)} ${x.toFixed(1)} ${y.toFixed(1)})" fill="#D8D3C3"/>`; }).join("")}<circle cx="200" cy="152" r="26" fill="#fff"/><circle cx="200" cy="152" r="18" fill="#7E3A4A"/>${dots([[176, 132], [226, 172]], "#F2D24A", 10)}`),
+    cafe: W("#24211F", `<rect x="34" y="96" width="332" height="110" rx="12" fill="#2F3236" filter="url(#s)"/><circle cx="94" cy="151" r="34" fill="#F4F1EA"/><circle cx="94" cy="151" r="24" fill="#4A2A18"/><ellipse cx="94" cy="151" rx="15" ry="9" fill="#B57A4A" opacity=".6"/><circle cx="200" cy="151" r="36" fill="#F4F1EA"/><circle cx="200" cy="151" r="27" fill="#D9963C"/><circle cx="200" cy="151" r="27" fill="url(#v)" opacity=".6"/><rect x="262" y="126" width="46" height="26" rx="6" fill="#D6A35E"/><circle cx="314" cy="174" r="20" fill="#F6EBD3"/>`),
+    cubes: W("#2B2622", `<rect x="60" y="56" width="280" height="188" rx="16" fill="#C9A47A" filter="url(#s)"/>${[[110, 100], [160, 96], [210, 104], [124, 150], [176, 148], [226, 156], [140, 196], [194, 196]].map(([x, y]) => `<rect x="${x}" y="${y}" width="38" height="34" rx="7" fill="#9E2F2A"/><rect x="${x + 6}" y="${y + 6}" width="14" height="10" rx="4" fill="#E9B7A6" opacity=".7"/>`).join("")}<path d="M270 80l50 140" stroke="#D9D9D9" stroke-width="10" stroke-linecap="round"/><path d="M262 64l14 30" stroke="#2B2B2B" stroke-width="14" stroke-linecap="round"/>`),
+    saisir: W("#1F1D1C", `<circle cx="200" cy="150" r="122" fill="#3A3A3D" filter="url(#s)"/><circle cx="200" cy="150" r="104" fill="#2A2A2C"/><rect x="316" y="138" width="80" height="24" rx="10" fill="#2A2A2C"/>${dots([[170, 120], [214, 112], [236, 150], [196, 162], [160, 168], [216, 196], [178, 200]], "#6B2A1A", 20)}${dots([[170, 116], [214, 108], [236, 146], [196, 158]], "#8E4426", 9)}<path d="M150 60c10 -20 -10 -30 0 -50M200 54c10 -20 -10 -30 0 -48M250 60c10 -20 -10 -30 0 -50" stroke="#fff" stroke-opacity=".25" stroke-width="6" fill="none" stroke-linecap="round"/>`),
+    spritz: W("#2A1E3A", glass("#F26B21", 92, `<circle cx="248" cy="104" r="22" fill="#FFB347" stroke="#FFE1A6" stroke-width="4"/>${dots([[178, 118], [204, 104], [222, 132], [190, 146]], "#fff", 9)}`, "ballon")),
+    limo: W("#1E3A33", glass("#F4E7A1", 150, `<circle cx="248" cy="78" r="22" fill="#F7E36A" stroke="#FFF6C4" stroke-width="4"/>${dots([[184, 150], [214, 186], [198, 220]], "#fff", 10)}<path d="M174 106c14-8 26-4 32 6" stroke="#3E9B52" stroke-width="8" fill="none" stroke-linecap="round"/>`, "tall")),
+    mojito: W("#16302A", glass("#CFEBC4", 170, `${dots([[176, 120], [214, 140], [186, 176], [226, 200], [196, 226]], "#4FA35C", 11)}${dots([[204, 108], [184, 150], [216, 172]], "#fff", 8)}<path d="M236 30l-20 120" stroke="#1F1F1F" stroke-width="7" stroke-linecap="round"/>`, "tall")),
+    vin: W("#2A1620", glass("#7A1530", 56, "", "ballon")),
+    expresso: W("#2A211C", `<ellipse cx="200" cy="170" rx="118" ry="70" fill="#F4F1EA" filter="url(#s)"/><circle cx="200" cy="150" r="62" fill="#FBF8F2"/><path d="M262 140c34 0 34 30 0 30" stroke="#FBF8F2" stroke-width="14" fill="none"/><circle cx="200" cy="150" r="48" fill="#3B2314"/><circle cx="200" cy="150" r="48" fill="#B8783F" opacity=".35"/><ellipse cx="190" cy="140" rx="20" ry="12" fill="#D9A06A" opacity=".45"/><rect x="92" y="196" width="34" height="22" rx="4" fill="#4A2A18"/>`),
+  };
+  return A[k] || "";
+}
 window.GG_DEMO = {
   rid: "demo",
   build() {
@@ -30,9 +55,11 @@ window.GG_DEMO = {
     /* demandes de l'équipe (js/espaces.js « Mon espace » / « Demandes de l'équipe ») */
     [["demo-sarah", "conge", 18, 21, "Mariage de ma sœur à Bordeaux", "attente", 1], ["demo-hugo", "dispo", 4, 4, "Libre tous les lundis midi ce mois-ci", "attente", 0], ["demo-lucas", "echange", 6, 6, "avec Inès Benali · je prends son soir, elle prend mon midi", "ok", 3], ["demo-sarah", "absence", -9, -9, "Rendez-vous médical le matin", "ok", 12]]
       .forEach(([mid, kind, a, b, note, status, ago]) => { const t = team.find((x) => x[0] === mid); put("esRequests", { kind, from: addDays(today, a), to: addDays(today, b), note, memberId: mid, name: t[1], staffId: "s_" + mid, status, at: now - ago * 864e5 - 3 * 36e5, uid: mid, ...(status !== "attente" ? { answeredBy: "demo-camille", answeredByName: "Camille Laurent", answeredAt: now - ago * 864e5 } : {}) }); });
+    /* planning intelligent (js/planif.js) : indisponibilités et postes de renfort */
+    const DEMO_PF = { "demo-hugo": { off: { 0: ["midi"], 2: ["midi"], 3: ["midi"], 4: ["midi"], 5: ["midi"], 6: ["midi"] } }, "demo-sarah": { off: { 0: ["soir"] } }, "demo-lucas": { alsoPosts: ["plonge"] }, "demo-ines": { off: { 3: ["midi"] } } };
     const staffIds = {};
     team.forEach(([mid, name, , color, jobRole, contract, weeklyHours, hourlyGross, post], i) => {
-      staffIds[mid] = put("staff", { memberId: mid, name, role: jobRole, color, contract, weeklyHours, hourlyGross: hourlyGross || 24, chargesPct: contract === "Extra" ? 30 : 42, active: true, start: addDays(today, -(400 - i * 40)), post }, "s_" + mid);
+      staffIds[mid] = put("staff", { memberId: mid, name, role: jobRole, color, contract, weeklyHours, hourlyGross: hourlyGross || 24, chargesPct: contract === "Extra" ? 30 : 42, active: true, start: addDays(today, -(400 - i * 40)), post, ...(DEMO_PF[mid] || {}) }, "s_" + mid);
     });
     const who = team.map((t) => t[0]), cooks = ["demo-thomas", "demo-ines", "demo-lucas"];
 
@@ -127,8 +154,8 @@ window.GG_DEMO = {
       L.forEach((l, i) => put("lots", { name: l.name, productId: l.productId, qty: l.qty, unit: l.unit, lot: l.lot, dlc: l.dlc, supplier, receptionId: recId, fridgeId: l.fridgeId, status: "in", receivedTemp: l.temp, code: "GG-" + rid6(), photoId: "", photoUrl: "", createdAt: t + i, uid: pick(cooks) }));
       L.forEach((l) => put("moves", { productId: l.productId, name: l.name, qty: l.qty, unit: l.unit, kind: "reception", ref: recId, refType: "reception", at: t, uid: "demo-thomas", by: "Thomas Girard" }));
     });
-    put("lots", { name: "Fond de veau maison", productId: "p-fond", qty: 2, unit: "L", lot: "MAISON", dlc: addDays(today, -1), supplier: "Fait maison", receptionId: "", fridgeId: "fr-cf", status: "opened", dlcOpen: addDays(today, -1), receivedTemp: null, code: "GG-" + rid6(), createdAt: now - 4 * 864e5, uid: "demo-ines" });
-    put("lots", { name: "Mayonnaise maison", productId: "", qty: 1, unit: "kg", lot: "MAISON", dlc: today, supplier: "Fait maison", receptionId: "", fridgeId: "fr-cf", status: "opened", dlcOpen: today, receivedTemp: null, code: "GG-" + rid6(), createdAt: now - 2 * 864e5, uid: "demo-lucas" });
+    put("lots", { name: "Fond de veau maison", productId: "p-fond", qty: 2, unit: "L", lot: "MAISON", dlc: addDays(today, -1), supplier: "Fait maison", receptionId: "", fridgeId: "fr-cf", status: "opened", openedAt: now - 2 * 864e5 - 3 * 36e5, openedBy: "demo-thomas", dlcOpen: addDays(today, -1), receivedTemp: null, code: "GG-" + rid6(), createdAt: now - 4 * 864e5, uid: "demo-ines" });
+    put("lots", { name: "Mayonnaise maison", productId: "", qty: 1, unit: "kg", lot: "MAISON", dlc: today, supplier: "Fait maison", receptionId: "", fridgeId: "fr-cf", status: "opened", openedAt: now - 864e5 - 5 * 36e5, openedBy: "demo-lucas", dlcOpen: today, receivedTemp: null, code: "GG-" + rid6(), createdAt: now - 2 * 864e5, uid: "demo-lucas" });
     put("lots", { name: "Croquettes de jambon (panées)", productId: "", qty: 60, unit: "pièce", lot: "MAISON", dlc: addDays(today, 1), supplier: "Fait maison", receptionId: "", fridgeId: "fr-cf", status: "in", receivedTemp: null, code: "GG-" + rid6(), createdAt: now - 864e5, uid: "demo-ines" });
     if (hourNow >= 11 && hourNow < 23) {
       const svcAt = at(today, 11, 2);
@@ -157,8 +184,34 @@ window.GG_DEMO = {
         steps: ["Crème brûlée : crème, jaunes, sucre, cuire 1 h à 95 °C.", "Financiers : beurre noisette, farine, blancs, cuire 9 min à 180 °C.", "Dresser à la minute avec le café."] }],
       ["n-proc", { title: "Ouverture de la cuisine", cat: "Procédures", body: "À faire chaque matin avant la mise en place.", steps: ["Relevé de température de tous les frigos.", "Vérifier les DLC du jour.", "Lavage des mains, tenue propre.", "Désinfecter les plans de travail."], ingredients: [], allergens: [], portions: 1 }],
     ];
+    /* the plates and glasses, drawn (nothing is fetched): the kitchen and bar screens read them step by step (js/recette.js) */
+    const art = typeof demoArt === "function" ? demoArt : () => "";
+    const dress = { "n-croq": ["Cinq croquettes en quinconce sur l'ardoise, la mayonnaise fumée en ramequin à droite, fleur de sel au dernier moment.", "Ardoise rectangulaire", "croq"],
+      "n-planche": ["Jambon en rosace à gauche, saucisson en éventail, terrine en tranche épaisse au centre, rillettes en quenelle. Cornichons et pain grillé à droite.", "Planche en bois", "planche"],
+      "n-bourgui": ["Assiette creuse chaude. Trois cubes de bœuf au centre, carottes autour, lardons et champignons par-dessus, sauce nappée. Persil plat ciselé. Pommes vapeur à part.", "Assiette creuse Ø 27 cm", "bourgui"],
+      "n-huitres": ["Lit de glace pilée, douze huîtres en couronne, charnière vers le centre. Citron en quartiers et mignonnette en ramequin au milieu.", "Plateau à fruits de mer", "huitres"],
+      "n-cafe": ["Café à gauche, crème brûlée caramélisée à la minute au centre, financier et boule de glace à droite.", "Ardoise longue", "cafe"] };
+    NOTES.forEach(([k, d]) => { const x = dress[k]; if (x) Object.assign(d, { dress: x[0], vessel: x[1], dressPh: art(x[2]), photo: art(x[2]) }); });
+    Object.assign(NOTES[2][1], { stepPh: [art("cubes"), "", art("saisir"), "", ""] });
+    const ds = (name, qty, unit) => ({ name, qty: String(qty), unit });
+    NOTES.splice(5, 0,
+      ["n-spritz", { title: "Spritz maison", cat: "Recettes", portions: 1, carte: true, carteCat: "boisson", price: 9, allergens: ["sulfites"], body: "Toujours le prosecco avant l'apéritif : il ne retombe pas au fond.", photo: art("spritz"),
+        ingredients: [ds("Prosecco", 9, "cl"), ds("Apéritif à l'orange amère", 6, "cl"), ds("Eau gazeuse", 3, "cl"), ds("Orange", 1, "tranche"), ds("Glaçons", 6, "pièce")],
+        steps: ["Remplir le verre de glaçons jusqu'en haut.", "Verser le prosecco, puis l'apéritif à l'orange.", "Allonger d'eau gazeuse, remuer une seule fois avec la cuillère de bar."],
+        dress: "Tranche d'orange glissée contre la paroi, paille noire. Servir tout de suite.", vessel: "Verre ballon", dressPh: art("spritz") }],
+      ["n-limo", { title: "Limonade maison", cat: "Recettes", portions: 1, carte: true, carteCat: "boisson", price: 4.5, allergens: [], body: "Le sirop citron se prépare le matin : 1 L de jus pour 600 g de sucre.", photo: art("limo"),
+        ingredients: [ds("Sirop citron maison", 4, "cl"), ds("Eau gazeuse bien froide", 20, "cl"), ds("Menthe fraîche", 3, "feuille"), ds("Citron jaune", 1, "rondelle")],
+        steps: ["Verser le sirop citron dans le verre.", "Ajouter quatre glaçons et les feuilles de menthe.", "Compléter d'eau gazeuse, remuer doucement."], dress: "Rondelle de citron sur le bord, une tige de menthe.", vessel: "Verre tumbler", dressPh: art("limo") }],
+      ["n-mojito", { title: "Mojito sans alcool", cat: "Recettes", portions: 1, carte: true, carteCat: "boisson", price: 7, allergens: [], body: "Piler sans écraser : la menthe doit rester entière, sinon elle devient amère.", photo: art("mojito"),
+        ingredients: [ds("Citron vert", 0.5, "pièce"), ds("Sucre de canne", 2, "c. à c."), ds("Menthe fraîche", 10, "feuille"), ds("Glace pilée", 1, "verre"), ds("Eau gazeuse", 12, "cl")],
+        steps: ["Couper le demi citron vert en quatre, le mettre dans le verre avec le sucre.", "Ajouter la menthe, piler doucement 10 secondes.", "Remplir de glace pilée, compléter d'eau gazeuse.", "Remuer de bas en haut avec la cuillère de bar."],
+        dress: "Bouquet de menthe en haut du verre, paille. Servir immédiatement.", vessel: "Verre highball", dressPh: art("mojito") }],
+      ["n-vin", { title: "Verre de Côtes-du-Rhône", cat: "Recettes", portions: 1, carte: true, carteCat: "boisson", price: 6, allergens: ["sulfites"], body: "Ouvrir la bouteille au début du service ; bouchée sous vide le soir, 3 jours maximum.", photo: art("vin"),
+        ingredients: [ds("Côtes-du-Rhône rouge", 12, "cl")], steps: ["Vérifier la température : 16 °C.", "Servir 12 cl, le doseur posé sur le verre.", "Noter la date d'ouverture sur la bouteille."], dress: "Le verre tenu par le pied, jamais par le calice.", vessel: "Verre à vin 35 cl", dressPh: art("vin") }],
+      ["n-expresso", { title: "Café", cat: "Recettes", portions: 1, carte: true, carteCat: "boisson", price: 2.5, allergens: [], body: "Purger le groupe avant chaque café.", photo: art("expresso"),
+        ingredients: [ds("Café moulu", 8, "g"), ds("Eau", 25, "ml")], steps: ["Purger le groupe 2 secondes.", "Doser 8 g, tasser bien à plat.", "Extraire 25 ml en 25 secondes."], dress: "Tasse chaude, soucoupe, cuillère à droite, un carré de chocolat.", vessel: "Tasse expresso", dressPh: art("expresso") }]);
     try { if (typeof noteBourguignon === "function") { const nb = noteBourguignon(); if (nb && nb.process) Object.assign(NOTES[2][1], { process: nb.process, processV: 1, processAt: now - 30 * 864e5, processBy: "demo-thomas", seed: "bourguignon" }); } } catch (e) {}
-    NOTES.forEach(([k, d], i) => put("notes", { ...d, uid: "demo-thomas", at: now - (200 - i) * 864e5, updatedAt: now - (10 - i) * 864e5, photo: "", photoId: "" }, k));
+    NOTES.forEach(([k, d], i) => put("notes", { ...d, uid: "demo-thomas", at: now - (200 - i) * 864e5, updatedAt: now - (10 - i) * 864e5, photo: d.photo || "", photoId: "" }, k));
 
     /* ── cleaning plan + logs ── */
     const CH = [
@@ -259,6 +312,36 @@ window.GG_DEMO = {
     };
     Object.entries(PEV).forEach(([uid, L]) => { for (let d = 0; d < 14; d++) { if (rnd() < 0.3) continue; const k = 1 + Math.floor(rnd() * 3); for (let j = 0; j < k; j++) { const [type, text] = pick(L); put("events", { type, text, at: at(addDays(today, -d), d === 0 ? Math.min(hourNow, 10 + j) : 10 + j * 4, Math.floor(rnd() * 59)), uid }); } } });
 
+    /* ── passation de service, gestes sensibles, accès temporaires (js/relais.js) ── */
+    {
+      const sNow = slotNow(); const prev = sNow === "midi" ? { day: addDays(today, -1), slot: "soir" } : { day: today, slot: "midi" };
+      const nx = (d, s) => (s === "midi" ? { day: d, slot: "soir" } : { day: addDays(d, 1), slot: "midi" });
+      const ho = (day, slot, by, byId, mood, items, note, reads) => put("handovers", { day, slot, to: nx(day, slot), mood, items: items.map((x, i) => ({ id: "it" + i, ...x })), note, ok: !items.length && !note, at: at(day, slot === "midi" ? 15 : 23, 20 + Math.floor(rnd() * 30)), uid: byId, by, byId, reads });
+      ho(prev.day, prev.slot, "Thomas Girard", "demo-thomas", "charge", [
+        { k: "rupture", t: "Plus de bar de ligne, la Marée livre demain 9 h" },
+        { k: "rupture", t: "Il reste 4 joues de bœuf : prévenir la salle" },
+        { k: "casse", t: "Le thermomètre sonde du poste chaud est tombé, il affiche n'importe quoi", auto: true },
+        { k: "rappel", t: "M. Bernard (table 6) a oublié son écharpe, il passe la chercher", tel: "06 12 34 56 78" },
+        { k: "prep", t: "Fond de veau à passer et refroidir avant 11 h" },
+        { k: "commande", t: "Commander crème et beurre chez Duval" },
+      ], "Gros service, 84 couverts. Le lave-vaisselle fuit encore un peu à gauche, seau en place.", { "demo-ines": now - 40 * 60000 });
+      let d = prev.day, s = prev.slot; const H = [
+        ["Inès Benali", "demo-ines", "calme", [{ k: "prep", t: "Tartelettes du soir déjà montées, au frigo 2" }], ""],
+        ["Thomas Girard", "demo-thomas", "feu", [{ k: "casse", t: "Deux assiettes creuses cassées" }, { k: "rupture", t: "Plus de frites maison" }, { k: "rappel", t: "Mme Roux veut réserver 10 pers. samedi", tel: "06 98 76 54 32" }], "Table de 12 arrivée avec 40 min de retard."],
+        ["Sarah Lemoine", "demo-sarah", "calme", [], ""],
+        ["Lucas Petit", "demo-lucas", "charge", [{ k: "info", t: "Le frigo de service 1 ferme mal, bien pousser la porte" }], ""],
+        ["Thomas Girard", "demo-thomas", "calme", [{ k: "commande", t: "Vin blanc de cuisine : dernière bouteille" }], "RAS, bonne équipe ce soir."],
+      ];
+      H.forEach(([by, byId, mood, items, note]) => { const p = s === "midi" ? { day: addDays(d, -1), slot: "soir" } : { day: d, slot: "midi" }; d = p.day; s = p.slot; const rd = {}; who.filter((m) => m !== byId && m !== "demo-camille").forEach((m, i) => { if (rnd() < 0.85) rd[m] = at(nx(d, s).day, nx(d, s).slot === "midi" ? 10 : 17, 5 + i * 4); }); ho(d, s, by, byId, mood, items, note, rd); });
+      /* the gestures that matter: comps, cancellations, refires, with amounts (journal « Gestes sensibles ») */
+      const SG = [[0, "demo-sarah", "offert", "a offert 1 × Café gourmand (table 4, client fidèle)", 9], [0, "demo-sarah", "annul", "a annulé 1 × Joue de bœuf braisée (table 7, erreur de saisie)", 18], [1, "demo-sarah", "offert", "a offert 2 × Verre de Chablis (table 12, attente trop longue)", 16], [1, "demo-thomas", "annul", "a refait 1 × Entrecôte (table 3, cuisson ratée)", 26], [2, "demo-sarah", "offert", "a offert 1 × Tarte fine aux pommes (table 9, anniversaire)", 8], [2, "demo-sarah", "annul", "a annulé 2 × Menu du jour (table 5, partis avant le plat, déjà en cuisine)", 38], [3, "demo-hugo", "offert", "a offert 1 × Digestif (table 2)", 7], [4, "demo-sarah", "offert", "a offert 3 × Café (table 11)", 7.5], [5, "demo-camille", "offert", "a offert l'apéritif à la table 8 (habitués)", 24], [5, "demo-sarah", "modif", "a remis au tarif 1 × Dessert du jour (table 6)", 0], [6, "demo-sarah", "annul", "a annulé 1 × Planche mixte (table 1, rupture)", 19], [8, "demo-ines", "annul", "a refait 1 × Bar de ligne (table 10, arête)", 24]];
+      SG.forEach(([ago, uid, k, text, amt], i) => put("events", { type: "salle", k, text, amt, at: at(addDays(today, -ago), ago === 0 ? Math.max(10, Math.min(hourNow, 13)) : 12 + (i % 9), 5 + i * 3), uid }));
+      put("events", { type: "team", k: "acces", text: "a ouvert un accès temporaire à Hugo Martin (extra, 3 jours)", at: now - 2 * 864e5, uid: "demo-camille" });
+      put("events", { type: "team", k: "acces", text: "L'accès de Jade Moreau (stagiaire) s'est fermé tout seul", at: now - 4 * 864e5, uid: "demo-camille" });
+      /* Hugo is an extra for three more days; Jade's internship ended four days ago */
+      Object.assign(D[P("members")]["demo-hugo"], { until: now + 3 * 864e5, tmp: { why: "extra" }, tmpFrom: now - 2 * 864e5 });
+      put("members", { name: "Jade Moreau", role: "equipe", color: "#9A5BD6", poste: "cuisine", joinedAt: now - 32 * 864e5, email: "", until: now - 4 * 864e5, tmp: { why: "stage" }, tmpFrom: now - 32 * 864e5 }, "demo-jade");
+    }
     /* ── consignes & discussion (js/consignes.js) ── */
     {
       const mn = (k) => now - k * 60000; const yest = addDays(today, -1);

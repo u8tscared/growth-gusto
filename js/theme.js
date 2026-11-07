@@ -19,7 +19,7 @@
 (function () {
   const LS = { get: (k) => { try { return localStorage.getItem(k); } catch (e) { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} } };
   const MQ = (() => { try { return matchMedia("(prefers-color-scheme: dark)"); } catch (e) { return null; } })();
-  const SVC_ROUTES = ["cuisine", "bar", "coupdefeu"];
+  const SVC_ROUTES = ["cuisine", "bar", "coupdefeu", "recette"];
   const TH = (window.TH = {
     pref: ["auto", "light", "dark", "soir"].includes(LS.get("gg-theme")) ? LS.get("gg-theme") : "auto",
     svc: LS.get("gg-theme-svc") !== "0",
@@ -84,7 +84,7 @@
       const r = Math.hypot(Math.max(how.x, innerWidth - how.x), Math.max(how.y, innerHeight - how.y));
       html.style.setProperty("--thx", how.x + "px"); html.style.setProperty("--thy", how.y + "px"); html.style.setProperty("--thr", r + "px");
       html.classList.add("th-vt");
-      try { const vt = document.startViewTransition(flip); vt.finished.finally(() => html.classList.remove("th-vt")); } catch (e) { flip(); html.classList.remove("th-vt"); }
+      try { const vt = document.startViewTransition(flip); vt.ready.catch(() => {}); vt.finished.catch(() => {}).finally(() => html.classList.remove("th-vt")); } catch (e) { flip(); html.classList.remove("th-vt"); }
     } else if (how && how.soft && !reduce) {
       html.classList.add("th-soft"); flip(); setTimeout(() => html.classList.remove("th-soft"), 520);
     } else flip();

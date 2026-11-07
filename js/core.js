@@ -111,7 +111,7 @@ function appIcon(size = 40) {
 /* the restaurant's own logo (r.logo: data:image or http(s) URL, set in onboarding or Réglages › Logo), "" when none */
 const restoLogo = (r) => { if (r === undefined) r = typeof S !== "undefined" ? S.resto : null; const l = r && typeof r.logo === "string" ? r.logo.trim() : ""; return /^(data:image\/|https?:\/\/)/i.test(l) ? l : ""; };
 /* a restaurant's initials skip the articles: « Le Comptoir » and « La Cantine » must not both read « LC » */
-const restoIni = (n) => { const w = String(n || "R").replace(/[’']/g, " ").split(/\s+/).filter((x) => x && !/^(le|la|les|l|du|de|des|d|au|aux|chez|et|&)$/i.test(x)); return w.length ? w.slice(0, 2).map((x) => x[0]).join("").toUpperCase() : initials(n); };
+const restoIni = (n) => { const w = String(n || "R").replace(/[’']/g, " ").split(/\s+/).filter((x) => x && !/^(le|la|les|l|du|de|des|d|au|aux|à|chez|et|&)$/i.test(x)); return w.length ? w.slice(0, 2).map((x) => x[0]).join("").toUpperCase() : initials(n); };
 /* the logo as a small rounded tile (.rlogo, css/base.css); without one: `fb` when given, else the initials tile. A logo that fails to load falls back to the initials. */
 function restoMark(size = 28, r, fb) {
   if (r === undefined) r = typeof S !== "undefined" ? S.resto : null;
@@ -861,7 +861,7 @@ function registerSW() {
    to the foreground. A new v means the code running here is old: with nothing in progress the app reloads silently (caches dropped,
    so the reload is guaranteed fresh); otherwise a toast offers « Mettre à jour ». sessionStorage guards against reload loops:
    one reload attempt per version per session, after which the version is simply adopted. */
-const APP_V = "2026-11-07.14";
+const APP_V = "2026-11-07.25";
 /* logos of the tools Growth Gusto connects to (img/logos/<id>.svg|png): caisses, réservations, comptabilité, banque, paiement */
 const BRAND_LOGOS = { sumup: "svg", zelty: "png", lightspeed: "svg", tiller: "svg", square: "svg", innovorder: "svg", popina: "png", zenchef: "svg", thefork: "png", sevenrooms: "png", guestonline: "png", resy: "svg", opentable: "svg", formitable: "svg", google: "svg", pennylane: "svg", qonto: "svg", quickbooks: "svg", sage: "svg", odoo: "svg", stripe: "svg", zebra: "svg" };
 const brandLogo = (id) => BRAND_LOGOS[id] ? `<img class="brand-logo" src="img/logos/${id}.${BRAND_LOGOS[id]}" alt="" loading="lazy" decoding="async" draggable="false">` : "";
