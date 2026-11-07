@@ -55,9 +55,11 @@ window.GG_DEMO = {
     /* demandes de l'équipe (js/espaces.js « Mon espace » / « Demandes de l'équipe ») */
     [["demo-sarah", "conge", 18, 21, "Mariage de ma sœur à Bordeaux", "attente", 1], ["demo-hugo", "dispo", 4, 4, "Libre tous les lundis midi ce mois-ci", "attente", 0], ["demo-lucas", "echange", 6, 6, "avec Inès Benali · je prends son soir, elle prend mon midi", "ok", 3], ["demo-sarah", "absence", -9, -9, "Rendez-vous médical le matin", "ok", 12]]
       .forEach(([mid, kind, a, b, note, status, ago]) => { const t = team.find((x) => x[0] === mid); put("esRequests", { kind, from: addDays(today, a), to: addDays(today, b), note, memberId: mid, name: t[1], staffId: "s_" + mid, status, at: now - ago * 864e5 - 3 * 36e5, uid: mid, ...(status !== "attente" ? { answeredBy: "demo-camille", answeredByName: "Camille Laurent", answeredAt: now - ago * 864e5 } : {}) }); });
+    /* planning intelligent (js/planif.js) : indisponibilités et postes de renfort */
+    const DEMO_PF = { "demo-hugo": { off: { 0: ["midi"], 2: ["midi"], 3: ["midi"], 4: ["midi"], 5: ["midi"], 6: ["midi"] } }, "demo-sarah": { off: { 0: ["soir"] } }, "demo-lucas": { alsoPosts: ["plonge"] }, "demo-ines": { off: { 3: ["midi"] } } };
     const staffIds = {};
     team.forEach(([mid, name, , color, jobRole, contract, weeklyHours, hourlyGross, post], i) => {
-      staffIds[mid] = put("staff", { memberId: mid, name, role: jobRole, color, contract, weeklyHours, hourlyGross: hourlyGross || 24, chargesPct: contract === "Extra" ? 30 : 42, active: true, start: addDays(today, -(400 - i * 40)), post }, "s_" + mid);
+      staffIds[mid] = put("staff", { memberId: mid, name, role: jobRole, color, contract, weeklyHours, hourlyGross: hourlyGross || 24, chargesPct: contract === "Extra" ? 30 : 42, active: true, start: addDays(today, -(400 - i * 40)), post, ...(DEMO_PF[mid] || {}) }, "s_" + mid);
     });
     const who = team.map((t) => t[0]), cooks = ["demo-thomas", "demo-ines", "demo-lucas"];
 
