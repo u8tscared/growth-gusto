@@ -49,6 +49,26 @@ function vrKind() {
   return { t: "Face ID ou empreinte", with: "avec Face ID ou l'empreinte", ic: "vrFace", face: true, dev: "appareil", btn: "Déverrouiller" };
 }
 
+/* iPads whose Touch ID is in the top button (Air, mini, iPad 10…): like Apple Pay, a light glows on the edge where the
+   button is, while the system window waits for the finger. Home-button iPads are left out (the button is in plain sight). */
+function vrTopBtn() {
+  if (VR.forceHint) return true;
+  const k = vrKind(); if (k.dev !== "iPad" || k.face) return false;
+  let a = 0, b = 0; try { a = Math.min(screen.width, screen.height); b = Math.max(screen.width, screen.height); } catch (e) {}
+  return ![[768, 1024], [810, 1080], [834, 1112]].some(([x, y]) => x === a && y === b);
+}
+/* where the button is now: portrait = top edge, right end; turned left (90) = left edge, top; turned right (-90) = right edge, bottom; upside down = bottom, left */
+function vrHintSide() { let o = 0; try { o = typeof window.orientation === "number" ? window.orientation : (screen.orientation && /landscape/.test(screen.orientation.type) ? (screen.orientation.type.includes("primary") ? 90 : -90) : 0); } catch (e) {} return o === 180 ? "b" : o === 90 ? "l" : o === -90 ? "r" : "t"; }
+function vrHint(on) {
+  let h = document.getElementById("vrTb");
+  if (!on) { if (h) { h.classList.remove("on"); setTimeout(() => { if (h && !h.classList.contains("on")) h.remove(); }, 420); } return; }
+  if (!vrTopBtn()) return;
+  if (!h) { h = document.createElement("div"); h.id = "vrTb"; h.className = "vr-tb"; h.setAttribute("aria-hidden", "true");
+    h.innerHTML = `<i class="vr-tb-btn"></i><span class="vr-tb-tx">${ico("vrFinger")}<b>Posez le doigt sur le bouton</b></span>`; document.body.appendChild(h); }
+  h.dataset.o = vrHintSide(); void h.offsetWidth; h.classList.add("on");
+}
+window.addEventListener("orientationchange", () => { const h = document.getElementById("vrTb"); if (h) setTimeout(() => { h.dataset.o = vrHintSide(); }, 250); });
+
 /* ── storage ── */
 const vrDemo = () => DB.mode === "demo";
 const vrLocal = () => DB.mode === "local";
@@ -84,7 +104,7 @@ vrCheckAvail().then(() => { if (S.route === "verrou" || S.route === "reglages") 
 const vrUV = (ad) => { const a = new Uint8Array(ad); return a.length > 32 && (a[32] & 0x04) !== 0; };
 function vrClientOk(cdj, type, chal) { try { const c = JSON.parse(new TextDecoder().decode(cdj)); return c.type === type && c.challenge === vrB64(chal) && c.origin === location.origin; } catch (e) { return false; } }
 function vrErr(e) { const n = e && e.name; return n === "NotAllowedError" || n === "AbortError" ? "cancel" : n === "InvalidStateError" ? "exists" : n === "SecurityError" ? "security" : "other"; }
-async function vrCreate() { VR.inSys = true; try { return await vrCreate0(); } finally { VR.inSys = false; VR.pickUntil = Date.now() + 1500; } }
+async function vrCreate() { VR.inSys = true; vrHint(true); try { return await vrCreate0(); } finally { VR.inSys = false; vrHint(false); VR.pickUntil = Date.now() + 1500; } }
 async function vrCreate0() {
   const chal = vrRand(32); const u = typeof authUser === "function" ? authUser() : null;
   const who = (u && u.email) || (S.me && S.me.name) || "Growth Gusto";
@@ -99,7 +119,7 @@ async function vrCreate0() {
   try { if (c.response.getAuthenticatorData && !vrUV(c.response.getAuthenticatorData())) throw Object.assign(new Error("uv"), { name: "NoUV" }); } catch (e) { if (e.name === "NoUV") throw e; }
   return vrB64(c.rawId);
 }
-async function vrGet(ids) { VR.inSys = true; try { return await vrGet0(ids); } finally { VR.inSys = false; VR.pickUntil = Date.now() + 1500; } }
+async function vrGet(ids) { VR.inSys = true; vrHint(true); try { return await vrGet0(ids); } finally { VR.inSys = false; vrHint(false); VR.pickUntil = Date.now() + 1500; } }
 async function vrGet0(ids) {
   try { if (VR.abort) VR.abort.abort(); } catch (e) {}
   const ac = typeof AbortController !== "undefined" ? new AbortController() : null; VR.abort = ac;
@@ -163,7 +183,7 @@ function vrLockHTML() {
     <div class="vr-mid st" style="--i:2">
       <button class="vr-gbtn ${VR.busy ? "scan" : ""} ${VR.ok ? "ok" : ""}" id="vrGlyph" data-act="vrBio" aria-label="Déverrouiller ${esc(k.with)}">${vrGlyph()}</button>
       <div class="vr-h">${VR.ok ? `Bon retour${name ? ", " + esc(name) : ""}` : conf ? "Confirmez que c'est vous" : name ? `Bonjour ${esc(name)}` : "Verrouillé"}</div>
-      <div class="vr-p" id="vrMsg">${VR.err ? `<span class="vr-err">${esc(VR.err)}</span>` : VR.busy ? (vrDemo() ? "Démo : Face ID simulé…" : "Regardez l'écran…") : conf ? esc(conf.why) : "Touchez pour déverrouiller"}</div>
+      <div class="vr-p" id="vrMsg">${VR.err ? `<span class="vr-err">${esc(VR.err)}</span>` : VR.busy ? (vrDemo() ? `Démo : ${vrKind().t} simulé…` : (vrKind().face ? "Regardez l'écran…" : "Posez le doigt…")) : conf ? esc(conf.why) : "Touchez pour déverrouiller"}</div>
     </div>
     <div class="vr-foot st" style="--i:3"><button class="vr-cta" data-act="vrBio">${ico(k.ic)}${esc(k.btn)}</button><div class="vr-row2"><button class="vr-link" data-act="vrUsePin">Utiliser le code</button>${cancel}</div></div>`;
 }
@@ -208,9 +228,9 @@ async function vrBioGo(auto) {
   const c = vrCfg(); if (!c || VR.busy || VR.ok || (auto && c.sim)) return;
   VR.busy = true; VR.err = "";
   const g = $("#vrGlyph"); if (g) { g.classList.remove("err", "ok"); void g.offsetWidth; g.classList.add("scan"); }
-  const m = $("#vrMsg"); if (m) m.textContent = vrDemo() ? "Démo : Face ID simulé…" : "Regardez l'écran…";
+  const m = $("#vrMsg"); if (m) m.textContent = vrDemo() ? `Démo : ${vrKind().t} simulé…` : (vrKind().face ? "Regardez l'écran…" : "Posez le doigt…");
   if (!auto) { SFX.init(); SFX.tap(); }
-  if (c.sim) { setTimeout(() => { if (VR.locked) vrSuccess(); }, 1300); return; }
+  if (c.sim) { vrHint(true); setTimeout(() => { vrHint(false); if (VR.locked) vrSuccess(); }, 1300); return; }
   try { await vrGet([c.cred]); if (VR.locked) vrSuccess(); }
   catch (e) {
     VR.busy = false; if (!VR.locked) return;
@@ -403,6 +423,7 @@ function vrSetupDone() {
 function vrSimScan(then) {
   const k = vrKind();
   openSheet(`<div class="vr-simsheet"><button class="vr-gbtn scan light" id="vrSimG" aria-hidden="true" tabindex="-1">${vrGlyph()}</button><div class="h2">${esc(k.t)}</div><p class="sub">Démo : sur votre ${esc(k.dev)}, c'est la vraie fenêtre ${esc(k.t)} qui s'ouvre ici.</p></div>`);
+  vrHint(true); setTimeout(vrHint, 1250, false);
   setTimeout(() => { const g = $("#vrSimG"); if (g) { g.classList.remove("scan"); g.classList.add("ok"); } SFX.ok(); buzz(8); }, 1200);
   setTimeout(then, 1800);
 }
