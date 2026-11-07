@@ -903,7 +903,7 @@ const AUTH = {
     this.setBusy("join");
     try {
       const b = fs.batch();
-      b.set(fs.doc(`restos/${inv.rid}/members/${u.uid}`), { name: u.displayName || inv.name || firstName(String(u.email || "").split("@")[0]), email: u.email || "", photo: u.photoURL || "", role: inv.role || "equipe", joinedAt: now, invite: J.code, ...(inv.perms ? { perms: inv.perms } : {}), ...(inv.poste ? { poste: inv.poste } : {}), ...(!u.photoURL && inv.photo ? { photo: inv.photo } : {}) });
+      b.set(fs.doc(`restos/${inv.rid}/members/${u.uid}`), { name: u.displayName || inv.name || firstName(String(u.email || "").split("@")[0]), email: u.email || "", photo: u.photoURL || "", role: inv.role || "equipe", joinedAt: now, invite: J.code, ...(inv.perms ? { perms: inv.perms } : {}), ...(inv.poste ? { poste: inv.poste } : {}), ...(!u.photoURL && inv.photo ? { photo: inv.photo } : {}), ...(typeof inv.until === "number" && inv.until > 0 ? { until: inv.until, tmp: inv.tmp || { why: "extra" }, tmpFrom: now } : {}) });
       b.set(fs.collection("users").doc(u.uid), { restos: FV.arrayUnion(inv.rid) }, { merge: true });
       b.update(fs.collection("invites").doc(J.code), { uses: FV.increment(1), lastUsedAt: now });
       b.set(fs.doc(`restos/${inv.rid}/events/e${now.toString(36)}`), { type: "team", text: `a rejoint ${inv.restoName || "l'équipe"}`, at: now, uid: u.uid });
@@ -1059,7 +1059,8 @@ const AUTH = {
     if (!DB.uid || myRole() !== "gerant" || !S.rid || !this.needNet()) return;
     const rid = S.rid, name = S.resto?.name || "le restaurant"; closeSheet(true); this.busy("Suppression des données…");
     try {
-      const n = await this.wipeCols(rid, this.COLS, (k) => this.busyTx(`Suppression… ${k} élément${k > 1 ? "s" : ""}`));
+      /* the action log stays (firestore.rules: append-only); only the owner, deleting the restaurant itself, takes it away */
+      const n = await this.wipeCols(rid, this.COLS.filter((c) => c !== "events" || this.isOwner()), (k) => this.busyTx(`Suppression… ${k} élément${k > 1 ? "s" : ""}`));
       await logEvent("team", `a vidé les données de ${name}`);
       this.hide(); SFX.done(); buzz([10, 30, 10]); toast(n ? `Données effacées · ${n} élément${n > 1 ? "s" : ""}` : "Rien à effacer"); try { refresh(); } catch (e) {}
     } catch (e) { console.warn("wipe", e); this.hide(); SFX.err(); toast(this.msg(e), "err"); }

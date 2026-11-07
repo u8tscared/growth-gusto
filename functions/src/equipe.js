@@ -1,5 +1,5 @@
 /* Growth Gusto — team notifications (js/consignes.js). Firebase Functions v2, Node 22, region europe-west9.
-   equipeNotify({ rid, kind: "consigne"|"chat", id }): after someone publishes a consigne or a message, every other member of the
+   equipeNotify({ rid, kind: "consigne"|"chat"|"passation", id }): after someone publishes a consigne or a message, every other member of the
    restaurant who switched notifications on (restos/{rid}/push/{memberId}.tokens) gets a push through Firebase Cloud Messaging.
    Free: FCM costs nothing, and this runs once per message. Dead tokens are removed.
    Groups (restos/{rid}/chatGroups, js/consignes.js): a message or a consigne for a group rings only the people of that group.
@@ -52,11 +52,11 @@ const cut = (s, n) => { s = String(s || "").replace(/\s+/g, " ").trim(); return 
 
 const equipeNotify = onCall({ region: REGION, cors: true, timeoutSeconds: 30, memory: "256MiB", maxInstances: 5 }, async (req) => {
   const uid = req.auth && req.auth.uid; if (!uid) throw new HttpsError("unauthenticated", "Connectez-vous.");
-  const d = req.data || {}; const rid = String(d.rid || ""); const id = String(d.id || ""); const kind = d.kind === "chat" ? "chat" : "consigne";
+  const d = req.data || {}; const rid = String(d.rid || ""); const id = String(d.id || ""); const kind = d.kind === "chat" ? "chat" : d.kind === "passation" ? "passation" : "consigne";
   if (!/^[\w-]{1,80}$/.test(rid) || !/^[\w-]{1,80}$/.test(id)) throw new HttpsError("invalid-argument", "Requête invalide.");
   const me = await db().doc(`restos/${rid}/members/${uid}`).get();
   if (!me.exists) throw new HttpsError("permission-denied", "Vous ne faites pas partie de ce restaurant.");
-  const snap = await db().doc(`restos/${rid}/${kind === "chat" ? "chat" : "consignes"}/${id}`).get();
+  const snap = await db().doc(`restos/${rid}/${kind === "chat" ? "chat" : kind === "passation" ? "handovers" : "consignes"}/${id}`).get();
   if (!snap.exists) throw new HttpsError("not-found", "Message introuvable.");
   const m = snap.data() || {};
   if (m.uid !== uid) throw new HttpsError("permission-denied", "Seul l'auteur peut prévenir l'équipe.");
@@ -64,9 +64,10 @@ const equipeNotify = onCall({ region: REGION, cors: true, timeoutSeconds: 30, me
   await snap.ref.update({ notified: Date.now() });
 
   const resto = (await db().doc(`restos/${rid}`).get()).data() || {};
-  const title = kind === "chat" ? `${first(m.by)} · ${cut(resto.name || "Équipe", 30)}` : `${KINDS[m.kind] || "Consigne"} · ${first(m.by)}`;
-  const body = cut(m.text, 180);
-  const g = await groupOf(rid, m.g);
+  const SLOT = { midi: "du midi", soir: "du soir" };
+  const title = kind === "passation" ? `Passation ${SLOT[m.slot] || "de service"} · ${first(m.by)}` : kind === "chat" ? `${first(m.by)} · ${cut(resto.name || "Équipe", 30)}` : `${KINDS[m.kind] || "Consigne"} · ${first(m.by)}`;
+  const body = cut(m.text || (kind === "passation" ? "Rien à signaler, bon service !" : ""), 180);
+  const g = kind === "passation" ? null : await groupOf(rid, m.g);
   const all = await tokensOf(rid, uid, await peopleOf(rid, g));
   let title2 = title;
   if (g && g.name && kind === "chat") title2 = `${first(m.by)} · ${cut(g.name, 30)}`;
@@ -91,7 +92,7 @@ const equipeNotify = onCall({ region: REGION, cors: true, timeoutSeconds: 30, me
     const part = tokens.slice(i, i + 500);
     const res = await admin.messaging().sendEachForMulticast({
       tokens: part,
-      data: { title: title2, body, url: "./#consignes", tag: `gg-${kind}` },
+      data: { title: title2, body, url: kind === "passation" ? "./?go=passation" : "./#consignes", tag: `gg-${kind}` },
       webpush: { headers: { Urgency: "high", TTL: String(kind === "chat" ? 6 * 3600 : 18 * 3600) } },
     });
     res.responses.forEach((r, k) => {

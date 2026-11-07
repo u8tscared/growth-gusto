@@ -310,6 +310,36 @@ window.GG_DEMO = {
     };
     Object.entries(PEV).forEach(([uid, L]) => { for (let d = 0; d < 14; d++) { if (rnd() < 0.3) continue; const k = 1 + Math.floor(rnd() * 3); for (let j = 0; j < k; j++) { const [type, text] = pick(L); put("events", { type, text, at: at(addDays(today, -d), d === 0 ? Math.min(hourNow, 10 + j) : 10 + j * 4, Math.floor(rnd() * 59)), uid }); } } });
 
+    /* ── passation de service, gestes sensibles, accès temporaires (js/relais.js) ── */
+    {
+      const sNow = slotNow(); const prev = sNow === "midi" ? { day: addDays(today, -1), slot: "soir" } : { day: today, slot: "midi" };
+      const nx = (d, s) => (s === "midi" ? { day: d, slot: "soir" } : { day: addDays(d, 1), slot: "midi" });
+      const ho = (day, slot, by, byId, mood, items, note, reads) => put("handovers", { day, slot, to: nx(day, slot), mood, items: items.map((x, i) => ({ id: "it" + i, ...x })), note, ok: !items.length && !note, at: at(day, slot === "midi" ? 15 : 23, 20 + Math.floor(rnd() * 30)), uid: byId, by, byId, reads });
+      ho(prev.day, prev.slot, "Thomas Girard", "demo-thomas", "charge", [
+        { k: "rupture", t: "Plus de bar de ligne, la Marée livre demain 9 h" },
+        { k: "rupture", t: "Il reste 4 joues de bœuf : prévenir la salle" },
+        { k: "casse", t: "Le thermomètre sonde du poste chaud est tombé, il affiche n'importe quoi", auto: true },
+        { k: "rappel", t: "M. Bernard (table 6) a oublié son écharpe, il passe la chercher", tel: "06 12 34 56 78" },
+        { k: "prep", t: "Fond de veau à passer et refroidir avant 11 h" },
+        { k: "commande", t: "Commander crème et beurre chez Duval" },
+      ], "Gros service, 84 couverts. Le lave-vaisselle fuit encore un peu à gauche, seau en place.", { "demo-ines": now - 40 * 60000 });
+      let d = prev.day, s = prev.slot; const H = [
+        ["Inès Benali", "demo-ines", "calme", [{ k: "prep", t: "Tartelettes du soir déjà montées, au frigo 2" }], ""],
+        ["Thomas Girard", "demo-thomas", "feu", [{ k: "casse", t: "Deux assiettes creuses cassées" }, { k: "rupture", t: "Plus de frites maison" }, { k: "rappel", t: "Mme Roux veut réserver 10 pers. samedi", tel: "06 98 76 54 32" }], "Table de 12 arrivée avec 40 min de retard."],
+        ["Sarah Lemoine", "demo-sarah", "calme", [], ""],
+        ["Lucas Petit", "demo-lucas", "charge", [{ k: "info", t: "Le frigo de service 1 ferme mal, bien pousser la porte" }], ""],
+        ["Thomas Girard", "demo-thomas", "calme", [{ k: "commande", t: "Vin blanc de cuisine : dernière bouteille" }], "RAS, bonne équipe ce soir."],
+      ];
+      H.forEach(([by, byId, mood, items, note]) => { const p = s === "midi" ? { day: addDays(d, -1), slot: "soir" } : { day: d, slot: "midi" }; d = p.day; s = p.slot; const rd = {}; who.filter((m) => m !== byId && m !== "demo-camille").forEach((m, i) => { if (rnd() < 0.85) rd[m] = at(nx(d, s).day, nx(d, s).slot === "midi" ? 10 : 17, 5 + i * 4); }); ho(d, s, by, byId, mood, items, note, rd); });
+      /* the gestures that matter: comps, cancellations, refires, with amounts (journal « Gestes sensibles ») */
+      const SG = [[0, "demo-sarah", "offert", "a offert 1 × Café gourmand (table 4, client fidèle)", 9], [0, "demo-sarah", "annul", "a annulé 1 × Joue de bœuf braisée (table 7, erreur de saisie)", 18], [1, "demo-sarah", "offert", "a offert 2 × Verre de Chablis (table 12, attente trop longue)", 16], [1, "demo-thomas", "annul", "a refait 1 × Entrecôte (table 3, cuisson ratée)", 26], [2, "demo-sarah", "offert", "a offert 1 × Tarte fine aux pommes (table 9, anniversaire)", 8], [2, "demo-sarah", "annul", "a annulé 2 × Menu du jour (table 5, partis avant le plat, déjà en cuisine)", 38], [3, "demo-hugo", "offert", "a offert 1 × Digestif (table 2)", 7], [4, "demo-sarah", "offert", "a offert 3 × Café (table 11)", 7.5], [5, "demo-camille", "offert", "a offert l'apéritif à la table 8 (habitués)", 24], [5, "demo-sarah", "modif", "a remis au tarif 1 × Dessert du jour (table 6)", 0], [6, "demo-sarah", "annul", "a annulé 1 × Planche mixte (table 1, rupture)", 19], [8, "demo-ines", "annul", "a refait 1 × Bar de ligne (table 10, arête)", 24]];
+      SG.forEach(([ago, uid, k, text, amt], i) => put("events", { type: "salle", k, text, amt, at: at(addDays(today, -ago), ago === 0 ? Math.max(10, Math.min(hourNow, 13)) : 12 + (i % 9), 5 + i * 3), uid }));
+      put("events", { type: "team", k: "acces", text: "a ouvert un accès temporaire à Hugo Martin (extra, 3 jours)", at: now - 2 * 864e5, uid: "demo-camille" });
+      put("events", { type: "team", k: "acces", text: "L'accès de Jade Moreau (stagiaire) s'est fermé tout seul", at: now - 4 * 864e5, uid: "demo-camille" });
+      /* Hugo is an extra for three more days; Jade's internship ended four days ago */
+      Object.assign(D[P("members")]["demo-hugo"], { until: now + 3 * 864e5, tmp: { why: "extra" }, tmpFrom: now - 2 * 864e5 });
+      put("members", { name: "Jade Moreau", role: "equipe", color: "#9A5BD6", poste: "cuisine", joinedAt: now - 32 * 864e5, email: "", until: now - 4 * 864e5, tmp: { why: "stage" }, tmpFrom: now - 32 * 864e5 }, "demo-jade");
+    }
     /* ── consignes & discussion (js/consignes.js) ── */
     {
       const mn = (k) => now - k * 60000; const yest = addDays(today, -1);

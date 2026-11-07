@@ -804,15 +804,16 @@ Object.assign(ACT, {
   slEdDel: async () => { const { e, tab, x } = slEdItem(); if (!x || x.sent) return; const i = tab.items.indexOf(x); tab.items.splice(i, 1); S.ui.undo = () => { tab.items.splice(i, 0, x); slSaveTab(tab); }; SFX.tap(); closeSheet(); await slSaveTab(tab); toastUndo(`${x.name} retiré`); void e; },
   slEdCancel: async (a) => {
     const { e, tab, x } = slEdItem(); if (!x) return; if (!e.why) { SFX.err(); toast("Choisissez un motif.", "err"); return; }
-    a.disabled = true; const k0 = x.k, sent = x.sent, y = slSplit(tab, x, e.n); y.off = true; y.offReason = e.why; y.offBy = S.me.id; y.offAt = Date.now();
+    a.disabled = true; const k0 = x.k, sent = x.sent, amt = Math.round(slUnit(x) * e.n * 100) / 100, y = slSplit(tab, x, e.n); y.off = true; y.offReason = e.why; y.offBy = S.me.id; y.offAt = Date.now();
     if (sent) await slTicketOff({ k: k0, sent }, e.n, e.why);
+    logEvent && logEvent("salle", `a annulé ${e.n} × ${x.name} (table ${tab.table}, ${e.why}${sent ? ", déjà en cuisine" : ""})`, { ref: tab.id, k: "annul", ...(amt ? { amt } : {}) });
     SFX.close(); buzz([20, 40, 20]); await slAfterEd(tab, sent ? `${x.name} annulé, la cuisine est prévenue` : `${x.name} annulé`);
   },
   slEdOffer: async () => {
-    const { e, tab, x } = slEdItem(); if (!x) return; const y = slSplit(tab, x, e.n); y.free = { why: e.why || "Geste commercial", by: S.me.id, at: Date.now() };
-    SFX.done(); buzz([12, 30, 12]); logEvent && logEvent("salle", `a offert ${e.n} × ${x.name} (table ${tab.table}, ${y.free.why})`, { ref: tab.id }); await slAfterEd(tab, `${x.name} offert`);
+    const { e, tab, x } = slEdItem(); if (!x) return; const amt = Math.round(slUnit(x) * e.n * 100) / 100; const y = slSplit(tab, x, e.n); y.free = { why: e.why || "Geste commercial", by: S.me.id, at: Date.now() };
+    SFX.done(); buzz([12, 30, 12]); logEvent && logEvent("salle", `a offert ${e.n} × ${x.name} (table ${tab.table}, ${y.free.why})`, { ref: tab.id, k: "offert", ...(amt ? { amt } : {}) }); await slAfterEd(tab, `${x.name} offert`);
   },
-  slEdUnoffer: async () => { const { tab, x } = slEdItem(); if (!x) return; delete x.free; SFX.tap(); await slAfterEd(tab, `${x.name} n'est plus offert`); },
+  slEdUnoffer: async () => { const { tab, x } = slEdItem(); if (!x) return; delete x.free; SFX.tap(); logEvent && logEvent("salle", `a remis ${x.q} × ${x.name} sur l'addition (table ${tab.table}, n'est plus offert)`, { ref: tab.id, k: "modif" }); await slAfterEd(tab, `${x.name} n'est plus offert`); },
   slEdRefire: async (a) => {
     const { e, tab, x } = slEdItem(); if (!x) return; if (!e.why) { SFX.err(); toast("Choisissez un motif.", "err"); return; } a.disabled = true;
     const id = slId("sl"), now = Date.now(), k = slId("i"); SL.mine.add(id);
@@ -821,7 +822,7 @@ Object.assign(ACT, {
       items: [line], total: 0, n: slNextN(), day: dayKey(), at: now, firedAt: now, waiter: S.me.id, waiterName: (typeof esActorName === "function" && esActorName()) || S.me.name || "", status: "nouvelle", pay: "place", paid: false, name: "", phone: "", slot: "", note: "", rush: true, refire: true, add: true }));
     tab.items.splice(tab.items.indexOf(x) + 1, 0, { ...x, k, q: e.n, refire: e.why, rush: true, free: { why: "Refait" }, sent: id });
     if (DB.mode === "demo") slDemoCook(id);
-    SFX.done(); buzz([16, 40, 16]); logEvent && logEvent("salle", `a fait refaire ${e.n} × ${x.name} (table ${tab.table}, ${e.why})`, { ref: tab.id }); await slAfterEd(tab, `${x.name} : la cuisine refait, en priorité`);
+    SFX.done(); buzz([16, 40, 16]); logEvent && logEvent("salle", `a fait refaire ${e.n} × ${x.name} (table ${tab.table}, ${e.why})`, { ref: tab.id, k: "annul" }); await slAfterEd(tab, `${x.name} : la cuisine refait, en priorité`);
   },
   slEdMoveTo: async (a, id) => {
     const { e, tab, x } = slEdItem(), to = slTabOf(id); if (!x || !to) return; const y = slSplit(tab, x, e.n); tab.items.splice(tab.items.indexOf(y), 1);

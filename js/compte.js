@@ -45,6 +45,8 @@ function ccPinOk(m, code) {
 function ccVerifyPin(id, code) { return ccPinOk(ccMember(id), String(code || "")); }
 const ccWeakPin = (c) => /^(\d)\1{3}$/.test(c) || ["1234", "4321", "0123", "9876"].includes(c);
 const ccMembers = () => [...S.members].sort((a, b) => (a.joinedAt || 0) - (b.joinedAt || 0));
+/* the people who may sign in on this device: a temporary access that ended (js/relais.js) is no longer offered */
+const ccMembersOn = () => ccMembers().filter((m) => typeof axOn !== "function" || axOn(m) || m.id === S.me.id);
 const ccMember = (id) => S.members.find((m) => m.id === id);
 const ccColor = (m) => (m && m.color) || colorFor(m ? m.id : "x");
 const ccAva = (m, size = 56) => m && m.photo ? `<span class="cc-ava img" style="--s:${size}px;--c:${esc(ccColor(m))}"><img src="${esc(m.photo)}" alt=""></span>` : `<span class="cc-ava" style="--s:${size}px;--c:${esc(ccColor(m))}">${esc(initials(m?.name || "") || "?")}</span>`;
@@ -190,7 +192,7 @@ function ccWaitTick() { clearInterval(ccWaitTimer); ccWaitTimer = setInterval(()
 /* step: "enter" (type your code), "new" + "confirm" (first time, or after a reset), "change" (old code first, then new) */
 function ccPickStart(id, step) { const m = ccMember(id); CC.who.pick = id; CC.who.code = ""; CC.who.err = false; CC.who.first = ""; CC.who.step = step || (ccHasPin(m) ? "enter" : "new"); if (ccWaitLeft(id)) ccWaitTick(); }
 function ccWhoHTML() {
-  const w = CC.who, lock = w.mode === "lock", ms = ccMembers();
+  const w = CC.who, lock = w.mode === "lock", ms = ccMembersOn();
   if (lock && !ms.length) return `<div class="cc-who"><div class="cc-who-head"><span class="cc-lockic">${ico("lock")}</span><span class="lbl">${esc(S.resto?.name || "")}</span><div class="title">Un instant…</div></div></div>`;
   if (w.pick) {
     const m = ccMember(w.pick); if (!m) { w.pick = null; return ccWhoHTML(); }
@@ -225,7 +227,7 @@ function ccLock(boot) {
   if (!ccLocalMode() || !S.resto || (!boot && !S.members.length)) return;
   if (!boot) closeSheet(true);
   CC.locked = true; CC.who = { mode: "lock", pick: null, code: "", err: false };
-  const ms = ccMembers(); if (ms.length === 1) ccPickStart(ms[0].id);
+  const ms = ccMembersOn(); if (ms.length === 1) ccPickStart(ms[0].id);
   const L = $("#ccLock"); ccWhoPaint(); L.hidden = false; void L.offsetWidth; L.classList.add("on"); if (!boot) SFX.sheet();
   try { document.getElementById("app").setAttribute("inert", ""); $("#tabbar").setAttribute("inert", ""); } catch (e) {}
 }
@@ -353,20 +355,21 @@ function ccCelebrate(name, resto, nFr) {
 /* ───────────── équipe ───────────── */
 VIEWS.equipe = {
   render() {
-    const canManage = myRole() === "gerant"; const ms = ccMembers(); const local = ccLocalMode();
+    const canManage = myRole() === "gerant"; const ended = typeof axEndedList === "function" ? axEndedList(ccMembers()) : []; const ms = ccMembers().filter((x) => !ended.includes(x)); const local = ccLocalMode();
     const ev = S.events.slice(0, 8);
     const cloud = ccCloud();
     const mark = (x) => (cloud && ccIsAccount(x) ? (ccIsOwner(x.id) ? ` <span class="cc-lk" title="Propriétaire">${ico("shield")}</span>` : "") : ccHasPin(x) ? ` <span class="cc-lk" title="Protégé par un code">${ico("lock")}</span>` : "");
     const nopin = (x) => !(cloud && ccIsAccount(x)) && !ccHasPin(x) ? `<span class="cc-nopin">Code à créer</span>` : "";
     const sub = (x, mine, last) => (cloud && ccIsAccount(x) ? esc(x.email || "Compte") : cloud ? "Profil cuisine · sans compte" : "") + (mine.length ? `${cloud ? " · " : ""}${mine.length} action${mine.length > 1 ? "s" : ""} · ${ccAgo(last.at)}` : cloud ? "" : "Aucune action");
-    const row = (x) => { const mine = S.events.filter((e) => e.uid === x.id); const last = mine[0]; return `<div class="li tap cc-mrow" data-act="ccMember" data-id="${x.id}">${ccAva(x, 44)}<div class="tx"><b><span class="cc-nm">${esc(x.name || nameOf(x.id))}</span>${x.id === S.me.id ? `<span class="cc-you">vous</span>` : ""}${mark(x)}</b><em>${nopin(x)}${sub(x, mine, last)}</em>${canManage && typeof PERMS !== "undefined" ? `<em class="cc-acc">${esc(PERMS.summary(x.id).short)}</em>` : ""}</div><span class="pill ${x.role === "gerant" ? "acc" : x.role === "chef" ? "warn" : "neu"}">${x.role !== "gerant" && x.poste && typeof PERMS !== "undefined" && PERMS.POSTES[x.poste] ? PERMS.POSTES[x.poste][0] : ROLES[x.role] || "Équipe"}</span>${ico("chev")}</div>`; };
+    const row = (x) => { const mine = S.events.filter((e) => e.uid === x.id); const last = mine[0]; return `<div class="li tap cc-mrow" data-act="ccMember" data-id="${x.id}">${ccAva(x, 44)}<div class="tx"><b><span class="cc-nm">${esc(x.name || nameOf(x.id))}</span>${x.id === S.me.id ? `<span class="cc-you">vous</span>` : ""}${mark(x)}${typeof axPill === "function" ? axPill(x) : ""}</b><em>${nopin(x)}${sub(x, mine, last)}</em>${canManage && typeof PERMS !== "undefined" ? `<em class="cc-acc">${esc(PERMS.summary(x.id).short)}</em>` : ""}</div><span class="pill ${x.role === "gerant" ? "acc" : x.role === "chef" ? "warn" : "neu"}">${x.role !== "gerant" && x.poste && typeof PERMS !== "undefined" && PERMS.POSTES[x.poste] ? PERMS.POSTES[x.poste][0] : ROLES[x.role] || "Équipe"}</span>${ico("chev")}</div>`; };
     return `<div class="inner cc-wide">${topBar("Équipe", { right: canManage ? `<button class="btn acc sm" data-act="ccMemberNew">${ico("plus")}Ajouter</button>` : "" })}
       ${local ? `<div class="cc-hero st" style="--i:1"><span class="cc-hero-ic">${ico("users")}</span><div style="flex:1;min-width:0"><b>Qui signe ?</b><span>Chacun signe à son nom.</span></div><button class="btn sm cc-hero-btn" data-act="whoami">${ico("swap")}Changer</button></div>` : cloud && canManage ? `<div class="cc-hero st" style="--i:1"><span class="cc-hero-ic">${ico("auLink")}</span><div style="flex:1;min-width:0"><b>Invitez votre équipe</b><span>Vous choisissez ce que chacun voit</span></div><button class="btn sm cc-hero-btn" data-act="auInvite">${ico("plus")}Inviter</button></div><button class="btn ghost sm st cc-invl" style="--i:1" data-act="auInvList">Invitations en cours${ico("chev")}</button>` : ""}
       <div class="cc-cols"><div class="cc-col"><div class="glass pad st" style="--i:2"><div class="row" style="margin-bottom:2px"><span class="lbl">${ms.length} personne${ms.length > 1 ? "s" : ""}</span>${!canManage ? `<span class="note">Seul un gérant peut modifier l'équipe</span>` : ""}</div>
         ${ms.length ? ms.map(row).join("") : `<div class="empty">Personne pour l'instant.</div>`}
         ${canManage ? `<button class="li tap cc-addrow" data-act="ccMemberNew"><span class="cc-ava plus" style="--s:44px">${ico("plus")}</span><div class="tx"><b>Ajouter un équipier</b><em>Vous choisissez ce qu'il voit et doit faire</em></div></button>` : ""}</div>
+      ${ended.length && typeof axEndedCard === "function" ? axEndedCard(ended, canManage) : ""}
       <p class="note st" style="--i:4">Touchez une personne pour régler ses accès et ce qui est obligatoire pour elle. ${cloud ? "Un profil cuisine sert à pointer et signer sans compte." : "Chacun entre avec son code à 4 chiffres."}</p></div>
-      <div class="cc-col"><div class="glass pad st" style="--i:3"><div class="row"><span class="lbl">Qui a fait quoi</span><button class="btn ghost sm" data-go="registre">Registre${ico("chev")}</button></div>
+      <div class="cc-col"><div class="glass pad st" style="--i:3"><div class="row"><span class="lbl">Qui a fait quoi</span><button class="btn ghost sm" data-go="${VIEWS.journal && canManage ? "journal" : "registre"}">${VIEWS.journal && canManage ? "Journal" : "Registre"}${ico("chev")}</button></div>
         ${ev.length ? ev.map((e) => `<div class="li cc-ev">${avatar(e.uid)}<div class="tx"><b style="white-space:normal">${esc(said(e.uid, e.text))}</b><em>${when(e.at)}</em></div></div>`).join("") : `<div class="empty" style="padding:16px 0 6px">Les actions de chacun apparaîtront ici.</div>`}</div></div></div></div>`;
   },
 };
@@ -379,6 +382,7 @@ function ccMemberSheet(id) {
   const evIco = (t) => (t === "reading" ? "therm" : t === "team" ? "users" : t === "out" || t === "lost" ? "out" : "check");
   openSheet(`<div class="cc-mhead">${ccAva(m, 72)}<div style="min-width:0"><div class="h2">${esc(m.name || "Sans nom")}${isMe ? ` <span class="cc-you">vous</span>` : ""}</div><div class="sub">${ROLES[m.role] || "Équipe"}${owner ? " · propriétaire" : ""} · depuis le ${m.joinedAt ? shortDate(dayKey(new Date(m.joinedAt))) : "–"}${acct ? (m.email ? ` · ${esc(m.email)}` : "") : ccHasPin(m) ? " · code actif" : " · code à créer"}</div></div></div>
     <div class="cc-kpis"><div><b class="mono">${ev.length}</b><span>actions</span></div><div><b class="mono">${today}</b><span>aujourd'hui</span></div><div><b class="mono">${reads}</b><span>relevés</span></div></div>
+    ${typeof axMemberBlock === "function" && (canManage || isMe) && !owner && m.role !== "gerant" ? axMemberBlock(m, canManage && !isMe) : ""}
     ${typeof PERMS !== "undefined" && (canManage || isMe) ? ccAccessHTML(m, canManage && !isMe && !owner) : ""}
     <div><span class="lbl">Activité récente</span>${ev.length ? ev.slice(0, 6).map((e) => `<div class="li"><span class="ic cc-evic">${ico(evIco(e.type))}</span><div class="tx"><b style="white-space:normal">${esc(String(e.text).replace(/^a /, "A "))}</b><em>${when(e.at)}</em></div></div>`).join("") : `<div class="empty" style="padding:14px 0">Aucune action pour l'instant.</div>`}</div>
     <div class="cc-acts">${local && !isMe ? `<button class="btn acc block" data-act="ccPick" data-id="${id}">${ico("swap")}Passer sur ${esc(firstName(m.name) || "ce profil")}</button>` : ""}
