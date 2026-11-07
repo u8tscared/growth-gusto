@@ -169,7 +169,10 @@ function acCovers(k) {
   let open = true; try { if (typeof rsCfg === "function" && typeof rsSvcsOn === "function" && S.resto && S.resto.resaCfg) open = rsSvcsOn(rsCfg(), k).length > 0; } catch (e) {}
   if (X.histN >= 7 && X.base[w] == null && !b) open = false; /* never open that weekday */
   if (!open && !b) return { n: 0, booked: 0, est: 0, open: false };
-  const usual = X.base[w] || 0; let n = Math.max(Math.round(b * X.walk), usual);
+  /* js/previsions.js: last year's same day × the trend, mixed with the usual weekday (better than the 8-week median alone) */
+  let pf = null; try { pf = typeof PREV !== "undefined" ? PREV.day(k) : null; } catch (e) { pf = null; }
+  if (pf && pf.ok && pf.closed && !b) return { n: 0, booked: 0, est: 0, open: false, prev: true };
+  const usual = pf && pf.ok && pf.covers > 0 ? pf.covers : X.base[w] || 0; let n = Math.max(Math.round(b * X.walk), usual);
   if (!usual && !b) n = X.histN ? Math.round(Object.values(X.hist).reduce((a, c) => a + c, 0) / X.histN) : 0;
   if (k === dayKey()) { const h = new Date().getHours(); n = Math.round(n * (h >= 22 ? 0 : h >= 15 ? 0.5 : 1)); }
   return { n, booked: b, est: Math.max(0, n - b), open: true, usual };
@@ -293,7 +296,7 @@ VIEWS.achats = {
       <div class="ac-hero-n">${todo.length ? (money ? `<b class="mono" data-count="${total}" data-eur="1">${acEur(total, 0)}</b><span>HT à commander</span>` : `<b class="mono">${todo.reduce((a, p) => a + p.on.length, 0)}</b><span>produits à commander</span>`) : `<b class="ac-hero-ok">${cold ? "Un inventaire, et c'est parti" : "Tout est en stock"}</b>`}</div>
       <p class="ac-hero-s">${todo.length ? `${todo.length} fournisseur${todo.length > 1 ? "s" : ""} · la première commande part chez <b>${esc(first.name)}</b> pour une livraison ${acDayLong(first.next.d1)}.` : cold ? "Comptez votre stock une fois et saisissez vos tickets Z : ensuite, les commandes se préparent toutes seules." : "Rien à commander pour l'instant : on vous prévient dès qu'un produit va manquer."}</p>
       ${cold ? `<button class="btn soft ac-hero-b" data-go="stock">${ico("acBox")}Faire l'inventaire</button>` : ""}
-      ${fc.tot ? `<div class="ac-hero-fc"><div class="ac-hero-fh"><span>Couverts attendus · 7 jours</span><b class="mono">${fc.tot}</b></div>${fc.html}<div class="ac-leg"><span><i class="bk"></i>Réservés ${fc.bk}</span><span><i class="est"></i>Sans réservation, estimés ${Math.max(0, fc.tot - fc.bk)}</span></div></div>` : ""}
+      ${fc.tot ? `<div class="ac-hero-fc"${VIEWS.previsions ? ` data-go="previsions" role="button" tabindex="0" aria-label="Voir les prévisions"` : ""}><div class="ac-hero-fh"><span>Couverts attendus · 7 jours</span><b class="mono">${fc.tot}</b></div>${fc.html}<div class="ac-leg"><span><i class="bk"></i>Réservés ${fc.bk}</span><span><i class="est"></i>Sans réservation, estimés ${Math.max(0, fc.tot - fc.bk)}</span></div></div>` : ""}
     </div>`;
     const cards = todo.map((pl, i) => {
       const prev = pl.on.slice(0, 4).map((L) => esc(L.name)).join(", ") + (pl.on.length > 4 ? ` +${pl.on.length - 4}` : "");
@@ -313,7 +316,7 @@ VIEWS.achats = {
     const waitH = waiting.length ? `<div class="glass pad st" style="--i:3"><div class="row"><span class="lbl">En route</span><span class="sub">${waiting.length} commande${waiting.length > 1 ? "s" : ""}</span></div>${waiting.map(ordRow).join("")}<p class="note ac-wnote">Quand vous réceptionnez la livraison, Growth Gusto compare avec la commande.</p></div>` : "";
     const histH = done.length ? `<div class="glass pad st" style="--i:4"><span class="lbl">Dernières commandes</span>${done.map(ordRow).join("")}${sent.length - waiting.length > done.length ? `<button class="btn ghost sm block" data-act="acMore">Voir plus</button>` : ""}</div>` : "";
     const how = `<div class="glass pad st ac-how" style="--i:5"><span class="lbl">Comment c'est calculé</span><ol>
-      <li><span>1</span><div><b>Les couverts à venir</b><em>Vos réservations, plus les clients sans réservation que vous avez d'habitude ce jour-là.</em></div></li>
+      <li><span>1</span><div><b>Les couverts à venir</b><em>La prévision du jour : le même jour l'an dernier, la tendance du moment et vos réservations.</em></div></li>
       <li><span>2</span><div><b>Ce que consomme un couvert</b><em>D'après vos tickets Z, vos recettes et vos livraisons des 4 dernières semaines.</em></div></li>
       <li><span>3</span><div><b>Jusqu'à la livraison suivante</b><em>Moins votre stock et ce qui est déjà commandé, arrondi au colis. Les produits souvent jetés sont commandés au plus juste.</em></div></li></ol></div>`;
     const nsH = noSup.length && plan.length ? `<button class="glass pad st ac-nosup" style="--i:6" data-act="acNoSupGo"><span class="ic warn">${ico("alert")}</span><span class="tx"><b>${noSup.length} produit${noSup.length > 1 ? "s" : ""} sans fournisseur</b><em>${esc(noSup.slice(0, 3).map((p) => p.name).join(", "))}${noSup.length > 3 ? "…" : ""} : ils ne sont dans aucune commande.</em></span>${ico("chev")}</button>` : "";
