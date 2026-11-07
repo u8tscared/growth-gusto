@@ -5,7 +5,7 @@ N = "&nbsp;"
 COMMIS, SECOND, CHEF = "Dès le pack Commis", "Pack Second", "Pack Chef"
 
 FEATURES = [
- dict(slug="haccp-temperatures", short="Relevés de températures", ic="thermo", icc="",
+ dict(slug="haccp-temperatures", app=["releve", "frigos", "sondes", "alertes"], short="Relevés de températures", ic="thermo", icc="",
   title="Relevés de températures HACCP et sondes sans fil · Growth Gusto",
   desc="Relevés de températures des frigos en un tap, à la voix ou par sondes sans fil, alertes par e-mail et registre HACCP automatique. Dès 59 € HT par mois.",
   kick="Températures", h1='Les relevés de frigos, <span class="hl">sans y penser.</span>',
@@ -23,7 +23,7 @@ FEATURES = [
        ("Et si je n'ai pas de sonde ?", "Aucun problème : l'équipe tape ou dicte la valeur lue sur le thermomètre du frigo. Tout est enregistré de la même façon dans le registre HACCP.")],
   related=["etiquettes-dlc", "controle-sanitaire", "recettes-allergenes"], guides=["temperatures-reglementaires", "normes-haccp-restaurant"]),
 
- dict(slug="etiquettes-dlc", short="Étiquettes DLC et traçabilité", ic="tag", icc="s",
+ dict(slug="etiquettes-dlc", app=["imprimante", "scan", "reception", "service"], short="Étiquettes DLC et traçabilité", ic="tag", icc="s",
   title="Étiquettes DLC, traçabilité et réception des livraisons · Growth Gusto",
   desc="Imprimez les étiquettes DLC de vos préparations, scannez le QR, contrôlez les livraisons et suivez la mise en place. Traçabilité HACCP complète dès 59 € HT.",
   kick="Étiquettes et traçabilité", h1='Chaque bac a son étiquette, <span class="hl">chaque lot sa trace.</span>',
@@ -39,7 +39,7 @@ FEATURES = [
        ("L'étiquetage des préparations maison est-il obligatoire ?", "La traçabilité l'est (règlement CE 178/2002), et votre PMS doit dire comment vous gérez les durées de vie. Étiqueter chaque préparation avec sa date et sa DLC est la façon la plus simple de le prouver. Voir notre <a href=\"/guides/dlc-ddm-etiquetage\">guide DLC et DDM</a>.")],
   related=["haccp-temperatures", "controle-sanitaire", "caisse-stock"], guides=["dlc-ddm-etiquetage", "plan-de-maitrise-sanitaire"]),
 
- dict(slug="controle-sanitaire", short="Contrôle sanitaire et PMS", ic="shield", icc="k",
+ dict(slug="controle-sanitaire", app=["controle", "registre", "rappel", "obligations", "documents"], short="Contrôle sanitaire et PMS", ic="shield", icc="k",
   title="Contrôle sanitaire, PMS et registre HACCP · Growth Gusto",
   desc="Le jour du contrôle DDPP, ouvrez le mode contrôle : relevés, traçabilité, nettoyage, PMS rédigé et dossier PDF en un tap. Rappel de lot et obligations suivies.",
   kick="Contrôle sanitaire", h1='Le jour du contrôle, <span class="hl">le dossier est prêt.</span>',
@@ -56,7 +56,7 @@ FEATURES = [
        ("Le dossier PDF remplace-t-il le classeur papier ?", "Oui : les enregistrements numériques sont acceptés s'ils sont fiables, datés et consultables. Le PDF reprend tout sur la période choisie.")],
   related=["haccp-temperatures", "recettes-allergenes", "etiquettes-dlc"], guides=["controle-sanitaire-ddpp", "plan-de-maitrise-sanitaire"]),
 
- dict(slug="recettes-allergenes", short="Recettes et allergènes", ic="book", icc="l",
+ dict(slug="recettes-allergenes", app=["notes", "hygiene", "formation", "menage"], short="Recettes et allergènes", ic="book", icc="l",
   title="Fiches recettes, 14 allergènes et formation HACCP · Growth Gusto",
   desc="Fiches recettes avec les 14 allergènes calculés, process HACCP par plat, refroidissement, friture, procédures et mini-formations pour l'équipe.",
   kick="Recettes et formation", h1='Le savoir de la cuisine, <span class="hl">au même endroit.</span>',
@@ -73,7 +73,7 @@ FEATURES = [
        ("La formation de l'app remplace-t-elle la formation hygiène de 14 heures ?", "Non. La formation obligatoire en hygiène alimentaire se fait auprès d'un organisme. Nos mini-formations aident à garder les bons gestes au quotidien.")],
   related=["controle-sanitaire", "marges-achats", "menu-qr"], guides=["allergenes-restaurant", "refroidissement-rapide", "formation-hygiene-obligatoire"]),
 
- dict(slug="reservations", short="Réservations et plan de salle", ic="cal", icc="r",
+ dict(slug="reservations", app=["resa", "plan"], short="Réservations et plan de salle", ic="cal", icc="r",
   title="Logiciel de réservation restaurant sans commission et plan de salle · Growth Gusto",
   desc="Carnet de réservations, lien de réservation pour vos clients, plan de salle et placement automatique, sans commission par couvert. Import Zenchef et TheFork.",
   kick="Réservations", h1='Votre carnet de réservations, <span class="hl">sans commission.</span>',
@@ -92,7 +92,7 @@ FEATURES = [
        ("Zenchef et TheFork sont-ils reliés en direct ?", "Non, par import : vous transférez les e-mails de réservation vers une adresse Growth Gusto, ou vous importez le fichier. Les réservations arrivent alors dans le carnet et sur le plan de salle.")],
   related=["prise-de-commande", "fidelite-clients", "menu-qr"], guides=[]),
 
- dict(slug="prise-de-commande", short="Prise de commande et écran cuisine", ic="order", icc="t",
+ dict(slug="prise-de-commande", app=["salle", "cuisine", "coupdefeu"], short="Prise de commande et écran cuisine", ic="order", icc="t",
   title="Prise de commande au téléphone et écran cuisine pour restaurant · Growth Gusto",
   desc="Le serveur prend la commande sur son téléphone, la cuisine la reçoit sur une tablette avec minuteurs et allergies en rouge. Ruptures en direct, notes de frais avec TVA. Sans encaissement dans l'app.",
   kick="Prise de commande", h1='De la table à la cuisine, <span class="hl">en un tap.</span>',
@@ -110,7 +110,7 @@ FEATURES = [
        ("Comment faire une note de frais avec TVA ?", "Depuis l'addition de la table, touchez « Note de frais », ou faites-la à la main avec le montant payé et le nombre de couverts. La note dit « 4 repas complets × 37,25 € » ou le détail des plats, avec la TVA ventilée à 10 % et 20 %. Elle est numérotée et s'imprime ou part par e-mail. Inclus dans les packs Second et Chef.")],
   related=["menu-qr", "reservations", "caisse-stock"], guides=[]),
 
- dict(slug="menu-qr", short="Menu QR et commande en ligne", ic="qr", icc="",
+ dict(slug="menu-qr", app=["commandes"], short="Menu QR et commande en ligne", ic="qr", icc="",
   title="Menu QR code et commande en ligne pour restaurant · Growth Gusto",
   desc="Menu QR sur chaque table, commande à emporter avec créneaux, paiement en ligne par Stripe, carte importée depuis votre PDF ou votre site. Sans commission Growth Gusto.",
   kick="Menu QR et commande en ligne", h1='Votre carte en ligne, <span class="hl">commandable.</span>',
@@ -126,7 +126,7 @@ FEATURES = [
        ("Growth Gusto prend-il une commission sur les commandes ?", "Non. Seuls les frais de paiement Stripe s'appliquent si vous activez le paiement en ligne.")],
   related=["prise-de-commande", "recettes-allergenes", "fidelite-clients"], guides=["allergenes-restaurant"]),
 
- dict(slug="marges-achats", short="Marges, achats et gaspillage", ic="scale", icc="t",
+ dict(slug="marges-achats", app=["marges", "factures", "achats", "gaspillage"], short="Marges, achats et gaspillage", ic="scale", icc="t",
   title="Marge par plat, factures fournisseurs, commandes et gaspillage · Growth Gusto",
   desc="Food cost et marge de chaque plat, factures scannées qui mettent les prix à jour, commandes fournisseurs préparées et gaspillage chiffré en euros.",
   kick="Achats et marges", h1='Acheter juste, <span class="hl">connaître sa marge.</span>',
@@ -143,7 +143,7 @@ FEATURES = [
        ("Les ventes sont-elles prises en compte ?", "Oui, avec une caisse reliée ou un import des ventes (pack Second) : la carte en 4 cases croise ventes et marge.")],
   related=["caisse-stock", "recettes-allergenes", "finances"], guides=[]),
 
- dict(slug="caisse-stock", short="Caisse, stock et ventes", ic="box", icc="s",
+ dict(slug="caisse-stock", app=["caisse", "stock", "tickets", "livraison", "frais", "dashboard"], short="Caisse, stock et ventes", ic="box", icc="s",
   title="Caisse connectée, stock et inventaire pour restaurant · Growth Gusto",
   desc="Ventes SumUp et Square en direct, autres caisses et Uber Eats, Deliveroo, Just Eat par import. Stock déduit selon vos recettes, inventaire guidé, tableau de bord.",
   kick="Caisse et stock", h1='Ce que vous vendez sort <span class="hl">du stock, tout seul.</span>',
@@ -160,7 +160,7 @@ FEATURES = [
        ("Uber Eats et Deliveroo sont-ils reliés en direct ?", "Non, par import du relevé de ventes. Les commandes en direct sur l'écran cuisine arrivent bientôt, en option.")],
   related=["marges-achats", "finances", "prise-de-commande"], guides=[]),
 
- dict(slug="equipe-planning", short="Équipe, planning et pointeuse", ic="users", icc="",
+ dict(slug="equipe-planning", app=["equipe", "pointeuse", "planning", "consignes"], short="Équipe, planning et pointeuse", ic="users", icc="",
   title="Planning, pointeuse et messagerie d'équipe pour restaurant · Growth Gusto",
   desc="Comptes de l'équipe, consignes et messagerie, pointeuse, planning avec repères HCR, employés et salaires, export paie pour le comptable.",
   kick="Équipe", h1='Chacun son compte, <span class="hl">son planning.</span>',
@@ -177,7 +177,7 @@ FEATURES = [
        ("Le planning calcule-t-il la paie ?", "Il prépare les heures et les éléments variables pour votre comptable. Le bulletin de paie reste fait par votre comptable ou votre logiciel de paie.")],
   related=["finances", "recettes-allergenes", "haccp-temperatures"], guides=["formation-hygiene-obligatoire"]),
 
- dict(slug="fidelite-clients", short="Fichier clients et fidélité", ic="heart", icc="r",
+ dict(slug="fidelite-clients", app=["clients"], short="Fichier clients et fidélité", ic="heart", icc="r",
   title="Fichier clients et carte de fidélité pour restaurant · Growth Gusto",
   desc="Fiche de chaque client, carte à tampons, clients à fêter et à relancer, campagnes e-mail et SMS avec consentement. Inclus dans le pack Second.",
   kick="Clients et fidélité", h1='Vos habitués, <span class="hl">enfin connus.</span>',
@@ -191,7 +191,7 @@ FEATURES = [
   faq=[("Est-ce conforme au RGPD ?", "Les campagnes ne partent qu'aux clients qui ont donné leur accord, et chacun peut se désinscrire. Vos données restent à vous, hébergées en France.")],
   related=["reservations", "menu-qr", "prise-de-commande"], guides=[]),
 
- dict(slug="finances", short="Finances et banque", ic="wallet", icc="k",
+ dict(slug="finances", app=["finance", "pennylane", "sites"], short="Finances et banque", ic="wallet", icc="k",
   title="Finances de restaurant, relevé bancaire et Pennylane · Growth Gusto",
   desc="Résultat estimé du mois, food cost, masse salariale, relevé bancaire par import, lien direct avec Pennylane et plusieurs restaurants dans un seul compte.",
   kick="Finances", h1='Vos chiffres, <span class="hl">sans tableur.</span>',
@@ -210,23 +210,43 @@ FEATURES = [
 
 BY = {f["slug"]: f for f in FEATURES}
 
+from registre import is_live
+
+def live_features():
+    """Pages dont au moins un écran (app=[…]) existe encore dans l'app : les autres ne sont plus construites."""
+    return [f for f in FEATURES if is_live(f["app"])]
+
+def live_slugs():
+    return {f["slug"] for f in live_features()}
+
+# Mots du bandeau défilant de /fonctionnalites, chacun rattaché à l'écran de l'app qu'il nomme.
+MOTS = [("Relevés de températures", "releve"), ("Sondes sans fil", "sondes"), ("Étiquettes DLC", "imprimante"), ("Réception", "reception"),
+        ("Plan de nettoyage", "menage"), ("PMS", "controle"), ("Mode contrôle", "controle"), ("Rappel de lot", "rappel"), ("14 allergènes", "notes"),
+        ("Process HACCP", "notes"), ("Formation", "formation"), ("Réservations", "resa"), ("Plan de salle", "plan"), ("Prise de commande", "salle"),
+        ("Écran cuisine", "cuisine"), ("Menu QR", "commandes"), ("Carte importée", "commandes"), ("Marge par plat", "marges"),
+        ("Factures scannées", "factures"), ("Commandes fournisseurs", "achats"), ("Gaspillage", "gaspillage"), ("Caisse", "caisse"),
+        ("Uber Eats", "livraison"), ("Stock", "stock"), ("Tableau de bord", "dashboard"), ("Finances", "finance"), ("Pennylane", "pennylane"),
+        ("Pointeuse", "pointeuse"), ("Planning", "planning"), ("Consignes", "consignes"), ("Fidélité", "clients")]
+NOMBRES = {n: w for n, w in enumerate("zéro un deux trois quatre cinq six sept huit neuf dix onze douze treize quatorze quinze seize dix-sept dix-huit dix-neuf vingt".split())}
+
 def build():
     # hub
-    cards = "".join(card(f"/fonctionnalites/{f['slug']}", e(f["short"]), e(f["card"]), f["ic"], f["icc"], [t for t in f["tags"] if t != COMMIS] or ["Tous les packs"], dl=i % 3) for i, f in enumerate(FEATURES))
-    words = ["Relevés de températures", "Sondes sans fil", "Étiquettes DLC", "Réception", "Plan de nettoyage", "PMS", "Mode contrôle", "Rappel de lot", "14 allergènes", "Process HACCP", "Formation", "Réservations", "Plan de salle", "Prise de commande", "Écran cuisine", "Menu QR", "Carte importée", "Marge par plat", "Factures scannées", "Commandes fournisseurs", "Gaspillage", "Caisse", "Uber Eats", "Stock", "Tableau de bord", "Finances", "Pennylane", "Pointeuse", "Planning", "Consignes", "Fidélité"]
+    LF = live_features()
+    cards = "".join(card(f"/fonctionnalites/{f['slug']}", e(f["short"]), e(f["card"]), f["ic"], f["icc"], [t for t in f["tags"] if t != COMMIS] or ["Tous les packs"], dl=i % 3) for i, f in enumerate(LF))
+    words = [w for w, r in MOTS if is_live([r])]
     mq = '<div class="mq" aria-hidden="true"><div class="mq-t">' + "".join(f"<span>{w}</span>" for w in words * 2) + "</div></div>"
     body = hero([("/", "Accueil"), ("/fonctionnalites", "Fonctionnalités")], "Fonctionnalités",
                 'Tout le restaurant, <span class="hl">une seule app.</span>',
-                "De l'hygiène à la salle, du stock aux chiffres : douze grands usages, les vrais écrans, et ce qui est relié en direct ou par import.",
+                f"De l'hygiène à la salle, du stock aux chiffres : {NOMBRES.get(len(LF), len(LF))} grands usages, les vrais écrans, et ce qui est relié en direct ou par import.",
                 img="home")
     body += f'<div class="wrap">{mq}<div class="sh" data-r style="margin-top:72px"><span class="kick">Par usage</span><h2>Choisissez par où commencer.</h2><p>Chaque page montre les écrans, ce que fait l\'app et dans quel pack.</p></div><div class="cards c3">{cards}</div></div>'
     body += band()
     page("/fonctionnalites", "Fonctionnalités · Logiciel de gestion de restaurant tout-en-un · Growth Gusto",
          "HACCP, étiquettes, contrôle sanitaire, réservations, prise de commande, menu QR, marges, stock, caisse, équipe, fidélité et finances : toutes les fonctions de Growth Gusto.",
          body, [("/", "Accueil"), ("/fonctionnalites", "Fonctionnalités")],
-         ld=[{"@context": "https://schema.org", "@type": "ItemList", "itemListElement": [{"@type": "ListItem", "position": i + 1, "url": f"{BASE}/fonctionnalites/{f['slug']}", "name": f["short"]} for i, f in enumerate(FEATURES)]}])
+         ld=[{"@context": "https://schema.org", "@type": "ItemList", "itemListElement": [{"@type": "ListItem", "position": i + 1, "url": f"{BASE}/fonctionnalites/{f['slug']}", "name": f["short"]} for i, f in enumerate(LF)]}])
 
-    for f in FEATURES:
+    for f in LF:
         trail = [("/", "Accueil"), ("/fonctionnalites", "Fonctionnalités"), (f"/fonctionnalites/{f['slug']}", f["short"])]
         body = hero(trail, f["kick"], f["h1"], f["lede"], img=f["img"], tags=f["tags"])
         body += '<div class="wrap">'
@@ -238,7 +258,7 @@ def build():
         # faq
         body += f'<section class="sec wrap"><div class="sh" data-r><span class="kick">Questions</span><h2>Ce qu\'on nous demande.</h2></div>{faq_html(f["faq"])}</section>'
         # related
-        rel = "".join(card(f"/fonctionnalites/{r}", e(BY[r]["short"]), e(BY[r]["card"]), BY[r]["ic"], BY[r]["icc"], dl=i) for i, r in enumerate(f["related"]))
+        rel = "".join(card(f"/fonctionnalites/{r}", e(BY[r]["short"]), e(BY[r]["card"]), BY[r]["ic"], BY[r]["icc"], dl=i) for i, r in enumerate([r for r in f["related"] if r in live_slugs()]))
         from content_guides import GBY
         rel += "".join(card(f"/guides/{g}", e(GBY[g]["short"]), e(GBY[g]["card"]), "book", "l", go="Lire le guide", dl=i + 3) for i, g in enumerate(f["guides"][:2]))
         body += f'<section class="sec wrap"><div class="sh" data-r><span class="kick">Pour aller plus loin</span><h2>Ça va bien avec.</h2></div><div class="cards c3">{rel}</div></section>'

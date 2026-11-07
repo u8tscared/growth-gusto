@@ -1,5 +1,5 @@
 # Mise en ligne automatique : à chaque merge sur main (à la main, ou par .github/workflows/pr.yml qui lance ce workflow), le site (growthgusto.fr), l'app (app.growthgusto.fr) et les règles
-# Firestore partent sur Firebase. Les fonctions serveur partent aussi quand functions/ a changé (ou à la demande).
+# Firestore partent sur Firebase. Le site vitrine est reconstruit juste avant, depuis le menu de l'app (tools/site/build.py). Les fonctions serveur partent aussi quand functions/ a changé (ou à la demande).
 # Connexion à Google sans clé ni secret (Workload Identity Federation) : seul ce dépôt peut emprunter le compte de service
 # github-deploy du projet growth-gusto. Réglage unique décrit dans tools/DEPLOY.md. Gratuit sur un dépôt public.
 name: Mise en ligne
@@ -59,6 +59,12 @@ jobs:
           [ -n "$before" ] || before="${{ github.event.before }}"
           if [ -z "$before" ] || [ "$before" = "0000000000000000000000000000000000000000" ] || ! git cat-file -e "$before" 2>/dev/null; then before="HEAD~1"; fi
           if git diff --name-only "$before" "${{ github.sha }}" | grep -q '^functions/'; then echo "functions=true" >> "$GITHUB_OUTPUT"; else echo "functions=false" >> "$GITHUB_OUTPUT"; fi
+      - name: Construire le site vitrine depuis le menu de l'app
+        # growthgusto.fr suit toujours l'app : une fonction ajoutée apparaît, une fonction retirée disparaît (tools/site/registre.py).
+        # La vérification bloque les PR (tools/ci.js) ; ici elle ne fait qu'avertir, pour ne jamais bloquer la mise en ligne de l'app.
+        run: |
+          python3 tools/site/build.py
+          python3 tools/site/check.py || echo "::warning::Un écran de l'app n'a pas encore de texte sur le site vitrine (voir ci-dessus)."
       - name: Déployer le site, l'app et les règles Firestore
         run: npx --yes $FIREBASE_TOOLS deploy --only hosting,firestore:rules --project $PROJECT --non-interactive
 
