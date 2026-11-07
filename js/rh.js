@@ -248,7 +248,7 @@ VIEWS.pointeuse = {
         <div class="rh-hero-r"><b class="mono">${present}</b><span>présent${present > 1 ? "s" : ""}</span><div class="rh-avs">${ppl.filter((p, i) => states[i].state !== "off").slice(0, 6).map((p) => rhAva(p, 26)).join("")}</div></div></div>
       ${ppl.length ? `<div class="lbl st" style="--i:2">Touchez votre prénom pour pointer</div><div class="rh-tiles">${ppl.map(rhTile).join("")}</div>` : empty}
       ${rhIsMgr() && !RH.kiosk && ppl.length ? rhTimesheet() : ""}
-      ${!RH.kiosk && rhIsMgr() ? `<div class="rh-links st" style="--i:24"><button class="btn soft sm" data-go="planning">${ico("cal")}Planning</button>${rhCanStaff() ? `<button class="btn soft sm" data-go="staff">${ico("rhid")}Employés</button>` : ""}</div>` : ""}
+      ${!RH.kiosk && rhIsMgr() ? `<div class="rh-links st" style="--i:24"><button class="btn soft sm" data-go="planning">${ico("cal")}Planning</button>${rhCanStaff() ? `<button class="btn soft sm" data-go="staff">${ico("rhid")}Employés</button>` : ""}<button class="btn soft sm" data-act="rhPdf" data-id="all">${ico("download")}Relevés PDF</button><button class="btn soft sm rh-tkt${rhTicketOn() ? " on" : ""}" data-act="rhTicketSet" aria-pressed="${rhTicketOn()}">${ico("printer")}Ticket au départ : ${rhTicketOn() ? "proposé" : "non"}</button></div>` : ""}
     </div>`;
   },
   after() { rhTickStart(); },
@@ -286,6 +286,7 @@ function rhActHTML(sid) {
     <div class="rh-act-kpi"><span><b class="mono">${rhHh(s.todayMin)}</b>aujourd'hui</span><span><b class="mono">${rhHh(wk)}</b>cette semaine</span><span><b class="mono">${plan.length ? esc(plan[0].start) : "—"}</b>${plan.length ? `prévu → ${esc(plan[plan.length - 1].end)}` : "rien de prévu"}</span></div>
     <div class="rh-bigs n${acts.length}">${acts.map((k) => `<button class="rh-big k-${k}" data-act="rhPunch" data-id="${esc(sid)}" data-v="${k}">${ico(RH_KIND[k].ic)}<b>${RH_KIND[k].t}</b><em class="mono">${hm(Date.now())}</em></button>`).join("")}</div>
     ${s.todayList.length ? `<div class="rh-tl">${s.todayList.map((x) => `<span class="k-${x.kind}">${ico(RH_KIND[x.kind].ic)}<b class="mono">${hm(x.at)}</b>${RH_KIND[x.kind].t}${x.edited ? " · corrigé" : ""}</span>`).join("")}</div>` : ""}
+    <div class="rh-act-x">${s.todayList.length ? `<button class="btn soft sm" data-act="rhTicket" data-id="${esc(sid)}" data-v="${today}">${ico("printer")}Ticket du jour</button>` : ""}<button class="btn soft sm" data-act="rhPdf" data-id="${esc(sid)}" data-v="self">${ico("download")}Mes heures en PDF</button></div>
     <button class="btn ghost" data-act="sheetClose">Ce n'est pas moi</button>
   </div>`;
 }
@@ -297,12 +298,14 @@ function rhPinOk(p, code) {
 }
 const rhMemberHasPin = (m) => (typeof ccHasPin === "function" ? ccHasPin(m) : !!(m && m.pinH));
 const rhHasPin = (p) => { const m = p.memberId ? S.members.find((x) => x.id === p.memberId) : null; return rhMemberHasPin(m) || !!p.pinHash; };
-function rhDone(kind, p, extra) {
+function rhDone(kind, p, extra, ask) {
   let el = $("#rhDone"); if (!el) { el = document.createElement("div"); el.id = "rhDone"; el.className = "rh-done"; el.setAttribute("role", "status"); document.body.appendChild(el); el.addEventListener("click", () => el.classList.remove("on")); }
   const K = RH_KIND[kind]; el.style.setProperty("--k", K.c);
   el.innerHTML = `<div class="rh-done-c"><span class="rh-done-ic"><svg viewBox="0 0 52 52"><circle cx="26" cy="26" r="23"/><path d="M15 27l7 7 15-16"/></svg></span>
-    <span class="rh-done-k">${ico(K.ic)}${K.t}</span><b class="mono">${hm(Date.now())}</b><div class="h2">${esc(K.msg(rhFirst(p)))}</div>${extra ? `<span class="sub">${esc(extra)}</span>` : ""}</div>`;
-  el.classList.remove("on"); void el.offsetWidth; el.classList.add("on"); clearTimeout(RH.doneT); RH.doneT = setTimeout(() => el.classList.remove("on"), 2600);
+    <span class="rh-done-k">${ico(K.ic)}${K.t}</span><b class="mono">${hm(Date.now())}</b><div class="h2">${esc(K.msg(rhFirst(p)))}</div>${extra ? `<span class="sub${ask ? " rh-done-x" : ""}">${esc(extra)}</span>` : ""}
+    ${ask ? `<div class="rh-done-q"><span>Voulez-vous imprimer un ticket ?</span><div class="rh-done-b"><button class="btn ghost" data-act="rhTicketNo">Non merci</button><button class="btn acc" data-act="rhTicket" data-id="${esc(p.id)}" data-v="${esc(ask)}">${ico("printer")}Imprimer le ticket</button></div></div>` : ""}</div>`;
+  el.classList.toggle("ask", !!ask);
+  el.classList.remove("on"); void el.offsetWidth; el.classList.add("on"); clearTimeout(RH.doneT); RH.doneT = setTimeout(() => el.classList.remove("on"), ask ? 15000 : 2600);
 }
 async function rhWakeLock(on) {
   try { if (on && navigator.wakeLock) RH.wake = await navigator.wakeLock.request("screen"); else if (!on && RH.wake) { await RH.wake.release(); RH.wake = null; } } catch (e) {}
@@ -333,7 +336,7 @@ function rhTsSheetHTML(sid) {
   const editP = E && E.id ? all.find((x) => x.id === E.id) : null;
   return `<div class="rh-tss">
     <div class="rh-act-hd">${rhAva(p, 52)}<div><div class="h2">${esc(p.name)}</div><div class="sub">Semaine du ${rhWeekLbl(mon)} · ${rhHh(tot)} pointées${ot.h ? ` · ${fmt(ot.h, 1)} h sup.` : ""}</div></div></div>
-    ${E ? form(editP) : `<button class="btn soft block" data-act="rhEdNew">${ico("plus")}Ajouter un pointage oublié</button>`}
+    ${E ? form(editP) : `<button class="btn soft block" data-act="rhEdNew">${ico("plus")}Ajouter un pointage oublié</button><div class="rh-act-x"><button class="btn soft sm" data-act="rhPdf" data-id="${esc(sid)}">${ico("download")}Relevé PDF</button>${all.some((x) => x.day === dayKey() && !x.void) ? `<button class="btn soft sm" data-act="rhTicket" data-id="${esc(sid)}" data-v="${dayKey()}">${ico("printer")}Ticket du jour</button>` : ""}</div>`}
     ${dayBlocks || `<div class="empty"><b>Aucun pointage cette semaine</b>Ajoutez un pointage oublié si besoin.</div>`}
     <p class="note">Chaque correction garde l'heure d'origine, son auteur et le motif.</p>
   </div>`;
@@ -358,6 +361,194 @@ function rhCsv(from, to) {
   });
   return [...rows, [], ...sum, [], ["Heures supplémentaires indicatives (convention HCR) : +10 % de la 36e à la 39e heure, +20 % de la 40e à la 43e, +50 % au-delà."]];
 }
+
+/* ═══════════════════════ TICKET D'HEURES + RELEVÉ PDF ═══════════════════════
+   At « Départ », the person is asked « Voulez-vous imprimer un ticket ? »: a small receipt of the day goes to the restaurant's printer
+   (the label printer of js/labels.js, through the system print dialog: AirPrint, Android, desktop). On a continuous roll (62 mm) it is a
+   full receipt; on die-cut labels (62 × 29 mm by default) a compact one that fits a single label.
+   At any time, the person (Mes heures, or the punch sheet after the code) and the manager (Pointeuse) export a « Relevé d'heures » as an
+   A4 document: the print dialog offers « Enregistrer au format PDF ». The estimated gross pay shows on one's own statement (as in Mes
+   heures) and, for someone else's, only to whoever can see salaries. */
+const rhTicketOn = () => S.resto?.rhTicket !== false;
+const rhDayLong = (k) => { const d = parseDay(k); return `${DAYS[d.getDay()]} ${d.getDate() === 1 ? "1er" : d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`; };
+const rhPerLbl = (a, b) => {
+  const A = parseDay(a), B = parseDay(b); const m0 = a.slice(8) === "01" && addDays(b, 1).slice(8) === "01" && a.slice(0, 7) === b.slice(0, 7);
+  if (m0) return `${MONTHS[A.getMonth()]} ${A.getFullYear()}`.replace(/^./, (c) => c.toUpperCase());
+  if (a.slice(8) === "01" && a.slice(0, 7) === b.slice(0, 7) && b === dayKey()) return `${MONTHS[A.getMonth()]} ${A.getFullYear()}, au ${B.getDate()}`.replace(/^./, (c) => c.toUpperCase());
+  if (a === b) return rhDayLong(a).replace(/^./, (c) => c.toUpperCase());
+  return `Du ${A.getDate() === 1 ? "1er" : A.getDate()} ${MONTHS[A.getMonth()]}${A.getFullYear() !== B.getFullYear() ? " " + A.getFullYear() : ""} au ${B.getDate()} ${MONTHS[B.getMonth()]} ${B.getFullYear()}`;
+};
+const rhSlug = (s) => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "").toLowerCase();
+
+/* everything one statement needs: days (sessions, breaks, planned), weeks with overtime, totals, gross when allowed */
+function rhPeriod(sid, from, to, pay) {
+  const p = rhStaff(sid); const dm = rhDayMin(sid, from, to); const today = dayKey();
+  const days = []; for (let d = from; d <= to; d = addDays(d, 1)) { const v = dm[d]; const pl = rhShiftsDay(sid, d); if (!v && !pl.length) continue; days.push({ d, v: v || { min: 0, brk: 0, sessions: [], anomalies: [] }, plan: pl.reduce((x, s) => x + rhShiftMin(s), 0), pl, edited: S.punches.some((x) => x.staffId === sid && x.day === d && x.edited) }); }
+  const wk = {}; days.forEach((x) => { const w = rhMonday(x.d); (wk[w] ||= { mon: w, min: 0, plan: 0, n: 0 }); wk[w].min += x.v.min; wk[w].plan += x.plan; if (x.v.min) wk[w].n++; });
+  const weeks = Object.values(wk).sort((a, b) => a.mon.localeCompare(b.mon)).map((w) => ({ ...w, ot: rhOT(w.min) }));
+  const min = days.reduce((x, y) => x + y.v.min, 0), brk = days.reduce((x, y) => x + (y.v.brk || 0), 0), plan = days.filter((x) => x.d <= today).reduce((x, y) => x + y.plan, 0);
+  const ot = weeks.reduce((x, w) => ({ b10: x.b10 + w.ot.b10, b20: x.b20 + w.ot.b20, b50: x.b50 + w.ot.b50, h: x.h + w.ot.h }), { b10: 0, b20: 0, b50: 0, h: 0 });
+  const rate = rhRate(p); const showPay = !!(pay && rate); const gross = showPay ? weeks.reduce((x, w) => x + rhWeekGross(w.min, p), 0) : 0;
+  return { p, from, to, days, weeks, min, brk, plan, ot, worked: days.filter((x) => x.v.min > 0).length, anomalies: days.reduce((x, y) => x + y.v.anomalies.length, 0), showPay, rate, gross };
+}
+
+/* ── the ticket ── */
+function rhTicketData(sid, day = dayKey()) {
+  const p = rhStaff(sid); const d = rhDayMin(sid, addDays(day, -1), day)[day] || { min: 0, brk: 0, sessions: [], anomalies: [] };
+  const mon = rhMonday(day); const wk = Object.values(rhDayMin(sid, mon, addDays(mon, 6))).reduce((x, v) => x + v.min, 0);
+  const m0 = day.slice(0, 8) + "01"; const mo = Object.values(rhDayMin(sid, m0, day)).reduce((x, v) => x + v.min, 0);
+  const plan = rhShiftsDay(sid, day);
+  return { p, day, d, wk, mo, plan, planMin: plan.reduce((x, s) => x + rhShiftMin(s), 0), contract: rhNum(p?.weeklyHours, 35) * 60, month: MONTHS[parseDay(day).getMonth()] };
+}
+const RH_TK_CSS = `*{box-sizing:border-box}html,body{margin:0;padding:0;background:#fff;color:#000;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+body{font-family:"Manrope",-apple-system,"Helvetica Neue",Helvetica,Arial,sans-serif;font-variant-numeric:tabular-nums}
+.tk{padding:3mm 3.5mm 4mm;font-size:3.1mm;line-height:1.3}.tk .hd{display:flex;align-items:center;gap:2mm;justify-content:center;text-align:center}.tk .hd img{width:8mm;height:8mm;object-fit:contain;border-radius:1.5mm}
+.tk .rn{font-weight:800;font-size:3.8mm;letter-spacing:-.01em}.tk .k{text-align:center;font-weight:800;font-size:2.6mm;letter-spacing:.16em;text-transform:uppercase;margin-top:1mm}
+.tk hr{border:0;border-top:.3mm dashed #000;margin:2.2mm 0}.tk .who{font-weight:800;font-size:4.2mm;text-align:center}.tk .dt{text-align:center;font-size:2.9mm}
+.tk .r{display:flex;justify-content:space-between;gap:2mm}.tk .r b{font-weight:800}.tk .big{text-align:center;margin:1.5mm 0 .5mm}.tk .big em{display:block;font-style:normal;font-weight:800;font-size:2.5mm;letter-spacing:.14em;text-transform:uppercase}
+.tk .big b{display:block;font-size:9.5mm;font-weight:800;letter-spacing:-.04em;line-height:1.05}.tk .sm{text-align:center;font-size:2.5mm}.tk .ft{text-align:center;font-size:2.4mm;margin-top:2mm}
+.tc{height:100%;padding:1.6mm 2.4mm;display:flex;flex-direction:column;justify-content:space-between;font-size:2.55mm;line-height:1.18;overflow:hidden}
+.tc .l1{display:flex;justify-content:space-between;gap:1.5mm;font-weight:800;font-size:2.9mm;white-space:nowrap}.tc .l1 span:first-child{overflow:hidden;text-overflow:ellipsis}
+.tc .bg{display:flex;align-items:baseline;gap:1.6mm}.tc .bg b{font-size:6.6mm;font-weight:800;letter-spacing:-.04em;line-height:1}.tc .bg span{font-weight:700}
+.tc .l3{display:flex;justify-content:space-between;gap:1.5mm;white-space:nowrap}.tc .l4{font-size:2.15mm;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}`;
+function rhTicketHTML(T, roll) {
+  const r = S.resto || {}; const logo = typeof restoLogo === "function" ? restoLogo() : ""; const ss = T.d.sessions;
+  const span = ss.length ? `${hm(ss[0].in)} → ${ss[ss.length - 1].open ? "en cours" : hm(ss[ss.length - 1].out)}` : "pas de pointage";
+  if (roll && roll.h) { /* one die-cut label (62 × 29 mm, or 90 × 29 mm) */
+    return `<div class="tc"><div class="l1"><span>${esc(T.p.name)}</span><span>${esc(rhDayLbl(T.day, true))}</span></div>
+      <div class="bg"><b>${rhDur(T.d.min)}</b><span>de travail</span></div>
+      <div class="l3"><span>${esc(span)}${T.d.brk >= 1 ? ` · pause ${rhDur(T.d.brk)}` : ""}</span></div>
+      <div class="l3"><span>Semaine <b>${rhHh(T.wk)}</b> / ${rhHh(T.contract)}</span><span>${esc(T.month.replace(/^./, (c) => c.toUpperCase()))} <b>${rhHh(T.mo)}</b></span></div>
+      <div class="l4">${esc(r.name || "Restaurant")} · imprimé à ${hm(Date.now())}</div></div>`;
+  }
+  const rows = ss.map((s, i) => `${ss.length > 1 ? `<div class="sm" style="text-align:left;font-weight:800;margin-top:${i ? 1.5 : 0}mm">Service ${i + 1}</div>` : ""}
+      <div class="r"><span>Arrivée</span><b>${hm(s.in)}</b></div>${s.br >= 60000 ? `<div class="r"><span>Pause</span><b>${rhDur(s.br / 60000)}</b></div>` : ""}<div class="r"><span>Départ</span><b>${s.open ? "en cours" : hm(s.out)}</b></div>`).join("");
+  return `<div class="tk"><div class="hd">${logo ? `<img src="${esc(logo)}" alt="">` : ""}<span class="rn">${esc(r.name || "Restaurant")}</span></div><div class="k">Ticket d'heures</div><hr>
+    <div class="who">${esc(T.p.name)}</div><div class="dt">${esc(rhDayLong(T.day).replace(/^./, (c) => c.toUpperCase()))}</div><hr>
+    ${rows || `<div class="sm">Aucun pointage ce jour</div>`}
+    <hr><div class="big"><em>Travail aujourd'hui</em><b>${rhDur(T.d.min)}</b></div>
+    ${T.plan.length ? `<div class="sm">Prévu : ${T.plan.map((s) => `${esc(s.start)} → ${esc(s.end)}`).join(", ")} (${rhDur(T.planMin)})</div>` : ""}
+    ${T.d.anomalies.length ? `<div class="sm"><b>À vérifier : ${esc(T.d.anomalies[0].t)}</b></div>` : ""}<hr>
+    <div class="r"><span>Cette semaine</span><b>${rhHh(T.wk)} / ${rhHh(T.contract)}</b></div><div class="r"><span>${esc(T.month.replace(/^./, (c) => c.toUpperCase()))}</span><b>${rhHh(T.mo)}</b></div>
+    <div class="ft">Imprimé le ${shortDate(dayKey())}/${dayKey().slice(0, 4)} à ${hm(Date.now())}<br>Heures d'après la pointeuse · Growth Gusto</div></div>`;
+}
+function rhTicketH(T) { const n = T.d.sessions.length; return Math.round(72 + n * 11 + (n > 1 ? n * 4 : 0) + (T.plan.length ? 4 : 0) + (T.d.anomalies.length ? 4 : 0) + (restoLogo() ? 2 : 0)); }
+function rhTicketDoc(T) {
+  const roll = typeof lbRoll === "function" ? lbRoll() : { w: 62, h: 0 }; const W = roll.w || 62, H = roll.h || rhTicketH(T);
+  const fonts = document.querySelector('link[rel=stylesheet][href*="fonts.googleapis"]');
+  return `<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>Ticket d'heures</title>${fonts ? `<link rel="stylesheet" href="${esc(fonts.href)}">` : ""}
+<style>@page{size:${W}mm ${H}mm;margin:0}${RH_TK_CSS}.pg{width:${W}mm;height:${H}mm;overflow:hidden}</style></head><body><div class="pg">${rhTicketHTML(T, roll)}</div></body></html>`;
+}
+/* a print-only document in a hidden iframe (same technique as the labels: Safari prints a blank page with display:none) */
+const RHP = { f: null, t: 0 };
+function rhPrintClean() { clearTimeout(RHP.t); if (RHP.f) { try { RHP.f.remove(); } catch (e) {} RHP.f = null; } }
+async function rhPrintDoc(html, title, opts = {}) {
+  rhPrintClean(); const f = document.createElement("iframe"); f.setAttribute("aria-hidden", "true"); f.title = title || "Impression"; f.className = "rh-pframe";
+  f.style.cssText = "position:fixed;left:0;top:0;width:1px;height:1px;opacity:0;border:0;pointer-events:none"; f.srcdoc = html;
+  const loaded = new Promise((r) => { f.addEventListener("load", r, { once: true }); setTimeout(r, 3000); });
+  document.body.appendChild(f); RHP.f = f; await loaded;
+  const w = f.contentWindow, d = f.contentDocument; if (!w || !d) { rhPrintClean(); return false; }
+  try { await Promise.race([d.fonts.ready, new Promise((r) => setTimeout(r, 1500))]); } catch (e) {}
+  await new Promise((r) => requestAnimationFrame(() => setTimeout(r, 30)));
+  if (opts.dry) { const n = d.body.innerText.length; rhPrintClean(); return n; }
+  const t0 = document.title; if (title) document.title = String(title).replace(/[\/\\:]/g, "-");
+  w.addEventListener("afterprint", () => { document.title = t0; setTimeout(rhPrintClean, 400); });
+  RHP.t = setTimeout(() => { document.title = t0; rhPrintClean(); }, 180000);
+  try { w.focus(); w.print(); } catch (e) { document.title = t0; rhPrintClean(); return false; }
+  return true;
+}
+async function rhPrintTicket(sid, day) {
+  const T = rhTicketData(sid, day); if (!T.p) return;
+  SFX.print ? SFX.print() : SFX.tap(); buzz(8);
+  const ok = await rhPrintDoc(rhTicketDoc(T), `Ticket d'heures ${firstName(T.p.name) || ""} ${T.day}`);
+  if (!ok) { toast("Impression impossible sur cet appareil.", "err"); return; }
+  const c = typeof lbPrinterCfg === "function" ? lbPrinterCfg() : {}; toast(c.model && c.model !== "other" ? `Ticket prêt : choisissez ${c.short}` : "Ticket prêt : choisissez votre imprimante");
+}
+window.rhPrintTicket = rhPrintTicket;
+
+/* ── the A4 statement (« Enregistrer au format PDF ») ── */
+const RH_PDF_CSS = `@page{size:A4;margin:12mm 12mm 14mm}*{box-sizing:border-box}html,body{margin:0;background:#fff;color:#14122B;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+body{font-family:"Manrope",-apple-system,"Helvetica Neue",Helvetica,Arial,sans-serif;font-size:9.5pt;line-height:1.35;font-variant-numeric:tabular-nums}
+.rp{break-after:page;page-break-after:always}.rp:last-child{break-after:auto;page-break-after:auto}
+.hd{display:flex;justify-content:space-between;align-items:flex-start;gap:8mm;padding-bottom:4mm;border-bottom:.6mm solid #4A1FE6}
+.br{display:flex;align-items:center;gap:3mm}.br img{width:12mm;height:12mm;object-fit:contain;border-radius:2.5mm}.br .ini{width:12mm;height:12mm;border-radius:2.5mm;background:#4A1FE6;color:#fff;display:grid;place-items:center;font-weight:800;font-size:11pt}
+.br b{display:block;font-size:13pt;font-weight:800;letter-spacing:-.01em}.br em{font-style:normal;color:#5A6386;font-size:8.5pt}
+.ti{text-align:right}.ti b{display:block;font-size:17pt;font-weight:800;letter-spacing:-.02em;color:#4A1FE6}.ti span{font-weight:700}
+.who{display:flex;justify-content:space-between;gap:6mm;margin:5mm 0 4mm;padding:3.5mm 4mm;border-radius:3mm;background:#F3F0FF}
+.who b{font-size:12pt;font-weight:800}.who em{display:block;font-style:normal;color:#5A6386;font-size:8.5pt}.who .r{text-align:right}
+.kp{display:grid;grid-template-columns:repeat(var(--n),1fr);gap:3mm;margin-bottom:5mm}.kp div{border:.3mm solid #DAD6EE;border-radius:3mm;padding:3mm 3.5mm}
+.kp b{display:block;font-size:15pt;font-weight:800;letter-spacing:-.02em}.kp span{color:#5A6386;font-size:8pt}.kp .acc{background:#4A1FE6;border-color:#4A1FE6;color:#fff}.kp .acc span{color:#E4DCFF}
+table{width:100%;border-collapse:collapse}th{text-align:left;font-size:7.5pt;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#5A6386;padding:1.8mm 1.5mm;border-bottom:.4mm solid #14122B}
+td{padding:1.6mm 1.5mm;border-bottom:.25mm solid #E6E3F2;vertical-align:top}td.n,th.n{text-align:right;white-space:nowrap}td small{display:block;color:#5A6386;font-size:7.5pt}
+tr.wk td{background:#F6F4FC;font-weight:800;border-bottom:.4mm solid #DAD6EE}tr.wk td small{display:inline;font-weight:600;margin-left:2mm}
+tr.tot td{font-weight:800;font-size:10.5pt;border-top:.5mm solid #14122B;border-bottom:0;padding-top:2.5mm}.nc{color:#B4232F;font-weight:700}.off{color:#9A9EB8}
+.ft{margin-top:6mm;font-size:7.8pt;color:#5A6386}.sg{display:grid;grid-template-columns:1fr 1fr;gap:8mm;margin-top:6mm}.sg div{border:.3mm solid #DAD6EE;border-radius:3mm;height:22mm;padding:2.5mm 3mm;font-size:8pt;color:#5A6386}
+.empty{padding:10mm;text-align:center;color:#5A6386;border:.3mm dashed #DAD6EE;border-radius:3mm}`;
+function rhPdfPage(R) {
+  const r = S.resto || {}; const p = R.p; const logo = typeof restoLogo === "function" ? restoLogo() : "";
+  const ini = typeof restoIni === "function" ? restoIni(r.name) : initials(r.name || "R");
+  const kp = [[rhDur(R.min), "heures travaillées", "acc"], [String(R.worked), R.worked > 1 ? "jours travaillés" : "jour travaillé"], [R.ot.h ? rhDur(R.ot.h * 60) : "0 h", "heures sup. (indicatif)"], ...(R.showPay ? [[rhEur(R.gross), "brut estimé"]] : [[rhDur(R.brk), "de pauses"]])];
+  let body = "";
+  R.weeks.forEach((w) => {
+    const ds = R.days.filter((x) => rhMonday(x.d) === w.mon);
+    body += ds.map((x) => {
+      const ss = x.v.sessions; const note = [...x.v.anomalies.map((a) => `<span class="nc">${esc(a.t)}</span>`), x.edited ? "corrigé par le gérant" : ""].filter(Boolean).join(" · ");
+      return `<tr><td><b>${esc(rhDayLbl(x.d, true))}</b></td><td>${ss.length ? ss.map((s) => `${hm(s.in)} → ${s.open ? "en cours" : hm(s.out)}`).join("<br>") : `<span class="off">${x.d > dayKey() ? "à venir" : "non pointé"}</span>`}</td>
+        <td class="n">${x.v.brk >= 1 ? rhDur(x.v.brk) : "–"}</td><td class="n">${x.plan ? rhHh(x.plan) : "–"}</td><td class="n"><b>${x.v.min ? rhHh(x.v.min) : "–"}</b></td><td>${note}</td></tr>`;
+    }).join("");
+    const o = w.ot; const otx = [o.b10 ? `${fmt(o.b10, 2)} h à +10 %` : "", o.b20 ? `${fmt(o.b20, 2)} h à +20 %` : "", o.b50 ? `${fmt(o.b50, 2)} h à +50 %` : ""].filter(Boolean).join(", ");
+    body += `<tr class="wk"><td colspan="3">Semaine du ${esc(rhWeekLbl(w.mon))}${otx ? `<small>dont ${otx}</small>` : ""}</td><td class="n">${w.plan ? rhHh(w.plan) : "–"}</td><td class="n">${rhHh(w.min)}</td><td>${R.showPay ? `<small>brut estimé ${rhEur(rhWeekGross(w.min, p), 2)}</small>` : ""}</td></tr>`;
+  });
+  const tbl = R.days.length ? `<table><thead><tr><th>Jour</th><th>Arrivée → départ</th><th class="n">Pauses</th><th class="n">Prévu</th><th class="n">Travaillé</th><th>Remarque</th></tr></thead><tbody>${body}
+    <tr class="tot"><td colspan="3">Total de la période</td><td class="n">${R.plan ? rhHh(R.plan) : "–"}</td><td class="n">${rhHh(R.min)}</td><td>${rhDec(R.min)} h en décimal</td></tr></tbody></table>`
+    : `<div class="empty">Aucun pointage ni service prévu sur cette période.</div>`;
+  return `<section class="rp"><header class="hd"><div class="br">${logo ? `<img src="${esc(logo)}" alt="">` : `<span class="ini">${esc(ini)}</span>`}<div><b>${esc(r.name || "Restaurant")}</b><em>${esc([r.address, r.siret ? "SIRET " + r.siret : ""].filter(Boolean).join(" · ") || "Relevé établi avec Growth Gusto")}</em></div></div>
+    <div class="ti"><b>Relevé d'heures</b><span>${esc(rhPerLbl(R.from, R.to))}</span></div></header>
+    <div class="who"><div><b>${esc(p.name)}</b><em>${esc([p.role, RH_POSTS[p.post]?.t].filter(Boolean).join(" · ") || "Employé")}</em></div><div class="r"><b>${esc(RH_CONTRACTS[p.contract] || p.contract || "")}</b><em>${rhNum(p.weeklyHours, 35)} h par semaine au contrat${R.showPay ? ` · ${fmt(R.rate, 2)} € brut / h` : ""}</em></div></div>
+    <div class="kp" style="--n:${kp.length}">${kp.map(([v, l, c]) => `<div class="${c || ""}"><b>${esc(v)}</b><span>${esc(l)}</span></div>`).join("")}</div>
+    ${tbl}
+    <p class="ft">Heures d'après la pointeuse : chaque correction garde l'heure d'origine, son auteur et le motif. Heures sup. indicatives (convention HCR) : +10 % de la 36e à la 39e heure, +20 % de la 40e à la 43e, +50 % au-delà.${R.showPay ? " Brut estimé hors primes, avantages en nature et absences : la fiche de paie fait foi." : ""}${R.anomalies ? ` <b class="nc">${R.anomalies} pointage${R.anomalies > 1 ? "s" : ""} à vérifier.</b>` : ""}</p>
+    <div class="sg"><div>Signature du salarié</div><div>Signature de l'employeur</div></div>
+    <p class="ft">Document établi le ${shortDate(dayKey())}/${dayKey().slice(0, 4)} à ${hm(Date.now())} par ${esc(nameOf(S.me.id) || "—")} avec Growth Gusto.</p></section>`;
+}
+function rhPdfDoc(list, title) {
+  const fonts = document.querySelector('link[rel=stylesheet][href*="fonts.googleapis"]');
+  return `<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>${esc(title)}</title>${fonts ? `<link rel="stylesheet" href="${esc(fonts.href)}">` : ""}<style>${RH_PDF_CSS}</style></head><body>${list.map(rhPdfPage).join("")}</body></html>`;
+}
+/* who: a staff id, or "all" (manager: one page per person with hours in the period). self = the person exports their own hours */
+async function rhPdfGo(who, from, to, self) {
+  const pay = self || rhIsBoss();
+  const ids = who === "all" ? rhPeople({ all: true }).map((p) => p.id) : [who];
+  let list = ids.map((id) => rhPeriod(id, from, to, pay)).filter((R) => R.p);
+  if (who === "all") list = list.filter((R) => R.min > 0 || R.days.some((x) => x.d <= dayKey()));
+  if (!list.length) { SFX.err(); toast("Aucune heure sur cette période.", "err"); return false; }
+  const title = `Relevé d'heures ${who === "all" ? S.resto?.name || "" : list[0].p.name} ${rhPerLbl(from, to)}`.replace(/\s+/g, " ").trim();
+  SFX.print ? SFX.print() : SFX.tap(); buzz(8);
+  const ok = await rhPdfPrint(rhPdfDoc(list, title), title);
+  if (!ok) toast("Impression impossible sur cet appareil.", "err"); else toast("Choisissez « Enregistrer en PDF » dans la fenêtre d'impression");
+  return ok;
+}
+const rhPdfPrint = (html, title) => rhPrintDoc(html, title);
+window.rhPdfGo = rhPdfGo;
+/* the period picker: this month, last month, this week, last week, or two dates */
+function rhPdfOpts() {
+  const t = dayKey(); const m0 = t.slice(0, 8) + "01"; const pm = parseDay(m0); pm.setMonth(pm.getMonth() - 1); const pm0 = dayKey(pm), pm1 = addDays(m0, -1); const mon = rhMonday();
+  return [["month", `Ce mois-ci`, m0, t, MONTHS[parseDay(m0).getMonth()]], ["prev", "Mois dernier", pm0, pm1, MONTHS[pm.getMonth()]], ["week", "Cette semaine", mon, addDays(mon, 6), rhWeekLbl(mon)], ["pweek", "Semaine dernière", addDays(mon, -7), addDays(mon, -1), rhWeekLbl(addDays(mon, -7))]];
+}
+function rhPdfSheetHTML() {
+  const U = S.ui.rhPdf; const all = U.who === "all"; const p = all ? null : rhStaff(U.who); const o = rhPdfOpts();
+  const hrs = (a, b) => all ? staffCost(a, b).hours * 60 : Object.values(rhDayMin(U.who, a, b)).reduce((x, v) => x + v.min, 0);
+  return `<div class="rh-pdf">
+    <div class="rh-act-hd">${all ? `<span class="rh-pdf-ic">${ico("users")}</span>` : rhAva(p, 52)}<div><div class="h2">${all ? "Relevés d'heures" : U.self ? "Mes heures en PDF" : `Relevé de ${esc(rhFirst(p))}`}</div><div class="sub">${all ? "Une page par employé, prête à signer" : "Jour par jour, semaines, heures sup." + (U.self || rhIsBoss() ? " et brut estimé" : "")}</div></div></div>
+    <div class="rh-pdf-l">${o.map(([k, l, a, b, s]) => { const m = hrs(a, b); return `<button class="rh-pdf-o" data-act="rhPdfPick" data-v="${k}"><span class="ic">${ico("download")}</span><span class="tx"><b>${esc(l)}</b><em>${esc(s)} · ${m ? rhDur(m) : "aucune heure"}</em></span>${ico("chev")}</button>`; }).join("")}</div>
+    <div class="lbl">Ou choisissez les dates</div>
+    <div class="grid2"><label class="field"><span>Du</span><input class="input" type="date" id="rhPdfA" value="${esc(U.a || o[0][2])}" max="${dayKey()}"></label><label class="field"><span>Au</span><input class="input" type="date" id="rhPdfB" value="${esc(U.b || dayKey())}"></label></div>
+    <button class="btn acc block" data-act="rhPdfPick" data-v="custom">${ico("download")}Exporter ces dates en PDF</button>
+    <p class="note">La fenêtre d'impression s'ouvre : choisissez « Enregistrer au format PDF » (ou « Enregistrer dans Fichiers » sur iPhone), ou imprimez-le directement.</p>
+  </div>`;
+}
+function rhPdfOpen(who, self) { S.ui.rhPdf = { who, self: !!self }; SFX.tap(); openSheet(rhPdfSheetHTML()); }
+window.rhPdfOpen = rhPdfOpen;
 
 /* ═══════════════════════ PLANNING ═══════════════════════ */
 const RH_WIDE = window.matchMedia("(min-width:760px)");
@@ -711,9 +902,19 @@ Object.assign(ACT, {
     closeSheet(true); RH.pin = null; clearTimeout(RH.idleT);
     const after = rhState(sid); const plan = rhShiftsDay(sid, dayKey());
     const extra = kind === "out" ? `${rhDur(after.todayMin)} de travail aujourd'hui` : kind === "in" && plan.length ? `Prévu jusqu'à ${plan[plan.length - 1].end}` : "";
-    rhDone(kind, p, extra); kind === "in" || kind === "out" ? SFX.done() : SFX.ok(); buzz(kind === "out" ? [10, 40, 10, 40, 20] : [10, 40, 18]);
+    rhDone(kind, p, extra, kind === "out" && rhTicketOn() ? day : ""); kind === "in" || kind === "out" ? SFX.done() : SFX.ok(); buzz(kind === "out" ? [10, 40, 10, 40, 20] : [10, 40, 18]);
     if (kind === "in") burst(window.innerWidth / 2, window.innerHeight / 2.6);
   }),
+  rhTicket: (a, sid, day) => { const el = $("#rhDone"); if (el) el.classList.remove("on"); clearTimeout(RH.doneT); rhPrintTicket(sid, day || dayKey()); },
+  rhTicketNo: () => { const el = $("#rhDone"); if (el) el.classList.remove("on"); clearTimeout(RH.doneT); SFX.close ? SFX.close() : SFX.tap(); },
+  rhTicketSet: () => rhOnce("rhTicketSet", async () => { const on = !rhTicketOn(); await safe(DB.update("restos", S.rid, { rhTicket: on })); if (S.resto) S.resto.rhTicket = on; SFX.tick(); buzz(5); toast(on ? "Au départ, chacun pourra imprimer son ticket d'heures" : "Plus de ticket proposé au départ"); rerender(); }),
+  rhPdf: (a, sid, v) => { if (sid !== "all" && v !== "self" && !rhIsMgr()) return; if (sid === "all" && !rhIsMgr()) return; RH.pin = null; clearTimeout(RH.idleT); rhPdfOpen(sid, v === "self"); },
+  rhPdfPick: (a, id, v) => {
+    const U = S.ui.rhPdf; if (!U) return; let A, B;
+    if (v === "custom") { A = $("#rhPdfA")?.value; B = $("#rhPdfB")?.value; if (!A || !B) { SFX.err(); toast("Choisissez les deux dates.", "err"); return; } if (B < A) [A, B] = [B, A]; U.a = A; U.b = B; }
+    else { const o = rhPdfOpts().find((x) => x[0] === v); if (!o) return; A = o[2]; B = o[3]; }
+    closeSheet(true); rhPdfGo(U.who, A, B, U.self);
+  },
   rhKiosk: async () => {
     RH.kiosk = !RH.kiosk; SFX.tap(); buzz(6); document.documentElement.classList.toggle("rh-kiosk", RH.kiosk);
     if (RH.kiosk) { try { const de = document.documentElement; if (de.requestFullscreen && !document.fullscreenElement) await de.requestFullscreen(); } catch (e) {} rhWakeLock(true); toast("Mode borne : posez la tablette à l'entrée"); }
@@ -754,7 +955,8 @@ Object.assign(ACT, {
     const opt = [["week", `Semaine du ${rhWeekLbl(mon)}`, mon, addDays(mon, 6)], ["month", `Ce mois-ci (${MONTHS[parseDay(m0).getMonth()]})`, m0, t], ["prev", `Mois dernier (${MONTHS[pm.getMonth()]})`, pm0, pm1]];
     S.ui.rhExp = opt;
     openSheet(`<div class="h2">Export pour le comptable</div><p class="sub">Fichier CSV (Excel) : heures par jour, pauses et corrections, puis un récapitulatif par semaine avec les heures sup.</p>
-      <div>${opt.map(([k, l, a, b]) => { const c = staffCost(a, b); return `<div class="li tap" role="button" tabindex="0" data-act="rhExportGo" data-v="${k}"><span class="ic">${ico("download")}</span><div class="tx"><b>${l}</b><em>${shortDate(a)} → ${shortDate(b)} · ${fmt(c.hours, 1)} h</em></div>${ico("chev")}</div>`; }).join("")}</div>`);
+      <div>${opt.map(([k, l, a, b]) => { const c = staffCost(a, b); return `<div class="li tap" role="button" tabindex="0" data-act="rhExportGo" data-v="${k}"><span class="ic">${ico("download")}</span><div class="tx"><b>${l}</b><em>${shortDate(a)} → ${shortDate(b)} · ${fmt(c.hours, 1)} h</em></div>${ico("chev")}</div>`; }).join("")}</div>
+      <div class="lbl" style="margin-top:14px">Relevés à signer</div><div class="li tap" role="button" tabindex="0" data-act="rhPdf" data-id="all"><span class="ic">${ico("printer")}</span><div class="tx"><b>Relevés d'heures en PDF</b><em>Une page par employé : jours, semaines, heures sup.</em></div>${ico("chev")}</div>`);
   },
   rhExportGo: (a, id, v) => { const o = (S.ui.rhExp || []).find((x) => x[0] === v); if (!o) return; closeSheet(true); const slug = (S.resto?.name || "resto").normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/gi, "-").toLowerCase(); saveCsv(`pointages-${slug}-${o[2]}-au-${o[3]}.csv`, rhCsv(o[2], o[3])); },
 

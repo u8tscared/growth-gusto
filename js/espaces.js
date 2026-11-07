@@ -659,6 +659,7 @@ VIEWS.moiPlanning = {
   },
   after(v) { $$(".es-cd,.es-day", v).forEach((el) => el.classList.add("in")); },
 };
+Object.assign(ACT, { esHrPdf: (el, id, v) => { const st = esStaff(); const [a, b] = String(v || "").split("|"); if (st && a && b && typeof rhPdfGo === "function") rhPdfGo(st.id, a, b, true); } });
 VIEWS.moiHeures = {
   render() {
     const st = esStaff(); if (!st) return `<div class="inner narrow">${topBar("Mes heures")}${esNoStaff()}</div>`;
@@ -687,7 +688,8 @@ VIEWS.moiHeures = {
       </section>
       <div class="es-lgd st" style="--i:3"><span><i class="p"></i>Prévu</span><span><i></i>Pointé</span></div>
       ${wk}
-      <p class="es-fine st" style="--i:${5 + weeks.length}">Estimation indicative, d'après vos pointages. Votre fiche de paie fait foi. Une erreur ? Le gérant corrige un pointage dans la Pointeuse.</p></div>`;
+      ${typeof rhPdfGo === "function" ? `<div class="es-hrx st" style="--i:${5 + weeks.length}"><button class="btn acc block" data-act="esHrPdf" data-v="${m0}|${last}">${ico("download")}Exporter ${esc(MONTHS[d0.getMonth()])} en PDF</button><div class="hstack">${dm[today] && ES.hm === 0 ? `<button class="btn soft sm" data-act="rhTicket" data-id="${esc(st.id)}" data-v="${today}">${ico("printer")}Ticket du jour</button>` : ""}<button class="btn soft sm" data-act="rhPdf" data-id="${esc(st.id)}" data-v="self">${ico("cal")}Autre période</button></div></div>` : ""}
+      <p class="es-fine st" style="--i:${6 + weeks.length}">Estimation indicative, d'après vos pointages. Votre fiche de paie fait foi. Une erreur ? Le gérant corrige un pointage dans la Pointeuse.</p></div>`;
   },
 };
 VIEWS.moiActivite = {

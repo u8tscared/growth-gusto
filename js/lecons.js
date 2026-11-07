@@ -9,7 +9,8 @@
          d: "Une phrase : à quoi ça sert, pour qui.",
          steps: ["Geste 1", "Geste 2", "Geste 3"],  // 2 à 4 gestes, verbe à l'impératif, courts
          q: ["Une question simple ?", ["Bonne réponse", "Piège 1", "Piège 2"], 0],   // index de la bonne réponse
-         sc: { k: "list", t: "Titre de l'écran", rows: [["icone", "Libellé", "valeur", "ok"]] },  // la mini-scène animée
+         sc: { k: "list", t: "Titre de l'écran", rows: [["icone", "Libellé", "valeur", "ok"]] },  // dessin de secours (le téléphone montre le vrai écran de la démo)
+         tap: ["[data-act=x]", ".classe", ""],  // facultatif : l'élément que le doigt touche à chaque étape (sinon deviné d'après le texte)
          who: ["cuisine", "salle", "bar", "plonge", "boss"],  // facultatif : postes concernés (déduit des postes sinon)
          tip: "Le réflexe à retenir (facultatif).",
        };
@@ -36,6 +37,7 @@ const PC_LECONS = {
     steps: ["Ouvrez le relevé du service", "Tapez la température lue sur le frigo", "Validez : vert c'est bon, rouge l'app vous guide"],
     q: ["Le frigo affiche 7 °C pour une limite à 4 °C. Que faites-vous ?", ["Je le note : l'app propose l'action corrective", "Je ne note rien", "J'écris 4 °C"], 0],
     tip: "Notez toujours la vraie valeur : c'est ce qui vous protège en cas de contrôle.",
+    tap: ["[data-act=frOpen]", ".rel-vw, .rel-lcd", "[data-act=saveReading]"],
     sc: { k: "keypad", t: "Chambre froide", v: "3,2", unit: "°C", ok: "Conforme" } },
   frigos: { t: "Frigos", d: "Chaque frigo, chambre froide ou congélateur, avec ses seuils et tout son historique.",
     steps: ["Touchez un frigo pour voir sa courbe", "Réglez ses seuils une fois pour toutes", "Ajoutez un équipement avec le +"],
@@ -147,7 +149,7 @@ const PC_LECONS = {
     q: ["Une rupture « plus de saumon » est affichée. Elle reste jusqu'à…", ["Quelqu'un touche « De retour »", "Minuit", "Toujours"], 0],
     sc: { k: "chat", t: "Consignes", msgs: [[0, "Plat du jour : blanquette 🙂"], [0, "Rupture : plus de saumon"], [1, "Lu, merci !"]] } },
   pointeuse: { t: "Pointeuse", d: "Arrivée, pause, départ : un geste avec votre code. Vos heures sont comptées justes.", who: ["cuisine", "salle", "bar", "plonge", "boss"],
-    steps: ["Touchez votre prénom", "Tapez votre code à 4 chiffres", "Arrivée, pause ou départ"],
+    steps: ["Touchez votre prénom", "Tapez votre code à 4 chiffres", "Arrivée, pause ou départ", "Au départ, imprimez votre ticket d'heures"],
     q: ["Vous oubliez de pointer. Que faire ?", ["Le signaler : le gérant corrige, c'est tracé", "Pointer pour un collègue", "Rien"], 0],
     sc: { k: "clock", t: "Pointeuse", time: "08:58", name: "Lucas", act: "Arrivée" } },
   planning: { t: "Planning", d: "Les horaires de chacun, semaine par semaine. Le gérant le prépare, l'équipe le voit sur son téléphone.",
@@ -175,7 +177,7 @@ const PC_LECONS = {
     q: ["Peut-on voir son planning depuis chez soi ?", ["Oui, dans Mon espace", "Non, seulement au resto", "Seulement le lundi"], 0],
     sc: { k: "cal", t: "Mon planning", shifts: [[0, .1, .5, 0, "Midi"], [2, .5, .45, 0, "Soir"], [3, .1, .85, 0, "Coupure"], [5, .5, .45, 0, "Soir"]] } },
   moiHeures: { t: "Mes heures", d: "Vos heures pointées, semaine après semaine : ce qui est compté, vous le voyez.", who: ["cuisine", "salle", "bar", "plonge"],
-    steps: ["Ouvrez Mes heures", "Choisissez la semaine", "Signalez une erreur au gérant"],
+    steps: ["Ouvrez Mes heures", "Choisissez le mois", "Exportez-le en PDF quand vous voulez", "Signalez une erreur au gérant"],
     q: ["Une heure manque. Que faire ?", ["La signaler depuis Mes heures", "Pointer deux fois", "Rien"], 0],
     sc: { k: "chart", t: "Mes heures", kpi: "35 h 30", sub: "Cette semaine", bars: [70, 60, 0, 75, 80, 90, 0] } },
   moiActivite: { t: "Mon activité", d: "Tout ce que vous avez fait et signé : relevés, réceptions, ménage. Votre travail, visible.", who: ["cuisine", "salle", "bar", "plonge"],
