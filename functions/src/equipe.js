@@ -11,6 +11,7 @@ const logger = require("firebase-functions/logger");
 const admin = require("firebase-admin");
 if (!admin.apps.length) admin.initializeApp();
 const db = () => admin.firestore();
+const NF = require("./notifs");
 const REGION = "europe-west9";
 const KINDS = { plat: "Plat du jour", rupture: "Rupture", info: "Info" };
 const first = (n) => String(n || "").trim().split(/\s+/)[0] || "Quelqu'un";
@@ -38,13 +39,17 @@ async function peopleOf(rid, g) {
   });
   return { only: ids };
 }
-async function tokensOf(rid, uid, who) {
+async function tokensOf(rid, uid, who, kind) {
   const push = await db().collection(`restos/${rid}/push`).get(); const out = [];
   push.docs.forEach((x) => {
     if (x.id === uid) return;
     if (who && who.only && !who.only.has(x.id)) return;
     if (who && who.rm && who.rm.includes(x.id)) return;
-    (Array.isArray(x.data().tokens) ? x.data().tokens : []).slice(-5).forEach((t) => { if (typeof t === "string" && t) out.push({ t, rid, mid: x.id }); });
+    /* each person's choice (js/notifs.js): consignes and discussion can be switched off, for the account or for one device */
+    const p = x.data() || {}; const k = kind === "chat" ? "chat" : "consigne"; const seen = new Set();
+    Object.values(p.devs || {}).forEach((dv) => { if (dv && typeof dv.t === "string" && dv.t) { seen.add(dv.t); if (NF._wants(null, null, p, dv, k)) out.push({ t: dv.t, rid, mid: x.id }); } });
+    if (!NF._wants(null, null, p, null, k)) return;
+    (Array.isArray(p.tokens) ? p.tokens : []).slice(-5).forEach((t) => { if (typeof t === "string" && t && !seen.has(t)) out.push({ t, rid, mid: x.id }); });
   });
   return out;
 }
@@ -68,7 +73,7 @@ const equipeNotify = onCall({ region: REGION, cors: true, timeoutSeconds: 30, me
   const title = kind === "passation" ? `Passation ${SLOT[m.slot] || "de service"} · ${first(m.by)}` : kind === "chat" ? `${first(m.by)} · ${cut(resto.name || "Équipe", 30)}` : `${KINDS[m.kind] || "Consigne"} · ${first(m.by)}`;
   const body = cut(m.text || (kind === "passation" ? "Rien à signaler, bon service !" : ""), 180);
   const g = kind === "passation" ? null : await groupOf(rid, m.g);
-  const all = await tokensOf(rid, uid, await peopleOf(rid, g));
+  const all = await tokensOf(rid, uid, await peopleOf(rid, g), kind);
   let title2 = title;
   if (g && g.name && kind === "chat") title2 = `${first(m.by)} · ${cut(g.name, 30)}`;
   /* a group shared with other restaurants: copy the message there, then ring their teams */
@@ -80,7 +85,7 @@ const equipeNotify = onCall({ region: REGION, cors: true, timeoutSeconds: 30, me
         if (!tg || tg.kind !== "multi" || !(tg.sites || []).some((x) => x && x.rid === rid)) continue;
         const ref = db().doc(`restos/${sr}/chat/${id}`);
         await ref.set({ text: String(m.text || "").slice(0, 1000), at: m.at || Date.now(), uid, by: String(m.by || ""), g: m.g, from: { rid, name: String(resto.name || "") }, notified: Date.now() }, { merge: true });
-        (await tokensOf(sr, uid, await peopleOf(sr, tg))).forEach((x) => all.push(x));
+        (await tokensOf(sr, uid, await peopleOf(sr, tg), kind)).forEach((x) => all.push(x));
       } catch (e) { logger.warn("equipeNotify mirror", sr, e && e.message); }
     }
   }
