@@ -77,6 +77,9 @@
             }
           ]
         }
+      ],
+      "predeploy": [
+        "python3 tools/site/build.py || echo \"Site vitrine : la reconstruction a échoué, le site en ligne reste celui du dépôt.\""
       ]
     }
   ],

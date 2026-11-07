@@ -104,8 +104,12 @@ def build():
         body = hero(trail, t["kick"], t["h1"], t["lede"], img=t["img"], ctas=btn_try("w", f"Essayer {name} 14 jours", t["pack"]) + btn_demo())
         steps = "".join(f'<li data-r style="--dl:{i}"><b>{e(a)}</b><span>{e(b)}</span></li>' for i, (a, b) in enumerate(t["day"]))
         body += f'<section class="sec wrap"><div class="sh" data-r><span class="kick">Une journée type</span><h2>Votre service, avec Growth Gusto.</h2></div><ol class="steps">{steps}</ol></section>'
-        fc = "".join(card(f"/fonctionnalites/{s}", e(BY[s]["short"]), e(BY[s]["card"]), BY[s]["ic"], BY[s]["icc"], shot=BY[s]["img"] if i < 3 else None, dl=i % 3) for i, s in enumerate(t["feats"]))
-        body += f'<section class="sec wrap"><div class="sh" data-r><span class="kick">Ce qui vous sert le plus</span><h2>Six fonctions à ouvrir en premier.</h2></div><div class="cards c3">{fc}</div></section>'
+        from content_features import live_slugs, NOMBRES
+        fs = [s for s in t["feats"] if s in live_slugs()]  # une fonction retirée de l'app disparaît d'ici aussi
+        fc = "".join(card(f"/fonctionnalites/{s}", e(BY[s]["short"]), e(BY[s]["card"]), BY[s]["ic"], BY[s]["icc"], shot=BY[s]["img"] if i < 3 else None, dl=i % 3) for i, s in enumerate(fs))
+        nb = NOMBRES.get(len(fs), str(len(fs))).capitalize()
+        if fs:
+            body += f'<section class="sec wrap"><div class="sh" data-r><span class="kick">Ce qui vous sert le plus</span><h2>{nb} fonction{"s" if len(fs) > 1 else ""} à ouvrir en premier.</h2></div><div class="cards c3">{fc}</div></section>'
         body += f'''<section class="sec wrap"><div class="note s" data-r><b>Le pack conseillé&nbsp;: {name}, {price}&nbsp;€ HT par mois.</b> Sans engagement, utilisateurs illimités, 14 jours gratuits sans carte bancaire. <a href="/tarifs">Comparer les trois packs</a>.</div></section>'''
         body += f'<section class="sec wrap"><div class="sh" data-r><span class="kick">Questions</span><h2>Ce qu\'on nous demande.</h2></div>{faq_html(t["faq"])}</section>'
         gc = "".join(card(f"/guides/{g}", e(GBY[g]["short"]), e(GBY[g]["card"]), "book", "l", go="Lire le guide", dl=i) for i, g in enumerate(t["guides"]))
