@@ -71,6 +71,16 @@ This build runs on GitHub Pages, with no Claude runtime.
    - what you verified, with screenshot paths;
    - anything left or needed from core.
 
+## New module = new content on growthgusto.fr (checked by CI)
+
+The marketing site follows the app menu automatically (`tools/site/registre.py` reads `NAV` from the code).
+- Add your screen to the menu on **one line**: `NAV.splice(i, 0, ["route", "icon", "Nom"])`.
+- Write its copy in French: a `FONCTION(…, app="route", …)` in `tools/site/accueil.py` (home page) **and** `"route"` in the `app=[…]`
+  of the right page in `tools/site/content_features.py` (add a block there if it deserves one). Not a selling point (settings…)?
+  Add it to `INTERNE` in `registre.py` with the reason. Honest labels only: En direct / Par import / Bientôt.
+- Run `python3 tools/site/build.py && python3 tools/site/check.py`. `node tools/ci.js` fails while a screen has no site content.
+- Removing a screen from the app removes its features and pages from the site by itself. Every deploy rebuilds the site.
+
 ## V3 data contract (2026-11-04)
 
 Core already subscribes these collections into `S` (arrays, newest first where ordered). Use them, don't re-watch them:
