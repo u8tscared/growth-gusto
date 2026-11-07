@@ -76,3 +76,21 @@
 .nf-acts{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px}
 .nf-acts .btn,.nf-cxb{display:inline-flex;align-items:center;justify-content:center;gap:7px}
 .nf-acts .ico,.nf-cxb .ico{width:18px;height:18px}
+
+/* repas complets: the count picker, the business clients, the tip (2026-11-07) */
+.nf-meals{display:flex;flex-direction:column;gap:10px;padding:12px;border-radius:14px;background:var(--well)}
+.nf-mh{display:flex;align-items:center;gap:12px}
+.nf-step{flex:none}.nf-step b{min-width:30px;text-align:center;font-size:18px}.nf-step button[disabled]{opacity:.3;cursor:default}
+.nf-mt{flex:1;min-width:0;display:flex;flex-direction:column}.nf-mt b{font-size:15px}.nf-mt em{font-style:normal;font-size:14px;color:var(--accent-ink);font-weight:700}
+.nf-mx{margin:0;font-size:12.5px;color:var(--muted);line-height:1.4}.nf-mx b{color:var(--ink)}
+.nf-clc{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;margin:0 -2px;padding:2px}.nf-clc::-webkit-scrollbar{display:none}
+.nf-clc .chip{flex:none;white-space:nowrap}
+.nf-q{margin-bottom:6px}.nf-none{font-style:normal;font-size:12.5px;color:var(--muted);padding:8px 2px}
+.nf-tip .nf-tseg{width:100%}.nf-tip .nf-tseg button{flex:1}
+.nf-th{display:block;font-style:normal;font-size:12px;color:var(--muted);line-height:1.4;margin-top:6px}
+.nf-save{width:100%}
+.nf-vat .tot{border-top:1px solid var(--line);margin-top:2px;padding-top:5px}.nf-vat .tot b{font-size:14px}
+.nf-tots .tip span small{display:block;font-size:10.5px;color:#7A7488}
+.nf-tots .paid{border-top:1px solid #DCD6E4;margin-top:4px;padding-top:5px;font-weight:800}
+.nf-crow{cursor:default}
+@media (min-width:900px){.nf-fields{gap:14px}}

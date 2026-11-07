@@ -14,7 +14,13 @@
      restos/{rid}/fraisNotes/{id} { kind:"facture"|"avoir", year, seq, no:"2026-0001", day, at, uid, by, tabId?, table?, covers,
                                     mode:"repas"|"detail", label, lines:[{ t, q, u (TTC), r, uht, tot (TTC), pp? }], rates:[{ r, ht, tva, ttc }],
                                     total, company, address?, vatNo?, pay?, ticket?, refId?/refNo? (avoir), avoirId?/avoirNo? (facture annulée), why? }
-     restos/{rid}/fraisCfg/main   { legal, address, siret, tva, footer, at, by } */
+     restos/{rid}/fraisCfg/main   { legal, address, siret, tva, footer, at, by }
+     restos/{rid}/fraisClients/{id} { name, address, siren, vatNo, n (notes faites), last, at, by } : les clients entreprises habitués.
+   Repas complets (2026-11-07) : on choisit N repas, chacun vaut total ÷ N ; la somme est toujours exactement le ticket, jamais plus.
+   Pourboire : jamais fondu dans le prix des repas. Un pourboire volontaire est hors champ de la TVA ; le mettre dans « N repas » ferait
+     apparaître de la TVA qui n'existe pas (toute TVA facturée est due, art. 283-3 CGI) et la facture ne correspondrait plus au ticket
+     (art. 1737 CGI). Deux choix : une ligne « Pourboire, hors TVA » sous les totaux (tipMode "ligne"), ou rien sur la note ("non").
+     doc.tip = montant du pourboire écrit sur la note (0 sinon) ; doc.total reste le montant de la vente. */
 "use strict";
 
 Object.assign(IC, {
@@ -35,8 +41,9 @@ const NF_LABELS = [["Repas complet", "Repas complets"], ["Menu", "Menus"], ["Dé
 const NF_PAY = ["Carte bancaire", "Espèces", "Titre-restaurant", "Chèque", "Virement"];
 const NF_WHY = ["Erreur de montant", "Mauvaise société", "Doublon", "Le client n'en veut plus"];
 const NF_ALC = /\b(vin|vins|rouge|blanc|ros[ée]|champagne|cr[ée]mant|prosecco|bi[èe]re|pinte|demi|ap[ée]ritif|ap[ée]ro|cocktail|spritz|mojito|kir|pastis|ricard|whisky|rhum|gin|vodka|cognac|armagnac|calvados|digestif|liqueur|cidre|porto|chablis|bordeaux|bourgogne|beaujolais|c[ôo]tes?|sancerre|muscadet|chinon|graves|m[ée]doc|pinot|chardonnay|merlot|syrah|sauvignon|riesling)\b/i;
-const NF = { rid: null, subs: {}, notes: null, cfg: null, B: {} };
-const NF_COLS = [["notes", "fraisNotes", { order: "at", dir: "desc", limit: 500 }], ["cfg", "fraisCfg", {}]];
+const NF = { rid: null, subs: {}, notes: null, cfg: null, clients: null, B: {}, q: "" };
+const NF_COLS = [["notes", "fraisNotes", { order: "at", dir: "desc", limit: 500 }], ["cfg", "fraisCfg", {}], ["clients", "fraisClients", {}]];
+const NF_MAXN = 40;
 const nfR2 = (v) => Math.round((+v || 0) * 100) / 100;
 const nfEur = (v) => (Math.round((+v || 0) * 100) / 100).toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €";
 const nfPct = (r) => (r % 1 ? String(r).replace(".", ",") : String(r)) + " %";
@@ -50,7 +57,7 @@ function nfAlive(key) {
 }
 function nfWatch() {
   if (!S.rid || typeof DB === "undefined") return;
-  if (NF.rid !== S.rid) { NF.rid = S.rid; NF.subs = {}; NF.notes = null; NF.cfg = null; NF.B = {}; }
+  if (NF.rid !== S.rid) { NF.rid = S.rid; NF.subs = {}; NF.notes = null; NF.cfg = null; NF.clients = null; NF.B = {}; }
   if (DB.mode === "demo") nfSeedDemo();
   const rid = S.rid;
   NF_COLS.forEach(([k, col, opts]) => {
@@ -61,6 +68,18 @@ function nfWatch() {
   });
 }
 const nfNotes = () => { nfWatch(); return NF.notes || []; };
+/* the regular business clients, most used first */
+const nfClients = () => { nfWatch(); return (NF.clients || []).slice().sort((a, b) => (+b.n || 0) - (+a.n || 0) || (+b.last || 0) - (+a.last || 0)); };
+const nfNorm = (s) => String(s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+/* SIREN from a French VAT number (FR + 2-character key + 9-digit SIREN) */
+const nfSirenOfVat = (v) => { const m = /^FR[0-9A-Z]{2}(\d{9})$/.exec(String(v || "").replace(/\s+/g, "").toUpperCase()); return m ? m[1] : ""; };
+/* the tip of a table: the one being entered in the bill (js/pourboires.js), else the ones saved for that table */
+function nfTipOf(tab) {
+  if (!tab) return 0;
+  try { if (typeof TP !== "undefined" && TP.bill && TP.bill.tab === tab.id) return nfR2(+TP.bill.amt || 0); } catch (e) {}
+  try { if (typeof TP !== "undefined" && TP.rows) return nfR2(TP.rows.filter((r) => r.tabId === tab.id && !r.void).reduce((a, r) => a + (+r.amount || 0), 0)); } catch (e) {}
+  return 0;
+}
 const nfById = (id) => nfNotes().find((n) => n.id === id);
 /* the invoice in force for a table (not cancelled by a credit note) */
 const nfOfTab = (tabId) => nfNotes().find((n) => n.tabId === tabId && (n.kind || "facture") === "facture" && !n.avoirId) || null;
@@ -98,9 +117,9 @@ function nfTabData(tab) {
 }
 /* « N repas complets » at 10 %: when the amount doesn't divide to the cent, two lines whose sum is exactly the amount.
    Alcoholic drinks (20 %) stay on their own line: one line, one rate. */
-function nfMealLines(d, label) {
+function nfMealLines(d, label, n) {
   const food = nfR2(d.lines.filter((l) => l.r !== 20).reduce((s, l) => s + l.tot, 0)), alc = nfR2(d.lines.filter((l) => l.r === 20).reduce((s, l) => s + l.tot, 0));
-  const N = d.covers, cents = Math.round(food * 100), out = [], L = NF_LABELS.find((l) => l[0] === label) || NF_LABELS[0];
+  const N = nfN(n, d), cents = Math.round(food * 100), out = [], L = NF_LABELS.find((l) => l[0] === label) || NF_LABELS[0];
   const pp = nfR2(d.total / N);
   if (cents > 0) {
     const base = Math.floor(cents / N), rest = cents - base * N;
@@ -111,14 +130,19 @@ function nfMealLines(d, label) {
   if (out[0]) out[0].pp = pp;
   return out;
 }
+/* how many meals: chosen in the bill (1…40), else the covers; never so many that a meal would be worth less than a cent */
+function nfN(n, d) { const cap = Math.max(1, Math.min(NF_MAXN, Math.round(d.total * 100) || 1)); return Math.max(1, Math.min(cap, Math.round(+n || d.covers || 1))); }
 /* the invoice as it will be saved for a table, from the bill options */
 function nfBuild(tab, B) {
   const d = nfTabData(tab), mode = B.mode === "detail" ? "detail" : "repas";
-  const lines = mode === "detail" ? d.lines.map((l) => ({ t: l.t, q: l.q, u: l.u, r: l.r, uht: l.uht, tot: l.tot })) : nfMealLines(d, B.label);
-  return { kind: "facture", mode, label: B.label, lines, rates: nfRates(lines), total: d.total, covers: d.covers, tabId: tab.id, table: String(tab.table || ""), day: tab.day || dayKey(),
-    company: (B.company || "").trim(), address: (B.address || "").trim(), vatNo: (B.vatNo || "").replace(/\s+/g, "").toUpperCase(), pay: B.pay || "", ticket: (B.ticket || "").trim() };
+  const meals = nfN(B.n, d);
+  const lines = mode === "detail" ? d.lines.map((l) => ({ t: l.t, q: l.q, u: l.u, r: l.r, uht: l.uht, tot: l.tot })) : nfMealLines(d, B.label, meals);
+  const tipAmt = B.tipAmt != null ? nfR2(B.tipAmt) : nfTipOf(tab), tipMode = B.tip === "non" ? "non" : "ligne", vatNo = (B.vatNo || "").replace(/\s+/g, "").toUpperCase();
+  return { kind: "facture", mode, label: B.label, lines, rates: nfRates(lines), total: d.total, covers: d.covers, meals: mode === "repas" ? meals : 0, tabId: tab.id, table: String(tab.table || ""), day: tab.day || dayKey(),
+    company: (B.company || "").trim(), address: (B.address || "").trim(), siren: (B.siren || "").replace(/\s+/g, "") || nfSirenOfVat(vatNo), vatNo, pay: B.pay || "", ticket: (B.ticket || "").trim(),
+    tip: tipAmt > 0 && tipMode === "ligne" ? tipAmt : 0, tipMode: tipAmt > 0 ? tipMode : "", ...(B.clientId ? { clientId: B.clientId } : {}) };
 }
-const nfB = (tabId) => (NF.B[tabId] ||= { on: false, company: "", address: "", vatNo: "", mode: "repas", label: "Repas complet", pay: "Carte bancaire", ticket: "" });
+const nfB = (tabId) => (NF.B[tabId] ||= { on: false, company: "", address: "", siren: "", vatNo: "", mode: "repas", label: "Repas complet", pay: "Carte bancaire", ticket: "", n: 0, tip: "ligne", clientId: "", save: true });
 
 /* ───────── the document (preview, print, e-mail) ───────── */
 function nfPaper(n, cfg, opts = {}) {
@@ -133,12 +157,13 @@ function nfPaper(n, cfg, opts = {}) {
     <div class="nf-pt"><b>${av ? "Avoir" : "Facture"}</b><span>N° ${e(n.no || "attribué à l'édition")}</span></div>
     <div class="nf-meta"><span>Le ${e(nfDayLong(n.day))}${n.at ? " à " + hm(n.at) : ""}${n.table ? ` · table ${e(n.table)}` : ""}</span>
       ${av ? `<span>Annule la facture n° ${e(n.refNo || "")}${n.why ? ` (${e(n.why.toLowerCase())})` : ""}</span>` : ""}</div>
-    <div class="nf-client"><em>Client</em><b>${e(n.company || "Société à indiquer")}</b>${n.address ? `<span>${e(n.address)}</span>` : ""}${n.vatNo ? `<span>N° TVA ${e(n.vatNo)}</span>` : ""}</div>
+    <div class="nf-client"><em>Client</em><b>${e(n.company || "Société à indiquer")}</b>${n.address ? `<span>${e(n.address)}</span>` : ""}${n.siren ? `<span>SIREN ${e(n.siren)}</span>` : ""}${n.vatNo ? `<span>N° TVA ${e(n.vatNo)}</span>` : ""}</div>
     <table class="nf-l"><thead><tr><th class="q">Qté</th><th>Désignation</th><th class="m">TVA</th><th class="m">P.U. HT</th><th class="m">Total TTC</th></tr></thead><tbody>${lines}</tbody></table>
     <table class="nf-r"><thead><tr><th>Taux</th><th class="m">Base HT</th><th class="m">TVA</th><th class="m">TTC</th></tr></thead><tbody>${rates}</tbody></table>
-    <div class="nf-tots"><div><span>Total HT</span><b>${nfEur(ht)}</b></div><div><span>Total TVA</span><b>${nfEur(tva)}</b></div><div class="big"><span>Total TTC</span><b>${nfEur(n.total)}</b></div></div>
+    <div class="nf-tots"><div><span>Total HT</span><b>${nfEur(ht)}</b></div><div><span>Total TVA</span><b>${nfEur(tva)}</b></div><div class="big"><span>Total TTC</span><b>${nfEur(n.total)}</b></div>
+      ${n.tip ? `<div class="tip"><span>Pourboire, hors TVA<small>reversé au personnel</small></span><b>${nfEur(n.tip)}</b></div><div class="paid"><span>Total ${av ? "remboursé" : "réglé"}</span><b>${nfEur(nfR2(n.total + n.tip))}</b></div>` : ""}</div>
     <div class="nf-foot">${av ? `<span>Montant remboursé ou déduit de la facture d'origine.</span>` : `<span>Facture acquittée${n.pay ? ` par ${e(n.pay.toLowerCase())}` : ""}${n.ticket ? ` · ticket de caisse n° ${e(n.ticket)}` : ""}.</span>`}
-      ${cfg.footer ? `<span>${e(cfg.footer)}</span>` : ""}<span>Merci de votre visite</span></div>
+      <span>Opération : prestation de services (restauration sur place).</span>${cfg.footer ? `<span>${e(cfg.footer)}</span>` : ""}<span>Merci de votre visite</span></div>
   </div>`;
 }
 const NF_PRINT_CSS = `@page{size:A5;margin:12mm}*{box-sizing:border-box}body{margin:0;font:400 9.5pt/1.45 -apple-system,"Segoe UI",Roboto,Arial,sans-serif;color:#111}
@@ -148,7 +173,7 @@ const NF_PRINT_CSS = `@page{size:A5;margin:12mm}*{box-sizing:border-box}body{mar
   .nf-client em{font-style:normal;font-size:7.5pt;text-transform:uppercase;letter-spacing:.05em;color:#666}.nf-client span{font-size:9pt;color:#444}
   table{width:100%;border-collapse:collapse;font-size:9pt}th{font-size:7.5pt;text-transform:uppercase;letter-spacing:.04em;color:#555;text-align:left;border-bottom:1px solid #333;padding:1.5mm 1mm}
   td{padding:1.5mm 1mm;border-bottom:1px solid #e3e3e3;vertical-align:top}td small{display:block;color:#666;font-size:8pt}.m{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}.q{width:9mm}
-  .nf-r{margin-top:4mm}.nf-tots{margin:3mm 0 0 auto;width:60mm}.nf-tots div{display:flex;justify-content:space-between;padding:.8mm 0;font-variant-numeric:tabular-nums}.nf-tots .big{font-size:12pt;font-weight:700;border-top:1px solid #333;margin-top:1mm;padding-top:1.5mm}
+  .nf-r{margin-top:4mm}.nf-tots{margin:3mm 0 0 auto;width:60mm}.nf-tots div{display:flex;justify-content:space-between;padding:.8mm 0;font-variant-numeric:tabular-nums}.nf-tots .big{font-size:12pt;font-weight:700;border-top:1px solid #333;margin-top:1mm;padding-top:1.5mm}.nf-tots .tip span small{display:block;font-size:7.5pt;color:#666}.nf-tots .paid{border-top:1px solid #ccc;margin-top:1mm;padding-top:1mm;font-weight:700}
   .nf-foot{display:flex;flex-direction:column;align-items:center;gap:.5mm;text-align:center;margin-top:6mm;padding-top:3mm;border-top:1px dashed #999;font-size:8.5pt;color:#444}
   .nf-void{position:absolute;top:45%;left:50%;transform:translate(-50%,-50%) rotate(-18deg);font:800 32pt sans-serif;color:rgba(200,20,40,.28);border:4px solid rgba(200,20,40,.28);padding:2mm 6mm;border-radius:4mm}`;
 function nfPrint(n) {
@@ -161,10 +186,12 @@ function nfText(n) {
   const c = nfCfg(), L = [c.legal]; if (c.address) L.push(c.address); if (c.siret) L.push("SIRET " + c.siret); if (c.tva) L.push("N° TVA " + c.tva);
   L.push("", `${n.kind === "avoir" ? "Avoir" : "Facture"} n° ${n.no} · ${nfDayLong(n.day)}${n.table ? " · table " + n.table : ""}`);
   if (n.kind === "avoir") L.push(`Annule la facture n° ${n.refNo}`);
-  L.push(`Client : ${n.company}${n.address ? ", " + n.address : ""}${n.vatNo ? " · N° TVA " + n.vatNo : ""}`, "");
+  L.push(`Client : ${n.company}${n.address ? ", " + n.address : ""}${n.siren ? " · SIREN " + n.siren : ""}${n.vatNo ? " · N° TVA " + n.vatNo : ""}`, "");
   (n.lines || []).forEach((l) => L.push(`${l.q} ${l.t} · TVA ${nfPct(l.r)} · P.U. HT ${nfEur(l.uht)} · ${nfEur(l.tot)} TTC${l.pp ? ` (soit ${nfEur(l.pp)} TTC par personne)` : ""}`));
   L.push(""); (n.rates || []).forEach((x) => L.push(`TVA ${nfPct(x.r)} : base HT ${nfEur(x.ht)} · TVA ${nfEur(x.tva)} · TTC ${nfEur(x.ttc)}`));
   L.push(`Total TTC : ${nfEur(n.total)}`);
+  if (n.tip) L.push(`Pourboire, hors TVA, reversé au personnel : ${nfEur(n.tip)}`, `Total ${n.kind === "avoir" ? "remboursé" : "réglé"} : ${nfEur(nfR2(n.total + n.tip))}`);
+  L.push("Opération : prestation de services (restauration sur place).");
   if (n.kind !== "avoir") L.push("", `Facture acquittée${n.pay ? " par " + n.pay.toLowerCase() : ""}${n.ticket ? " · ticket de caisse n° " + n.ticket : ""}.`);
   if (c.footer) L.push(c.footer);
   return L.join("\n");
@@ -174,19 +201,40 @@ function nfText(n) {
 function nfFields(tab, B, opts = {}) {
   const chip = (act, v, on, t) => `<button class="chip${on ? " on" : ""}" data-act="${act}" data-id="${esc(tab.id)}" data-v="${esc(v)}">${esc(t || v)}</button>`;
   const inp = (k, label, ph, extra = "") => `<label class="field"><span>${label}</span><input class="input" data-nfb="${esc(tab.id)}" data-k="${k}" value="${esc(B[k] || "")}" placeholder="${ph}" autocomplete="off" ${extra}></label>`;
+  const d = nfTabData(tab), doc = nfBuild(tab, B), N = nfN(B.n, d), L = NF_LABELS.find((l) => l[0] === B.label) || NF_LABELS[0];
+  const tip = B.tipAmt != null ? nfR2(B.tipAmt) : nfTipOf(tab), CL = nfClients(), q = nfNorm(NF.q);
+  const shown = (q ? CL.filter((c) => nfNorm(c.name).includes(q)) : CL).slice(0, 8);
+  const known = CL.some((c) => nfNorm(c.name) === nfNorm(B.company));
+  const meals = doc.lines.filter((l) => l.r === 10 && B.mode === "repas"), alc = doc.lines.find((l) => l.r === 20 && B.mode === "repas");
+  const each = meals.map((l) => `${l.q} × ${nfEur(l.u)}`).join(" + ");
   return `<div class="nf-fields">
+    ${CL.length ? `<div class="field nf-cl"><span>Client habitué</span>
+      ${CL.length > 6 ? `<input class="input nf-q" data-nfq="${esc(tab.id)}" value="${esc(NF.q)}" placeholder="Chercher une société" autocomplete="off" enterkeyhint="search">` : ""}
+      <div class="nf-chips nf-clc">${shown.map((c) => `<button class="chip${B.clientId === c.id ? " on" : ""}" data-act="nfBClient" data-id="${esc(tab.id)}" data-v="${esc(c.id)}">${esc(c.name)}</button>`).join("") || `<em class="nf-none">Aucune société ne correspond.</em>`}
+        ${B.clientId ? chip("nfBClient", "", false, "Autre société") : ""}</div></div>` : ""}
     ${inp("company", "Société *", "Ex. : Atelier Lumière SAS", 'maxlength="80" autocomplete="organization"')}
     ${inp("address", "Adresse de la société", "Ex. : 4 quai Saint-Antoine, 69002 Lyon", 'maxlength="140"')}
-    <div class="grid2">${inp("vatNo", "N° TVA du client", "Facultatif", 'maxlength="20"')}${inp("ticket", "N° ticket de caisse", "Facultatif", 'maxlength="30"')}</div>
-    <div class="field"><span>Sur la facture</span><div class="nf-chips">${chip("nfBMode", "repas", B.mode === "repas", `${nfTabData(tab).covers} ${(NF_LABELS.find((l) => l[0] === B.label) || NF_LABELS[0])[nfTabData(tab).covers > 1 ? 1 : 0].toLowerCase()}`)}${chip("nfBMode", "detail", B.mode === "detail", "Le détail des plats")}</div></div>
-    ${B.mode === "repas" ? `<div class="nf-chips sm">${NF_LABELS.map(([l]) => chip("nfBLabel", l, B.label === l)).join("")}</div>` : ""}
+    <div class="grid2">${inp("siren", "SIREN du client", "9 chiffres", 'maxlength="17" inputmode="numeric"')}${inp("vatNo", "N° TVA du client", "Facultatif", 'maxlength="20" autocapitalize="characters" spellcheck="false"')}</div>
+    ${inp("ticket", "N° ticket de caisse", "Facultatif", 'maxlength="30"')}
+    <div class="field"><span>Sur la facture</span><div class="nf-chips">${chip("nfBMode", "repas", B.mode === "repas", "Repas complets")}${chip("nfBMode", "detail", B.mode === "detail", "Le détail des plats")}</div></div>
+    ${B.mode === "repas" ? `<div class="nf-meals">
+      <div class="nf-mh"><div class="cm-step nf-step"><button data-act="nfBN" data-id="${esc(tab.id)}" data-v="-1" aria-label="Un repas de moins" ${N <= 1 ? "disabled" : ""}>${ico("minus")}</button><b class="mono">${N}</b><button data-act="nfBN" data-id="${esc(tab.id)}" data-v="1" aria-label="Un repas de plus" ${N >= nfN(NF_MAXN, d) ? "disabled" : ""}>${ico("plus")}</button></div>
+        <span class="nf-mt"><b>${esc(L[N > 1 ? 1 : 0].toLowerCase())}</b><em class="mono">${each || "—"}</em></span></div>
+      <p class="nf-mx">${alc ? `Avec ${nfEur(alc.tot)} de boissons alcoolisées sur une ligne à part (TVA 20 %). ` : ""}Total : <b class="mono">${nfEur(d.total)}</b>, exactement le ticket.${N !== d.covers ? ` La table a ${d.covers} couvert${d.covers > 1 ? "s" : ""}.` : ""}</p>
+      <div class="nf-chips sm">${NF_LABELS.map(([l]) => chip("nfBLabel", l, B.label === l)).join("")}</div></div>` : ""}
+    ${tip > 0 ? `<div class="field nf-tip"><span>Pourboire de ${nfEur(tip)}</span>
+      <div class="sl-segs sm nf-tseg">${[["ligne", "Ligne à part"], ["non", "Pas sur la note"]].map(([k, t]) => `<button class="${(B.tip === "non" ? "non" : "ligne") === k ? "on" : ""}" data-act="nfBTip" data-id="${esc(tab.id)}" data-v="${k}">${t}</button>`).join("")}</div>
+      <em class="nf-th">${B.tip === "non" ? `La note fait ${nfEur(d.total)}, le pourboire n'y apparaît pas.` : `Sous les repas : « Pourboire, hors TVA, ${nfEur(tip)} », total réglé ${nfEur(nfR2(d.total + tip))}.`} Il ne peut pas être fondu dans le prix des repas : il n'a pas de TVA et la note doit coller au ticket.</em></div>` : ""}
     <div class="field"><span>Réglé par</span><div class="nf-chips">${NF_PAY.map((p) => chip("nfBPay", p, B.pay === p)).join("")}</div></div>
-    ${opts.preview ? `<div class="nf-mini">${nfMini(nfBuild(tab, B))}</div>` : ""}
+    ${!known ? `<button class="cm-tog nf-save${B.save ? " on" : ""}" data-act="nfBSave" data-id="${esc(tab.id)}" aria-pressed="${!!B.save}"><span class="cm-tt"><b>Enregistrer ce client</b><em>La prochaine fois, un toucher remplit tout.</em></span><span class="cm-sw${B.save ? " on" : ""}"><i></i></span></button>` : ""}
+    ${opts.preview ? `<div class="nf-mini">${nfMini(doc)}</div>` : ""}
   </div>`;
 }
 /* the VAT lines shown in the bill once it's a « note de frais » */
 function nfMini(n) {
-  return `<div class="nf-vat">${(n.rates || []).map((x) => `<div><span>TVA ${nfPct(x.r)}</span><em class="mono">HT ${nfEur(x.ht)}</em><b class="mono">${nfEur(x.tva)}</b></div>`).join("")}</div>`;
+  return `<div class="nf-vat">${(n.rates || []).map((x) => `<div><span>TVA ${nfPct(x.r)}</span><em class="mono">HT ${nfEur(x.ht)}</em><b class="mono">${nfEur(x.tva)}</b></div>`).join("")}
+    ${n.tip ? `<div><span>Pourboire</span><em>hors TVA</em><b class="mono">${nfEur(n.tip)}</b></div>` : ""}
+    <div class="tot"><span>Sur la note</span><b class="mono">${nfEur(nfR2(n.total + (n.tip || 0)))}</b></div></div>`;
 }
 function nfBillBlock(tab) {
   const ex = nfOfTab(tab.id), B = nfB(tab.id);
@@ -199,7 +247,7 @@ function nfBillBlock(tab) {
 /* after the table is settled: the same form in a sheet */
 function nfTabSheet(tab) {
   const ex = nfOfTab(tab.id); if (ex) { nfSheet(ex); return; }
-  const B = nfB(tab.id); B.on = true;
+  const B = nfB(tab.id); B.on = true; try { if (typeof tpWatch === "function") tpWatch(); } catch (e) {}
   openSheet(`<div class="nf-sh" data-nftab="${esc(tab.id)}"><div class="row"><span class="h2">Note de frais · table ${esc(tab.table)}</span><button class="iconbtn" data-act="sheetClose" aria-label="Fermer">${ico("x")}</button></div>
     <p class="sub">Réglée ${tab.closedAt ? "à " + hm(tab.closedAt) : ""} · ${nfEur(nfTabData(tab).total)} · ${nfTabData(tab).covers} couvert${nfTabData(tab).covers > 1 ? "s" : ""}</p>
     ${nfFields(tab, B, { preview: true })}
@@ -211,15 +259,53 @@ function nfRepaintTab(tabId) {
   const sh = $(`.nf-sh[data-nftab="${CSS.escape(tabId)}"]`); if (sh) { const f = sh.querySelector(".nf-fields"); if (f) f.outerHTML = nfFields(tab, nfB(tabId), { preview: true }); }
 }
 const nfTabById = (id) => ((typeof SL !== "undefined" && SL.tabs) || []).find((t) => t.id === id) || null;
-/* typed values survive the repaints of the bill */
-document.addEventListener("input", (e) => { const el = e.target; if (!el || !el.dataset || !el.dataset.nfb) return; nfB(el.dataset.nfb)[el.dataset.k] = el.value; });
+/* only the note de frais block is repainted (keeps the scroll, the bill and the tip block as they are) */
+function nfRepaintFields(tabId) {
+  const tab = nfTabById(tabId); if (!tab) return;
+  const f = $(`.sl-sh.bill .nf-fields`) || $(`.nf-sh[data-nftab="${CSS.escape(tabId)}"] .nf-fields`); if (!f) return;
+  const act = document.activeElement, k = act && act.dataset && (act.dataset.k || (act.dataset.nfq ? "__q" : "")), pos = k ? act.selectionStart : null;
+  f.outerHTML = nfFields(tab, nfB(tabId), { preview: true });
+  if (k) { const el = k === "__q" ? $(`[data-nfq="${CSS.escape(tabId)}"]`) : $(`[data-nfb="${CSS.escape(tabId)}"][data-k="${k}"]`); if (el) try { el.focus({ preventScroll: true }); el.setSelectionRange(pos, pos); } catch (e) {} }
+}
+/* typed values survive the repaints of the bill; a typed name that matches a saved client is not a new one */
+let nfTq = 0;
+document.addEventListener("input", (e) => {
+  const el = e.target; if (!el || !el.dataset) return;
+  if (el.dataset.nfq) { NF.q = el.value; clearTimeout(nfTq); nfTq = setTimeout(() => nfRepaintFields(el.dataset.nfq), 120); return; }
+  if (el.dataset.nfb) {
+    const B = nfB(el.dataset.nfb); B[el.dataset.k] = el.value;
+    if (el.dataset.k === "vatNo" && !B.siren) { const sn = nfSirenOfVat(el.value); if (sn) { B.siren = sn; const i = $(`[data-nfb="${CSS.escape(el.dataset.nfb)}"][data-k=siren]`); if (i) i.value = sn; } }
+    if (el.dataset.k === "company" && B.clientId) { const c = nfClients().find((x) => x.id === B.clientId); if (!c || nfNorm(c.name) !== nfNorm(el.value)) B.clientId = ""; }
+  }
+  if (el.id === "tpBillV") { const sh = $(".sl-sh.bill"), tab = typeof slCurTab === "function" ? slCurTab() : null; if (sh && tab && nfB(tab.id).on) { clearTimeout(nfTq); nfTq = setTimeout(() => nfRepaintFields(tab.id), 150); } }
+});
+/* a client chosen fills the whole note */
+function nfUseClient(B, c) {
+  if (!c) { Object.assign(B, { clientId: "", company: "", address: "", siren: "", vatNo: "" }); return; }
+  Object.assign(B, { clientId: c.id, company: c.name || "", address: c.address || "", siren: c.siren || "", vatNo: c.vatNo || "" });
+}
+/* remember the business client (new one, or the same one with fresher details) */
+async function nfKeepClient(doc, B) {
+  const name = doc.company, k = nfNorm(name); if (!k) return;
+  const ex = B.clientId ? nfClients().find((c) => c.id === B.clientId) : nfClients().find((c) => nfNorm(c.name) === k);
+  if (!ex && !B.save) return;
+  const data = { name, address: doc.address || "", siren: doc.siren || "", vatNo: doc.vatNo || "", last: Date.now(), by: S.me.id };
+  try {
+    if (ex) { await DB.update("fraisClients", ex.id, { ...data, n: (+ex.n || 0) + 1 }); doc.clientId = ex.id; }
+    else { const id = await DB.add("fraisClients", { ...data, n: 1, at: Date.now() }); doc.clientId = id; }
+  } catch (e) { console.warn("frais client", e); }
+}
 
 /* save the invoice of a table (once) */
 async function nfIssue(tab) {
   const B = nfB(tab.id);
   if (!(B.company || "").trim()) { SFX.err(); toast("Indiquez le nom de la société.", "err"); const i = $(`[data-nfb="${CSS.escape(tab.id)}"][data-k=company]`); i && i.focus(); return null; }
   const ex = nfOfTab(tab.id); if (ex) return ex;
+  const sr = (B.siren || "").replace(/\s+/g, "");
+  if (sr && !/^\d{9}(\d{5})?$/.test(sr)) { SFX.err(); toast("Le SIREN fait 9 chiffres (ou le SIRET 14).", "err"); const i = $(`[data-nfb="${CSS.escape(tab.id)}"][data-k=siren]`); i && i.focus(); return null; }
   const doc = nfBuild(tab, B); if (!(doc.total > 0)) { SFX.err(); toast("Cette table n'a rien à facturer.", "err"); return null; }
+  if (doc.siren.length === 14) doc.siren = doc.siren.slice(0, 9);
+  await nfKeepClient(doc, B);
   const y = +doc.day.slice(0, 4), seq = nfNextSeq(y);
   Object.assign(doc, { year: y, seq, no: `${y}-${String(seq).padStart(4, "0")}`, at: Date.now(), uid: S.me.id, by: S.me.name || "" });
   const id = await DB.add("fraisNotes", doc);
@@ -243,11 +329,20 @@ function nfSheet(n) {
 }
 function nfListSheet() {
   const L = nfNotes();
-  openSheet(`<div class="nf-sh"><div class="row"><span class="h2">Notes de frais</span><span class="row" style="gap:8px"><button class="iconbtn" data-act="nfCfgOpen" aria-label="En-tête des factures">${ico("sliders")}</button><button class="iconbtn" data-act="sheetClose" aria-label="Fermer">${ico("x")}</button></span></div>
+  openSheet(`<div class="nf-sh"><div class="row"><span class="h2">Notes de frais</span><span class="row" style="gap:8px"><button class="iconbtn" data-act="nfClients" aria-label="Clients entreprises">${ico("users")}</button><button class="iconbtn" data-act="nfCfgOpen" aria-label="En-tête des factures">${ico("sliders")}</button><button class="iconbtn" data-act="sheetClose" aria-label="Fermer">${ico("x")}</button></span></div>
     <p class="sub">Toutes les factures faites pour des clients professionnels, de la plus récente à la plus ancienne.</p>
     <div class="nf-list">${L.length ? L.map((n) => `<button class="nf-row${n.avoirId ? " void" : ""}" data-act="nfOpen" data-id="${esc(n.id)}"><span class="nf-ic">${ico(n.kind === "avoir" ? "nfUndo" : "nfNote")}</span>
       <span class="nf-rt"><b>${esc(n.company || "")}</b><em>${n.kind === "avoir" ? "Avoir" : "Facture"} n° ${esc(n.no)} · ${esc(shortDate(n.day))}${n.table ? " · table " + esc(n.table) : ""}</em></span>
       <span class="nf-rv">${n.avoirId ? "<i>Annulée</i>" : ""}<b class="mono">${nfEur(n.total)}</b></span></button>`).join("") : `<div class="empty">Aucune note de frais pour l'instant. Elle se fait dans l'addition d'une table.</div>`}</div></div>`);
+}
+function nfClientsSheet() {
+  const L = nfClients();
+  openSheet(`<div class="nf-sh"><div class="row"><span class="h2">Clients entreprises</span><button class="iconbtn" data-act="sheetClose" aria-label="Fermer">${ico("x")}</button></div>
+    <p class="sub">Les sociétés qui reviennent. Dans l'addition, un toucher sur leur nom remplit la note de frais. Un client s'ajoute tout seul à sa première note.</p>
+    <div class="nf-list">${L.length ? L.map((c) => `<div class="nf-row nf-crow"><span class="nf-ic">${ico("users")}</span>
+      <span class="nf-rt"><b>${esc(c.name)}</b><em>${esc([c.address, c.siren ? "SIREN " + c.siren : "", (+c.n || 0) + " note" + ((+c.n || 0) > 1 ? "s" : "")].filter(Boolean).join(" · "))}</em></span>
+      <button class="iconbtn" data-act="nfClientDel" data-id="${esc(c.id)}" aria-label="Retirer ${esc(c.name)}">${ico("trash")}</button></div>`).join("") : `<div class="empty">Aucun client enregistré. Faites une note de frais dans l'addition : la société est gardée pour la prochaine fois.</div>`}</div>
+    <button class="btn ghost block" data-act="nfList">Retour aux notes de frais</button></div>`);
 }
 function nfCfgSheet() {
   const c = nfCfg();
@@ -266,6 +361,12 @@ const nfRe = (id) => { SFX.tick(); buzz(3); nfRepaintTab(id); };
 Object.assign(ACT, {
   nfBToggle: (a, id) => { const B = nfB(id); B.on = !B.on; nfRe(id); if (B.on) setTimeout(() => { const i = $(`[data-nfb="${CSS.escape(id)}"][data-k=company]`); if (i && !i.value) try { i.focus({ preventScroll: true }); } catch (e) {} }, 60); },
   nfBMode: (a, id, v) => { nfB(id).mode = v; nfRe(id); },
+  nfBN: (a, id, v) => { const t = nfTabById(id); if (!t) return; const B = nfB(id), d = nfTabData(t), n = nfN(nfN(B.n, d) + +v, d); if (n === nfN(B.n, d)) return; B.n = n; SFX.tick(); buzz(3); nfRepaintFields(id); },
+  nfBTip: (a, id, v) => { nfB(id).tip = v === "non" ? "non" : "ligne"; SFX.tick(); buzz(3); nfRepaintFields(id); },
+  nfBClient: (a, id, v) => { const B = nfB(id); nfUseClient(B, v ? nfClients().find((c) => c.id === v) : null); SFX.tick(); buzz(3); nfRepaintFields(id); if (!v) setTimeout(() => { const i = $(`[data-nfb="${CSS.escape(id)}"][data-k=company]`); i && i.focus({ preventScroll: true }); }, 40); },
+  nfBSave: (a, id) => { const B = nfB(id); B.save = !B.save; SFX.tick(); nfRepaintFields(id); },
+  nfClients: () => { SFX.sheet ? SFX.sheet() : SFX.tap(); nfClientsSheet(); },
+  nfClientDel: async (a, id) => { const c = (NF.clients || []).find((x) => x.id === id); if (!c) return; const { id: _i, ...doc } = c; try { await DB.del("fraisClients", id); } catch (e) { return; } SFX.tap(); nfClientsSheet(); S.ui.undo = () => DB.set("fraisClients", id, doc); toastUndo(`${c.name} retiré des clients`); },
   nfBLabel: (a, id, v) => { nfB(id).label = v; nfRe(id); },
   nfBPay: (a, id, v) => { const B = nfB(id); B.pay = B.pay === v ? "" : v; nfRe(id); },
   nfTab: (a, id) => { const t = nfTabById(id); if (!t) return; SFX.sheet ? SFX.sheet() : SFX.tap(); nfTabSheet(t); },
@@ -288,7 +389,7 @@ Object.assign(ACT, {
     const n = nfById(id); if (!n || n.avoirId) return;
     const y = +dayKey().slice(0, 4), seq = nfNextSeq(y), neg = (x) => -x;
     const av = { kind: "avoir", year: y, seq, no: `${y}-${String(seq).padStart(4, "0")}`, day: dayKey(), at: Date.now(), uid: S.me.id, by: S.me.name || "", refId: n.id, refNo: n.no, why: v || "",
-      tabId: n.tabId || "", table: n.table || "", covers: n.covers, mode: n.mode, label: n.label, company: n.company, address: n.address || "", vatNo: n.vatNo || "",
+      tabId: n.tabId || "", table: n.table || "", covers: n.covers, mode: n.mode, label: n.label, company: n.company, address: n.address || "", siren: n.siren || "", vatNo: n.vatNo || "", tip: n.tip ? -n.tip : 0, tipMode: n.tipMode || "", meals: n.meals || 0,
       lines: (n.lines || []).map((l) => ({ ...l, tot: neg(l.tot), pp: undefined })).map((l) => { delete l.pp; return l; }), rates: (n.rates || []).map((x) => ({ r: x.r, ht: neg(x.ht), tva: neg(x.tva), ttc: neg(x.ttc) })), total: neg(n.total) };
     try { const aid = await DB.add("fraisNotes", av); await DB.update("fraisNotes", id, { avoirId: aid, avoirNo: av.no }); if (typeof logEvent === "function") logEvent("frais", `a fait l'avoir n° ${av.no} (annule la facture n° ${n.no})`, { ref: aid }); SFX.ok ? SFX.ok() : SFX.tap(); nfSheet({ id: aid, ...av }); toast(`Avoir n° ${av.no} édité`); } catch (e) {}
   },
@@ -327,6 +428,22 @@ Object.assign(ACT, {
     await close.apply(this, args);
     setTimeout(() => nfSheet(nfById(n.id) || n), 700);
   };
+  /* the tip block (js/pourboires.js, loaded after) sits above the note de frais, and a tip change updates the note */
+  const wrapTp = () => {
+    if (typeof tpBillInject !== "function" || tpBillInject.nf) return;
+    const tpi = tpBillInject;
+    tpBillInject = function () { // eslint-disable-line no-global-assign
+      const r = tpi.apply(this, arguments);
+      try {
+        const sh = $(".sl-sh.bill"), nb = sh && sh.querySelector(".nf-bill,.nf-done"), tb = sh && sh.querySelector(".tp-bill");
+        if (nb && tb && nb.compareDocumentPosition(tb) & 4 /* tb follows nb */) nb.before(tb);
+        const tab = typeof slCurTab === "function" ? slCurTab() : null; if (tab && NF.B[tab.id] && NF.B[tab.id].on) nfRepaintFields(tab.id);
+      } catch (e) { console.warn("frais", e); }
+      return r;
+    };
+    tpBillInject.nf = true;
+  };
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", wrapTp); else setTimeout(wrapTp, 0);
   /* the floor: tables settled today, to make (or reprint) a note de frais after the fact */
   if (typeof slFloor !== "function") return;
   const floor = slFloor;
@@ -349,6 +466,12 @@ Object.assign(ACT, {
 function nfSeedDemo() {
   const p = `restos/${S.rid}/fraisNotes`; if (DB.local[p]) return;
   DB.local[p] = {};
+  const cl = (name, address, siren, vatNo, n, ago) => ({ name, address, siren, vatNo, n, last: Date.now() - ago * 864e5, at: Date.now() - 40 * 864e5 });
+  DB.local[`restos/${S.rid}/fraisClients`] = DB.local[`restos/${S.rid}/fraisClients`] || {
+    nfc1: cl("Atelier Lumière SAS", "4 quai Saint-Antoine, 69002 Lyon", "884512376", "FR23884512376", 6, 9),
+    nfc2: cl("Groupe Vénus Immobilier", "21 cours Lafayette, 69003 Lyon", "512874930", "", 4, 0),
+    nfc3: cl("Cabinet Marchand", "8 rue de la République, 69001 Lyon", "", "", 3, 12),
+    nfc4: cl("Lyon Conseil", "37 rue Garibaldi, 69006 Lyon", "790331245", "FR61790331245", 1, 20) };
   DB.local[`restos/${S.rid}/fraisCfg`] = { main: { legal: "SAS Le Bistrot Démo", address: "12 rue des Vignes, 69002 Lyon", siret: "91234567800018", tva: "FR41912345678", footer: "SAS au capital de 10 000 € · RCS Lyon 912 345 678", at: Date.now() } };
   const today = dayKey(), y = +today.slice(0, 4), now = Date.now();
   /* a table settled an hour ago (no note yet) and one settled with its note */
@@ -368,6 +491,6 @@ function nfSeedDemo() {
   const av = DB.local[p][a2]; av.total = -av.total; av.lines = av.lines.map((l) => ({ ...l, tot: -l.tot })); av.lines.forEach((l) => delete l.pp); av.rates = av.rates.map((x) => ({ r: x.r, ht: -x.ht, tva: -x.tva, ttc: -x.ttc }));
   Object.assign(DB.local[p][f2], { avoirId: a2, avoirNo: av.no });
   put(mk(fake([it("Entrecôte, frites maison", 26, 3, "plat"), it("Pichet de vin rouge", 18, 1, "boisson")], 3), { company: "Atelier Lumière SAS", address: "4 quai Saint-Antoine, 69002 Lyon", vatNo: "FR23884512376" }, { table: "6" }), 9);
-  put(mk(T12, { company: "Groupe Vénus Immobilier", address: "21 cours Lafayette, 69003 Lyon", ticket: "2031" }, { table: "12", tabId: "nfd-t12" }), 0);
+  put(mk(T12, { company: "Groupe Vénus Immobilier", address: "21 cours Lafayette, 69003 Lyon", siren: "512874930", ticket: "2031", tipAmt: 6, tip: "ligne" }, { table: "12", tabId: "nfd-t12" }), 0);
   setTimeout(() => { try { DB.emit(tp); } catch (e) {} }, 0);
 }
