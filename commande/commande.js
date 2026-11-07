@@ -27,6 +27,43 @@
   const vib = (p) => { try { navigator.vibrate && navigator.vibrate(p); } catch (e) {} };
   const store = { get() { try { return JSON.parse(localStorage.getItem(LS) || "null"); } catch (e) { return null; } }, set(v) { try { localStorage.setItem(LS, JSON.stringify(v)); } catch (e) {} } };
 
+  /* prix dynamiques (js/prix.js): pub.promos [{ k:"hh"|"jour", t, days, day?, from?, to?, it:{ itemId: pct } }]. The server
+     (functions/src/commande.js) applies the same rule to the order, so the price shown is the price charged. Time is Paris time. */
+  const pxMin = (t) => { const m = /^(\d{1,2}):(\d{2})$/.exec(t || ""); return m ? +m[1] * 60 + +m[2] : null; };
+  function pxParis() { try { const p = Object.fromEntries(new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Paris", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false, weekday: "short" }).formatToParts(new Date()).map((x) => [x.type, x.value]));
+    return { day: `${p.year}-${p.month}-${p.day}`, min: (+p.hour % 24) * 60 + +p.minute, wd: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].indexOf(p.weekday) }; } catch (e) { const d = new Date(); return { day: `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`, min: d.getHours() * 60 + d.getMinutes(), wd: d.getDay() }; } }
+  function pxActive(r, now) {
+    if (!r || !r.it) return false; if (r.day ? r.day !== now.day : !(Array.isArray(r.days) && r.days.includes(now.wd))) return false;
+    const a = pxMin(r.from) ?? 0, b = pxMin(r.to) ?? 1440; return a <= b ? now.min >= a && now.min < b : now.min >= a || now.min < b;
+  }
+  function pxDeal(promos, id, now) {
+    let best = null; (Array.isArray(promos) ? promos : []).forEach((r) => { const v = r && r.it ? r.it[id] : undefined; const pc = +v;
+      if (v == null || !(pc >= 0 && pc <= 90) || !pxActive(r, now)) return; if (!best || pc > best.pct) best = { pct: pc, t: r.t || "", k: r.k || "", to: r.to || "" }; });
+    return best;
+  }
+  const pxPrice = (p, pct) => (pct > 0 ? Math.max(0.1, Math.round((+p || 0) * (100 - pct) / 10) / 10) : Math.round((+p || 0) * 100) / 100);
+  const hTx = (t) => String(t || "").replace(/^0(\d)/, "$1").replace(":00", " h").replace(":", " h ");
+  /* sets it.p (price now), it.p0 (the carte price) and it.pr (the running deal); true when something changed */
+  function applyPromos() {
+    if (!st.pub) return false; const now = pxParis(); let ch = false;
+    (st.pub.items || []).forEach((it) => { if (it.p0 == null) it.p0 = it.p; const d = pxDeal(st.pub.promos, it.id, now); const p = d && d.pct > 0 ? pxPrice(it.p0, d.pct) : it.p0;
+      const sig = d ? `${d.k}${d.pct}${d.t}` : ""; if (p !== it.p || sig !== (it.prSig || "")) { ch = true; it.p = p; it.pr = d; it.prSig = sig; } });
+    return ch;
+  }
+  const dealTag = (it) => (!it.pr ? "" : `<span class="qm-tag deal${it.pr.k === "jour" ? " jour" : ""}">${it.pr.k === "jour" ? "Plat du jour" : esc(it.pr.t || "Happy hour")}${it.pr.pct > 0 ? ` −${it.pr.pct} %` : ""}</span>`);
+  const was = (it) => (it.pr && it.pr.pct > 0 ? `<s class="qm-was">${eur(it.p0)}</s>` : "");
+  /* banner: the happy hour running now (what, until when) and the plat du jour */
+  function dealBanner() {
+    const P = (st.pub && st.pub.promos) || [], now = pxParis(), out = [];
+    P.filter((r) => r.k === "hh" && pxActive(r, now)).slice(0, 2).forEach((r) => { const ids = Object.keys(r.it || {}).filter((id) => +r.it[id] > 0 && itemOf(id)); if (!ids.length) return;
+      const cs = [...new Set(ids.map((id) => itemOf(id).c))].map((c) => ((st.pub.cats || []).find((x) => x.id === c) || {}).t).filter(Boolean);
+      const pcs = [...new Set(ids.map((id) => +r.it[id]))]; const pc = Math.max(...pcs);
+      out.push(`<div class="qm-deal st" style="--i:1"><span class="qm-deal-pc">−${pc}<small>%</small></span><span class="qm-deal-tx"><b>${esc(r.t || "Happy hour")} en ce moment</b><em>${pcs.length > 1 ? "Jusqu'à " : ""}−${pc} % sur ${esc(cs.join(", ").toLowerCase() || "une sélection")}${r.to ? ` · jusqu'à ${esc(hTx(r.to))}` : ""}</em></span></div>`); });
+    P.filter((r) => r.k === "jour" && pxActive(r, now)).slice(0, 1).forEach((r) => { const id = Object.keys(r.it || {})[0]; const it = itemOf(id); if (!it || it.out) return;
+      out.push(`<button class="qm-deal jour st" style="--i:1" data-a="open" data-id="${esc(it.id)}"><span class="qm-deal-pc">${svg.chef}</span><span class="qm-deal-tx"><b>Plat du jour : ${esc(it.t)}</b><em>${was(it)}${eur(it.p)}${it.pr && it.pr.pct > 0 ? ` · −${it.pr.pct} % aujourd'hui` : " · aujourd'hui seulement"}</em></span><span class="qm-chev">${svg.back}</span></button>`); });
+    return out.join("");
+  }
+
   const AL = [["gluten", "Gluten"], ["crustaces", "Crustacés"], ["oeufs", "Œufs"], ["poissons", "Poissons"], ["arachides", "Arachides"], ["soja", "Soja"], ["lait", "Lait"], ["fruitscoque", "Fruits à coque"], ["celeri", "Céleri"], ["moutarde", "Moutarde"], ["sesame", "Sésame"], ["sulfites", "Sulfites"], ["lupin", "Lupin"], ["mollusques", "Mollusques"]];
   const alName = (id) => (AL.find((a) => a[0] === id) || [id, id])[1];
   const svg = {
@@ -123,7 +160,13 @@
         { id: "d9", t: "Mousse au chocolat", d: "Chocolat noir 70 %, fleur de sel.", p: 7, c: "dessert", al: ["oeufs", "lait"], ph: DEMO_PH("#B98A6E", "#4A2A1C", "🍫"), pop: true },
         { id: "d10", t: "Limonade maison", d: "Citron pressé, sucre de canne, menthe fraîche. 33 cl.", p: 4.5, c: "boisson", al: [], ph: DEMO_PH("#E6F5B8", "#9CC23E", "🍋"), veg: true },
         { id: "d11", t: "Côtes-du-Rhône, verre", d: "Domaine des Sarments, rouge. 12 cl.", p: 6, c: "boisson", al: ["sulfites"], ph: DEMO_PH("#D8A0B8", "#7A2148", "🍷") },
-      ] };
+      ], promos: demoPromos() };
+  }
+  /* the demo always has a happy hour running (drinks) and a plat du jour */
+  function demoPromos() {
+    const n = pxParis(), h0 = Math.max(0, Math.floor(n.min / 60) - 1), h1 = Math.min(23, h0 + 3);
+    return [{ id: "hh1", k: "hh", t: "Happy hour", days: [0, 1, 2, 3, 4, 5, 6], from: `${pad(h0)}:00`, to: h1 >= 23 ? "23:59" : `${pad(h1)}:00`, it: { d10: 30, d11: 30 } },
+      { id: "jour", k: "jour", t: "Plat du jour", days: [], day: n.day, it: { d5: 20 } }];
   }
   const demo = { orders: {} };
   async function demoApi(op, d) {
@@ -238,9 +281,9 @@
     const q = qtyOf(it.id), h = hits(it), can = !!st.mode && !it.out;
     return `<article class="qm-it st${it.out ? " out" : ""}${h.length ? " hit" : ""}${q ? " has" : ""}" style="--i:${Math.min(i, 14)}" data-a="open" data-id="${esc(it.id)}" tabindex="0" role="button" aria-label="${esc(it.t)}, ${eur(it.p)}">
       <div class="qm-it-tx">
-        <div class="qm-it-h"><b>${esc(it.t)}</b><i class="qm-lead" aria-hidden="true"></i><span class="qm-pr2" aria-hidden="true">${eur(it.p).replace(",00", "")}</span></div>
+        <div class="qm-it-h"><b>${esc(it.t)}</b><i class="qm-lead" aria-hidden="true"></i><span class="qm-pr2${it.pr && it.pr.pct > 0 ? " deal" : ""}" aria-hidden="true">${it.pr && it.pr.pct > 0 ? `<s>${eur(it.p0).replace(",00", "")}</s> ` : ""}${eur(it.p).replace(",00", "")}</span></div>
         ${it.d ? `<p>${esc(it.d)}</p>` : ""}
-        <div class="qm-it-meta"><span class="qm-pr">${eur(it.p)}</span>${it.pop ? `<span class="qm-tag pop">Le plus commandé</span>` : ""}${it.veg ? `<span class="qm-tag veg">${svg.leaf}Végétarien</span>` : ""}${it.out ? `<span class="qm-tag out">Épuisé</span>` : ""}</div>
+        <div class="qm-it-meta">${was(it)}<span class="qm-pr${it.pr && it.pr.pct > 0 ? " deal" : ""}">${eur(it.p)}</span>${dealTag(it)}${it.pop ? `<span class="qm-tag pop">Le plus commandé</span>` : ""}${it.veg ? `<span class="qm-tag veg">${svg.leaf}Végétarien</span>` : ""}${it.out ? `<span class="qm-tag out">Épuisé</span>` : ""}</div>
         ${h.length ? `<div class="qm-it-al">${svg.alert}Contient : ${esc(h.map(alName).join(", ").toLowerCase())}</div>` : it.alu && st.al.size ? `<div class="qm-it-al">${svg.alert}Allergènes : demandez au personnel</div>` : ""}
       </div>
       <div class="qm-it-ph">${it.ph ? `<img src="${esc(it.ph)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : `<span>${esc(initials(it.t))}</span>`}
@@ -259,6 +302,7 @@
     if (!st.cat || !C.some((c) => c.id === st.cat)) st.cat = (C[0] || {}).id || "";
     app.innerHTML = `${hero(st.mode === "emporter" ? "Commande à emporter" : st.mode === "table" ? "Commander à table" : "La carte")}
       ${live && !st.order ? `<button class="qm-track st" style="--i:0" data-a="track">${svg.bell}<span><b>Suivre ma commande</b><em>Commande n° ${esc(mine.n || "")} · touchez pour voir où elle en est</em></span><span class="qm-chev">${svg.back}</span></button>` : ""}
+      ${dealBanner()}
       ${p.msg ? `<p class="qm-msgline st" style="--i:1">${esc(p.msg)}</p>` : ""}
       ${!st.mode ? `<p class="qm-msgline info st" style="--i:1">${svg.alert}<span>Vous consultez la carte. <button class="qm-link in" data-a="mode">Commander</button></span></p>` : ""}
       <nav class="qm-cats" id="qmCats" aria-label="Catégories"><div class="qm-cats-in">${C.map((c) => `<button class="qm-cat${c.id === st.cat ? " on" : ""}" data-a="cat" data-v="${esc(c.id)}">${esc(c.t)}</button>`).join("")}<span class="qm-cat-ind" id="qmInd"></span></div></nav>
@@ -325,7 +369,7 @@
       <div class="qm-dt-ph">${it.ph ? `<img src="${esc(it.ph)}" alt="" referrerpolicy="no-referrer">` : `<span>${esc(initials(it.t))}</span>`}<button class="qm-x" data-a="close" aria-label="Fermer">${svg.x}</button></div>
       <div class="qm-dt">
         <h3>${esc(it.t)}</h3>
-        <div class="qm-it-meta"><span class="qm-pr big">${eur(it.p)}</span>${it.veg ? `<span class="qm-tag veg">${svg.leaf}Végétarien</span>` : ""}${it.out ? `<span class="qm-tag out">Épuisé</span>` : ""}</div>
+        <div class="qm-it-meta">${was(it)}<span class="qm-pr big${it.pr && it.pr.pct > 0 ? " deal" : ""}">${eur(it.p)}</span>${dealTag(it)}${it.veg ? `<span class="qm-tag veg">${svg.leaf}Végétarien</span>` : ""}${it.out ? `<span class="qm-tag out">Épuisé</span>` : ""}</div>
         ${it.d ? `<p>${esc(it.d)}</p>` : ""}
         <div class="qm-dt-al"><b>Allergènes</b>${it.alu ? `<em>Le restaurant vérifie encore les allergènes de ce plat. Demandez au personnel avant de commander.</em>` : (it.al || []).length ? `<div class="qm-alc">${it.al.map((a) => `<span class="${st.al.has(a) ? "hit" : ""}">${esc(alName(a))}</span>`).join("")}</div>` : `<em>Aucun des 14 allergènes réglementaires.</em>`}
           ${h.length ? `<div class="qm-warn">${svg.alert}<span>Ce plat contient ${esc(h.map(alName).join(", ").toLowerCase())}. Parlez-en au personnel avant de commander.</span></div>` : ""}</div>
@@ -490,6 +534,9 @@
     } catch (e) { console.warn(e); return paintMsg("Connexion impossible", "Vérifiez votre connexion internet, puis réessayez.", true); }
     if (!st.pub || !(st.pub.items || []).length) return paintMsg("Carte introuvable", "Ce restaurant n'a pas (encore) de carte en ligne.");
     st.pub.items.forEach((it) => { if (Array.isArray(it.al)) it.al = [...new Set(it.al.map(alId))]; });
+    applyPromos();
+    /* a happy hour starts or ends while the menu is open: prices follow (the cart too) */
+    setInterval(() => { if (!applyPromos()) return; if (st.view === "menu" && !st.sheet) { const y = window.scrollY; paintMenu(); window.scrollTo(0, y); } else if (st.view === "menu") { const b = $("#qmP"); if (b) b.textContent = eur(total()); } }, 30000);
     applyLook();
     if (PV) { const c0 = cfg(); st.mode = DEMO && /^\d{1,4}$/.test(T0) && c0.on && c0.table ? "table" : null; /* a real menu is only browsed in the preview: no order can leave it */ st.table = st.mode ? T0 : ""; st.view = "menu"; paintMenu(); return; }
     if (st.oid && st.okey) { poll(true); return; }
