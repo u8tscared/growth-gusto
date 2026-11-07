@@ -24,6 +24,20 @@ module.exports = async (page, shot) => {
     const sps = await page.evaluate((who) => { if (typeof esDemoBecome !== 'function') return []; esDemoBecome(who); return esAllowed(); }, who);
     for (const sp of sps) { await page.evaluate((sp) => { ES.sp = sp; const tb = document.querySelector('#tabbar'); if (tb) delete tb.dataset.built; renderChrome(); }, sp); out.push(await check(who + ' · ' + sp)); }
   }
+  /* appareils du restaurant : verrouillés sur leur mode (écran cuisine et pointeuse en grand écran, sans menu) */
+  const dev = await page.evaluate(() => new Promise((res) => {
+    if (typeof ES_ST === 'undefined') return res([]);
+    const g = (S.members.find((m) => m.role === 'gerant') || {}).id; const out = [];
+    const ks = Object.keys(ES_ST); let i = 0;
+    const next = () => {
+      if (i >= ks.length) { esDemoBecome(g); S.history = []; go('home', {}, { replace: true }); renderChrome(); return res(out); }
+      const k = ks[i++]; esDemoBecome(g, k); S.history = []; go('home', {}, { replace: true }); renderChrome();
+      setTimeout(() => { go('finance'); setTimeout(() => { const h = document.documentElement; out.push({ k, route: S.route, big: h.classList.contains('gg-big'), side: getComputedStyle(document.querySelector('#side')).display, nav: esNavRoutes() }); next(); }, 400); }, 500);
+    };
+    next();
+  }));
+  const devBad = dev.filter((d) => d.route === 'finance' || d.nav.includes('finance') || d.nav.includes('reglages') || ((d.k === 'cuisine' || d.k === 'pointeuse') && (!d.big || d.side !== 'none' || d.route !== d.k)));
+  if (devBad.length) throw new Error('appareil du restaurant pas verrouillé : ' + JSON.stringify(devBad));
   if (out[0].mode !== 'demo') throw new Error('démo non ouverte');
   const bad = out.filter((r) => r.missing.length);
   if (bad.length) throw new Error('absent du menu Plus sur téléphone/tablette : ' + bad.map((r) => `${r.label} (${r.sp}) → ${r.missing.join(', ')}`).join(' ; '));

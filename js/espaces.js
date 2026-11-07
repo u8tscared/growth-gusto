@@ -26,6 +26,9 @@ Object.assign(IC, {
   esInbox: ["f:M3.5 13.5h5l1.5 2.5h4l1.5-2.5h5V18a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z", "M3.5 13.5h5l1.5 2.5h4l1.5-2.5h5", "M3.5 13.5 6 5.5A1.5 1.5 0 0 1 7.4 4.5h9.2A1.5 1.5 0 0 1 18 5.5l2.5 8V18a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"],
   esHist: ["M3.5 12a8.5 8.5 0 1 0 2.5-6", "M3.5 3.5V8H8", "M12 7.5V12l3 2"],
   esEye: ["M2.5 12s3.5-6.5 9.5-6.5 9.5 6.5 9.5 6.5-3.5 6.5-9.5 6.5S2.5 12 2.5 12z", "c:12,12,3", "f:M12 9a3 3 0 1 1 0 6 3 3 0 0 1 0-6z"],
+  esUnlock: ["f:M5 11.5A1.5 1.5 0 0 1 6.5 10h11a1.5 1.5 0 0 1 1.5 1.5v7a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 5 18.5z", "r:5,10,14,10,1.5", "M8 10V7a4 4 0 0 1 7.6-1.7", "M12 14v2"],
+  esKey: ["c:8,15,4", "f:M8 11a4 4 0 1 1 0 8 4 4 0 0 1 0-8z", "M10.8 12.2 19 4", "M16 7l2.5 2.5", "M14 9l1.5 1.5"],
+  esEyeOff: ["M3 3l18 18", "M10.6 6.1A9.7 9.7 0 0 1 12 6c6 0 9.5 6 9.5 6a17 17 0 0 1-3 3.6", "M6.6 6.7C4 8.4 2.5 12 2.5 12S6 18 12 18c1.6 0 3-.4 4.3-1", "M9.9 9.9a3 3 0 0 0 4.2 4.2"],
   esHand2: ["M7 11.5 10.5 8a2 2 0 0 1 2.8 0l.2.2", "M3 12.5l3.5-3.5 4 1 3.5-2 7 7", "M14 18.5l-1.5 1.5a1.5 1.5 0 0 1-2.1 0l-5-5", "M17 16l-2.5 2.5"],
 });
 
@@ -59,13 +62,30 @@ const ES_PERSONAS = [
   ["demo-lucas", "Commis : écran cuisine, relevés, ses heures", null],
   ["demo-hugo", "Plongeur extra : ménage, hygiène, ses heures", null],
 ];
-const ES_DEVICES = [
-  ["cuisine", "slHat", "Tablette de la cuisine", "Partagée, s'ouvre sur l'écran cuisine"],
-  ["salle", "slPad", "Téléphone de salle prêté", "Partagé, chacun prend la main avec son code"],
-  ["pointeuse", "clock", "Pointeuse murale", "Une tablette à l'entrée pour pointer"],
-];
+/* appareil du restaurant : ce qu'il affiche (« station »). kiosk = verrouillé sur un seul écran, en grand écran, sans menus */
+const ES_HIDE_TEAM = ["Mon espace de chacun : planning, heures, demandes", "Le pilotage : chiffres, stock, équipe, réglages"];
+const ES_ST = {
+  service: { ic: "esServ", t: "Outils du service", dev: "Tablette ou téléphone partagé", route: "home", kiosk: false, mk: "service",
+    d: "Les outils d'un poste. Chacun prend la main avec son prénom.",
+    sees: ["Les outils du poste choisi : cuisine, salle, bar ou plonge", "Les consignes et la pointeuse", "Le prénom de qui a la main signe ce qu'il fait"],
+    hides: ES_HIDE_TEAM, exit: "le cadenas en bas du menu, puis le code du gérant" },
+  salle: { ic: "slPad", t: "Prise de commande", dev: "Téléphone de salle prêté", route: "salle", kiosk: false, mk: "salle",
+    d: "Le téléphone prêté aux serveurs : tables, commandes, réservations.",
+    sees: ["La prise de commande et le plan de salle", "Les réservations et l'écran cuisine", "Le prénom du serveur sur chaque commande"],
+    hides: ES_HIDE_TEAM, exit: "le cadenas en bas du menu, puis le code du gérant" },
+  cuisine: { ic: "slHat", t: "Écran cuisine", dev: "Tablette fixée en cuisine", route: "cuisine", kiosk: true, mk: "kds",
+    d: "Les bons en grand écran, et rien d'autre.",
+    sees: ["Les bons qui arrivent, en plein écran", "Le temps de chaque table et ce qui attend au passe"],
+    hides: ["Le menu, la barre d'onglets et tout le reste de l'app"], exit: "le cadenas en bas de l'écran, puis le code du gérant" },
+  pointeuse: { ic: "clock", t: "Pointeuse murale", dev: "Tablette à l'entrée", route: "pointeuse", kiosk: true, mk: "pt",
+    d: "Chacun touche son prénom et pointe avec son code.",
+    sees: ["Les prénoms de l'équipe, l'heure, qui est là"],
+    hides: ["Le menu, les heures des autres et tout le reste de l'app"], exit: "le cadenas en bas de l'écran, puis le code du gérant" },
+};
+const ES_ST_ORDER = ["service", "salle", "cuisine", "pointeuse"];
+const ES_DEVICES = ES_ST_ORDER.map((k) => [k, ES_ST[k].ic, ES_ST[k].dev, ES_ST[k].d]);
 
-const ES = { sp: null, demoDev: null, kioskDone: false, edit: false, wk: 0, mo: 0, hm: 0, view: "week", act: "all", unlock: false, F: null, pin: null, tabs0: null };
+const ES = { sp: null, demoDev: null, devDraft: null, lk: null, kioskDone: false, edit: false, wk: 0, mo: 0, hm: 0, view: "week", act: "all", unlock: false, F: null, pin: null, tabs0: null };
 
 /* ───────────── storage ───────────── */
 const esLSget = (k, d) => { try { const v = JSON.parse(localStorage.getItem(k) || "null"); return v && typeof v === "object" ? v : d; } catch (e) { return d; } };
@@ -78,6 +98,11 @@ const ES_UMEM = {};
 function esUser() { if (DB.mode === "demo") return (ES_UMEM[esUKey()] ||= {}); return esLSget(esUKey(), {}); }
 function esUserSet(fn) { const u = { ...esUser() }; fn(u); if (DB.mode === "demo") ES_UMEM[esUKey()] = u; else esLSset(esUKey(), u); return u; }
 const esShared = () => esDev().kind === "partage";
+const esStation = () => { const s = esDev().station; return ES_ST[s] ? s : "service"; };
+/* locked = a restaurant device nobody unlocked with the gérant's code; kiosk = locked on one screen, in grand écran */
+const esLocked = () => !!S.resto && esShared() && !ES.unlock;
+const esKioskOn = () => esLocked() && ES_ST[esStation()].kiosk;
+if (typeof BIG_ROUTES !== "undefined" && !BIG_ROUTES.includes("pointeuse")) BIG_ROUTES.push("pointeuse");
 
 /* ───────────── who am I, what may I see ───────────── */
 const esMember = (id = S.me.id) => (S.members || []).find((m) => m.id === id) || null;
@@ -94,8 +119,10 @@ function esAllowed() {
 }
 function esStaff(mid = S.me.id) { return (S.staff || []).find((s) => s.memberId === mid && s.active !== false) || null; }
 function esPoste() {
+  const d = esDev(); if (esShared() && (d.station === "salle" || d.station === "cuisine")) return d.station;
+  /* shared « outils du service »: the tools follow whoever took over with their code */
+  if (esShared() && d.station === "service") { const a = esActor(); if (ES.pTap && ES.pTap.a === ((a && a.id) || "") && ES_POSTES[ES.pTap.p]) return ES.pTap.p; const am = a && esMember(a.id); const ap = am && ES_POSTE_OF[am.poste || ""]; if (ap) return ap; }
   const u = esUser(); if (ES_POSTES[u.poste]) return u.poste;
-  const d = esDev(); if (esShared() && ES_POSTES[d.station]) return d.station;
   const m = esMember(); return ES_POSTE_OF[(m && m.poste) || ""] || (m && m.role === "gerant" ? "salle" : "cuisine");
 }
 /* now on shift (clocked in, or a planned shift from 45 min before to its end) */
@@ -136,15 +163,17 @@ const esIs = (sp) => esCur() === sp;
 function esSet(sp = esCur()) {
   if (sp === "pilotage") return null;
   if (sp === "moi") return new Set(ES_MOI_SET);
+  if (esKioskOn()) return new Set([ES_ST[esStation()].route]);
   const u = esUser(); const ps = esPoste(); const tools = (u.tiles && Array.isArray(u.tiles[ps]) ? u.tiles[ps] : ES_POSTES[ps].tools);
-  return new Set(["home", ...tools, ...ES_POSTES[ps].tabs.map((t) => t[0]), ...ES_ALWAYS]);
+  return new Set(["home", ...tools, ...ES_POSTES[ps].tabs.map((t) => t[0]), ...(esLocked() ? ES_ALWAYS.filter((r) => r !== "espaces" && r !== "reglages") : ES_ALWAYS)]);
 }
 const esHomeLbl = (sp = esCur()) => (sp === "pilotage" ? null : ES_SP[sp].t);
 /* the groups of a space: [title, routes]; pilotage keeps NAV's own sections */
 function esPlan(sp = esCur()) {
   if (sp === "moi") return [["Mon espace", [...ES_MOI, "pointeuse", "consignes", "frais", "formation", "avis"]], ["Réglages", ["espaces", "reglages"]]];
+  if (esKioskOn()) { const k = ES_ST[esStation()]; return [[k.t, [k.route]]]; }
   const ps = esPoste(); const u = esUser(); const tools = u.tiles && Array.isArray(u.tiles[ps]) ? u.tiles[ps] : ES_POSTES[ps].tools;
-  return [[`Mes outils · ${ES_POSTES[ps].t}`, [...ES_POSTES[ps].tabs.map((t) => t[0]), ...tools]], ["Équipe", ["consignes", "pointeuse"]], ["Réglages", ["espaces", "reglages"]]];
+  return [[`${esShared() ? "Outils" : "Mes outils"} · ${ES_POSTES[ps].t}`, [...ES_POSTES[ps].tabs.map((t) => t[0]), ...tools]], ["Équipe", ["consignes", "pointeuse"]], ...(esLocked() ? [] : [["Réglages", ["espaces", "reglages"]]])];
 }
 function esFilterNav(list) {
   const sp = esCur(); const out = [];
@@ -155,7 +184,7 @@ function esFilterNav(list) {
   }
   /* En service / Mon espace: the same NAV rows (with the person's names, icons, colours), in the order of the space */
   const row = {}; list.forEach((n) => { if (n[0] !== "sep") row[n[0]] = n; });
-  const home = row.home ? row.home.slice() : ["home", "home", ""]; home[1] = ES_SP[sp].ic; home[2] = ES_SP[sp].t; out.push(home);
+  const home = row.home ? row.home.slice() : ["home", "home", ""]; home[1] = ES_SP[sp].ic; home[2] = ES_SP[sp].t; if (!(sp === "service" && esKioskOn())) out.push(home);
   const used = new Set(["home"]);
   esPlan(sp).forEach(([t, rs]) => { const its = rs.filter((r) => row[r] && !used.has(r) && used.add(r)).map((r) => row[r]); if (its.length) out.push(["sep", "", t], ...its); });
   return out;
@@ -194,15 +223,41 @@ function esNavRoutes() { return esFilterNav(NAV.filter((n) => n[0] === "sep" || 
   /* sidebar: the space switcher under the restaurant */
   const rc0 = renderChrome;
   window.renderChrome = function () {
+    /* kiosk device: its screen is always in grand écran (no side menu, no tab bar) */
+    let k = false; try { k = esKioskOn() && S.route === ES_ST[esStation()].route; if (k && typeof BIG !== "undefined" && !BIG.on) bigApply(true); } catch (e) {}
     rc0();
     try {
-      const side = $("#side"); const sp = esCur(); document.documentElement.dataset.es = sp;
+      const html = document.documentElement; const side = $("#side"); const sp = esCur(); html.dataset.es = sp;
+      html.classList.toggle("es-kiosk", k); html.classList.toggle("es-locked", esLocked());
       if (side && S.resto && !$(".es-sw", side)) { const nav = $(".navs", side); if (nav) nav.insertAdjacentHTML("beforebegin", esSwitch("side")); }
+      /* restaurant device: the « me » block (Réglages) becomes the device's lock */
+      const me = side && $(".me", side); if (me && S.resto && esShared()) me.outerHTML = esLockRow();
+      esLockFab(k);
     } catch (e) {}
   };
+  /* restaurant device: screens outside its mode don't open; a kiosk only knows its own screen */
+  const go0 = go;
+  window.go = function (route, params, opts) {
+    try {
+      if (esLocked()) {
+        const K = ES_ST[esStation()];
+        if (K.kiosk && (route === "home" || route === "more")) route = K.route;
+        else if (!esRouteOk(route)) { esBlocked(route); return; }
+        if (K.kiosk && route === "pointeuse" && typeof RH !== "undefined" && !RH.kiosk) { RH.kiosk = true; document.documentElement.classList.add("rh-kiosk"); }
+      }
+    } catch (e) {}
+    return go0.call(this, route, params, opts);
+  };
+  /* leaving grand écran (button, Échap, the browser's own gesture) on a kiosk asks for the gérant instead */
+  if (typeof bigSet === "function") {
+    const bs0 = bigSet; ES.bigSet0 = bs0;
+    window.bigSet = function (on, o) { if (!on && esKioskOn() && typeof bigOk === "function" && bigOk()) { setTimeout(esLockSheet, 30); return; } return bs0.call(this, on, o); };
+  }
+  if (ACT.rhKiosk) { const rk0 = ACT.rhKiosk; ACT.rhKiosk = function () { if (esKioskOn()) return esLockSheet(); return rk0.apply(this, arguments); }; }
   /* « Aujourd'hui » becomes the home of the space */
   const H = VIEWS.home; const r0 = H.render, a0 = H.after;
   H.render = function (p) {
+    if (esKioskOn()) return `<div class="inner es-kwait"></div>`;
     const sp = esCur();
     if (sp === "service") return esServiceView();
     if (sp === "moi") return esMoiView();
@@ -210,13 +265,14 @@ function esNavRoutes() { return esFilterNav(NAV.filter((n) => n[0] === "sep" || 
     return html.replace(/(<\/header>)/, `$1${esSwitch("hd")}${strip}`);
   };
   H.after = function (v) {
+    if (esKioskOn()) { setTimeout(() => { if (S.route === "home") go("home", {}, { replace: true }); }, 30); return; }
     const sp = esCur();
     if (sp !== "pilotage") { esCount(v); esKiosk(); return; }
     if (a0) a0.call(this, v);
   };
   /* Plus: the switcher at the top */
   const M = VIEWS.more; const m0 = M.render;
-  M.render = function (p) { const h = m0.call(this, p); const k = '<div class="lbl st cc-sec"'; return h.includes(k) ? h.replace(k, esSwitch("more") + k) : h; };
+  M.render = function (p) { const h = m0.call(this, p); const k = '<div class="lbl st cc-sec"'; const top = esSwitch("more") + (esShared() ? esLockCard() : ""); return h.includes(k) ? h.replace(k, top + k) : h; };
   /* « Mon espace »: the DLC alarm count belongs to the kitchen, not to my personal home */
   const uc0 = urgentCount; window.urgentCount = function () { return esCur() === "moi" ? 0 : uc0(); };
   /* shared device: the person who took over signs the audit trail */
@@ -259,16 +315,17 @@ function esApply(sp, ev, opts = {}) {
   if (reduce || opts.quiet) { swap(); return; }
   esMorph(sp, ev, swap);
 }
-function esMorph(sp, ev, mid) {
-  const D = ES_SP[sp]; const x = ev && ev.clientX ? ev.clientX : innerWidth / 2, y = ev && ev.clientY ? ev.clientY : innerHeight / 3;
+function esMorph(sp, ev, mid, over) {
+  const D = over || ES_SP[sp]; const x = ev && ev.clientX ? ev.clientX : innerWidth / 2, y = ev && ev.clientY ? ev.clientY : innerHeight / 3;
   $$(".es-morph").forEach((e) => e.remove());
   const el = document.createElement("div"); el.className = `es-morph es-m-${sp}`; el.setAttribute("aria-hidden", "true");
   el.style.cssText = `--x:${x}px;--y:${y}px;--c:${D.c};--c2:${D.c2}`;
-  el.innerHTML = `<i class="es-mg"></i><div class="es-mc"><span class="es-mi">${ico(D.ic)}</span><b>${esc(D.t)}</b><em>${esc(D.d)}</em></div>`;
+  el.innerHTML = `<i class="es-mg"></i><div class="es-mc"><span class="es-mi">${ico(D.ic)}${over && over.hold ? `<i class="es-mlk">${ico("lock")}</i>` : ""}</span><b>${esc(D.t)}</b><em>${esc(D.d)}</em></div>`;
   document.body.appendChild(el); setTimeout(() => { try { SFX.sheet(); } catch (e) {} }, 60);
   setTimeout(() => { mid(); }, 520);
-  setTimeout(() => { el.classList.add("out"); try { SFX.ok(); } catch (e) {} buzz(10); }, 820);
-  setTimeout(() => el.remove(), 1350);
+  const hold = (over && over.hold) || 0;
+  setTimeout(() => { el.classList.add("out"); try { SFX.ok(); } catch (e) {} buzz(10); }, 820 + hold);
+  setTimeout(() => el.remove(), 1350 + hold);
 }
 
 /* ───────────── shared device: who took over ───────────── */
@@ -287,7 +344,7 @@ function esTeam() { return (S.members || []).filter((m) => m.role !== "kiosk" &&
 function esActorSheet() {
   const team = esTeam(); const cur = esActor();
   openSheet(`<div class="es-sh"><div class="es-shh"><span class="h2">Qui prend la main ?</span><button class="iconbtn" data-act="sheetClose" aria-label="Fermer">${ico("x")}</button></div>
-    <p class="sub">Ce téléphone appartient au restaurant. Votre prénom signera les commandes et ce que vous faites.</p>
+    <p class="sub">Cet appareil appartient au restaurant. Touchez votre prénom puis tapez votre code : ${esStation() === "service" ? "l'appareil s'ouvre sur les outils de votre poste, et " : ""}votre prénom signe ce que vous faites.</p>
     <div class="es-team">${team.map((m, i) => `<button class="es-tm${cur && cur.id === m.id ? " on" : ""}" style="--i:${i}" data-act="esActorPick" data-id="${esc(m.id)}">${avatar(m.id)}<b>${esc(firstName(m.name))}</b><em>${esc(esJob(m.id))}</em>${typeof ccHasPin === "function" && ccHasPin(m) ? `<i class="es-lk">${ico("lock")}</i>` : ""}</button>`).join("")}</div>
     ${cur ? `<button class="btn ghost block" data-act="esActorOff">${ico("out")}Rendre l'appareil</button>` : ""}</div>`);
 }
@@ -297,11 +354,71 @@ function esPinSheet() {
     <div class="es-dots${P.err ? " err" : ""}">${dots}</div>
     <div class="keypad es-keys">${[1, 2, 3, 4, 5, 6, 7, 8, 9].map((d) => `<button data-act="esKey" data-v="${d}">${d}</button>`).join("")}<button data-act="sheetClose" aria-label="Annuler">${ico("x")}</button><button data-act="esKey" data-v="0">0</button><button data-act="esKey" data-v="del" aria-label="Effacer">${ico("back")}</button></div></div>`);
 }
-function esTookOver(m) { esSetActor(m); closeSheet(); SFX.ok(); buzz([8, 30, 8]); toast(`${firstName(m.name)} prend la main`); rerender(); renderChrome(); }
+function esTookOver(m) { esSetActor(m); closeSheet(); SFX.ok(); buzz([8, 30, 8]); const ps = esPoste(); toast(`${firstName(m.name)} prend la main${esStation() === "service" && ES_POSTES[ps] ? ` · ${ES_POSTES[ps].t}` : ""}`); const tb = $("#tabbar"); if (tb) delete tb.dataset.built; rerender(); renderChrome(); }
+
+/* ───────────── restaurant device: the lock ───────────── */
+const ES_NOLOCK = ["perso", "staff", "admin", "avisAdmin", "sites", "espaces", "reglages"];
+/* may this route open on a locked restaurant device? (screens outside the menu, like a recipe card, follow their screen) */
+function esRouteOk(r) {
+  if (!esLocked()) return true;
+  if (ES_NOLOCK.includes(r)) return false;
+  if (r === "home" || r === "more" || r === "locked" || !NAV.some((n) => n[0] === r)) return true;
+  const set = esSet("service"); return !set || set.has(r);
+}
+function esBlocked(r) {
+  const n = esNavRow(r); SFX.err && SFX.err(); buzz([14, 30, 14]);
+  toast(`${n ? `« ${n[2]} »` : "Cet écran"} n'est pas sur cet appareil du restaurant. Le cadenas permet d'en sortir.`, "info");
+}
+function esLockRow() {
+  const K = ES_ST[esStation()];
+  return `<button class="me es-lkme${ES.unlock ? " open" : ""}" data-act="esLock" title="Appareil du restaurant"><span class="es-lki">${ico(ES.unlock ? "esUnlock" : "lock")}</span><div style="min-width:0;flex:1"><b>${esc(K.t)}</b><em>${ES.unlock ? "Déverrouillé, pour le gérant" : "Appareil du restaurant · verrouillé"}</em></div>${ico("chev")}</button>`;
+}
+function esLockCard() {
+  const K = ES_ST[esStation()];
+  return `<button class="es-lkc st" style="--i:1" data-act="esLock"><span class="es-lki">${ico(ES.unlock ? "esUnlock" : "lock")}</span><span><b>Appareil du restaurant · ${esc(K.t)}</b><em>${ES.unlock ? "Déverrouillé par le gérant. Touchez pour reverrouiller." : "Seulement les outils du service. Touchez pour en sortir."}</em></span>${ico("chev")}</button>`;
+}
+/* kiosk: a small lock in a corner, the only way out */
+function esLockFab(on) {
+  let b = $("#esLockFab");
+  if (!on) { if (b) b.remove(); return; }
+  if (!b) { b = document.createElement("button"); b.id = "esLockFab"; b.className = "es-lkfab"; b.dataset.act = "esLock"; document.body.appendChild(b); }
+  const K = ES_ST[esStation()]; b.setAttribute("aria-label", `${K.t} : appareil verrouillé. Toucher pour en sortir`);
+  b.innerHTML = `${ico("lock")}<span>${esc(K.t)}</span>`;
+}
+function esUnkiosk() {
+  const K = ES_ST[esStation()]; const h = document.documentElement;
+  h.classList.remove("es-kiosk", "rh-kiosk"); if (typeof RH !== "undefined") RH.kiosk = false;
+  try { localStorage.setItem("gg-big-" + K.route, "0"); } catch (e) {}
+  if (typeof BIG !== "undefined" && BIG.on) { try { bigFs(false); } catch (e) {} bigApply(false); }
+  esLockFab(false);
+}
+const esMgrPins = () => (S.members || []).filter((m) => (m.role === "gerant" || (S.resto && m.id === S.resto.owner)) && typeof ccHasPin === "function" && ccHasPin(m));
+function esLockSheet() {
+  const K = ES_ST[esStation()]; const L = ES.lk || (ES.lk = { code: "", err: "", ok: false });
+  const need = !ES.unlock && !L.ok && DB.mode !== "demo" && esMgrPins().length > 0;
+  const head = `<div class="es-lkh"><span class="es-lkhi">${ico(K.ic)}<i>${ico(ES.unlock ? "esUnlock" : "lock")}</i></span><div><span class="h2">${esc(K.t)}</span><p class="sub">${ES.unlock ? "Déverrouillé pour cette fois. L'équipe retrouve l'appareil verrouillé quand vous relancez." : `Cet appareil est celui du restaurant. ${K.kiosk ? "Il n'affiche que cet écran, en grand." : "Il n'affiche que les outils du service."}`}</p></div></div>`;
+  if (need) {
+    const dots = [0, 1, 2, 3].map((i) => `<i class="${i < L.code.length ? "on" : ""}"></i>`).join("");
+    openSheet(`<div class="es-sh es-pin es-lks">${head}<div class="es-pinw"><div class="sub">${L.err ? `<span style="color:var(--bad)">${esc(L.err)}</span>` : "Code du gérant pour en sortir"}</div></div>
+      <div class="es-dots${L.err ? " err" : ""}">${dots}</div>
+      <div class="keypad es-keys">${[1, 2, 3, 4, 5, 6, 7, 8, 9].map((d) => `<button data-act="esLkKey" data-v="${d}">${d}</button>`).join("")}<button data-act="sheetClose" aria-label="Annuler">${ico("x")}</button><button data-act="esLkKey" data-v="0">0</button><button data-act="esLkKey" data-v="del" aria-label="Effacer">${ico("back")}</button></div></div>`);
+    return;
+  }
+  const note = DB.mode === "demo" ? "Dans la vraie app, le code à 4 chiffres du gérant est demandé avant ces choix." : !esMgrPins().length && !ES.unlock ? "Astuce : créez votre code de gérant (Équipe, votre fiche) pour que personne d'autre ne puisse sortir de ce mode." : "";
+  const opt = (v, ic, t, d, cls = "") => `<button class="es-lko ${cls}" data-act="esLockGo" data-v="${v}"><span class="es-oi">${ico(ic)}</span><span><b>${t}</b><em>${d}</em></span>${ico("chev")}</button>`;
+  openSheet(`<div class="es-sh es-lks">${head}
+    <div class="es-lkos">${ES.unlock ? opt("relock", "lock", `Reverrouiller sur « ${esc(K.t)} »`, "L'équipe retrouve seulement cet écran", "acc") : ""}
+    ${opt("change", "esLayers", "Changer ce que l'appareil affiche", "Choisir un autre mode, voir ce que chacun verra")}
+    ${opt("perso", "pmPhone", "En faire mon téléphone", "Toute l'app, avec Mon espace et le Pilotage")}
+    ${!ES.unlock ? opt("full", "esUnlock", "Déverrouiller pour cette fois", "Toute l'app jusqu'au prochain lancement") : ""}</div>
+    ${note ? `<p class="es-fine">${esc(note)}</p>` : ""}
+    ${DB.mode === "demo" ? `<button class="es-demob" data-act="esDemoPick">${ico("esEye")}<span><b>Démo : voir l'app comme…</b><em>une autre personne ou un autre appareil</em></span>${ico("chev")}</button>` : ""}
+    <button class="btn ghost block" data-act="sheetClose">${ES.unlock ? "Fermer" : "Rester verrouillé"}</button></div>`);
+}
 /* kiosk stations: the screen the device opens on, once per launch */
 function esKiosk() {
   if (ES.kioskDone || !esShared()) return; ES.kioskDone = true;
-  const st = esDev().station; if (["cuisine", "salle", "pointeuse"].includes(st) && VIEWS[st]) setTimeout(() => { if (S.route === "home") go(st, {}, { replace: true }); }, 60);
+  const st = esStation(); if (st === "salle" && VIEWS.salle) setTimeout(() => { if (S.route === "home") go("salle", {}, { replace: true }); }, 60);
 }
 
 /* ───────────── small bits ───────────── */
@@ -358,7 +475,7 @@ function esServiceView() {
     <span class="es-glow" aria-hidden="true"><i></i><i></i></span>
     <div class="es-hk"><span class="es-live"><i></i>Service du ${esc(slot)}</span><span class="mono es-clock" data-es-clock>${pad(now.getHours())}:${pad(now.getMinutes())}</span></div>
     <div class="es-hb">${esc(big)}</div><div class="es-hsub">${esc(sub)}</div>
-    <div class="es-postes" role="group" aria-label="Mon poste sur cet appareil">${postes}</div>
+    ${sh && esStation() !== "service" ? "" : `<div class="es-postes" role="group" aria-label="Mon poste sur cet appareil">${postes}</div>`}
     <div class="es-ctas">${VIEWS[head[0]] && permOk(head[0]) ? `<button class="es-cta" data-go="${head[0]}"><span class="es-ctai">${ico(head[1])}</span><span>${esc(head[2])}</span>${ico("arrow")}</button>` : ""}
     ${VIEWS.coupdefeu && permOk("coupdefeu") ? `<button class="es-cf" data-act="esCf" aria-label="Mode coup de feu">${ico("cfFlame")}<span>Coup de feu</span></button>` : ""}</div>
   </section>`;
@@ -383,7 +500,7 @@ function esServiceView() {
   const crew = team.length ? `<section class="glass es-crew st" style="--i:6"><span class="lbl">En service maintenant</span><div class="es-crw">${team.slice(0, 8).map((x) => `<span class="es-cm">${typeof homeShiftAva === "function" ? homeShiftAva(x) : ""}<b>${esc(firstName(x.name))}</b><em>${x.st === "pause" ? "pause" : hm(x.since)}</em></span>`).join("")}</div></section>` : "";
   const cs = esTry(() => (typeof csHomeCard === "function" ? csHomeCard() : ""), "");
   return `<div class="inner es-home es-svc">
-    <div class="es-head es-hcol"><div class="row st es-head" style="--i:0"><div style="min-width:0">${esDateBtn()}<h1 class="title">${sh ? "En service" : `${esGreet()} ${esc(firstName(S.me.name) || "")}`.trim()}</h1></div>${sh ? `<span class="es-shared">${ico("pmTablet")}Appareil du resto</span>` : DB.mode === "demo" ? "" : `<button class="iconbtn es-me" data-go="reglages" aria-label="Réglages">${avatar(S.me.id, true)}</button>`}</div>${esSwitch("hd")}</div>
+    <div class="es-head es-hcol"><div class="row st es-head" style="--i:0"><div style="min-width:0">${esDateBtn()}<h1 class="title">${sh ? "En service" : `${esGreet()} ${esc(firstName(S.me.name) || "")}`.trim()}</h1></div>${sh ? `<button class="es-shared" data-act="esLock" aria-label="Appareil du restaurant : voir ce qu'il affiche et comment en sortir">${ico(ES.unlock ? "esUnlock" : "lock")}<span>${esc(ES_ST[esStation()].t)}</span></button>` : DB.mode === "demo" ? "" : `<button class="iconbtn es-me" data-go="reglages" aria-label="Réglages">${avatar(S.me.id, true)}</button>`}</div>${esSwitch("hd")}</div>
     <div class="es-cols"><div class="es-col">${hero}${who}${stats}${cs}</div><div class="es-col">${grid}${crew}</div></div>
   </div>`;
 }
@@ -604,16 +721,54 @@ VIEWS.esDemandes = {
 };
 
 /* ═══════════════════════════ Vues & appareils (réglages) ═══════════════════════════ */
+/* tiny drawings of what a device shows: the person sees the screen before choosing it */
+function esMock(k) {
+  const rows = (n, c = "") => Array.from({ length: n }, (_, i) => `<i class="${c}" style="--w:${[78, 54, 66, 46, 70][i % 5]}%"></i>`).join("");
+  const M = {
+    perso: `<span class="es-mk ph"><span class="mk-sc"><span class="mk-sw"><i></i><i></i><i></i></span>${rows(3, "ln")}<span class="mk-tb"><i></i><i></i><b></b><i></i><i></i></span></span></span>`,
+    partage: `<span class="es-mk tb"><span class="mk-sc"><span class="mk-lk">${ico("lock")}</span><span class="mk-g4"><i></i><i></i><i></i><i></i></span></span></span>`,
+    service: `<span class="es-mk sc svc"><span class="mk-side">${rows(4, "ln")}</span><span class="mk-main"><span class="mk-hero"></span><span class="mk-g4"><i></i><i></i><i></i><i></i></span></span></span>`,
+    salle: `<span class="es-mk sc sal"><span class="mk-side">${rows(4, "ln")}</span><span class="mk-main"><span class="mk-tables"><i></i><i class="on"></i><i></i><i></i><i class="on"></i><i></i></span></span></span>`,
+    kds: `<span class="es-mk sc kds"><span class="mk-main"><span class="mk-bons"><i><b></b>${rows(3, "ln")}</i><i class="hot"><b></b>${rows(2, "ln")}</i><i><b></b>${rows(4, "ln")}</i></span></span></span>`,
+    pt: `<span class="es-mk sc pt"><span class="mk-main"><span class="mk-clk"></span><span class="mk-avs"><i></i><i class="on"></i><i></i><i></i><i class="on"></i><i></i></span></span></span>`,
+  };
+  return M[k] || "";
+}
+function esDevSection() {
+  const cur = esDev(); const curSt = esStation();
+  const D = ES.devDraft || { kind: cur.kind, station: curSt }; ES.devDraft = D;
+  const shared = D.kind === "partage"; const K = ES_ST[D.station] || ES_ST.service;
+  const isNow = (kind, st) => cur.kind === kind && (kind === "perso" || curSt === st);
+  const now = `<span class="es-now">Maintenant</span>`;
+  const kind = (k, t, s) => `<button class="es-kd${D.kind === k ? " on" : ""}" data-act="esDevPick" data-id="kind" data-v="${k}" aria-pressed="${D.kind === k}">${esMock(k)}<span class="es-kdt"><b>${t}</b><em>${s}</em></span>${cur.kind === k ? now : ""}</button>`;
+  const step1 = `<span class="lbl st" style="--i:2">1 · Cet appareil, c'est…</span>
+    <div class="es-kds st" style="--i:3">${kind("perso", "Mon téléphone", "À moi seul. Je passe d'une vue à l'autre.")}${kind("partage", "Un appareil du restaurant", "Prêté ou posé au resto. Verrouillé sur un mode.")}</div>`;
+  if (!shared) {
+    const al = esAllowed(); const back = cur.kind === "partage";
+    return `${step1}<section class="glass pad es-sec es-det st" style="--i:4">
+      ${back ? "" : `<span class="lbl">Au lancement, ouvrir</span><div class="seg es-seg">${[["auto", "Auto"], ...al.map((k) => [k, ES_SP[k].short])].map(([k, t]) => `<button class="${(cur.start || "auto") === k ? "on" : ""}" data-act="esDevStart" data-v="${k}">${esc(t)}</button>`).join("")}</div>`}
+      <p class="es-fine">${back ? "Toute l'app revient sur cet appareil : En service, Mon espace et le Pilotage, avec votre compte." : `Auto : ${esIsMgr() ? "Pilotage au bureau, " : ""}« En service » quand vous êtes pointé ou que votre service commence, « Mon espace » le reste du temps. Les vues se changent en haut de l'accueil ou du menu.`}</p>
+      ${back ? `<button class="btn acc block es-launch" data-act="esDevLaunch">${ico("pmPhone")}En faire mon téléphone</button>` : ""}</section>`;
+  }
+  const mode = (k, i) => { const x = ES_ST[k]; return `<button class="es-md${D.station === k ? " on" : ""}" style="--i:${i}" data-act="esDevPick" data-id="station" data-v="${k}" aria-pressed="${D.station === k}">${esMock(x.mk)}<span class="es-mdt"><b>${ico(x.ic)}${esc(x.t)}</b><em>${esc(x.dev)}</em></span>${isNow("partage", k) ? now : ""}${x.kiosk ? `<span class="es-big">${ico("bigIn")}Grand écran</span>` : ""}</button>`; };
+  const step2 = `<span class="lbl st" style="--i:4">2 · Il affiche…</span><div class="es-mds st" style="--i:5">${ES_ST_ORDER.map(mode).join("")}</div>`;
+  const li = (arr) => arr.map((t) => `<li>${esc(t)}</li>`).join("");
+  const same = isNow("partage", D.station);
+  const step3 = `<span class="lbl st" style="--i:6">3 · Ce que l'équipe verra</span>
+    <section class="glass es-det es-dx st" style="--i:7" data-k="${D.station}">
+      <div class="es-dxh">${esMock(K.mk)}<div><b class="h2">${esc(K.t)}</b><p class="sub">${esc(K.d)}</p>${K.kiosk ? `<p class="es-fine">S'ouvre en grand écran : ni menu à gauche, ni barre d'onglets, l'écran reste allumé.</p>` : ""}</div></div>
+      <div class="es-dxc"><div class="es-dxb y"><span class="es-dxk">${ico("esEye")}Visible</span><ul>${li(K.sees)}</ul></div>
+      <div class="es-dxb n"><span class="es-dxk">${ico("esEyeOff")}Caché</span><ul>${li(K.hides)}</ul></div>
+      <div class="es-dxb o"><span class="es-dxk">${ico("esKey")}Pour sortir</span><ul><li>${esc(K.exit.replace(/^./, (c) => c.toUpperCase()))}</li></ul></div></div>
+      <button class="btn acc block es-launch" data-act="esDevLaunch">${ico(K.ic)}${same ? (ES.unlock ? `Reverrouiller sur « ${esc(K.t)} »` : `Relancer « ${esc(K.t)} »`) : `Lancer « ${esc(K.t)} » sur cet appareil`}</button>
+    </section>`;
+  return step1 + step2 + step3;
+}
 VIEWS.espaces = {
   render() {
     const d = esDev(); const al = esAllowed(); const u = esUser(); const ps = esPoste(); const g = esRole() === "gerant";
     const card = (on, act, v, ic, t, s) => `<button class="es-opt${on ? " on" : ""}" data-act="${act}" data-v="${v}" aria-pressed="${on}"><span class="es-oi">${ico(ic)}</span><span><b>${esc(t)}</b><em>${esc(s)}</em></span><i class="es-radio"></i></button>`;
-    const dev = `<span class="lbl st" style="--i:2">Cet appareil</span>
-      <section class="glass pad es-sec st" style="--i:3"><div class="es-opts">${card(d.kind === "perso", "esDevKind", "perso", "pmPhone", "Mon téléphone", "À moi : mon espace, mon planning, mes heures")}${card(d.kind === "partage", "esDevKind", "partage", "pmTablet", "Appareil du restaurant", "Prêté ou fixe : seulement le service, chacun prend la main")}</div>
-      ${d.kind === "partage" ? `<span class="lbl">S'ouvre sur</span><div class="es-opts g2">${[["service", "esServ", "En service", "Les outils du poste"], ...ES_DEVICES.map(([k, i, t]) => [k, i, k === "cuisine" ? "Écran cuisine" : k === "salle" ? "Prise de commande" : "Pointeuse", t])].map(([k, i, t, s]) => card(d.station === k, "esDevStation", k, i, t, s)).join("")}</div>`
-        : `<span class="lbl">Au lancement</span><div class="seg es-seg">${[["auto", "Auto"], ...al.map((k) => [k, ES_SP[k].short])].map(([k, t]) => `<button class="${d.start === k ? "on" : ""}" data-act="esDevStart" data-v="${k}">${esc(t)}</button>`).join("")}</div>
-        <p class="es-fine">Automatique : ${esIsMgr() ? "Pilotage au bureau, " : ""}« En service » quand vous êtes pointé ou que votre service commence, « Mon espace » le reste du temps.</p>`}
-      </section>`;
+    const dev = esDevSection();
     const mine = `<span class="lbl st" style="--i:4">Mon compte</span>
       <section class="glass pad es-sec st" style="--i:5"><div class="es-myl">${ES_ORDER.map((k) => `<div class="es-myr${al.includes(k) ? "" : " off"}"><span class="es-oi sp-${k}">${ico(ES_SP[k].ic)}</span><span><b>${ES_SP[k].t}</b><em>${esc(ES_SP[k].d)}</em></span>${al.includes(k) ? `<button class="btn sm soft" data-act="esGo" data-v="${k}">Ouvrir</button>` : `<span class="pill neu">${ico("lock")}Fermé</span>`}</div>`).join("")}</div>
       <span class="lbl">Mon poste en service</span><div class="es-postes light">${Object.entries(ES_POSTES).map(([k, x]) => `<button class="${k === ps ? "on" : ""}" data-act="esPoste" data-v="${k}">${ico(x.ic)}<span>${x.t}</span></button>`).join("")}</div>
@@ -645,6 +800,7 @@ function esDemoSheet() {
 }
 function esDemoBecome(mid, dev) {
   const m = esMember(mid); if (!m) return;
+  esUnkiosk(); ES.devDraft = null; ES.lk = null; ES.pTap = null;
   S.me = { id: mid, name: m.name || "", color: m.color }; S.profiles[mid] = { ...(S.profiles[mid] || {}), ...S.me };
   S.isOwner = m.role === "gerant"; S.demoAs = m.role === "gerant" ? null : mid;
   ES.demoDev = dev ? { kind: "partage", station: dev, start: "auto" } : null; ES.demoActor = null; ES.unlock = false; ES.kioskDone = false; ES.sp = null; ES.edit = false;
@@ -669,12 +825,27 @@ function esIcs() {
   SFX.ok(); toast(`${esPl(list.length, "service")} prêt${list.length > 1 ? "s" : ""} pour votre agenda`);
 }
 
+/* apply the device's mode: a short card says what it is and how to leave, then the device opens on it */
+function esDevLaunch(ev, D = ES.devDraft) {
+  if (!D) return; const was = esShared();
+  if (was) esUnkiosk();
+  ES.devDraft = null; ES.unlock = false; ES.lk = null; ES.pTap = null; ES.sp = null; ES.edit = false; ES.kioskDone = true;
+  const done = (route) => { const tb = $("#tabbar"); if (tb) delete tb.dataset.built; $$(".es-sw").forEach((w) => w.remove()); S.history = []; go(route, {}, { replace: true, tab: true }); renderChrome(); };
+  if (D.kind !== "partage") {
+    esDevSet({ kind: "perso" }); esSetActor(null);
+    esMorph(esCur(), ev, () => done("home")); toast(was ? "C'est de nouveau votre téléphone : toute l'app" : "Cet appareil est le vôtre"); return;
+  }
+  const K = ES_ST[D.station] || ES_ST.service; esDevSet({ kind: "partage", station: D.station }); esSetActor(null);
+  if (K.kiosk) { try { localStorage.setItem("gg-big-" + K.route, "1"); } catch (e) {} try { bigFs(true); } catch (e) {} } /* the browser's own fullscreen needs this tap */
+  esMorph("service", ev, () => done(K.route), { ic: K.ic, t: K.t, d: `Verrouillé. Pour sortir : ${K.exit}.`, c: "#1B1530", c2: K.kiosk ? "#EF5A3C" : "#F6B93B", hold: 900 });
+}
+
 /* ═══════════════════════════ actions ═══════════════════════════ */
 Object.assign(ACT, {
   esGo: (a, id, v, e) => { if (S.route !== "home" && esCur() === v) { go("home", {}, { replace: true }); return; } esApply(v, e); },
   esSpGo: (a, id, v, e) => esApply(v, e),
   esPoste: (a, id, v) => {
-    if (!ES_POSTES[v] || v === esPoste()) return; esUserSet((u) => { u.poste = v; }); SFX.tick(); buzz(6);
+    if (!ES_POSTES[v] || v === esPoste()) return; if (esShared()) { const ac = esActor(); ES.pTap = { a: (ac && ac.id) || "", p: v }; } else esUserSet((u) => { u.poste = v; }); SFX.tick(); buzz(6);
     try { localStorage.setItem("gg-cf-role-" + S.rid, v === "salle" || v === "bar" ? "salle" : "cuisine"); } catch (e) {}
     const tb = $("#tabbar"); if (tb) delete tb.dataset.built; ES.edit = false; renderChrome(); rerender();
   },
@@ -684,7 +855,7 @@ Object.assign(ACT, {
   esTileReset: () => { const ps = esPoste(); esUserSet((u) => { if (u.tiles) { u.tiles = { ...u.tiles }; delete u.tiles[ps]; } }); SFX.close(); rerender(); renderChrome(); },
   esActor: () => { SFX.sheet ? SFX.sheet() : SFX.tap(); esActorSheet(); },
   esActorPick: (a, id) => { const m = esMember(id); if (!m) return; if (DB.mode !== "demo" && typeof ccHasPin === "function" && ccHasPin(m)) { ES.pin = { id, code: "", err: "" }; esPinSheet(); return; } esTookOver(m); },
-  esActorOff: () => { esSetActor(null); closeSheet(); SFX.close(); toast("Appareil rendu"); rerender(); },
+  esActorOff: () => { esSetActor(null); closeSheet(); SFX.close(); toast("Appareil rendu"); const tb = $("#tabbar"); if (tb) delete tb.dataset.built; rerender(); renderChrome(); },
   esKey: (a, id, v) => {
     const P = ES.pin; if (!P) return; P.err = ""; if (v === "del") P.code = P.code.slice(0, -1); else if (P.code.length < 4) P.code += v; SFX.tick(); buzz(4);
     if (P.code.length === 4) { const ok = typeof ccVerifyPin === "function" ? ccVerifyPin(P.id, P.code) : true; if (ok) { const m = esMember(P.id); ES.pin = null; return esTookOver(m); } P.err = "Ce n'est pas le bon code"; P.code = ""; SFX.err(); buzz([20, 40, 20]); }
@@ -722,8 +893,28 @@ Object.assign(ACT, {
   },
   esIcs: () => esIcs(),
   esCf: () => { const ps = esPoste(); SFX.tap(); buzz(8); if (typeof cfEnter === "function") { try { return cfEnter(ps === "salle" || ps === "bar" ? "salle" : "cuisine", false); } catch (e) {} } go("coupdefeu"); },
-  esDevKind: (a, id, v) => { esDevSet({ kind: v === "partage" ? "partage" : "perso" }); ES.sp = null; ES.kioskDone = true; SFX.tick(); buzz(6); const tb = $("#tabbar"); if (tb) delete tb.dataset.built; renderChrome(); rerender(); toast(v === "partage" ? "Cet appareil est celui du restaurant" : "Cet appareil est le vôtre"); },
-  esDevStation: (a, id, v) => { esDevSet({ station: v }); if (ES_POSTES[v]) esUserSet((u) => { u.poste = v; }); SFX.tick(); const tb = $("#tabbar"); if (tb) delete tb.dataset.built; renderChrome(); rerender(); },
+  esDevPick: (a, id, v) => {
+    const D = ES.devDraft || (ES.devDraft = { kind: esDev().kind, station: esStation() });
+    if (id === "kind") D.kind = v === "partage" ? "partage" : "perso"; else if (ES_ST[v]) D.station = v;
+    SFX.tick(); buzz(6); rerender();
+    if (id === "station" || D.kind === "partage") setTimeout(() => { const el = $(id === "station" ? ".es-dx" : ".es-mds"); if (el && el.getBoundingClientRect().top > innerHeight * 0.55) el.scrollIntoView({ behavior: "smooth", block: "start" }); }, 80);
+  },
+  esDevLaunch: (a, id, v, e) => esDevLaunch(e),
+  esLock: () => { ES.lk = null; SFX.sheet ? SFX.sheet() : SFX.tap(); esLockSheet(); },
+  esLkKey: (a, id, v) => {
+    const L = ES.lk; if (!L) return; L.err = ""; if (v === "del") L.code = L.code.slice(0, -1); else if (L.code.length < 4) L.code += v; SFX.tick(); buzz(4);
+    if (L.code.length === 4) { if (esMgrPins().some((m) => ccVerifyPin(m.id, L.code))) { L.ok = true; L.code = ""; SFX.ok(); buzz([8, 30, 8]); } else { L.err = "Ce n'est pas le code du gérant"; L.code = ""; SFX.err(); buzz([20, 40, 20]); } }
+    esLockSheet();
+  },
+  esLockGo: (a, id, v, e) => {
+    const K = ES_ST[esStation()]; ES.lk = null; closeSheet();
+    if (v === "relock") { ES.unlock = false; ES.devDraft = null; return esDevLaunch(e, { kind: "partage", station: esStation() }); }
+    if (v === "perso") return esDevLaunch(e, { kind: "perso" });
+    ES.unlock = true; esUnkiosk(); ES.sp = null; const tb = $("#tabbar"); if (tb) delete tb.dataset.built;
+    if (v === "change") { ES.devDraft = { kind: "partage", station: esStation() }; S.history = []; go("espaces", {}, { replace: true }); }
+    else { S.history = []; go(K.route === "home" ? "home" : K.route, {}, { replace: true }); }
+    renderChrome(); SFX.ok(); toast("Déverrouillé pour cette fois");
+  },
   esDevStart: (a, id, v) => { esDevSet({ start: v }); ES.sp = null; SFX.tick(); const tb = $("#tabbar"); if (tb) delete tb.dataset.built; renderChrome(); rerender(); },
   esMx: async (a, id, v) => {
     if (esRole() !== "gerant") return; const m = esMember(id); if (!m) return;
@@ -736,7 +927,8 @@ Object.assign(ACT, {
   esDemoAs: (a, id, v, e) => { esDemoBecome(id); closeSheet(); const sp = esCur(); ES.sp = null; esMorph(sp, e, () => { esCur(); const tb = $("#tabbar"); if (tb) delete tb.dataset.built; $$(".es-sw").forEach((w) => w.remove()); S.history = []; go("home", {}, { replace: true, tab: true }); renderChrome(); }); toast(`Vous voyez l'app comme ${firstName(S.me.name)}`); },
   esDemoDev: (a, id, v, e) => {
     const owner = (S.members || []).find((m) => m.role === "gerant"); esDemoBecome(owner ? owner.id : S.me.id, v); closeSheet();
-    esMorph("service", e, () => { const tb = $("#tabbar"); if (tb) delete tb.dataset.built; $$(".es-sw").forEach((w) => w.remove()); S.history = []; go("home", {}, { replace: true, tab: true }); renderChrome(); });
+    const K = ES_ST[v] || ES_ST.service;
+    esMorph("service", e, () => { const tb = $("#tabbar"); if (tb) delete tb.dataset.built; $$(".es-sw").forEach((w) => w.remove()); S.history = []; go(K.route, {}, { replace: true, tab: true }); renderChrome(); }, { ic: K.ic, t: K.t, d: `Verrouillé. Pour sortir : ${K.exit}.`, c: "#1B1530", c2: K.kiosk ? "#EF5A3C" : "#F6B93B", hold: 900 });
   },
 });
 function esReqRead() { const F = ES.F; if (!F) return; const g = (i) => { const el = $("#" + i); return el ? el.value : null; }; F.from = g("esRf") ?? F.from; F.to = g("esRt") ?? F.to; F.note = g("esRn") ?? F.note; F.with = g("esRw") ?? F.with; }
