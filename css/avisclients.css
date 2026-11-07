@@ -1,0 +1,107 @@
+/* Growth Gusto — avis clients (js/avisclients.js). Prefix « vc- ». Violet wall hero with the note, paper cards, saffron stars. */
+.vc-stars{display:inline-flex;gap:1px;flex:none}
+.vc-stars i{display:grid;color:var(--rim-2)}
+.vc-stars i.on{color:var(--saffron)}
+.vc-stars i.on .ico path[fill],.vc-qs .ico path[fill]{opacity:1}
+.vc-stars i.on .ico{filter:drop-shadow(0 1px 0 rgba(217,154,30,.5))}
+.vc-stars .ico{width:15px;height:15px}
+.vc-stars.big .ico{width:22px;height:22px}
+
+.vc-grid{display:flex;flex-direction:column;gap:14px}
+.vc-side,.vc-main{display:flex;flex-direction:column;gap:14px;min-width:0}
+
+/* hero: the note, its stars, where the notes went, and the 5→1 bars */
+.vc-hero{border-radius:28px;padding:18px;display:flex;gap:16px;align-items:flex-end;justify-content:space-between;box-shadow:0 4px 0 #2A0BA6,0 24px 40px -24px rgba(76,31,234,.6);position:relative;overflow:hidden}
+.vc-hero::after{content:"";position:absolute;right:-70px;top:-90px;width:240px;height:240px;border-radius:50%;background:radial-gradient(circle,rgba(246,185,59,.28),transparent 65%);pointer-events:none;animation:vcGlow 9s ease-in-out infinite alternate}
+@keyframes vcGlow{to{transform:translate(-50px,40px) scale(1.15)}}
+.vc-h-l{display:flex;flex-direction:column;gap:6px;min-width:0;position:relative;z-index:1}
+.vc-h-k{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;font-weight:700;letter-spacing:.03em;color:rgba(255,255,255,.84)}
+.vc-h-k .ico{width:16px;height:16px;color:var(--saffron)}
+.vc-h-n{display:flex;align-items:baseline;gap:6px}
+.vc-h-n b{font-size:54px;font-weight:800;letter-spacing:-.05em;line-height:.95;animation:vcPop .7s var(--spring) both .1s}
+.vc-h-n span{font-size:17px;font-weight:700;color:rgba(255,255,255,.7)}
+.vc-hero .vc-stars i{color:rgba(255,255,255,.25)}
+.vc-hero .vc-stars i.on{color:var(--saffron);animation:vcStar .5s var(--spring) both}
+.vc-hero .vc-stars i:nth-child(2){animation-delay:.06s}.vc-hero .vc-stars i:nth-child(3){animation-delay:.12s}.vc-hero .vc-stars i:nth-child(4){animation-delay:.18s}.vc-hero .vc-stars i:nth-child(5){animation-delay:.24s}
+.vc-h-s{margin:0;font-size:14px;line-height:1.45;color:rgba(255,255,255,.88);max-width:260px}
+.vc-h-f{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.vc-h-f span{font-size:12.5px;font-weight:650;padding:5px 10px;border-radius:999px;background:rgba(255,255,255,.14);color:#fff}
+.vc-h-f span.warn{background:var(--saffron);color:#3B2A06}
+.vc-dist{display:flex;flex-direction:column;gap:5px;width:132px;flex:none;position:relative;z-index:1}
+.vc-dr{display:grid;grid-template-columns:10px 1fr 22px;align-items:center;gap:7px;font-size:12px;font-weight:700;color:rgba(255,255,255,.8)}
+.vc-dr i{height:7px;border-radius:9px;background:rgba(255,255,255,.16);position:relative;overflow:hidden}
+.vc-dr i::after{content:"";position:absolute;inset:0 auto 0 0;width:var(--w);border-radius:9px;background:var(--saffron);transform-origin:left;animation:vcBar .8s var(--ease) both;animation-delay:calc(.2s + var(--j) * 60ms)}
+.vc-dr em{font-style:normal;text-align:right}
+
+/* how the notes arrive */
+.vc-how{display:flex;flex-direction:column;gap:12px}
+.vc-how-h{display:flex;flex-direction:column;gap:2px}
+.vc-how-h .sub{font-size:13px}
+.vc-src{display:flex;flex-direction:column}
+.vc-s{display:flex;align-items:center;gap:12px;padding:10px 0;border-top:1px solid var(--line)}
+.vc-s:first-child{border-top:0}
+.vc-si{width:40px;height:40px;flex:none;border-radius:14px;display:grid;place-items:center;background:var(--tint);color:var(--accent-ink)}
+.vc-si .ico{width:19px;height:19px}
+.vc-s .tx{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.vc-s b{font-size:15px;font-weight:700}
+.vc-s em{font-style:normal;font-size:13px;color:var(--muted);line-height:1.35}
+.vc-warn{display:flex;align-items:center;gap:12px;background:var(--saffron-tint);border-radius:18px;padding:12px 12px 12px 14px}
+.vc-warn>.ico{width:22px;height:22px;color:var(--saffron-edge);flex:none}
+.vc-warn div{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.vc-warn b{font-size:14.5px}
+.vc-warn span{font-size:13px;color:var(--saffron-ink);line-height:1.35}
+.vc-try{all:unset;cursor:pointer;align-self:flex-start;display:inline-flex;align-items:center;gap:7px;font-size:14px;font-weight:700;color:var(--accent-ink);padding:4px 0}
+.vc-try .ico{width:16px;height:16px}
+
+/* list */
+.vc-seg{align-self:stretch}
+.vc-list{display:flex;flex-direction:column;gap:12px}
+.vc-card{padding:15px 16px;display:flex;flex-direction:column;gap:10px;position:relative}
+.vc-card.todo{box-shadow:0 0 0 2px var(--saffron) inset,var(--sh)}
+.vc-card.todo::before{content:"";position:absolute;left:-1px;top:18px;width:5px;height:28px;border-radius:0 6px 6px 0;background:var(--saffron)}
+.vc-c-h{display:flex;align-items:center;gap:11px}
+.vc-av{width:40px;height:40px;flex:none;border-radius:50%;display:grid;place-items:center;font-weight:780;font-size:14px;background:var(--cream-2);color:var(--ink-2)}
+.vc-card.low .vc-av{background:var(--tomato-tint);color:var(--bad)}
+.vc-c-h .tx{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.vc-c-h b{font-size:15.5px;font-weight:720;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.vc-c-h b i{font-style:normal;font-weight:600;color:var(--muted)}
+.vc-c-h em{font-style:normal;font-size:12.5px;color:var(--muted);display:flex;align-items:center;gap:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.vc-c-h em .ico{width:14px;height:14px;flex:none}
+.vc-tags{display:flex;flex-wrap:wrap;gap:6px}
+.vc-tags span{font-size:12.5px;font-weight:650;padding:4px 10px;border-radius:999px;background:var(--tint-ok);color:var(--ok)}
+.vc-tags span.bad{background:var(--tint-bad);color:var(--bad)}
+.vc-txt{margin:0;font-size:15px;line-height:1.5;color:var(--ink);overflow-wrap:anywhere}
+.vc-c-f{display:flex;align-items:center;flex-wrap:wrap;gap:8px}
+.vc-c-f .sp{flex:1}
+.vc-c-f .pill .ico{width:13px;height:13px}
+.vc-rep{display:inline-flex;align-items:center;gap:5px;font-size:12.5px;font-weight:650;color:var(--muted)}
+.vc-rep .ico{width:14px;height:14px}
+
+/* sheets */
+.vc-sheet{display:flex;flex-direction:column;gap:14px}
+.vc-quote{background:var(--cream-2);border-radius:16px;padding:12px 14px;display:flex;flex-direction:column;gap:6px}
+.vc-quote p{margin:0;font-size:14.5px;line-height:1.45;color:var(--ink-2)}
+.vc-sheet textarea{min-height:180px;line-height:1.45;resize:vertical}
+.vc-sb{display:flex;flex-direction:column;gap:10px}
+.vc-qrcard{align-self:center;width:min(100%,300px);background:#FBF6EC;border:1.5px dashed #DCCFB8;border-radius:26px;padding:20px 18px;display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center;color:#1B1530;animation:vcPop .6s var(--spring) both}
+.vc-qk{font-size:13px;font-weight:700;color:#5B2BFF}
+.vc-qrcard b{font-family:var(--d);font-size:22px;font-weight:780;letter-spacing:-.03em;line-height:1.05}
+.vc-qq{width:170px;height:170px;padding:9px;background:#fff;border-radius:16px;margin:6px 0 2px}
+.vc-qq svg{width:100%;height:100%}
+.vc-qs{display:flex;gap:2px;color:#F6B93B}
+.vc-qs .ico{width:16px;height:16px}
+.vc-qrcard em{font-style:normal;font-size:13px;font-weight:600;color:#615B74}
+
+@keyframes vcPop{from{opacity:0;transform:scale(.8)}to{opacity:1;transform:none}}
+@keyframes vcStar{from{opacity:0;transform:scale(.3) rotate(-30deg)}to{opacity:1;transform:none}}
+@keyframes vcBar{from{transform:scaleX(0)}to{transform:none}}
+
+@media (min-width:960px){
+  .vc-grid{display:grid;grid-template-columns:minmax(300px,380px) minmax(0,1fr);align-items:start;gap:18px}
+  .vc-side{position:sticky;top:12px}
+  .vc-hero{flex-direction:column;align-items:stretch}
+  .vc-dist{width:auto}
+}
+.view.nost .vc-hero::after,.view.nost .vc-dr i::after,.view.nost .vc-hero .vc-stars i{animation:none}
+@media (prefers-reduced-motion:reduce){.vc-hero::after,.vc-dr i::after,.vc-hero .vc-stars i,.vc-h-n b,.vc-qrcard{animation:none!important}}
+.vc-h-l .vc-stars{align-self:flex-start}
