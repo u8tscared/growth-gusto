@@ -21,7 +21,7 @@ module.exports = async (page, shot) => {
   console.log('PAY OFF', await ev(() => R.ce.reviewPay === false));
   await page.$eval('[data-act=rsCeRevPay]', (e) => e.click()); await page.waitForTimeout(300);
   await page.$eval('.rs-revmls [data-act=rsMailPrev][data-v=paye]', (e) => e.click()); await page.waitForTimeout(1200);
-  const pv = await ev(() => { const f = document.querySelector('.rs-mpf'); return { subj: (document.querySelector('.rs-mpo b') || {}).textContent, html: f && /Merci de votre visite/.test(f.srcdoc) && /avis-etoiles\.gif/.test(f.srcdoc) }; });
+  const pv = await ev(() => { const f = document.querySelector('.rs-mpf'); return { subj: (document.querySelector('.rs-mpo b') || {}).textContent, html: f && /Merci de votre visite/.test(f.srcdoc) && /Un petit avis/.test(f.srcdoc) }; });
   console.log('PREVIEW', JSON.stringify(pv));
   await shot(P + 'rvp-2-apercu-paiement');
   if (!pv.html || !ok.pay || ok.prevs !== 2 || !ok.to || !ok.btn) console.log('SCRIPT ERROR rvp');

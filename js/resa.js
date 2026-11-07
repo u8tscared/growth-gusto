@@ -612,60 +612,55 @@ function rsMailHtml(kind, b, r, L) {
 </div></body></html>`;
 }
 
-/* The review e-mail (« Votre dîner s'est bien passé ? » after a booking, « Merci de votre visite ! » after an online payment).
-   Motion: the hero is an animated GIF (img/mail/avis-etoiles.gif, tools/gen-mail-gif.py): five stars popping in, sparkles. It is the only
-   motion every mail client plays (Gmail drops CSS animations; Outlook desktop shows frame 0, the finished picture). Apple Mail and iOS
-   also get CSS motion (button shine, stars bouncing in), switched off for « reduce motion ». Every guest gets the same Google button
-   (no filtering of unhappy guests: Google forbids it). */
+/* The review e-mail (« Votre dîner s'est bien passé ? » after a booking, « Merci de votre visite ! » after an online payment), in the
+   look of growthgusto.fr: cream page, one flat violet card, a white « sticker » word, a white button sitting on its shadow, paper tiles.
+   Apple Mail and iOS also get a little motion (the stars pop in one by one, the sticker settles), off for « reduce motion »;
+   Gmail and Outlook show the same page, still. Every guest gets the same Google button (no filtering of unhappy guests: Google forbids it). */
 function rsAvisHtml(b, r, L, e, pay) {
   const nm = e(String(b.name || "").trim().split(/\s+/)[0] || ""), rn = e(r.name || "le restaurant"), m = rsMeal(b), away = pay && b.mode === "emporter", pl = !pay && +b.covers > 1 ? "s" : "";
   const lg = typeof r.logo === "string" && /^https:\/\/[^\s"'<>]+$/.test(r.logo) && r.logo.length <= 2000 ? r.logo : "";
   const g = e(L.review || "#"), av = L.avis || "", sep = /\?/.test(av) ? "&" : "?", go = av ? e(av) : g;
-  const title = pay ? (away ? "Merci pour votre commande !" : "Merci de votre visite !") : `Votre ${m} s'est bien passé ?`;
-  const lead = pay ? (away ? `${nm ? `Bonjour ${nm}, merci` : "Merci"} d'avoir commandé chez <b style="color:#1B1530">${rn}</b>. On espère que vous vous êtes régalé !`
-      : `${nm ? `Bonjour ${nm}, merci` : "Merci"} d'être passé chez <b style="color:#1B1530">${rn}</b> et merci pour votre règlement. Toute l'équipe espère que vous vous êtes régalé !`)
-    : `Bonjour ${nm}, merci d'être venu${pl} chez <b style="color:#1B1530">${rn}</b>. Toute l'équipe espère que vous vous êtes régalé${pl} !`;
-  const ask = pay ? "Vous avez aimé ? Pouvez-vous nous laisser un avis ?" : "Comment nous avez-vous trouvés ?";
-  const HERO = "https://app.growthgusto.fr/img/mail/avis-etoiles.gif";
-  const W = ["Bof", "Moyen", "Bien", "Très bien", "Parfait"];
+  const t1 = pay ? (away ? "Merci pour votre commande." : "Merci de votre visite.") : `Votre ${m} s'est`, t2 = pay ? "Un petit avis ?" : "bien passé ?";
+  const title = pay ? `${t1} ${t2}` : `Votre ${m} s'est bien passé ?`;
+  const hi = nm ? `Bonjour ${nm}, ` : "";
+  const lead = pay ? (away ? `${hi}on espère que vous vous êtes régalé. Si vous avez aimé, dites-le en un geste : votre avis aide <b style="color:#ffffff">${rn}</b> à se faire connaître.`
+      : `${hi}merci d'être passé et merci pour votre règlement. Si vous avez aimé, dites-le en un geste : votre avis aide <b style="color:#ffffff">${rn}</b> à se faire connaître.`)
+    : `${hi}merci d'être venu${pl} chez <b style="color:#ffffff">${rn}</b>. Dites-nous en un geste comment c'était : votre avis aide d'autres gourmands à nous découvrir.`;
+  const F = `'Instrument Sans',-apple-system,'Segoe UI',Helvetica,Arial,sans-serif`, D = `'Bricolage Grotesque','Instrument Sans',-apple-system,'Segoe UI',Helvetica,Arial,sans-serif`;
   /* the stars open « Comment nous avez-vous trouvés ? » (avis/ page) with that note already picked; no page link (preview, test): Google */
   const sh = (n) => e(av ? av + sep + "n=" + n : L.review || "#");
-  const star = (n) => `<td class="gg-s gg-s${n}" align="center" style="padding:0 3px"><a href="${sh(n)}" style="display:block;text-decoration:none;background:#F6F1FF;border:1.5px solid #E4DAFF;border-radius:16px;padding:10px 0 8px;width:58px" title="${n} sur 5"><span style="display:block;font-size:30px;line-height:1;color:#F5B700">&#9733;</span><span style="display:block;font-size:11px;font-weight:700;color:#6E6880;margin-top:5px;letter-spacing:.1px;white-space:nowrap">${W[n - 1]}</span></a></td>`;
+  const star = (n) => `<td class="gg-s gg-s${n}" style="padding:0 4px"><a href="${sh(n)}" title="${n} sur 5" style="display:block;width:52px;height:52px;line-height:52px;text-align:center;text-decoration:none;background:#FFFDF8;border:1.5px solid #E9DFCD;border-radius:16px;box-shadow:0 3px 0 #E2D6C2;font-size:28px;color:#F6B93B">&#9733;</a></td>`;
   return `<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light only"><meta name="supported-color-schemes" content="light"><title>${e(title)}</title>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,800&family=Instrument+Sans:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
-@keyframes ggUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
-@keyframes ggPop{0%{opacity:0;transform:scale(.4) rotate(-12deg)}70%{transform:scale(1.12) rotate(3deg)}100%{opacity:1;transform:none}}
-@keyframes ggShine{0%{background-position:-180% 0}55%,100%{background-position:280% 0}}
-@keyframes ggGlow{0%,100%{box-shadow:0 10px 26px -8px rgba(91,43,255,.55),0 4px 0 #2A0BA6}50%{box-shadow:0 14px 34px -6px rgba(236,72,153,.55),0 4px 0 #2A0BA6}}
-.gg-up{animation:ggUp .7s cubic-bezier(.2,.8,.2,1) both}.gg-d1{animation-delay:.15s}.gg-d2{animation-delay:.3s}.gg-d3{animation-delay:.45s}
-.gg-s a{animation:ggPop .55s cubic-bezier(.2,.9,.3,1.3) both}.gg-s1 a{animation-delay:.5s}.gg-s2 a{animation-delay:.6s}.gg-s3 a{animation-delay:.7s}.gg-s4 a{animation-delay:.8s}.gg-s5 a{animation-delay:.9s}
-.gg-s a:hover{background:#FFF6D6!important;border-color:#F5B700!important}
-.gg-cta{background-image:linear-gradient(110deg,#5B2BFF 0%,#5B2BFF 40%,#9C7BFF 50%,#5B2BFF 60%,#5B2BFF 100%)!important;background-size:250% 100%!important;animation:ggShine 3.2s ease-in-out 1.2s infinite,ggGlow 3.2s ease-in-out infinite}
-@media (prefers-reduced-motion:reduce){.gg-up,.gg-s a,.gg-cta{animation:none!important}}
-@media (max-width:480px){.gg-s a{width:52px!important}.gg-s span+span{font-size:10px!important}.gg-h1{font-size:27px!important}}
+@keyframes ggPop{0%{opacity:0;transform:translateY(8px) scale(.6)}70%{transform:translateY(-2px) scale(1.08)}100%{opacity:1;transform:none}}
+@keyframes ggTag{0%{opacity:0;transform:rotate(-8deg) scale(.8)}100%{opacity:1;transform:rotate(-2deg)}}
+.gg-s a{animation:ggPop .5s cubic-bezier(.2,.9,.3,1.3) both}.gg-s1 a{animation-delay:.25s}.gg-s2 a{animation-delay:.33s}.gg-s3 a{animation-delay:.41s}.gg-s4 a{animation-delay:.49s}.gg-s5 a{animation-delay:.57s}
+.gg-tag{display:inline-block;transform:rotate(-2deg);animation:ggTag .5s cubic-bezier(.2,.9,.3,1.3) .1s both}
+@media (prefers-reduced-motion:reduce){.gg-s a,.gg-tag{animation:none!important}}
+@media (max-width:480px){.gg-h1{font-size:34px!important}.gg-s a{width:46px!important;height:46px!important;line-height:46px!important;font-size:25px!important}.gg-s{padding:0 3px!important}}
 </style></head>
-<body style="margin:0;padding:0;background:#EFE9FB;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;color:#1B1530;-webkit-font-smoothing:antialiased">
-<div style="display:none;max-height:0;overflow:hidden;opacity:0">${e(ask)} Dix secondes, cinq étoiles, et vous aidez ${rn} à se faire connaître.</div>
-<div style="max-width:520px;margin:0 auto;padding:22px 12px 34px">
- <div style="background:#1E0B63;background-image:linear-gradient(160deg,#3A10D8 0%,#24097A 55%,#14063F 100%);border-radius:28px 28px 0 0;padding:24px 24px 0;color:#ffffff;overflow:hidden">
-  <table role="presentation" style="border-collapse:collapse"><tr>
-   ${lg ? `<td style="padding:0 12px 0 0"><img src="${e(lg)}" width="44" height="44" alt="${rn}" style="display:block;width:44px;height:44px;border-radius:13px;background:#ffffff;object-fit:contain;border:0"></td>` : ""}
-   <td><div style="display:inline-block;font-size:13px;font-weight:700;color:#E6DFFF;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.22);border-radius:99px;padding:6px 12px">${rn}</div></td>
-  </tr></table>
-  <div class="gg-up gg-h1" style="font-size:31px;line-height:1.08;font-weight:800;letter-spacing:-.8px;margin:18px 0 0">${e(title)}</div>
-  <div class="gg-up gg-d1" style="font-size:16px;line-height:1.45;color:#D9D2FF;margin:8px 0 0">${e(ask)}</div>
-  <a href="${go}" style="display:block;margin:16px -24px 0;text-decoration:none"><img src="${HERO}" width="520" alt="★★★★★ Notez-nous en un geste" style="display:block;width:100%;max-width:520px;height:auto;border:0;background:#2A0BA6;color:#F5B700;font-size:28px;text-align:center"></a>
+<body style="margin:0;padding:0;background:#FBF6EC;font-family:${F};color:#1B1530;-webkit-font-smoothing:antialiased">
+<div style="display:none;max-height:0;overflow:hidden;opacity:0">${pay ? "Vous avez aimé ? Pouvez-vous nous laisser un avis ? Dix secondes, cinq étoiles." : "Comment nous avez-vous trouvés ? Dix secondes, cinq étoiles."}</div>
+<div style="max-width:520px;margin:0 auto;padding:26px 14px 36px">
+ <table role="presentation" style="border-collapse:collapse;margin:0 4px 16px"><tr>
+  ${lg ? `<td style="padding:0 10px 0 0"><img src="${e(lg)}" width="36" height="36" alt="" style="display:block;width:36px;height:36px;border-radius:11px;background:#ffffff;object-fit:contain;border:1px solid #E9DFCD"></td>` : ""}
+  <td style="font-family:${D};font-size:17px;font-weight:800;letter-spacing:-.3px;color:#1B1530">${rn}</td>
+ </tr></table>
+ <div style="background:#4C1FEA;border-radius:28px;padding:28px 24px 30px;color:#ffffff;box-shadow:0 6px 0 #2A0BA6">
+  <div class="gg-h1" style="font-family:${D};font-size:38px;line-height:1.02;font-weight:800;letter-spacing:-1.2px;margin:0">${e(t1)}<br><span class="gg-tag" style="display:inline-block;background:#ffffff;color:#4C1FEA;border-radius:12px;padding:2px 12px 5px;margin-top:8px;box-shadow:0 4px 0 #2A0BA6">${e(t2)}</span></div>
+  <p style="margin:18px 0 0;font-size:16.5px;line-height:1.55;color:#E4DCF7">${lead}</p>
+  <a href="${go}" style="display:block;margin-top:22px;background:#ffffff;color:#1B1530;text-align:center;text-decoration:none;font-family:${F};font-weight:700;font-size:17px;padding:17px 18px;border-radius:17px;box-shadow:0 5px 0 #1B1530">${av ? "Donner mon avis" : "Laisser un avis sur Google"} &nbsp;&#8594;</a>
  </div>
- <div style="background:#FFFDF8;border:1.5px solid #E4DAFF;border-top:0;border-radius:0 0 28px 28px;padding:24px 20px 26px;box-shadow:0 18px 40px -22px rgba(42,11,166,.45)">
-  <p class="gg-up gg-d2" style="margin:0 0 6px;font-size:16px;line-height:1.55;color:#4A4560">${lead}</p>
-  <p class="gg-up gg-d3" style="margin:0;font-size:16px;line-height:1.55;color:#4A4560">Touchez une étoile : c'est fait en <b style="color:#1B1530">dix secondes</b>, et votre avis aide d'autres gourmands à nous découvrir.</p>
-  <table role="presentation" align="center" style="border-collapse:collapse;margin:20px auto 4px"><tr>${[1, 2, 3, 4, 5].map(star).join("")}</tr></table>
-  <a class="gg-cta" href="${go}" style="display:block;text-align:center;text-decoration:none;font-weight:800;font-size:17px;letter-spacing:.2px;padding:17px 18px;border-radius:18px;margin-top:18px;background:#5B2BFF;background-image:linear-gradient(135deg,#6A3BFF,#4C1FEA);color:#ffffff;box-shadow:0 10px 26px -8px rgba(91,43,255,.55),0 4px 0 #2A0BA6">${av ? "Donner mon avis" : "Laisser un avis sur Google"} &#8594;</a>
-  ${av && L.review ? `<div style="margin-top:14px;text-align:center"><a href="${g}" style="color:#3A10D8;font-weight:700;font-size:14px;text-decoration:none">Ou directement sur Google</a></div>` : ""}
-  ${r.phone ? `<div style="margin-top:20px;padding:14px 16px;background:#F6F1FF;border-radius:16px;font-size:14px;color:#4A4560;text-align:center;line-height:1.5">Quelque chose ne vous a pas plu ? Dites-le nous aussi, on veut s'améliorer : <a href="tel:${e(String(r.phone).replace(/[^\d+]/g, ""))}" style="color:#3A10D8;font-weight:800;text-decoration:none;white-space:nowrap">${e(r.phone)}</a></div>` : ""}
-  ${L.book ? `<div style="margin-top:14px;text-align:center"><a href="${e(L.book)}" style="color:#3A10D8;font-weight:700;font-size:14px;text-decoration:none">Réserver à nouveau</a></div>` : ""}
+ <div style="background:#FFFDF8;border:1.5px solid #E9DFCD;border-radius:24px;padding:20px 16px 18px;margin-top:22px;box-shadow:0 4px 0 #E2D6C2;text-align:center">
+  <div style="font-family:${D};font-size:18px;font-weight:800;letter-spacing:-.3px;color:#1B1530">Ou notez-nous ici, en un geste</div>
+  <table role="presentation" align="center" style="border-collapse:collapse;margin:14px auto 8px"><tr>${[1, 2, 3, 4, 5].map(star).join("")}</tr></table>
+  <table role="presentation" align="center" style="border-collapse:collapse;width:290px;max-width:100%"><tr><td style="font-size:12.5px;color:#6E6880;text-align:left">Pas terrible</td><td style="font-size:12.5px;color:#6E6880;text-align:right">Parfait</td></tr></table>
+  ${av && L.review ? `<div style="margin-top:14px"><a href="${g}" style="color:#4C1FEA;font-weight:700;font-size:14px;text-decoration:none">Directement sur Google &#8594;</a></div>` : ""}
  </div>
- <div style="text-align:center;font-size:12px;color:#7A7390;margin-top:18px;line-height:1.55">${pay ? "Un seul message après votre paiement en ligne, pas plus d'une fois tous les 4 mois." : "Un seul message après votre venue, pas plus d'une fois tous les 4 mois."}<br>${pay ? "Envoyé par Growth Gusto pour " + rn : "Réservation par Growth Gusto"}</div>
+ ${r.phone ? `<p style="margin:20px 8px 0;font-size:14px;line-height:1.55;color:#615B74;text-align:center">Quelque chose ne vous a pas plu ? Dites-le nous aussi&nbsp;: <a href="tel:${e(String(r.phone).replace(/[^\d+]/g, ""))}" style="color:#1B1530;font-weight:700;text-decoration:none;white-space:nowrap">${e(r.phone)}</a></p>` : ""}
+ ${L.book ? `<p style="margin:10px 0 0;text-align:center"><a href="${e(L.book)}" style="color:#4C1FEA;font-weight:700;font-size:14px;text-decoration:none">Réserver à nouveau</a></p>` : ""}
+ <p style="margin:26px 8px 0;font-size:12px;line-height:1.55;color:#6E6880;text-align:center">${pay ? "Un seul message après votre paiement en ligne, pas plus d'une fois tous les 4 mois." : "Un seul message après votre venue, pas plus d'une fois tous les 4 mois."}<br>${pay ? "Envoyé par Growth Gusto pour " + rn : "Réservation par Growth Gusto"}</p>
 </div></body></html>`;
 }
 
@@ -746,7 +741,7 @@ function rsRevCard(c) {
     ${R.revHelp ? `<ol class="rs-revhelp"><li>Sur Google, cherchez le nom de votre restaurant (connecté au compte de votre fiche).</li><li>Touchez <b>Demander des avis</b> (ou <b>Recevoir plus d'avis</b>).</li><li>Copiez le lien et collez-le ici. C'est tout.</li></ol>` : ""}
     <div class="rs-row"><div><b>Quand l'envoyer</b><em>${esc((RS_REV_WHEN.find((x) => x[0] === w) || RS_REV_WHEN[0])[2])}</em></div><div class="rs-seg">${RS_REV_WHEN.map(([v, l]) => `<button class="${w === v ? "on" : ""}" data-act="rsCeRevWhen" data-v="${v}">${l}</button>`).join("")}</div></div>
     <button class="rs-tog${pay ? " on" : ""}" data-act="rsCeRevPay" aria-pressed="${pay}"${on ? "" : " disabled"}><span><b>Aussi après un paiement en ligne</b><em>${pay && on ? "Quand un client règle par le QR (addition ou commande), il reçoit « Merci de votre visite ! » environ 1 h après." : "Coupé : seulement les clients qui ont réservé."}</em></span><i></i></button>
-    <div class="rs-mls rs-revmls"><div class="rs-ml"><button class="rs-mlb" data-act="rsMailPrev" data-v="avis">${ico("rsMail")}<span><b>Voir l'e-mail après le repas</b><em>« Votre dîner s'est bien passé ? », étoiles animées</em></span>${ico("chev")}</button></div>
+    <div class="rs-mls rs-revmls"><div class="rs-ml"><button class="rs-mlb" data-act="rsMailPrev" data-v="avis">${ico("rsMail")}<span><b>Voir l'e-mail après le repas</b><em>« Votre dîner s'est bien passé ? », étoiles en un geste</em></span>${ico("chev")}</button></div>
     <div class="rs-ml"><button class="rs-mlb" data-act="rsMailPrev" data-v="paye">${ico("rsMail")}<span><b>Voir l'e-mail après paiement</b><em>« Merci de votre visite ! Pouvez-vous nous laisser un avis ? »</em></span>${ico("chev")}</button></div></div>
     <div class="rs-revtest">
       <b>Recevoir un e-mail de test</b>
