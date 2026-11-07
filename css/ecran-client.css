@@ -1,0 +1,109 @@
+/* Growth Gusto — écran client (js/appel.js), face au client : toujours les couleurs de la marque, même en mode sombre
+   (tools/sombre.js ne traduit pas cette feuille : les QR codes doivent rester noirs sur blanc pour être lus). */
+/* ── the customer screen (always the brand look, whatever the theme) ── */
+.ap-scr{--cv:#130C35;--cv2:#2A1580;position:relative;overflow:hidden;width:100%;height:100%;min-height:420px;border-radius:inherit;background:radial-gradient(120% 90% at 0% 0%,#3B1BC9 0%,#1D0F5C 45%,#0E0828 100%);color:#fff;font-family:var(--f);isolation:isolate}
+.ap-aur{position:absolute;inset:-20%;z-index:-1;filter:blur(60px);opacity:.8}
+.ap-aur i{position:absolute;width:55%;height:55%;border-radius:50%;mix-blend-mode:screen}
+.ap-aur i:nth-child(1){left:-5%;top:0;background:#7A4DFF;animation:apAur1 18s ease-in-out infinite alternate}
+.ap-aur i:nth-child(2){right:-8%;top:20%;background:#2F7BFF;opacity:.6;animation:apAur2 22s ease-in-out infinite alternate}
+.ap-aur i:nth-child(3){left:25%;bottom:-15%;background:#F6B93B;opacity:.35;animation:apAur3 26s ease-in-out infinite alternate}
+.ap-d{position:relative;z-index:1;height:100%;padding:clamp(18px,4cqw,48px);display:flex;flex-direction:column;gap:clamp(16px,3cqw,32px);animation:apIn .8s var(--spring-soft) both}
+.ap-k{display:inline-flex;align-items:center;gap:7px;font-size:clamp(12px,1.4cqw,15px);font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#C9BFFF}
+.ap-k svg{width:16px;height:16px}
+.ap-qr{background:#fff;border-radius:18px;padding:10px;width:clamp(96px,14cqw,150px);aspect-ratio:1;flex:none;box-shadow:0 20px 40px -18px rgba(0,0,0,.6)}
+.ap-qr svg{width:100%;height:100%;display:block}
+.ap-qr.big{width:clamp(150px,22cqw,250px);border-radius:24px;padding:14px;animation:apQr 3s ease-in-out infinite}
+/* idle: welcome */
+.ap-d.idle{justify-content:space-between}
+.ap-idh{display:flex;align-items:center;gap:clamp(14px,2.4cqw,26px)}
+.ap-idh>div{flex:1;min-width:0}
+.ap-idh h1{margin:4px 0 0;font-size:clamp(30px,5.6cqw,72px);font-weight:800;letter-spacing:-.04em;line-height:.98;overflow-wrap:anywhere}
+.ap-lg{width:clamp(64px,9cqw,110px);aspect-ratio:1;flex:none;border-radius:28%;background:#fff;display:grid;place-items:center;overflow:hidden;box-shadow:0 18px 40px -16px rgba(0,0,0,.6)}
+.ap-lg img{width:100%;height:100%;object-fit:contain;padding:12%}
+.ap-lg.ini{background:linear-gradient(140deg,#8B5CFF,#4A1FE6);color:#fff;font-size:clamp(22px,3cqw,40px);font-weight:800}
+.ap-clock{align-self:flex-start;font-size:clamp(20px,3cqw,40px);font-weight:700;color:#E7E2FF;opacity:.9}
+.ap-qrs{display:flex;gap:clamp(12px,2cqw,22px);flex-wrap:wrap}
+.ap-qc{flex:1 1 280px;display:flex;align-items:center;gap:16px;padding:clamp(12px,1.6cqw,18px);border-radius:26px;background:rgba(255,255,255,.08);box-shadow:0 0 0 1px rgba(255,255,255,.12) inset;-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);animation:apIn .9s var(--spring-soft) both}
+.ap-qc:nth-child(2){animation-delay:.12s}
+.ap-qc b,.ap-rv b{display:block;font-size:clamp(17px,2cqw,24px);font-weight:800;letter-spacing:-.02em;line-height:1.15}
+.ap-qc em,.ap-rv em{display:block;font-style:normal;margin-top:4px;font-size:clamp(13px,1.4cqw,16px);color:#CFC8F0;line-height:1.35}
+.ap-stars{display:flex;gap:3px;margin-top:8px}
+.ap-stars i{color:#F6B93B;animation:apStar 2.8s calc(var(--s) * .12s) ease-in-out infinite}
+.ap-stars svg{fill:#F6B93B;width:clamp(16px,2cqw,24px);height:clamp(16px,2cqw,24px)}
+/* bill */
+.ap-d.bill{flex-direction:row;align-items:stretch}
+.ap-bl{flex:1.25;min-width:0;display:flex;flex-direction:column;gap:12px;padding:clamp(14px,2cqw,26px);border-radius:28px;background:#FFFDF8;color:#1B1530;box-shadow:0 30px 60px -30px rgba(0,0,0,.7)}
+.ap-bh{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+.ap-bh .ap-k{color:#5B2BFF;width:100%}
+.ap-bh h1{margin:0;font-size:clamp(28px,4.2cqw,54px);font-weight:800;letter-spacing:-.04em;line-height:1}
+.ap-bh em{font-style:normal;color:#615B74;font-weight:700}
+.ap-lines{flex:1;min-height:0;overflow:auto;display:flex;flex-direction:column;gap:2px;margin:0 -6px;padding:0 6px;scrollbar-width:thin}
+.ap-lines>div{display:flex;align-items:baseline;gap:12px;padding:9px 0;border-bottom:1.5px dashed #E9DFCD;font-size:clamp(15px,1.7cqw,20px);animation:apLine .5s calc(var(--i) * 45ms + .15s) var(--spring-soft) both}
+.ap-lines b{min-width:26px;color:#5B2BFF}
+.ap-lines span{flex:1;min-width:0;font-weight:650}
+.ap-lines em{font-style:normal;font-weight:700}
+.ap-tot{display:flex;justify-content:space-between;align-items:baseline;padding-top:6px;font-size:clamp(17px,2cqw,22px);font-weight:800}
+.ap-tot b{font-size:clamp(28px,3.8cqw,48px);letter-spacing:-.03em}
+.ap-tot.left b{color:#5B2BFF}
+.ap-paid{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-radius:16px;background:#E2F5EC;color:#0E8A5F;font-weight:750}
+.ap-paid span{display:flex;align-items:center;gap:7px}.ap-paid svg{width:17px;height:17px;stroke-width:3}
+.ap-split{display:flex;justify-content:space-between;align-items:baseline;padding:12px 16px;border-radius:18px;background:#EFE9FF;color:#3A10D8;font-weight:750}
+.ap-split b{font-size:clamp(20px,2.6cqw,30px)}
+.ap-br{flex:1;min-width:0;display:flex;flex-direction:column;gap:14px}
+.ap-pay{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;text-align:center;padding:clamp(16px,2cqw,26px);border-radius:28px;background:rgba(255,255,255,.08);box-shadow:0 0 0 1px rgba(255,255,255,.14) inset;-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)}
+.ap-pay p{margin:0;font-size:clamp(14px,1.5cqw,18px);color:#DCD6FA;max-width:300px;line-height:1.4}
+.ap-pay .ap-big{font-size:clamp(20px,2.4cqw,30px);font-weight:800;color:#fff}
+.ap-rv{display:flex;align-items:center;gap:14px;padding:12px;border-radius:24px;background:rgba(255,255,255,.08);box-shadow:0 0 0 1px rgba(255,255,255,.12) inset}
+.ap-rv .ap-qr{width:clamp(76px,9cqw,110px);border-radius:14px;padding:7px}
+/* merci */
+.ap-d.merci{align-items:center;justify-content:center;text-align:center}
+.ap-mc{display:flex;flex-direction:column;align-items:center}
+.ap-ok{width:clamp(80px,10cqw,128px);aspect-ratio:1;border-radius:34%;display:grid;place-items:center;background:#1BB27C;box-shadow:0 0 0 12px rgba(27,178,124,.18),0 24px 50px -16px rgba(27,178,124,.7);animation:apPop .8s var(--spring)}
+.ap-ok svg{width:52%;height:52%;stroke-width:3;stroke-dasharray:30;stroke-dashoffset:30;animation:apTick .6s .35s ease-out forwards}
+.ap-mc h1{margin:22px 0 0;font-size:clamp(46px,8cqw,110px);font-weight:800;letter-spacing:-.05em;line-height:.95;animation:apIn .8s .15s var(--spring-soft) both}
+.ap-mc p{margin:8px 0 0;font-size:clamp(17px,2.2cqw,26px);color:#DCD6FA;animation:apIn .8s .25s var(--spring-soft) both}
+.ap-rv.big{max-width:620px;text-align:left;padding:18px;border-radius:28px;animation:apIn .9s .45s var(--spring-soft) both}
+.ap-rv.big .ap-qr{width:clamp(110px,13cqw,160px)}
+.ap-conf{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+.ap-conf i{position:absolute;top:-6%;left:calc(var(--x) * 1%);width:10px;height:16px;border-radius:3px;background:#F6B93B;transform:rotate(var(--r));animation:apFall 3.4s var(--d) cubic-bezier(.3,.5,.4,1) both}
+.ap-conf i:nth-child(3n){background:#9ED7FF;border-radius:50%;width:11px;height:11px}
+.ap-conf i:nth-child(3n+1){background:#B79CFF}
+.ap-conf i:nth-child(5n){background:#FF8A6B}
+/* a payment arrives */
+.ap-flash{position:absolute;z-index:5;left:50%;top:50%;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:10px;padding:28px 40px;border-radius:32px;background:rgba(14,138,95,.94);box-shadow:0 40px 80px -30px rgba(0,0,0,.7);animation:apFlash 5s var(--spring) both}
+.ap-flash span{width:72px;height:72px;border-radius:24px;background:#fff;color:#0E8A5F;display:grid;place-items:center}
+.ap-flash span svg{width:40px;height:40px;stroke-width:3}
+.ap-flash b{font-size:28px;font-weight:800}.ap-flash em{font-style:normal;font-size:22px;font-weight:700}
+/* portrait / phone: stack */
+@container apscr (max-width:640px){.ap-d.bill{flex-direction:column}.ap-br{flex-direction:row}.ap-pay{flex:1.3}.ap-rv{flex-direction:column;text-align:center;flex:1}}
+.ap-scr{container:apscr / inline-size}
+@media (max-width:640px){.ap-d.bill{flex-direction:column}.ap-qc{flex-basis:100%}}
+
+/* full screen (device mode or grand écran) */
+.ap-full{position:fixed;inset:0;z-index:45;background:#0E0828}
+.ap-full .ap-scr{border-radius:0;height:100%;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+.ap-exit{all:unset;cursor:pointer;position:absolute;z-index:6;right:calc(env(safe-area-inset-right,0px) + 12px);top:calc(env(safe-area-inset-top,0px) + 12px);width:40px;height:40px;border-radius:14px;display:grid;place-items:center;color:#fff;background:rgba(255,255,255,.08);opacity:.35;transition:opacity .2s}
+.ap-exit:hover,.ap-exit:focus-visible{opacity:1}
+
+/* layout fixes: the bill card hugs its lines; portrait screens stack; a phone preview grows with its content */
+.ap-d.bill{align-items:center}
+.ap-bl{max-height:100%;align-self:center}
+.ap-br{align-self:stretch;justify-content:center}
+.ap-pay{flex:0 1 auto;min-height:0}
+.ap-full .ap-d{padding-bottom:max(70px,calc(env(safe-area-inset-bottom,0px) + 60px))}
+@media (orientation:portrait){
+  .ap-full .ap-d.bill{flex-direction:column;align-items:stretch;justify-content:center}
+  .ap-full .ap-bl{flex:0 1 auto;align-self:stretch}
+  .ap-full .ap-br{flex:none;flex-direction:row;align-items:stretch}
+  .ap-full .ap-pay{flex:1.4}.ap-full .ap-rv{flex:1;flex-direction:column;text-align:center;justify-content:center}
+}
+@media (max-width:640px){
+  .ap-bezel{aspect-ratio:auto}
+  .ap-bezel .ap-scr{height:auto}
+  .ap-bezel .ap-d.bill{flex-direction:column;align-items:stretch}
+  .ap-bezel .ap-br{flex-direction:column}
+  .ap-bezel .ap-rv{flex-direction:row;text-align:left}
+}
+.ap-tag{margin:0;max-width:16em;font-size:clamp(24px,4.4cqw,56px);font-weight:800;letter-spacing:-.035em;line-height:1.05;color:#fff;background:linear-gradient(100deg,#fff 20%,#C9BFFF 50%,#fff 80%) 0 0/200% 100%;-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;animation:apIn .9s .1s var(--spring-soft) both,apShine 7s 1s linear infinite}
+@keyframes apShine{to{background-position:-200% 0}}
+@media (prefers-reduced-motion:reduce){.ap-tag{animation:none}}
