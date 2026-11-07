@@ -1,65 +1,27 @@
-/* Growth Gusto — opening animation (js/intro.js).
-   Frame 0 is pixel-identical to the iOS launch images (icons/splash-*.jpg): cream, the paper tile, the violet mark.
-   Then: the aurora wakes up behind the tile, light runs through the G into the arrow, the arrow springs, the name rises;
-   when the app is ready the arrow shoots off and the screen opens from the tile like an iris onto the app. */
-.boot{overflow:hidden;contain:strict}
-.boot-stage{position:relative;display:grid;place-items:center;z-index:2}
-.boot-ic{position:relative;overflow:hidden;will-change:transform}
-.boot-ic svg{overflow:visible}
-.boot-ic .bm-run{opacity:0;stroke-dasharray:14 100;stroke-dashoffset:14}
-.boot-ic .bm-arw{transform-box:view-box;transform-origin:50% 50%}
-/* the sheen that crosses the tile */
-.boot-ic::after{content:"";position:absolute;inset:-40%;background:linear-gradient(115deg,transparent 42%,rgba(255,255,255,.85) 50%,transparent 58%);transform:translateX(-120%);pointer-events:none}
-/* the name, under the tile (outside the frame-0 picture until it rises) */
-.boot-wm{position:absolute;top:calc(100% + 26px);left:50%;transform:translateX(-50%);white-space:nowrap;font-family:var(--d,"Bricolage Grotesque",system-ui,sans-serif);font-variation-settings:"opsz" 96,"wdth" 92;font-size:30px;font-weight:760;letter-spacing:-.035em;color:var(--ink,#1B1530);line-height:1.15}
-.boot-wm .bw{display:inline-block;overflow:hidden;vertical-align:bottom;padding:0 .02em .08em}
-.boot-wm .bw-g{color:var(--accent,#5B2BFF)}
-.boot-wm .ch{display:inline-block;transform:translateY(110%);opacity:0}
-/* the aurora: three soft lights behind the tile */
-.boot-glow{position:absolute;left:50%;top:50%;width:0;height:0;z-index:1;pointer-events:none}
-.boot-glow i{position:absolute;border-radius:50%;opacity:0;transform:translate(-50%,-50%) scale(.3);filter:blur(38px);will-change:transform,opacity}
-.boot-glow i:nth-child(1){width:340px;height:300px;margin:-40px 0 0 -70px;background:radial-gradient(closest-side,rgba(122,77,255,.55),rgba(122,77,255,0))}
-.boot-glow i:nth-child(2){width:300px;height:280px;margin:30px 0 0 80px;background:radial-gradient(closest-side,rgba(110,190,255,.5),rgba(110,190,255,0))}
-.boot-glow i:nth-child(3){width:260px;height:240px;margin:70px 0 0 -40px;background:radial-gradient(closest-side,rgba(255,150,220,.38),rgba(255,150,220,0))}
-@media (min-width:900px){.boot-glow{transform:scale(1.6)}}
-.boot-ring{position:absolute;left:50%;top:50%;width:2px;height:2px;margin:-1px 0 0 -1px;border-radius:50%;z-index:3;pointer-events:none;opacity:0;box-shadow:0 0 0 1.5px rgba(91,43,255,.55),0 0 40px 8px rgba(122,77,255,.35),inset 0 0 30px 6px rgba(158,197,255,.35)}
-
-/* ── intro (class "go") ── */
-.boot.go .boot-glow i{animation:bgGlow 1.3s cubic-bezier(.2,.8,.2,1) forwards,bgDrift 7s ease-in-out 1.3s infinite alternate}
-.boot.go .boot-glow i:nth-child(2){animation-delay:.12s,1.42s}
-.boot.go .boot-glow i:nth-child(3){animation-delay:.24s,1.54s}
-.boot.go .boot-stage{animation:bgLift .9s cubic-bezier(.65,0,.15,1) .38s forwards}
-.boot.go .boot-ic{animation:bgTile .8s cubic-bezier(.3,.7,.2,1) .05s both}
-.boot.go .boot-ic::after{animation:bgSheen .9s cubic-bezier(.5,0,.2,1) .42s forwards}
-.boot.go .boot-ic .bm-run{animation:bgRun .62s cubic-bezier(.55,0,.35,1) .14s forwards}
-.boot.go .boot-ic .bm-arw{animation:bgArrow .7s cubic-bezier(.3,.7,.2,1) .5s both}
-.boot.go .boot-wm .ch{animation:bgCh .62s cubic-bezier(.2,.8,.2,1) calc(.52s + var(--i) * 32ms) forwards}
-@keyframes bgGlow{to{opacity:1;transform:translate(-50%,-50%) scale(1)}}
-@keyframes bgDrift{to{transform:translate(-44%,-56%) scale(1.12)}}
-@keyframes bgLift{to{transform:translateY(-28px)}}
-@keyframes bgTile{0%{transform:scale(1)}22%{transform:scale(.93)}58%{transform:scale(1.045)}100%{transform:scale(1)}}
-@keyframes bgSheen{to{transform:translateX(120%)}}
-@keyframes bgRun{0%{opacity:0;stroke-dashoffset:14}12%{opacity:1}85%{opacity:1}100%{opacity:0;stroke-dashoffset:-100}}
-@keyframes bgArrow{0%{transform:translate(0,0)}30%{transform:translate(-5px,5px)}62%{transform:translate(4px,-4px)}100%{transform:translate(0,0)}}
-@keyframes bgCh{to{transform:none;opacity:1}}
-
-/* ── exit (class "gg-x" + "out"): js/intro.js opens the iris; the tile and the name leave first ── */
-.boot.gg-x.out{opacity:1;visibility:visible;transition:none}
-.boot.gg-x.out .boot-ic{transition:transform .5s cubic-bezier(.6,0,.2,1),opacity .35s ease .12s;transform:scale(.86);opacity:0}
-.boot.gg-x.out .boot-ic .bm-arw{animation:bgShoot .45s cubic-bezier(.6,0,.3,1) forwards}
-.boot.gg-x.out .boot-wm{transition:opacity .3s ease,transform .45s cubic-bezier(.6,0,.2,1);opacity:0;transform:translate(-50%,-10px)}
-.boot.gg-x.out .boot-glow{transition:transform .8s cubic-bezier(.3,.7,.2,1),opacity .6s ease .15s;transform:scale(2.4);opacity:0}
-@keyframes bgShoot{to{transform:translate(70px,-70px);opacity:0}}
+/* Growth Gusto — opening animation « L'élan » (js/intro.js), chosen by Marceau 2026-11-07.
+   Frame 0 = the iOS launch images (icons/splash-*.jpg, rendered by tools/gen-splash.js): plain violet, no tile.
+   The G draws itself in white, the arrow springs in, then the camera dives through the bowl of the G into the app. */
+.boot#boot{background:radial-gradient(60% 34% at 30% 30%,rgba(255,255,255,.14),rgba(255,255,255,0) 70%),radial-gradient(60% 32% at 80% 78%,rgba(30,10,120,.35),rgba(30,10,120,0) 70%),#5B2BFF!important;overflow:hidden;transition:none}
+.boot-glow{display:none}
+.boot#boot .boot-ic{position:absolute;left:50%;top:50%;width:min(26vw,116px);height:auto;aspect-ratio:1;margin:0;transform:translate(-50%,-50%);transform-origin:45% 45%;
+  background:none!important;box-shadow:none!important;border-radius:0;display:block;transition:none;will-change:transform}
+.boot#boot .boot-ic svg{width:100%;height:100%;overflow:visible}
+.boot .bm-arc{stroke-dasharray:100 102;stroke-dashoffset:101;opacity:0}
+.boot .bm-arw{opacity:0}
+/* intro */
+.boot.go .bm-arc{animation:bmDraw .38s cubic-bezier(.55,0,.25,1) .04s forwards}
+.boot.go .bm-arw{animation:bmSpring .38s cubic-bezier(.2,.8,.2,1) .26s forwards}
+@keyframes bmDraw{0%{opacity:1;stroke-dashoffset:101}100%{opacity:1;stroke-dashoffset:0}}
+@keyframes bmSpring{0%{opacity:0;transform:translate(-34px,34px)}70%{opacity:1;transform:translate(3px,-3px)}100%{opacity:1;transform:none}}
+/* waiting longer than planned (slow network): the mark breathes */
+.boot.wait .boot-ic{animation:bmBreath 1.6s ease-in-out infinite}
+@keyframes bmBreath{50%{transform:translate(-50%,-50%) scale(.94)}}
+.boot.out:not(.gg-x){opacity:0;visibility:hidden;transition:opacity .35s ease,visibility 0s .4s}
 .boot.gone{visibility:hidden!important;pointer-events:none!important}
-/* the app arrives under the iris */
-html.gg-enter #app{animation:bgApp .8s cubic-bezier(.2,.8,.2,1) both}
-@keyframes bgApp{from{transform:scale(1.035);opacity:.6}to{transform:none;opacity:1}}
-
+html.gg-enter #app{animation:bmApp .62s cubic-bezier(.2,.7,.2,1) both}
+@keyframes bmApp{from{transform:scale(1.22)}to{transform:none}}
 @media (prefers-reduced-motion:reduce){
-  .boot.go .boot-glow i{animation:none;opacity:1;transform:translate(-50%,-50%)}
-  .boot.go .boot-wm .ch{animation:none;transform:none;opacity:1}
-  .boot.go .boot-stage{animation:none;transform:translateY(-28px)}
-  .boot.go .boot-ic,.boot.go .boot-ic::after,.boot.go .boot-ic .bm-run,.boot.go .boot-ic .bm-arw{animation:none}
-  .boot.gg-x.out{opacity:0;transition:opacity .3s ease}
+  .boot .bm-arc{stroke-dashoffset:0;opacity:1}.boot .bm-arw{opacity:1}
+  .boot.go .bm-arc,.boot.go .bm-arw,.boot.wait .boot-ic{animation:none}
   html.gg-enter #app{animation:none}
 }
