@@ -349,7 +349,7 @@ function dfRing(d, s, size = 196) {
     <svg viewBox="0 0 100 100" aria-hidden="true"><defs><linearGradient id="dfRg-${esc(d.id)}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FFD66B"/><stop offset=".55" stop-color="#FF8A5B"/><stop offset="1" stop-color="#C46BFF"/></linearGradient></defs>
       <circle cx="50" cy="50" r="${r}" class="df-rtrack"/>
       ${[0.25, 0.5, 0.75].map((m) => { const a = -Math.PI / 2 + m * 2 * Math.PI; return `<circle cx="${50 + r * Math.cos(a)}" cy="${50 + r * Math.sin(a)}" r="1.4" class="df-rtick${s.pct >= m ? " on" : ""}"/>`; }).join("")}
-      <circle cx="50" cy="50" r="${r}" class="df-rbar" stroke="url(#dfRg-${esc(d.id)})" stroke-dasharray="${C.toFixed(2)}" stroke-dashoffset="${off.toFixed(2)}" data-c="${C.toFixed(2)}"/></svg>
+      <circle cx="50" cy="50" r="${r}" class="df-rbar"${s.pct > 0 ? "" : ' style="opacity:0"'} stroke="url(#dfRg-${esc(d.id)})" stroke-dasharray="${C.toFixed(2)}" stroke-dashoffset="${off.toFixed(2)}" data-c="${C.toFixed(2)}"/></svg>
     <div class="df-rin"><b class="mono" data-dfv="${esc(d.id)}">${esc(dfVal(d, s.v))}</b><span>sur <b class="mono">${esc(dfVal(d, s.goal))}</b></span><em>${esc(dfUnit(d))}</em></div>
     <span class="df-rpop" data-dfpop="${esc(d.id)}" aria-hidden="true"></span></div>`;
 }
@@ -435,7 +435,7 @@ function dfPatch() {
   dfLive().forEach((d) => {
     const hero = v.querySelector(`[data-dfhero="${d.id}"]`); if (!hero) { rerender(); return; }
     const s = dfStats(d), was = (DF.prevDom || {})[d.id];
-    const bar = hero.querySelector(".df-rbar"); if (bar) { const C = +bar.dataset.c; bar.style.strokeDashoffset = (C * (1 - s.pct)).toFixed(2); }
+    const bar = hero.querySelector(".df-rbar"); if (bar) { const C = +bar.dataset.c; bar.style.opacity = s.pct > 0 ? 1 : 0; bar.style.strokeDashoffset = (C * (1 - s.pct)).toFixed(2); }
     hero.querySelectorAll(".df-rtick").forEach((t, i) => t.classList.toggle("on", s.pct >= [0.25, 0.5, 0.75][i]));
     const num = hero.querySelector(`[data-dfv="${d.id}"]`); if (num) dfRoll(num, was ? was.v : s.v, s.v, d);
     const rest = hero.querySelector(`[data-dfrest="${d.id}"]`); if (rest) rest.textContent = dfLeftT(d, s);
