@@ -24,6 +24,7 @@ module.exports = async (page, shot) => {
   if (await page.evaluate(() => VR.locked)) throw new Error('bon code refusé');
   if (await page.evaluate(() => vrCfg().delay) !== 0) throw new Error('« Dès que je quitte » n\'est pas le réglage par défaut');
   await module.exports.leave(page); await shot('vr-10b-apres-sortie');
+  await module.exports.shared(page); await page.evaluate(() => { go('reglages'); }); await w(500); await page.evaluate(() => go('verrou')); await w(900);
   await c('[data-act=vrOff]'); await w(700); await shot('vr-11-confirmer');
   await c('.vr-cta[data-act=vrBio]'); await w(2200);
   if (await page.evaluate(() => vrOn())) throw new Error('désactivation impossible');
@@ -45,4 +46,10 @@ module.exports.leave = async (page) => {
   await page.evaluate(() => { VR.pickUntil = 0; VR.beat = Date.now() - 30000; }); await page.waitForTimeout(1300);
   if (!(await page.evaluate(() => VR.locked))) throw new Error('pas verrouillé après un gel de la page');
   await page.evaluate(() => vrUnlockTest()); await page.waitForTimeout(600);
+};
+// appareil du restaurant (tablette partagée) : jamais verrouillé par Face ID
+module.exports.shared = async (page) => {
+  const r = await page.evaluate(() => { const before = vrOn(); esDevSet({ kind: 'partage' }); const after = vrOn(); go('verrou'); return { before, after, txt: document.querySelector('.vr-ht b')?.textContent || '' }; });
+  await page.evaluate(() => esDevSet({ kind: 'perso' }));
+  if (r.after || !/restaurant/.test(r.txt)) throw new Error('le verrou s\'applique encore sur un appareil du restaurant ' + JSON.stringify(r));
 };
