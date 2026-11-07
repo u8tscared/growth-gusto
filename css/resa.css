@@ -496,6 +496,18 @@
 @keyframes rsStar{from{transform:scale(.3) rotate(-30deg);opacity:0}to{transform:none;opacity:1}}
 @media (prefers-reduced-motion:reduce){.rs-revs .ico{animation:none!important}}
 .rs-revb{display:flex;gap:8px;flex-wrap:wrap}
+.rs-revmls{display:flex;flex-direction:column;gap:8px}
+.rs-tog[disabled]{opacity:.5}
+.rs-revtest{display:flex;flex-direction:column;gap:10px;padding:14px;border-radius:18px;background:linear-gradient(135deg,#F4EEFF,#FFF6E6);border:1.5px solid #E4DAFF}
+.rs-revtest>b{font-size:15px;font-weight:750}
+.rs-revtk{align-self:flex-start}
+.rs-revtr{display:flex;gap:8px;flex-wrap:wrap}
+.rs-revtr .input{flex:1 1 200px;min-width:0}
+.rs-revtr .btn{flex:0 0 auto;white-space:nowrap}
+.rs-revok{margin:0;font-size:13.5px;line-height:1.45;color:#1E7A4C;font-weight:600}
+html[data-theme=dark] .rs-revtest{background:linear-gradient(135deg,rgba(124,92,255,.16),rgba(245,183,0,.08));border-color:rgba(124,92,255,.35)}
+html[data-theme=dark] .rs-revok{color:#5ED39A}
+@media (max-width:420px){.rs-revtr .btn{flex:1 1 100%}}
 .rs-revb .btn{flex:1;min-width:150px}
 .rs-bad{box-shadow:0 0 0 2px var(--danger, #D64545) inset!important}
 .rs-revbad{display:flex;gap:8px;align-items:flex-start;margin:-6px 0 0;font-size:13px;color:var(--danger, #B42318);font-weight:600}

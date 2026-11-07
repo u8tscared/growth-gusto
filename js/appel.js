@@ -99,21 +99,36 @@ function apRing(c) {
   try { SFX.init(); [[1568, 0], [1175, 0.2], [1568, 0.55], [1175, 0.75]].forEach(([f, at]) => SFX.tone(f, 0.38, "sine", 0.05, at)); buzz([40, 60, 40, 60, 40]); } catch (e) {}
   toast(`Table ${c.table} · ${apLabel(c)}`, "info");
   try { if (window.ALERTES && typeof window.ALERTES.push === "function") window.ALERTES.push({ type: "service", key: `apcall_${c.id}_${c.n || 1}`, level: "warn", text: `Table ${c.table} · ${apLabel(c)}`, sub: "Depuis le QR code de la table", day: c.day || dayKey(), route: "salle" }); } catch (e) {}
-  const p = document.getElementById("apPill"); if (p) { p.classList.remove("ring"); void p.offsetWidth; p.classList.add("ring"); }
+  const p = document.getElementById("apPill"); if (p) { p.classList.remove("wig"); void p.offsetWidth; p.classList.add("wig"); setTimeout(() => p.classList.remove("wig"), 1000); }
 }
 /* the open tab sitting at a table number (« 8+9 » joined tables included) */
 const apTabAt = (n) => (typeof slOpenTabs === "function" ? slOpenTabs() : []).find((t) => String(t.table) === String(n) || String(t.table || "").split("+").includes(String(n))) || null;
 
-/* a floating bubble on every staff screen: who calls, from which table */
+/* a floating bubble on every staff screen: who calls, from which table.
+   It can be pushed away (× or a swipe): it stays hidden on this device until a table calls again or calls back (relance).
+   The call itself is not closed: it stays in « Les tables vous appellent » and on the floor plan. */
+const apHidKey = (c) => `${c.id}|${c.n || 1}`;
+function apHid() { if (!AP.hid) { try { AP.hid = new Set(JSON.parse(localStorage.getItem("gg-ap-hid") || "[]")); } catch (e) { AP.hid = new Set(); } } return AP.hid; }
+function apHide(L) {
+  const H = apHid(); L.forEach((c) => H.add(apHidKey(c)));
+  const live = new Set((AP.calls || []).map(apHidKey)); [...H].forEach((k) => { if (!live.has(k)) H.delete(k); });
+  try { localStorage.setItem("gg-ap-hid", JSON.stringify([...H].slice(-60))); } catch (e) {}
+}
+function apPillOff() {
+  apHide(apLive()); const el = document.getElementById("apPill"); if (el) el.classList.remove("on");
+  toast("Masqué sur cet appareil. L'appel reste dans Prise de commande.", "info");
+}
 function apPill() {
   let el = document.getElementById("apPill");
-  const L = apLive(), hide = !L.length || apQuiet() || !S.resto || (S.route === "salle" && !(S.params && S.params.id));
+  const L = apLive().filter((c) => !apHid().has(apHidKey(c))), hide = !L.length || apQuiet() || !S.resto || (S.route === "salle" && !(S.params && S.params.id));
   if (hide) { if (el) { el.classList.remove("on"); } return; }
-  if (!el) { el = document.createElement("button"); el.id = "apPill"; el.className = "ap-pill"; el.dataset.act = "apSheet"; document.body.appendChild(el); }
+  if (!el) {
+    el = document.createElement("div"); el.id = "apPill"; el.className = "ap-pill"; document.body.appendChild(el);
+    swipeAway(el, () => { apPillOff(); el.style.translate = ""; el.style.opacity = ""; });
+  }
   const c = L[0], nw = L.filter((x) => x.status === "new").length, k = AP_KIND[c.kind] || AP_KIND.serveur;
   el.classList.toggle("vu", !nw);
-  el.setAttribute("aria-label", `${L.length} demande${L.length > 1 ? "s" : ""} des tables. Voir`);
-  el.innerHTML = `<span class="ap-pi">${ico(k[1])}</span><span class="ap-pt"><b>Table ${esc(c.table)}</b><em>${esc(apLabel(c))}${c.status === "vu" && c.byName ? ` · ${esc(firstName(c.byName))} y va` : ` · <span data-apago="${c.again || c.at}">${apAgo(c.again || c.at)}</span>`}</em></span>${L.length > 1 ? `<span class="ap-pn mono">+${L.length - 1}</span>` : ""}`;
+  el.innerHTML = `<button class="ap-po" data-act="apSheet" aria-label="${L.length} demande${L.length > 1 ? "s" : ""} des tables. Voir"><span class="ap-pi">${ico(k[1])}</span><span class="ap-pt"><b>Table ${esc(c.table)}</b><em>${esc(apLabel(c))}${c.status === "vu" && c.byName ? ` · ${esc(firstName(c.byName))} y va` : ` · <span data-apago="${c.again || c.at}">${apAgo(c.again || c.at)}</span>`}</em></span>${L.length > 1 ? `<span class="ap-pn mono">+${L.length - 1}</span>` : ""}</button><button class="ap-px" data-act="apPillX" data-noswipe aria-label="Masquer">${ico("x")}</button>`;
   requestAnimationFrame(() => el.classList.add("on"));
 }
 { const rc0 = renderChrome; renderChrome = function () { const r = rc0.apply(this, arguments); try { apPill(); } catch (e) {} return r; }; }
@@ -371,6 +386,7 @@ function apSeedDemo() {
 /* ───────── actions ───────── */
 Object.assign(ACT, {
   apSheet: () => { SFX.tap(); buzz(6); apSheetPaint(); },
+  apPillX: () => { SFX.close(); buzz(6); apPillOff(); },
   apGo: async (a, id) => { SFX.ok(); buzz([10, 30, 10]); await apSetCall(id, { status: "vu", seenAt: Date.now(), by: S.me.id, byName: apMe() }); toast("Le client sait que vous arrivez"); if (document.querySelector(".ap-sh")) apSheetPaint(); },
   apDone: async (a, id) => { SFX.tap(); buzz(8); await apSetCall(id, { status: "fait", doneAt: Date.now(), by: S.me.id, byName: apMe() }); if (document.querySelector(".ap-sh")) apSheetPaint(); },
   apTable: (a, id) => { const c = (AP.calls || []).find((x) => x.id === id), tab = c && apTabAt(c.table); closeSheet(true); if (tab) go("salle", { id: tab.id }); else go("salle"); },

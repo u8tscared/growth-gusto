@@ -33,7 +33,7 @@
  * Data (server-written; no client can read the private ones: firestore.rules)
  *   restos/{rid}/tips/qr_{id}       { at, day, amount, method:"ligne", src:"qr", table, orderId } the client's tip, written when the payment is confirmed
  *   restos/{rid}/clientOrders/{id}  { n, day, at, mode, table, slot, name, phone, note, items:[{id,name,price,q,note}], total, tip?, pay, paid, paidAt,
- *                                     status: apayer|nouvelle|prep|prete|servie|annulee|abandonnee, sid, pi, refunded, src:"qr", by? }
+ *                                     status: apayer|nouvelle|prep|prete|servie|annulee|abandonnee, sid, pi, refunded, src:"qr", by?, email? }
  *   restos/{rid}/qrPay/link         { acct, status: "pending"|"active"|"restricted", charges, payouts, name, live, at }   (members read)
  *   orderKeys/{rid}_{id}            { k, rid, oid, at }            the client's private status link
  *   orderSeq/{rid}                  { day, n, min, cnt }           order numbers of the day + a per-minute flood cap
@@ -42,7 +42,9 @@
  *                                   ({ rid, bp, … } for a bill payment, id {rid}_bp_{id})
  *   restos/{rid}/tableCalls/{id}    { table, kind, pay, at, again?, n, day, status: new|vu|fait|annule, k, seenAt?, by?, byName?, doneAt? }
  *                                   (members read and move it on: « J'y vais », « C'est fait »)
- *   restos/{rid}/billPays/{id}      { tabId, table, amount, status: apayer|paye|abandonnee, at, paidAt?, sid, acct, pi? }   (members read)
+ *   restos/{rid}/billPays/{id}      { tabId, table, amount, status: apayer|paye|abandonnee, at, paidAt?, sid, acct, pi?, email? }   (members read)
+ *   payReviews/{rid}_{o|p}_{id}     { rid, kind, id, email, name, mode, paidAt, due }  a paid order or bill whose payer gets the review e-mail
+ *                                   (« Merci de votre visite », Google link) once due: functions/src/resa.js payReviewTick sends and deletes it
  *   callSeq/{rid}                   { min, cnt }                   a per-minute cap on the calls of one restaurant
  *   siteSeq/{rid}                   { day, n }                     website reads for the menu import (25 a day)
  * Cost: Stripe's fee per payment, paid by the restaurant on its own account. A few function calls per order. */
@@ -190,6 +192,9 @@ async function create(d) {
 }
 
 /* ───────── payment state ───────── */
+/* Stripe Checkout always asks the payer's e-mail (receipt): it is the address of the « Merci de votre visite » review e-mail */
+const payEmail = (ses) => { const v = String((ses && ses.customer_details && ses.customer_details.email) || (ses && ses.customer_email) || "").trim().toLowerCase().slice(0, 120); return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v) ? v : ""; };
+const payName = (ses) => String((ses && ses.customer_details && ses.customer_details.name) || "");
 async function settle(rid, oid, ses) {
   const ref = db.doc(`restos/${rid}/clientOrders/${oid}`);
   const paid = ses.payment_status === "paid" || ses.payment_status === "no_payment_required";
@@ -198,7 +203,10 @@ async function settle(rid, oid, ses) {
     const s = await t.get(ref); if (!s.exists) return; const o = s.data();
     if (o.sid && ses.id && o.sid !== ses.id) return;
     if (paid && !o.paid) {
-      t.update(ref, { paid: true, paidAt: Date.now(), pi: typeof ses.payment_intent === "string" ? ses.payment_intent : (ses.payment_intent && ses.payment_intent.id) || null, status: o.status === "apayer" || o.status === "abandonnee" ? "nouvelle" : o.status, payUrl: null });
+      const em = payEmail(ses);
+      t.update(ref, { paid: true, paidAt: Date.now(), pi: typeof ses.payment_intent === "string" ? ses.payment_intent : (ses.payment_intent && ses.payment_intent.id) || null, status: o.status === "apayer" || o.status === "abandonnee" ? "nouvelle" : o.status, payUrl: null, ...(em ? { email: em } : {}) });
+      /* « Merci de votre visite » + Google review, sent later by functions/src/resa.js payReviewTick */
+      if (em) t.set(db.doc(`payReviews/${rid}_o_${oid}`), { rid, kind: "o", id: oid, email: em, name: clean(o.name || payName(ses), 60), mode: o.mode === "emporter" ? "emporter" : "table", paidAt: Date.now(), due: Date.now() + (o.mode === "emporter" ? 90 : 120) * 6e4 });
       /* the tip joins the team's pot (js/pourboires.js) */
       if (+o.tip > 0) t.set(db.doc(`restos/${rid}/tips/qr_${oid}`), { at: Date.now(), day: parisNow().day, amount: r2(o.tip), method: "ligne", src: "qr", table: o.table || "", orderId: oid, n: o.n || null, service: parisNow().min < 16 * 60 ? "midi" : "soir", uid: "server", by: "Menu QR" });
     }
@@ -451,7 +459,12 @@ async function settleBill(rid, bp, ses) {
   const paid = ses.payment_status === "paid" || ses.payment_status === "no_payment_required", dead = ses.status === "expired";
   await db.runTransaction(async (t) => {
     const s = await t.get(ref); if (!s.exists) return; const o = s.data(); if (o.sid && ses.id && o.sid !== ses.id) return;
-    if (paid && o.status !== "paye") t.update(ref, { status: "paye", paidAt: Date.now(), pi: typeof ses.payment_intent === "string" ? ses.payment_intent : (ses.payment_intent && ses.payment_intent.id) || null });
+    if (paid && o.status !== "paye") {
+      const em = payEmail(ses);
+      t.update(ref, { status: "paye", paidAt: Date.now(), pi: typeof ses.payment_intent === "string" ? ses.payment_intent : (ses.payment_intent && ses.payment_intent.id) || null, ...(em ? { email: em } : {}) });
+      /* the bill is paid at the end of the meal: the review e-mail leaves about an hour later (functions/src/resa.js payReviewTick) */
+      if (em) t.set(db.doc(`payReviews/${rid}_p_${bp}`), { rid, kind: "p", id: bp, email: em, name: clean(payName(ses), 60), mode: "addition", table: o.table || "", paidAt: Date.now(), due: Date.now() + 60 * 6e4 });
+    }
     else if (dead && o.status === "apayer") t.update(ref, { status: "abandonnee" });
   });
   if (paid || dead) await db.doc(`payPending/${rid}_bp_${bp}`).delete().catch(() => {});

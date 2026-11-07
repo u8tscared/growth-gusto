@@ -20,7 +20,7 @@ PLANS = [
  ("complet", "Chef", "169", "Toute la maison tourne : HACCP, salle, caisse, stock, équipe et chiffres.", "Tout Second, plus :", [
    ("Équipe", ["Planning intelligent, proposé d'après les couverts prévus", "Coût du personnel et heures sup. en euros", "Export paie pour le comptable", "Employés et salaires"]),
    ("Finances", ["Finances et marges", "Banque : import du relevé (connexion directe bientôt)", "Lien direct avec Pennylane"]),
-   ("Et aussi", ["Plusieurs restaurants, 49 € HT par restaurant en plus", "Mise en route avec nous (visio 30 min)", "Support prioritaire 7 j/7"])]),
+   ("Et aussi", ["Plusieurs marques dans une même cuisine : chiffre et marge de chacune", "Plusieurs restaurants, 49 € HT par restaurant en plus", "Mise en route avec nous (visio 30 min)", "Support prioritaire 7 j/7"])]),
 ]
 
 # feature, Commis, Second, Chef
@@ -30,7 +30,7 @@ MATRIX = [
  ("Marges, factures, commandes fournisseurs, gaspillage", 1, 1, 1), ("Consignes et messagerie d'équipe, par groupes", 1, 1, 1), ("Passation de service, journal des actions, accès temporaires", 1, 1, 1), ("Mode hors ligne, mode sombre, prise en main de l'app", 1, 1, 1),
  ("Réservations et plan de salle", 0, 1, 1), ("Prise de commande, écran cuisine, écran bar", 0, 1, 1), ("Menu QR et commande en ligne", 0, 1, 1),
  ("Caisse, stock, inventaire, tableau de bord", 0, 1, 1), ("Relevés Uber Eats, Deliveroo, Just Eat", 0, 1, 1), ("Fichier clients, fidélité, avis clients et Google", 0, 1, 1), ("Notes de frais avec TVA", 0, 1, 1),
- ("Pointeuse, planning de la semaine, relevé d'heures", 0, 1, 1), ("Planning intelligent, coûts du personnel, export paie", 0, 0, 1), ("Finances, relevé bancaire, Pennylane", 0, 0, 1), ("Plusieurs restaurants", 0, 0, 1),
+ ("Pointeuse, planning de la semaine, relevé d'heures", 0, 1, 1), ("Planning intelligent, coûts du personnel, export paie", 0, 0, 1), ("Finances, relevé bancaire, Pennylane", 0, 0, 1), ("Plusieurs marques dans une même cuisine", 0, 0, 1), ("Plusieurs restaurants", 0, 0, 1),
 ]
 
 PRICE_FAQ = [

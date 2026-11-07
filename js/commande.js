@@ -9,7 +9,8 @@
    - Réglages : open/closed, à table, à emporter (days, hours, preparation time), payment (Stripe Connect link, on site).
    Data:
      restos/{rid}/clientOrders/{id}  written by the server (functions/src/commande.js orderApi); the team moves status on:
-                                     nouvelle → prep → prete → servie (+ prepAt, readyAt, doneAt, by). Read by js/achats.js for forecasts.
+                                     nouvelle → prep → prete → servie (+ prepAt/prepBy, readyAt/readyBy, doneAt/doneBy, by). Read by js/achats.js for forecasts.
+                                     A tap on an order opens its detail (cmDetailHtml): timeline, articles, client, channel, payment, notes.
      restos/{rid}/qrMenu/cfg         { on, table, takeaway, payOnline, payPlace, tablePay: avant|choix|apres (à table), tips (pourboire proposé au paiement en ligne, js/pourboires.js), prepMin, tables, pickup:{days,windows:[{from,to}],step}, msg,
                                        hidden:[noteId], out:{noteId:"YYYY-MM-DD"}, desc:{noteId:text}, veg:[noteId], setupAt }
      restos/{rid}/qrPay/link         Stripe account of the restaurant (server-written, members read)
@@ -96,7 +97,7 @@ function cmOnRows(rows) {
   const first = !CM.known; CM.orders = rows;
   if (first) CM.known = new Set(rows.map((r) => r.id + ":" + r.status));
   else rows.forEach((o) => { const k = o.id + ":" + o.status; if (CM.known.has(k)) return; CM.known.add(k); if (o.status === "nouvelle" && !o.seenAt) cmAlert(o); });
-  onData();
+  onData(); cmDetailRefresh();
 }
 const cmLiveSt = (o) => ["nouvelle", "prep", "prete"].includes(o.status);
 function cmOrdersToday() { const k = dayKey(); return (CM.orders || []).filter((o) => o.src !== "salle").filter((o) => o.day === k || (cmLiveSt(o) && Date.now() - (o.at || 0) < 36 * 3600e3)); }
@@ -245,7 +246,7 @@ function cmLive() {
       <p class="sub">${c.on ? "Les nouvelles commandes arrivent ici avec un carillon. Gardez cet écran ouvert en cuisine." : "Ouvrez-la quand le service commence : vos clients pourront commander depuis les QR codes."}</p>
       <div class="cm-erow">${c.on ? `<a class="btn soft sm" href="${esc(cmUrl(DB.mode === "demo" ? "12" : ""))}" target="_blank" rel="noopener">${ico("cmEye")}Voir la page client</a>` : `<button class="btn acc sm" data-act="cmOpenNow">Ouvrir maintenant</button>`}</div></div>`;
   const doneL = done.length ? `<button class="cm-donet st" style="--i:4" data-act="cmDoneTog" aria-expanded="${CM.showDone}">${ico("check")}Terminées aujourd'hui<b class="mono">${done.length}</b>${ico("down", CM.showDone ? "rot" : "")}</button>
-    ${CM.showDone ? `<div class="glass cm-done">${done.map((o) => `<div class="cm-dr${o.status === "annulee" ? " off" : ""}"><b class="mono">${o.mode === "table" ? "QR" : `n° ${o.n}`}</b><span>${o.mode === "table" ? `Table ${esc(o.table)}` : `À emporter${o.name ? ` · ${esc(o.name)}` : ""}`}</span><em>${(o.items || []).reduce((a, x) => a + x.q, 0)} art.</em><b class="mono">${cmEur(o.total)}</b><span class="pill ${o.status === "annulee" ? "bad" : o.paid ? "ok" : "neu"}">${o.status === "annulee" ? (o.refunded ? "Remboursée" : "Annulée") : o.paid ? "Payée en ligne" : "Sur place"}</span></div>`).join("")}</div>` : ""}` : "";
+    ${CM.showDone ? `<div class="glass cm-done">${done.map((o) => `<button class="cm-dr${o.status === "annulee" ? " off" : ""}" data-act="cmOpen" data-id="${esc(o.id)}" aria-label="Détail de la commande ${o.mode === "table" ? `table ${esc(o.table)}` : `n° ${o.n}`}"><em class="mono cm-dr-t">${hm(o.doneAt || o.cancelledAt || o.at)}</em>${o.mode === "table" ? "" : `<b class="mono">n° ${o.n}</b>`}<span>${o.mode === "table" ? `Table ${esc(o.table)}` : `À emporter${o.name ? ` · ${esc(o.name)}` : ""}`}</span><em>${(o.items || []).reduce((a, x) => a + x.q, 0)} art.</em><b class="mono">${cmEur(o.total)}</b><span class="pill ${o.status === "annulee" ? "bad" : o.paid ? "ok" : "neu"}">${o.status === "annulee" ? (o.refunded ? "Remboursée" : "Annulée") : o.paid ? "Payée en ligne" : o.settled ? "Réglée" : "Sur place"}</span>${ico("chev")}</button>`).join("")}</div>` : ""}` : "";
   return head + rail + doneL;
 }
 function cmCard(o, k) {
@@ -253,7 +254,7 @@ function cmCard(o, k) {
   const late = o.status === "nouvelle" ? 5 : o.status === "prep" ? 25 : 15;
   const at = o.status === "prep" ? o.prepAt || o.at : o.status === "prete" ? o.readyAt || o.at : o.at;
   const busy = CM.busy[o.id];
-  return `<article class="cm-o${CM.fresh.has(o.id) ? " fresh" : ""} m-${o.mode}" style="--i:${Math.min(k, 8)}" data-id="${esc(o.id)}">
+  return `<article class="cm-o${CM.fresh.has(o.id) ? " fresh" : ""} m-${o.mode}" style="--i:${Math.min(k, 8)}" data-id="${esc(o.id)}" data-act="cmOpen">
     <div class="cm-o-h">${o.mode === "table" ? "" : `<b class="cm-n mono">${o.n}</b>`}
       ${o.mode === "table" ? `<span class="cm-where t">${ico("rsTable")}Table <b>${esc(o.table)}</b></span>` : `<span class="cm-where e">${ico("cmBag")}${esc(o.slot || "")}</span>`}
       <span class="cm-ago mono${(Date.now() - at) / 6e4 > late ? " late" : ""}" data-at="${at}" data-late="${late}">${cmAgo(at)}</span></div>
@@ -262,7 +263,7 @@ function cmCard(o, k) {
     ${o.note ? `<div class="cm-onote">${ico("rsNote")}<span>${esc(o.note)}</span></div>` : ""}
     ${cmDue(o) ? cmDueBand(o) : ""}
     <div class="cm-o-f"><span class="cm-pay ${o.paid || o.settled ? "ok" : ""}">${o.paid ? `${ico("check")}Payée` : o.settled ? `${ico("check")}Réglée` : `${ico("cmCard")}À encaisser`}</span><b class="mono">${cmEur(o.total)}</b>
-      <button class="cm-more" data-act="cmMenu" data-id="${esc(o.id)}" aria-label="Plus d'actions">${ico("dots")}</button></div>
+      <button class="cm-more" data-act="cmMenu" data-id="${esc(o.id)}" aria-label="Détail de la commande">${ico("dots")}</button></div>
     ${next ? `<button class="btn ${o.status === "prete" ? "" : "acc"} block cm-next" data-act="cmNext" data-id="${esc(o.id)}" data-v="${next[0]}" ${busy ? "disabled" : ""}>${ico(next[2])}${next[1]}</button>` : ""}
   </article>`;
 }
@@ -271,6 +272,82 @@ function cmCard(o, k) {
 function cmDueBand(o, big) {
   return `<div class="cm-due${big ? " big" : ""}" role="status"><span class="cm-due-i">${ico("cmCard")}</span><span class="cm-due-t"><b>À régler</b><em>${big ? "" : `Table ${esc(o.table)} · `}${cmEur(o.total)} · non payée</em></span>
     <button class="cm-due-b" data-act="cmSettle" data-id="${esc(o.id)}" aria-label="Table ${esc(o.table)} réglée">${ico("check")}Réglé</button></div>`;
+}
+
+/* ── the detail of one order (tap a card or a finished line): when it was placed, paid, sent to the kitchen, launched, ready, served;
+   what was ordered, who, through which channel, the payment, the notes, and the actions (call, step back, cancel) ── */
+const cmWhoName = (uid) => { if (!uid) return ""; if (S.me && uid === S.me.id) return "vous"; const m = (S.members || []).find((x) => x.id === uid); return m ? firstName(m.name) : ""; };
+const cmDur = (ms) => { const m = Math.max(0, Math.round(ms / 6e4)); return m < 1 ? "moins d'1 min" : m < 60 ? `${m} min` : `${Math.floor(m / 60)} h ${pad(m % 60)}`; };
+function cmTimeline(o) {
+  const online = o.pay === "stripe" || !!o.paidAt, kAt = o.status === "apayer" || o.status === "abandonnee" ? 0 : online && o.paid ? o.paidAt || o.at : o.at;
+  const doneT = o.mode === "table" ? "Servie à table" : "Remise au client", off = ["annulee", "abandonnee"].includes(o.status);
+  const S2 = [
+    { k: "at", t: "Commande passée", s: o.mode === "table" ? `Depuis le QR code de la table ${esc(o.table)}` : "Sur la page de commande à emporter", at: o.at },
+    online ? { k: "paid", t: o.paid ? "Payée en ligne" : o.status === "abandonnee" ? "Paiement abandonné" : "Paiement en ligne en cours", s: o.paid ? `Carte ou Apple Pay${o.tip ? ` · pourboire ${cmEur(o.tip)}` : ""}` : "", at: o.paid ? o.paidAt || o.at : 0, bad: o.status === "abandonnee" } : null,
+    { k: "kit", t: "Arrivée en cuisine", s: online && !o.paid ? "Dès que le paiement est validé" : "", at: kAt },
+    { k: "prep", t: "Lancée en préparation", at: o.prepAt, by: o.prepBy || (o.status === "prep" ? o.by : "") },
+    { k: "prete", t: o.mode === "table" ? "Prête à servir" : "Prête à retirer", at: o.readyAt, by: o.readyBy || (o.status === "prete" ? o.by : "") },
+    { k: "servie", t: doneT, at: o.doneAt, by: o.doneBy || (o.status === "servie" ? o.by : "") },
+    o.settledAt || cmDue(o) ? { k: "settled", t: o.settled ? "Réglée sur place" : "À régler sur place", at: o.settled ? o.settledAt : 0, by: o.settledBy, bad: !o.settled } : null,
+    o.status === "annulee" ? { k: "x", t: o.refunded ? `Annulée et remboursée (${cmEur(o.refunded)})` : "Annulée", at: o.cancelledAt || o.refundedAt || 0, by: o.cancelledBy, bad: true } : null,
+  ].filter(Boolean).filter((x) => !off || x.at || x.k === "x" || x.k === "paid");
+  const cur = S2.findIndex((x) => !x.at);
+  let prev = 0;
+  const rows = S2.map((x, i) => {
+    const gap = x.at && prev && x.at - prev >= 6e4 ? `<i class="cm-tl-gap mono">+${cmDur(x.at - prev)}</i>` : ""; if (x.at) prev = x.at;
+    const st = x.at ? "ok" : i === cur && !off ? "now" : "todo", who = cmWhoName(x.by);
+    const sub = [x.s, x.at && who ? `par ${esc(who)}` : "", !x.at && i === cur && !off && prev ? `en attente depuis <span class="cm-ago" data-at="${prev}">${cmAgo(prev)}</span>` : ""].filter(Boolean).join(" · ");
+    return `<li class="cm-tl-r ${st}${x.bad ? " bad" : ""}" style="--i:${i}"><span class="cm-tl-dot">${x.at ? ico(x.bad ? "x" : "check") : ""}</span>
+      <div class="cm-tl-tx"><b>${x.t}</b>${sub ? `<em>${sub}</em>` : ""}</div><span class="cm-tl-at mono">${x.at ? hm(x.at) : st === "now" ? "en cours" : "—"}</span>${gap}</li>`;
+  }).join("");
+  const end = o.doneAt;
+  const tot = kAt && end ? `<div class="cm-tl-sum"><span>${ico("clock")}De la cuisine au client <b class="mono">${cmDur(end - kAt)}</b></span>${o.prepAt && o.readyAt ? `<span>Préparation <b class="mono">${cmDur(o.readyAt - o.prepAt)}</b></span>` : ""}</div>` : "";
+  return `<ol class="cm-tl">${rows}</ol>${tot}`;
+}
+function cmStatusPill(o) {
+  const L = { apayer: ["warn", "Paiement en cours"], nouvelle: ["acc", "Nouvelle"], prep: ["warn", "En préparation"], prete: ["ok", "Prête"], servie: ["neu", o.mode === "table" ? "Servie" : "Remise"], annulee: ["bad", o.refunded ? "Remboursée" : "Annulée"], abandonnee: ["bad", "Abandonnée"] }[o.status] || ["neu", o.status || ""];
+  return `<span class="pill ${L[0]}">${L[1]}</span>`;
+}
+function cmDetailHtml(o) {
+  const items = o.items || [], n = items.reduce((a, x) => a + (+x.q || 0), 0);
+  const back = { prep: ["nouvelle", "Remettre en « nouvelle »"], prete: ["prep", "Remettre en préparation"] }[o.status];
+  const live = cmLiveSt(o) || o.status === "apayer", tel = o.phone ? String(o.phone).replace(/[^\d+]/g, "") : "";
+  const d = new Date(o.at || Date.now()), today = o.day === dayKey();
+  const when = today ? `aujourd'hui à ${hm(o.at)}` : `le ${d.toLocaleDateString("fr-FR", { day: "numeric", month: "long" })} à ${hm(o.at)}`;
+  const pay = o.status === "annulee" ? (o.refunded ? ["bad", "x", "Remboursée", `${cmEur(o.refunded)} rendus sur la carte du client${o.refundedAt ? ` le ${new Date(o.refundedAt).toLocaleDateString("fr-FR")}` : ""}.`] : ["bad", "x", "Annulée", o.paid ? "Remboursement en cours." : "Rien n'a été encaissé."])
+    : o.paid ? ["ok", "check", "Payée en ligne", `${o.paidAt ? `à ${hm(o.paidAt)} · ` : ""}carte ou Apple Pay, sur votre compte Stripe`]
+    : o.settled ? ["ok", "check", "Réglée sur place", `${o.settledAt ? `à ${hm(o.settledAt)} · ` : ""}${cmWhoName(o.settledBy) ? `par ${esc(cmWhoName(o.settledBy))}, ` : ""}à votre caisse`]
+    : o.status === "apayer" ? ["warn", "cmCard", "Paiement en ligne en cours", "La commande part en cuisine dès que le client a payé."]
+    : o.status === "abandonnee" ? ["bad", "x", "Paiement abandonné", "Le client n'a pas payé : la commande n'est pas partie en cuisine."]
+    : ["warn", "cmCard", "À encaisser sur place", o.mode === "table" ? "À la fin du repas, à votre caisse." : "Au retrait, à votre caisse."];
+  const chan = o.mode === "table" ? `${ico("cmQr")}<span><b>Menu QR à table</b><em>Table ${esc(o.table)}</em></span>` : `${ico("cmBag")}<span><b>À emporter</b><em>${o.slot ? `Retrait prévu à ${esc(o.slot)}` : "Retrait dès que possible"}</em></span>`;
+  const who = o.name || o.phone ? `${ico("users")}<span><b>${esc(o.name || "Client")}</b><em>${o.phone ? `<a href="tel:${esc(tel)}">${esc(o.phone)}</a>` : "Pas de téléphone"}</em></span>` : `${ico("users")}<span><b>Client à table</b><em>Pas de nom demandé</em></span>`;
+  return `<div class="cm-ed cm-dt" data-oid="${esc(o.id)}">
+    <div class="cm-edh"><span class="h2">${o.mode === "table" ? `Commande QR · Table ${esc(o.table)}` : `Commande n° ${esc(o.n)}`}</span><button class="iconbtn" data-act="sheetClose" aria-label="Fermer">${ico("x")}</button></div>
+    <p class="sub cm-dt-sub">${cmStatusPill(o)}<span>${o.n ? `N° ${esc(o.n)} du jour · ` : ""}passée ${when}</span></p>
+    ${cmDue(o) ? cmDueBand(o) : ""}
+    <div class="cm-dt-grid">
+      <div class="cm-dt-cards"><div class="cm-dt-c">${chan}</div><div class="cm-dt-c">${who}</div>
+        <div class="cm-dt-c pay ${pay[0]}">${ico(pay[1])}<span><b>${pay[2]}</b><em>${pay[3]}</em></span></div></div>
+      <section class="cm-dt-s"><h3>${ico("clock")}Chronologie</h3>${cmTimeline(o)}</section>
+      <div class="cm-dt-side"><section class="cm-dt-s"><h3>${ico("receipt")}Articles <span class="mono">${n}</span></h3>
+        <ul class="cm-dt-items">${items.map((x) => `<li><b class="mono">${x.q}×</b><span>${esc(x.name)}${x.promo ? `<small>${esc(x.promo)}</small>` : ""}${x.note ? `<em>${esc(x.note)}</em>` : ""}</span><i class="mono">${x.full && x.full > x.price ? `<s>${cmEur(x.full * x.q)}</s>` : ""}${cmEur((+x.price || 0) * (+x.q || 0))}</i></li>`).join("")}</ul>
+        <div class="cm-dt-tot"><b>Total TTC<i class="mono">${cmEur(o.total)}</i></b>${+o.tip > 0 ? `<span>+ pourboire pour l'équipe<i class="mono">${cmEur(o.tip)}</i></span>` : ""}</div></section>
+      <section class="cm-dt-s"><h3>${ico("rsNote")}Notes</h3>${o.note || items.some((x) => x.note) ? `${o.note ? `<div class="cm-onote">${ico("rsNote")}<span>${esc(o.note)}</span></div>` : ""}${items.filter((x) => x.note).map((x) => `<p class="cm-dt-n"><b>${esc(x.name)}</b> · ${esc(x.note)}</p>`).join("")}` : `<p class="note" style="margin:0">Aucune note du client.</p>`}</section></div>
+    </div>
+    ${live || tel ? `<div class="cm-dt-act">
+      ${tel ? `<a class="btn soft" href="tel:${esc(tel)}">${ico("rsPhone")}Appeler ${esc(o.name || "le client")}</a>` : ""}
+      ${back ? `<button class="btn soft" data-act="cmBack" data-id="${esc(o.id)}" data-v="${back[0]}">${ico("back")}${back[1]}</button>` : ""}
+      ${live ? `<button class="btn danger" data-act="cmCancel" data-id="${esc(o.id)}">${ico("x")}${o.paid ? "Annuler et rembourser" : "Annuler la commande"}</button>` : ""}
+    </div>${live && o.paid ? `<p class="note">Si vous annulez, le client est remboursé sur sa carte (sous 5 à 10 jours chez sa banque).</p>` : ""}` : ""}
+  </div>`;
+}
+function cmOpenDetail(id) { const o = (CM.orders || []).find((x) => x.id === id); if (!o) return; openSheet(cmDetailHtml(o)); cmDetailRefresh(); }
+/* live: the open detail follows the order (the kitchen moves it on, the client pays…) */
+function cmDetailRefresh() {
+  const el = document.querySelector("#sheet.open .cm-dt"); if (!el) return; const o = (CM.orders || []).find((x) => x.id === el.dataset.oid); if (!o) return;
+  const k = JSON.stringify([o.status, o.paid, o.paidAt, o.prepAt, o.readyAt, o.doneAt, o.settled, o.refunded, o.cancelledAt]); if (el.dataset.k === k) return;
+  if (el.dataset.k) { const b = $("#sheetBody"), y = b.scrollTop; b.innerHTML = cmDetailHtml(o); b.scrollTop = y; } const n = document.querySelector("#sheet .cm-dt"); if (n) n.dataset.k = k;
 }
 
 /* ── la carte ── */
@@ -540,12 +617,13 @@ function cmSeedDemo() {
   const it = (i, q, note) => { const n = pick(i); return n ? { id: n.id, name: n.title, price: num(n.price), q, note: note || "" } : { id: "x" + i, name: ["Bœuf bourguignon", "Croquettes de jambon", "Mousse au chocolat", "Limonade maison"][i % 4], price: [22, 9, 7, 4.5][i % 4], q, note: note || "" }; };
   const now = Date.now(), day = dayKey(), rows = {};
   const mk = (id, n, minAgo, o) => { const items = o.items; rows[id] = { n, day, at: now - minAgo * 6e4, mode: "table", table: "", slot: "", name: "", phone: "", note: "", items, total: items.reduce((a, x) => a + x.price * x.q, 0), pay: "place", paid: false, status: "nouvelle", src: "qr", seenAt: now, ...o }; };
-  mk("dm1", 9, 2, { table: "4", items: [it(0, 2), it(1, 1, "Sans oignons")], paid: true, pay: "stripe" });
+  mk("dm1", 9, 2, { table: "4", items: [it(0, 2), it(1, 1, "Sans oignons")], paid: true, pay: "stripe", paidAt: now - 1.5 * 6e4 });
   mk("dm2", 8, 6, { mode: "emporter", slot: "12:45", name: "Camille", phone: "06 12 34 56 78", items: [it(2, 1), it(3, 2)], status: "nouvelle" });
-  mk("dm3", 7, 14, { table: "11", items: [it(1, 3), it(4, 2)], status: "prep", prepAt: now - 9 * 6e4, paid: true, pay: "stripe", note: "Les desserts plus tard, merci" });
+  mk("dm3", 7, 14, { table: "11", items: [it(1, 3), it(4, 2)], status: "prep", paidAt: now - 13 * 6e4, prepAt: now - 9 * 6e4, prepBy: S.me.id, paid: true, pay: "stripe", tip: 3, note: "Les desserts plus tard, merci" });
   mk("dm4", 6, 22, { table: "5", items: [it(0, 1), it(2, 1)], status: "prep", prepAt: now - 18 * 6e4 });
-  mk("dm5", 5, 31, { mode: "emporter", slot: "12:30", name: "Hugo", phone: "07 22 18 40 11", items: [it(3, 2)], status: "prete", readyAt: now - 3 * 6e4, paid: true, pay: "stripe" });
-  [4, 3, 2, 1].forEach((n, i) => mk("dmd" + n, n, 60 + i * 25, { table: String(3 + i * 2), items: [it(i, 2), it(i + 1, 1)], status: "servie", paid: i % 2 === 0, pay: i % 2 === 0 ? "stripe" : "place", settled: i % 2 !== 0 }));
+  mk("dm5", 5, 31, { mode: "emporter", slot: "12:30", name: "Hugo", phone: "07 22 18 40 11", items: [it(3, 2)], status: "prete", paidAt: now - 30 * 6e4, prepAt: now - 24 * 6e4, readyAt: now - 3 * 6e4, prepBy: S.me.id, readyBy: S.me.id, paid: true, pay: "stripe" });
+  [4, 3, 2, 1].forEach((n, i) => mk("dmd" + n, n, 60 + i * 25, { table: String(3 + i * 2), items: [it(i, 2), it(i + 1, 1)], status: "servie", paid: i % 2 === 0, pay: i % 2 === 0 ? "stripe" : "place", settled: i % 2 !== 0,
+    ...(i % 2 === 0 ? { paidAt: now - (59 + i * 25) * 6e4 } : { settledAt: now - (8 + i * 25) * 6e4, settledBy: S.me.id }), prepAt: now - (55 + i * 25) * 6e4, readyAt: now - (41 + i * 25) * 6e4, doneAt: now - (39 + i * 25) * 6e4, prepBy: S.me.id, readyBy: S.me.id, doneBy: S.me.id }));
   DB.local[path] = rows;
 }
 function cmDemoPing() {
@@ -566,21 +644,13 @@ Object.assign(ACT, {
   cmOpenNow: async () => { SFX.ok(); buzz(8); await cmSaveCfg({ on: true }); toast("Commande en ligne ouverte"); },
   cmNext: async (a, id, v) => {
     const o = (CM.orders || []).find((x) => x.id === id); if (!o || CM.busy[id]) return; CM.busy[id] = true;
-    const patch = { status: v, by: S.me.id }; if (v === "prep") patch.prepAt = Date.now(); if (v === "prete") patch.readyAt = Date.now(); if (v === "servie") patch.doneAt = Date.now();
+    const patch = { status: v, by: S.me.id }; if (v === "prep") { patch.prepAt = Date.now(); patch.prepBy = S.me.id; } if (v === "prete") { patch.readyAt = Date.now(); patch.readyBy = S.me.id; } if (v === "servie") { patch.doneAt = Date.now(); patch.doneBy = S.me.id; }
     const card = a.closest(".cm-o"); if (card) card.classList.add("go");
     if (v === "prete") { SFX.done(); buzz([14, 40, 14]); } else if (v === "servie") { SFX.ok(); buzz(8); } else { SFX.ok(); buzz(8); }
     setTimeout(async () => { try { await safe(DB.update("clientOrders", id, patch)); if (v === "servie") toastUndo(o.mode === "table" ? `Commande QR · Table ${o.table} terminée` : `Commande n° ${o.n} terminée`), S.ui.undo = () => DB.update("clientOrders", id, { status: "prete", doneAt: null }); } catch (e) {} delete CM.busy[id]; onData(); }, card ? 260 : 0);
   },
-  cmMenu: (a, id) => {
-    const o = (CM.orders || []).find((x) => x.id === id); if (!o) return; SFX.tap();
-    const back = { prep: ["nouvelle", "Remettre en « nouvelle »"], prete: ["prep", "Remettre en préparation"] }[o.status];
-    openSheet(`<div class="cm-ed"><div class="cm-edh"><span class="h2">${o.mode === "table" ? `Commande QR · Table ${esc(o.table)}` : `Commande n° ${o.n}`}</span><button class="iconbtn" data-act="sheetClose" aria-label="Fermer">${ico("x")}</button></div>
-      <p class="sub">${o.mode === "table" ? `Table ${esc(o.table)}` : `À emporter ${esc(o.slot || "")}${o.name ? ` · ${esc(o.name)}` : ""}`} · ${cmEur(o.total)} · ${o.paid ? "payée en ligne" : "à encaisser"}</p>
-      ${o.phone ? `<a class="btn soft block" href="tel:${esc(String(o.phone).replace(/[^\d+]/g, ""))}">${ico("rsPhone")}Appeler ${esc(o.name || "le client")}</a>` : ""}
-      ${back ? `<button class="btn soft block" data-act="cmBack" data-id="${esc(o.id)}" data-v="${back[0]}">${ico("back")}${back[1]}</button>` : ""}
-      <button class="btn danger block" data-act="cmCancel" data-id="${esc(o.id)}">${ico("x")}${o.paid ? "Annuler et rembourser" : "Annuler la commande"}</button>
-      ${o.paid ? `<p class="note">Le client est remboursé sur sa carte (sous 5 à 10 jours chez sa banque).</p>` : ""}</div>`);
-  },
+  cmMenu: (a, id) => { SFX.tap(); cmOpenDetail(id); },
+  cmOpen: (a, id, v, e) => { if (e && e.target && e.target.closest && e.target.closest("a[href]")) return; SFX.tap(); cmOpenDetail(id); },
   cmBack: async (a, id, v) => { closeSheet(); SFX.tap(); await safe(DB.update("clientOrders", id, { status: v })); },
   cmCancel: async (a, id) => {
     const o = (CM.orders || []).find((x) => x.id === id); if (!o) return;

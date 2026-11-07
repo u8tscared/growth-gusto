@@ -53,6 +53,7 @@ const PU_KINDS = [
   ["ca", "patron", "puEuro", "ok", "Chiffre du service", "À la fin du midi et du soir"],
   ["haccp", "patron", "therm", "bad", "Alertes frigos et hygiène", "Température, relevé oublié, DLC, sondes"],
   ["geste", "patron", "puGift", "w-sa", "Offerts et annulations", "Un plat offert ou annulé après l'envoi"],
+  ["heures", "patron", "hsGauge", "warn", "Heures sup.", "Un employé dépasse vos seuils ou va sortir du cadre légal"],
   ["consigne", "equipe", "csMega", "w-vi", "Consignes", "Plat du jour, rupture, info"],
   ["chat", "equipe", "csChat", "w-sk", "Discussion", "Les messages de vos groupes"],
 ];
@@ -60,8 +61,8 @@ const PU_K = Object.fromEntries(PU_KINDS.map((k) => [k[0], k]));
 const PU_GROUPS = [["cuisine", "En cuisine"], ["bar", "Au bar"], ["salle", "En salle"], ["patron", "Pour le patron"], ["equipe", "Toute l'équipe"]];
 /* same table as DEF in functions/src/notifs.js */
 const PU_DEF = {
-  patron: ["qr", "resa", "ca", "haccp", "geste", "consigne", "chat"],
-  chef: ["k_new", "k_rush", "k_mod", "haccp", "consigne", "chat"],
+  patron: ["qr", "resa", "ca", "haccp", "geste", "heures", "consigne", "chat"],
+  chef: ["k_new", "k_rush", "k_mod", "haccp", "heures", "consigne", "chat"],
   cuisine: ["k_new", "k_rush", "k_mod", "consigne", "chat"],
   salle: ["s_ready", "s_call", "qr", "resa", "consigne", "chat"],
   bar: ["b_new", "s_ready", "s_call", "consigne", "chat"],
@@ -197,6 +198,7 @@ function puEx() {
     ca: ["Aujourd'hui : 2 340 € TTC", "68 couverts · ticket moyen 34,40 € · +12 % vs la semaine dernière"],
     haccp: ["Chambre froide à 6,2 °C", "Au-dessus de 4 °C depuis 25 min"],
     geste: ["Offert · Table 8", `1 ${sh(D[2])} (7,50 €) · « anniversaire »`],
+    heures: [`${firstName((S.members || []).find((m) => m.role !== "gerant")?.name) || "Lucas"} va sortir du cadre légal`, "D'après le planning : 49 h cette semaine, 48 h maximum (HCR)"],
     consigne: ["Rupture · Thomas", `Plus de ${sh(D[1])} ce soir, proposez le ${sh(D[3] || D[0])}`],
     chat: ["Inès · Cuisine", "Je passe chez le primeur à 16h, il vous faut quelque chose ?"],
   };
@@ -212,12 +214,13 @@ function puBanner(n) {
   host.prepend(el); while (host.children.length > 3) host.lastElementChild.remove();
   requestAnimationFrame(() => el.classList.add("on"));
   try { SFX.init(); SFX.tone(1175, 0.12, "sine", 0.045); SFX.tone(1568, 0.28, "sine", 0.04, 0.09); buzz([12, 50, 12]); } catch (e) {}
-  const out = () => { if (el._out) return; el._out = true; el.classList.remove("on"); el.classList.add("out"); setTimeout(() => el.remove(), 420); };
-  let y0 = null; el._t = setTimeout(out, 6200);
-  el.addEventListener("pointerdown", (e) => { y0 = e.clientY; clearTimeout(el._t); });
-  el.addEventListener("pointermove", (e) => { if (y0 == null) return; const dy = Math.min(0, e.clientY - y0); el.style.transform = `translateY(${dy}px)`; });
-  el.addEventListener("pointerup", (e) => { const dy = y0 == null ? 0 : e.clientY - y0; y0 = null; el.style.transform = ""; if (dy < -24) { out(); return; } out(); const r = puRouteOf(n.url); if (r && VIEWS[r] && r !== S.route) go(r); });
-  el.addEventListener("pointercancel", () => { y0 = null; el.style.transform = ""; el._t = setTimeout(out, 3000); });
+  const out = () => { if (el._out) return; el._out = true; clearTimeout(el._t); el.classList.remove("on"); el.classList.add("out"); setTimeout(() => el.remove(), 420); };
+  el._t = setTimeout(out, 6200);
+  /* glisser (sur le côté ou vers le haut) ou la petite croix pour l'effacer ; toucher ailleurs ouvre l'écran concerné */
+  el.insertAdjacentHTML("beforeend", `<button class="pu-bx" data-noswipe aria-label="Effacer la notification">${ico("x")}</button>`);
+  $(".pu-bx", el).addEventListener("click", (e) => { e.stopPropagation(); try { SFX.close(); buzz(6); } catch (x) {} out(); });
+  swipeAway(el, () => { el._out = true; clearTimeout(el._t); el.remove(); }, { hold: () => clearTimeout(el._t), release: () => { clearTimeout(el._t); el._t = setTimeout(out, 3000); } });
+  el.addEventListener("click", () => { out(); const r = puRouteOf(n.url); if (r && VIEWS[r] && r !== S.route) go(r); });
   PU.log.unshift({ ...n, at: Date.now() }); PU.log = PU.log.slice(0, 30);
   if (S.route === "notifs") puPaintLog();
 }

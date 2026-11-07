@@ -279,7 +279,7 @@ function rsCard(b, cfg, i) {
     <button class="rs-hit" data-act="rsOpen" data-id="${esc(b.id)}" aria-label="${esc(b.name || "Réservation")}, ${+b.covers || 0} personnes à ${b.time}"></button>
     <span class="rs-cv"><b>${+b.covers || 0}</b><i>pers.</i></span>
     <span class="rs-tx"><b>${esc(b.name || "Sans nom")}</b>
-      <em>${cl && cl.vip ? `<span class="rs-vip">VIP</span>` : ""}${cs && cs.noshow ? `<span class="rs-nsw">${rsPl(cs.noshow, "no-show")}</span>` : ""}${tb ? `<span class="rs-tbl">T${esc(typeof plLabel === "function" ? plLabel(b, cfg) || tb.n : tb.n)}</span>` : ""}${web ? `<span class="rs-web">${fresh ? "Nouveau · " : ""}en ligne</span>` : ""}${typeof rzBadge === "function" ? rzBadge(b) : ""}${b.phone ? `<span>${esc(b.phone)}</span>` : ""}</em>
+      <em>${rsVip(b.phone) ? `<span class="rs-vip">VIP</span>` : ""}${cs && cs.noshow ? `<span class="rs-nsw">${rsPl(cs.noshow, "no-show")}</span>` : ""}${tb ? `<span class="rs-tbl">T${esc(typeof plLabel === "function" ? plLabel(b, cfg) || tb.n : tb.n)}</span>` : ""}${web ? `<span class="rs-web">${fresh ? "Nouveau · " : ""}en ligne</span>` : ""}${typeof rzBadge === "function" ? rzBadge(b) : ""}${b.phone ? `<span>${esc(b.phone)}</span>` : ""}</em>
       ${b.notes ? `<span class="rs-note ${nk}">${nk ? ico("alert") : ""}${esc(b.notes)}</span>` : ""}</span>
     ${btn}
   </div>`;
@@ -306,12 +306,16 @@ function rsReqPanel(cfg) {
   return `<section class="rs-reqs st" style="--i:1"><div class="rs-rqh"><span class="rs-rqn">${L.length}</span><b>${L.length > 1 ? "Demandes à valider" : "Demande à valider"}</b></div>
     ${L.slice(0, 6).map((b) => { const cs = rsStatOf(b.phone), cl = rsClientOf(b.phone), nk = rsNoteKind(b.notes); return `<div class="rs-req" data-card="${esc(b.id)}">
       <button class="rs-rqi" data-act="rsOpen" data-id="${esc(b.id)}"><span class="rs-cv"><b>${+b.covers || 0}</b><i>pers.</i></span>
-        <span class="rs-tx"><b>${esc(b.name || "")}</b><em><span class="rs-rqd">${esc((rsRel(b.date) || rsShort(b.date)))} · ${b.time}</span>${cl && cl.vip ? `<span class="rs-vip">VIP</span>` : ""}${cs && cs.visits ? `<span>${rsPl(cs.visits, "visite")}</span>` : ""}${cs && cs.noshow ? `<span class="rs-nsw">${rsPl(cs.noshow, "no-show")}</span>` : ""}${rsFdTags(b)}</em>
+        <span class="rs-tx"><b>${esc(b.name || "")}</b><em><span class="rs-rqd">${esc((rsRel(b.date) || rsShort(b.date)))} · ${b.time}</span>${rsVip(b.phone) ? `<span class="rs-vip">VIP</span>` : ""}${cs && cs.visits ? `<span>${rsPl(cs.visits, "visite")}</span>` : ""}${cs && cs.noshow ? `<span class="rs-nsw">${rsPl(cs.noshow, "no-show")}</span>` : ""}${rsFdTags(b)}</em>
         ${b.notes ? `<span class="rs-note ${nk}">${nk ? ico("alert") : ""}${esc(b.notes)}</span>` : ""}</span></button>
       <div class="rs-rqb"><button class="btn soft" data-act="rsRefuse" data-id="${esc(b.id)}">${ico("x")}Refuser</button><button class="btn acc" data-act="rsAccept" data-id="${esc(b.id)}">${ico("check")}Accepter</button></div>
     </div>`; }).join("")}${L.length > 6 ? `<p class="rs-lp">+ ${L.length - 6} autres demandes</p>` : ""}</section>`;
 }
 /* client file: restos/{rid}/clients/{phone key} { name, phone, email?, vip?, notes? } + what the bookings say */
+/* VIP: ticked by hand (vip), taken off by hand (vipOff), or given on its own after the visits set in the loyalty settings
+   (restos/{rid}.fidCfg.vipAuto + vipN). js/clients.js counts every visit (bookings, take-away, counter, tables); here only bookings. */
+function rsVipOf(d, visits) { d = d || {}; if (d.vipOff) return false; if (d.vip) return true; const c = (S.resto && S.resto.fidCfg) || {}; return !!c.vipAuto && (+visits || 0) >= Math.max(2, +c.vipN || 10); }
+function rsVip(ph) { try { if (typeof fdPerson === "function") { const p = fdPerson(ph); if (p) return !!p.vip; } } catch (e) {} const s0 = rsStatOf(ph); return rsVipOf(rsClientOf(ph), s0 && s0.visits); }
 const rsClientOf = (ph) => { const k = rsPk(ph); return k ? R.clients.find((c) => c.id === k) || null : null; };
 let rsStatMemo = { src: null, map: null };
 function rsStats() {
@@ -446,7 +450,7 @@ const rsNorm = (t) => String(t || "").toLowerCase().normalize("NFD").replace(/[\
 function rsPeople() {
   const m = {}; Object.entries(rsStats()).forEach(([k, x]) => { m[k] = { id: k, name: x.name, phone: x.phone, email: x.email, visits: x.visits, noshow: x.noshow }; });
   R.clients.forEach((c) => { if (!c || !c.id) return; m[c.id] = { visits: 0, noshow: 0, ...(m[c.id] || {}), ...c, id: c.id }; });
-  return Object.values(m);
+  return Object.values(m).map((c) => ({ ...c, vip: c.phone ? rsVip(c.phone) : rsVipOf(c, c.visits) }));
 }
 function rsSugHtml() {
   const e = R.ed; if (!e) return ""; const pk = rsPk(e.phone);
@@ -481,7 +485,7 @@ function rsOpenSheet(id) {
     : `<div class="rs-sts">${sts.map(([k, t, ic]) => `<button class="rs-sb k-${k}${cur === k ? " on" : ""}" data-act="rsSetSt" data-id="${esc(b.id)}" data-v="${k}" aria-pressed="${cur === k}">${ico(ic)}<span>${b.status === "refuse" && k === "annule" ? "Refusée" : t}</span></button>`).join("")}</div>`;
   openSheet(`<div class="rs-bk">
     <div class="rs-bkh"><span class="rs-cv big"><b>${+b.covers || 0}</b><i>pers.</i></span><div><button class="rs-who" data-act="rsClient" data-id="${esc(b.id)}" ${rsPk(b.phone) ? "" : "disabled"}><span class="h2">${esc(b.name || "Sans nom")}</span>${rsPk(b.phone) ? ico("chev") : ""}</button><em>${esc(rsLong(b.date))} · <b>${b.time}</b>${tb ? ` · table ${esc(typeof plLabel === "function" ? plLabel(b, cfg) || tb.n : tb.n)}` : ""}</em></div></div>
-    ${cs && (cs.visits || cs.noshow || (cl && (cl.vip || cl.notes || (cl.allergens || []).length))) ? `<button class="rs-cline" data-act="rsClient" data-id="${esc(b.id)}">${cl && cl.vip ? `<span class="rs-vip">VIP</span>` : ""}<span>${cs.visits ? rsPl(cs.visits, "visite") : "Première visite"}</span>${cs.noshow ? `<span class="rs-nsw">${rsPl(cs.noshow, "no-show")}</span>` : ""}${rsFdTags(b)}${cl && cl.notes ? `<span class="rs-cn">${esc(cl.notes)}</span>` : ""}</button>` : ""}
+    ${cs && (cs.visits || cs.noshow || (rsVip(b.phone) || (cl && (cl.notes || (cl.allergens || []).length)))) ? `<button class="rs-cline" data-act="rsClient" data-id="${esc(b.id)}">${rsVip(b.phone) ? `<span class="rs-vip">VIP</span>` : ""}<span>${cs.visits ? rsPl(cs.visits, "visite") : "Première visite"}</span>${cs.noshow ? `<span class="rs-nsw">${rsPl(cs.noshow, "no-show")}</span>` : ""}${rsFdTags(b)}${cl && cl.notes ? `<span class="rs-cn">${esc(cl.notes)}</span>` : ""}</button>` : ""}
     ${rsWeb(b) ? `<div class="rs-from">${ico("rsWeb")}<span>Réservé en ligne${b.createdAt ? ` le ${shortDate(dayKey(new Date(+b.createdAt || Date.now())))} à ${hm(+b.createdAt || Date.now())}` : ""}</span></div>` : ""}
     ${b.clientChange ? `<div class="rs-from cc">${ico("edit")}<span>${b.clientChange.what === "annule" ? "Annulée" : "Modifiée"} par le client ${when(b.clientChange.at)}</span></div>` : ""}
     ${b.notes ? `<div class="rs-note big ${nk}">${nk ? ico("alert") : ico("rsNote")}<span>${esc(b.notes)}</span></div>` : ""}
@@ -527,12 +531,12 @@ function rsFdTags(b) {
 }
 function rsClientSheet(b) {
   const k = rsPk(b.phone); if (!k) return; const cs = rsStatOf(b.phone) || { visits: 0, noshow: 0, cancel: 0, list: [] }, cl = rsClientOf(b.phone) || {};
-  R.cl = { id: k, name: cl.name || b.name || "", phone: cl.phone || b.phone || "", email: cl.email || cs.email || b.email || "", vip: !!cl.vip, notes: cl.notes || "" };
+  R.cl = { id: k, name: cl.name || b.name || "", phone: cl.phone || b.phone || "", email: cl.email || cs.email || b.email || "", vip: rsVip(b.phone), vip0: rsVip(b.phone), notes: cl.notes || "" };
   const past = cs.list.slice(0, 8);
   openSheet(`<div class="rs-cf">
     <div class="rs-edh"><span class="h2">${esc(R.cl.name || "Client")}</span><button class="iconbtn" data-act="sheetClose" aria-label="Fermer">${ico("x")}</button></div>
     <div class="rs-cfs"><div><b>${cs.visits}</b><em>visite${cs.visits > 1 ? "s" : ""}</em></div><div class="${cs.noshow ? "bad" : ""}"><b>${cs.noshow}</b><em>no-show</em></div><div><b>${cs.cancel}</b><em>annulée${cs.cancel > 1 ? "s" : ""}</em></div><div><b>${cs.last ? shortDate(cs.last) : "–"}</b><em>dernière</em></div></div>
-    <button class="rs-tog${R.cl.vip ? " on" : ""}" data-act="rsClVip" aria-pressed="${R.cl.vip}"><span><b>Client VIP</b><em>Un badge VIP sur chacune de ses réservations.</em></span><i></i></button>
+    <button class="rs-tog${R.cl.vip ? " on" : ""}" data-act="rsClVip" aria-pressed="${R.cl.vip}"><span><b>Client VIP</b><em>${(S.resto && S.resto.fidCfg && S.resto.fidCfg.vipAuto) ? `Donné tout seul à partir de ${Math.max(2, +S.resto.fidCfg.vipN || 10)} visites, ou à la main ici.` : "Un badge VIP sur chacune de ses réservations."}</em></span><i></i></button>
     <label class="rs-big-in sm"><span>Notes (allergies, préférences)</span><textarea class="input" id="rsClNotes" rows="2" maxlength="300" placeholder="Allergie arachides, aime la table près de la fenêtre…">${esc(R.cl.notes)}</textarea></label>
     <div class="rs-cfc">${R.cl.phone ? `<a href="tel:${esc(String(R.cl.phone).replace(/[^\d+]/g, ""))}">${ico("rsPhone")}${esc(R.cl.phone)}</a>` : ""}${R.cl.email ? `<span>${ico("rsMail")}${esc(R.cl.email)}</span>` : ""}</div>
     ${past.length ? `<div class="rs-cfh"><b>Historique</b>${past.map((x) => `<div class="rs-cfr"><span>${shortDate(x.date)} · ${x.time}</span><span>${+x.covers || 0} pers.</span><span class="rs-stp ${(RS_ST[x.status] || RS_ST.avenir).k}">${(RS_ST[x.status] || RS_ST.avenir).t}</span></div>`).join("")}</div>` : ""}
@@ -551,6 +555,7 @@ const RS_MAIL_KINDS = {
   annule: { t: "Réservation annulée", s: (r) => `Réservation annulée · ${r.name}` },
   annule_client: { t: "Annulation confirmée", s: (r) => `Annulation confirmée · ${r.name}` },
   avis: { t: "Votre dîner s'est bien passé ?", s: (r, b) => `Votre ${rsMeal(b)} chez ${r.name} s'est bien passé ?` },
+  paye: { t: "Merci de votre visite !", s: (r) => `Merci de votre visite chez ${r.name} ! Un petit avis ?` },
 };
 const rsMeal = (b) => (rsMin(b && b.time) < 16 * 60 ? "déjeuner" : "dîner");
 /* the restaurant's Google review link: a Place ID (ChIJ…) or an https link on a Google domain (g.page/r/…/review, maps.app.goo.gl…).
@@ -567,7 +572,7 @@ function rsGoogleUrl(v) {
 function rsMailDay(k) { const D = ["dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi"], M = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"]; const [y, m, d] = String(k || "").split("-").map(Number); if (!y) return ""; const dt = new Date(Date.UTC(y, m - 1, d, 12)); return `${D[dt.getUTCDay()]} ${d} ${M[m - 1]}`; }
 function rsMailHtml(kind, b, r, L) {
   const e = (v) => String(v == null ? "" : v).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-  if (kind === "avis") return rsAvisHtml(b, r, L, e);
+  if (kind === "avis" || kind === "paye") return rsAvisHtml(b, r, L, e, kind === "paye");
   const K = RS_MAIL_KINDS[kind] || RS_MAIL_KINDS.confirme, nm = e(String(b.name || "").trim().split(/\s+/)[0] || ""), rn = e(r.name || "le restaurant");
   /* the restaurant logo, only as an https URL: most mail clients block data: images */
   const lg = typeof r.logo === "string" && /^https:\/\/[^\s"'<>]+$/.test(r.logo) && r.logo.length <= 2000 ? r.logo : "";
@@ -607,31 +612,60 @@ function rsMailHtml(kind, b, r, L) {
 </div></body></html>`;
 }
 
-/* « Votre dîner s'est bien passé ? » — every guest gets the same Google button (no filtering of unhappy guests: Google forbids it) */
-function rsAvisHtml(b, r, L, e) {
-  const nm = e(String(b.name || "").trim().split(/\s+/)[0] || ""), rn = e(r.name || "le restaurant"), m = rsMeal(b);
+/* The review e-mail (« Votre dîner s'est bien passé ? » after a booking, « Merci de votre visite ! » after an online payment).
+   Motion: the hero is an animated GIF (img/mail/avis-etoiles.gif, tools/gen-mail-gif.py): five stars popping in, sparkles. It is the only
+   motion every mail client plays (Gmail drops CSS animations; Outlook desktop shows frame 0, the finished picture). Apple Mail and iOS
+   also get CSS motion (button shine, stars bouncing in), switched off for « reduce motion ». Every guest gets the same Google button
+   (no filtering of unhappy guests: Google forbids it). */
+function rsAvisHtml(b, r, L, e, pay) {
+  const nm = e(String(b.name || "").trim().split(/\s+/)[0] || ""), rn = e(r.name || "le restaurant"), m = rsMeal(b), away = pay && b.mode === "emporter", pl = !pay && +b.covers > 1 ? "s" : "";
   const lg = typeof r.logo === "string" && /^https:\/\/[^\s"'<>]+$/.test(r.logo) && r.logo.length <= 2000 ? r.logo : "";
-  const g = e(L.review || "#"), av = L.avis || "", sep = /\?/.test(av) ? "&" : "?";
-  /* the stars open « Comment nous avez-vous trouvés ? » (avis/ page) with that note already picked; no page link (old e-mails, preview): Google */
-  const star = (n) => `<a href="${e(av ? av + sep + "n=" + n : L.review || "#")}" style="text-decoration:none;color:#F5B700;font-size:40px;line-height:1;padding:0 3px" title="${n} sur 5">&#9733;</a>`;
-  return `<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Votre ${m} s'est bien passé ?</title></head>
-<body style="margin:0;padding:0;background:#FBF6EC;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;color:#1B1530">
-<div style="max-width:500px;margin:0 auto;padding:24px 14px 32px">
- <div style="background:#4C1FEA;border-radius:26px 26px 0 0;padding:26px 24px 30px;color:#ffffff">
-  ${lg ? `<img src="${e(lg)}" width="52" height="52" alt="${rn}" style="display:block;width:52px;height:52px;border-radius:15px;background:#ffffff;object-fit:contain;margin:0 0 14px;border:0">` : ""}
-  <div style="font-size:14px;color:#D9D2FF;font-weight:600">${rn}</div>
-  <div style="font-size:28px;line-height:1.1;font-weight:800;letter-spacing:-.5px;margin-top:6px">Votre ${m} s'est bien passé ?</div>
+  const g = e(L.review || "#"), av = L.avis || "", sep = /\?/.test(av) ? "&" : "?", go = av ? e(av) : g;
+  const title = pay ? (away ? "Merci pour votre commande !" : "Merci de votre visite !") : `Votre ${m} s'est bien passé ?`;
+  const lead = pay ? (away ? `${nm ? `Bonjour ${nm}, merci` : "Merci"} d'avoir commandé chez <b style="color:#1B1530">${rn}</b>. On espère que vous vous êtes régalé !`
+      : `${nm ? `Bonjour ${nm}, merci` : "Merci"} d'être passé chez <b style="color:#1B1530">${rn}</b> et merci pour votre règlement. Toute l'équipe espère que vous vous êtes régalé !`)
+    : `Bonjour ${nm}, merci d'être venu${pl} chez <b style="color:#1B1530">${rn}</b>. Toute l'équipe espère que vous vous êtes régalé${pl} !`;
+  const ask = pay ? "Vous avez aimé ? Pouvez-vous nous laisser un avis ?" : "Comment nous avez-vous trouvés ?";
+  const HERO = "https://app.growthgusto.fr/img/mail/avis-etoiles.gif";
+  const W = ["Bof", "Moyen", "Bien", "Très bien", "Parfait"];
+  /* the stars open « Comment nous avez-vous trouvés ? » (avis/ page) with that note already picked; no page link (preview, test): Google */
+  const sh = (n) => e(av ? av + sep + "n=" + n : L.review || "#");
+  const star = (n) => `<td class="gg-s gg-s${n}" align="center" style="padding:0 3px"><a href="${sh(n)}" style="display:block;text-decoration:none;background:#F6F1FF;border:1.5px solid #E4DAFF;border-radius:16px;padding:10px 0 8px;width:58px" title="${n} sur 5"><span style="display:block;font-size:30px;line-height:1;color:#F5B700">&#9733;</span><span style="display:block;font-size:11px;font-weight:700;color:#6E6880;margin-top:5px;letter-spacing:.1px;white-space:nowrap">${W[n - 1]}</span></a></td>`;
+  return `<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light only"><meta name="supported-color-schemes" content="light"><title>${e(title)}</title>
+<style>
+@keyframes ggUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+@keyframes ggPop{0%{opacity:0;transform:scale(.4) rotate(-12deg)}70%{transform:scale(1.12) rotate(3deg)}100%{opacity:1;transform:none}}
+@keyframes ggShine{0%{background-position:-180% 0}55%,100%{background-position:280% 0}}
+@keyframes ggGlow{0%,100%{box-shadow:0 10px 26px -8px rgba(91,43,255,.55),0 4px 0 #2A0BA6}50%{box-shadow:0 14px 34px -6px rgba(236,72,153,.55),0 4px 0 #2A0BA6}}
+.gg-up{animation:ggUp .7s cubic-bezier(.2,.8,.2,1) both}.gg-d1{animation-delay:.15s}.gg-d2{animation-delay:.3s}.gg-d3{animation-delay:.45s}
+.gg-s a{animation:ggPop .55s cubic-bezier(.2,.9,.3,1.3) both}.gg-s1 a{animation-delay:.5s}.gg-s2 a{animation-delay:.6s}.gg-s3 a{animation-delay:.7s}.gg-s4 a{animation-delay:.8s}.gg-s5 a{animation-delay:.9s}
+.gg-s a:hover{background:#FFF6D6!important;border-color:#F5B700!important}
+.gg-cta{background-image:linear-gradient(110deg,#5B2BFF 0%,#5B2BFF 40%,#9C7BFF 50%,#5B2BFF 60%,#5B2BFF 100%)!important;background-size:250% 100%!important;animation:ggShine 3.2s ease-in-out 1.2s infinite,ggGlow 3.2s ease-in-out infinite}
+@media (prefers-reduced-motion:reduce){.gg-up,.gg-s a,.gg-cta{animation:none!important}}
+@media (max-width:480px){.gg-s a{width:52px!important}.gg-s span+span{font-size:10px!important}.gg-h1{font-size:27px!important}}
+</style></head>
+<body style="margin:0;padding:0;background:#EFE9FB;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;color:#1B1530;-webkit-font-smoothing:antialiased">
+<div style="display:none;max-height:0;overflow:hidden;opacity:0">${e(ask)} Dix secondes, cinq étoiles, et vous aidez ${rn} à se faire connaître.</div>
+<div style="max-width:520px;margin:0 auto;padding:22px 12px 34px">
+ <div style="background:#1E0B63;background-image:linear-gradient(160deg,#3A10D8 0%,#24097A 55%,#14063F 100%);border-radius:28px 28px 0 0;padding:24px 24px 0;color:#ffffff;overflow:hidden">
+  <table role="presentation" style="border-collapse:collapse"><tr>
+   ${lg ? `<td style="padding:0 12px 0 0"><img src="${e(lg)}" width="44" height="44" alt="${rn}" style="display:block;width:44px;height:44px;border-radius:13px;background:#ffffff;object-fit:contain;border:0"></td>` : ""}
+   <td><div style="display:inline-block;font-size:13px;font-weight:700;color:#E6DFFF;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.22);border-radius:99px;padding:6px 12px">${rn}</div></td>
+  </tr></table>
+  <div class="gg-up gg-h1" style="font-size:31px;line-height:1.08;font-weight:800;letter-spacing:-.8px;margin:18px 0 0">${e(title)}</div>
+  <div class="gg-up gg-d1" style="font-size:16px;line-height:1.45;color:#D9D2FF;margin:8px 0 0">${e(ask)}</div>
+  <a href="${go}" style="display:block;margin:16px -24px 0;text-decoration:none"><img src="${HERO}" width="520" alt="★★★★★ Notez-nous en un geste" style="display:block;width:100%;max-width:520px;height:auto;border:0;background:#2A0BA6;color:#F5B700;font-size:28px;text-align:center"></a>
  </div>
- <div style="background:#FFFDF8;border:1.5px solid #E9DFCD;border-top:0;border-radius:0 0 26px 26px;padding:22px 22px 24px;box-shadow:0 3px 0 #E2D6C2">
-  <p style="margin:0 0 14px;font-size:16px;line-height:1.5;color:#4A4560">Bonjour ${nm}, merci d'être venu${+b.covers > 1 ? "s" : ""} chez <b>${rn}</b>. Toute l'équipe espère que vous vous êtes régalé${+b.covers > 1 ? "s" : ""} !</p>
-  <p style="margin:0 0 6px;font-size:16px;line-height:1.5;color:#4A4560">Comment nous avez-vous trouvés ? Touchez une étoile : c'est fait en dix secondes, et votre avis aide d'autres gourmands à nous découvrir.</p>
-  <div style="text-align:center;margin:18px 0 6px">${[1, 2, 3, 4, 5].map(star).join("")}</div>
-  <a href="${av ? e(av) : g}" style="display:block;text-align:center;text-decoration:none;font-weight:700;font-size:16px;padding:15px 18px;border-radius:16px;margin-top:10px;background:#5B2BFF;color:#ffffff;box-shadow:0 4px 0 #2A0BA6">${av ? "Donner mon avis" : "Laisser un avis sur Google"}</a>
-  ${av && L.review ? `<div style="margin-top:12px;text-align:center"><a href="${g}" style="color:#3A10D8;font-weight:700;font-size:14px;text-decoration:none">Ou directement sur Google</a></div>` : ""}
-  ${r.phone ? `<div style="margin-top:16px;font-size:14px;color:#4A4560;text-align:center;line-height:1.45">Quelque chose ne vous a pas plu ? Dites-le nous aussi, on veut s'améliorer : <a href="tel:${e(String(r.phone).replace(/[^\d+]/g, ""))}" style="color:#3A10D8;font-weight:700;text-decoration:none">${e(r.phone)}</a></div>` : ""}
+ <div style="background:#FFFDF8;border:1.5px solid #E4DAFF;border-top:0;border-radius:0 0 28px 28px;padding:24px 20px 26px;box-shadow:0 18px 40px -22px rgba(42,11,166,.45)">
+  <p class="gg-up gg-d2" style="margin:0 0 6px;font-size:16px;line-height:1.55;color:#4A4560">${lead}</p>
+  <p class="gg-up gg-d3" style="margin:0;font-size:16px;line-height:1.55;color:#4A4560">Touchez une étoile : c'est fait en <b style="color:#1B1530">dix secondes</b>, et votre avis aide d'autres gourmands à nous découvrir.</p>
+  <table role="presentation" align="center" style="border-collapse:collapse;margin:20px auto 4px"><tr>${[1, 2, 3, 4, 5].map(star).join("")}</tr></table>
+  <a class="gg-cta" href="${go}" style="display:block;text-align:center;text-decoration:none;font-weight:800;font-size:17px;letter-spacing:.2px;padding:17px 18px;border-radius:18px;margin-top:18px;background:#5B2BFF;background-image:linear-gradient(135deg,#6A3BFF,#4C1FEA);color:#ffffff;box-shadow:0 10px 26px -8px rgba(91,43,255,.55),0 4px 0 #2A0BA6">${av ? "Donner mon avis" : "Laisser un avis sur Google"} &#8594;</a>
+  ${av && L.review ? `<div style="margin-top:14px;text-align:center"><a href="${g}" style="color:#3A10D8;font-weight:700;font-size:14px;text-decoration:none">Ou directement sur Google</a></div>` : ""}
+  ${r.phone ? `<div style="margin-top:20px;padding:14px 16px;background:#F6F1FF;border-radius:16px;font-size:14px;color:#4A4560;text-align:center;line-height:1.5">Quelque chose ne vous a pas plu ? Dites-le nous aussi, on veut s'améliorer : <a href="tel:${e(String(r.phone).replace(/[^\d+]/g, ""))}" style="color:#3A10D8;font-weight:800;text-decoration:none;white-space:nowrap">${e(r.phone)}</a></div>` : ""}
   ${L.book ? `<div style="margin-top:14px;text-align:center"><a href="${e(L.book)}" style="color:#3A10D8;font-weight:700;font-size:14px;text-decoration:none">Réserver à nouveau</a></div>` : ""}
  </div>
- <div style="text-align:center;font-size:12px;color:#6E6880;margin-top:18px;line-height:1.5">Un seul message après votre venue, pas plus d'une fois tous les 4 mois.<br>Réservation par Growth Gusto</div>
+ <div style="text-align:center;font-size:12px;color:#7A7390;margin-top:18px;line-height:1.55">${pay ? "Un seul message après votre paiement en ligne, pas plus d'une fois tous les 4 mois." : "Un seul message après votre venue, pas plus d'une fois tous les 4 mois."}<br>${pay ? "Envoyé par Growth Gusto pour " + rn : "Réservation par Growth Gusto"}</div>
 </div></body></html>`;
 }
 
@@ -698,8 +732,10 @@ function rsCfgPaint() {
 /* ── « Votre dîner s'est bien passé ? » settings: Google link, when, on/off, how many sent (server: functions/src/resa.js reviewTick) ── */
 const RS_REV_WHEN = [["soir", "Le soir même", "2 h 30 après l'heure de la table (le lendemain 10 h si c'est tard)"], ["lendemain", "Le lendemain", "À 11 h, le jour d'après"]];
 function rsRevSent(days) { const from = Date.now() - days * 864e5; return rsRows().filter((b) => +b.reviewAskAt > from).length; }
+function rsMyEmail() { try { const u = typeof authUser === "function" && authUser(); if (u && u.email) return u.email; } catch (e) {} return (S.me && S.me.email) || ""; }
+function rsRevToKeep() { const i = document.getElementById("rsRevTo"); if (i) R.revTo = i.value; }
 function rsRevCard(c) {
-  const url = rsGoogleUrl(c.googleReview), on = c.reviewAsk !== false, bad = String(c.googleReview || "").trim() && !url, w = c.reviewWhen === "lendemain" ? "lendemain" : "soir";
+  const url = rsGoogleUrl(c.googleReview), on = c.reviewAsk !== false, pay = c.reviewPay !== false, bad = String(c.googleReview || "").trim() && !url, w = c.reviewWhen === "lendemain" ? "lendemain" : "soir";
   const n = rsRevSent(30);
   return `<div class="rs-rev">
     <div class="rs-revh"><span class="rs-revs" aria-hidden="true">${ico("rsStar").repeat(5)}</span><div><b>Plus d'avis Google, sans y penser</b><em>Après le repas, chaque client venu reçoit « Votre ${"dîner"} s'est bien passé ? » avec un bouton vers votre fiche Google.</em></div></div>
@@ -709,8 +745,16 @@ function rsRevCard(c) {
     <div class="rs-revb">${url ? `<a class="btn soft sm" href="${esc(url)}" target="_blank" rel="noopener">${ico("rsWeb")}Tester mon lien</a>` : ""}<button class="btn soft sm" data-act="rsRevHelp">${ico("rsHelp")}Où trouver mon lien ?</button></div>
     ${R.revHelp ? `<ol class="rs-revhelp"><li>Sur Google, cherchez le nom de votre restaurant (connecté au compte de votre fiche).</li><li>Touchez <b>Demander des avis</b> (ou <b>Recevoir plus d'avis</b>).</li><li>Copiez le lien et collez-le ici. C'est tout.</li></ol>` : ""}
     <div class="rs-row"><div><b>Quand l'envoyer</b><em>${esc((RS_REV_WHEN.find((x) => x[0] === w) || RS_REV_WHEN[0])[2])}</em></div><div class="rs-seg">${RS_REV_WHEN.map(([v, l]) => `<button class="${w === v ? "on" : ""}" data-act="rsCeRevWhen" data-v="${v}">${l}</button>`).join("")}</div></div>
-    <div class="rs-ml"><button class="rs-mlb" data-act="rsMailPrev" data-v="avis">${ico("rsMail")}<span><b>Voir l'e-mail</b><em>Le même pour tous les clients, avec vos étoiles et votre téléphone</em></span>${ico("chev")}</button></div>
-    <ul class="rs-revrules"><li>Une seule fois par réservation, et pas plus d'une fois tous les 4 mois pour un même client.</li><li>Seulement les clients qui ont laissé leur e-mail et qui sont marqués <b>Arrivé</b> (ou dont vous avez ouvert la table en salle).</li><li>Sans e-mail ? Dans la fiche de la réservation, « Demander un avis » ouvre un SMS tout prêt.</li></ul>
+    <button class="rs-tog${pay ? " on" : ""}" data-act="rsCeRevPay" aria-pressed="${pay}"${on ? "" : " disabled"}><span><b>Aussi après un paiement en ligne</b><em>${pay && on ? "Quand un client règle par le QR (addition ou commande), il reçoit « Merci de votre visite ! » environ 1 h après." : "Coupé : seulement les clients qui ont réservé."}</em></span><i></i></button>
+    <div class="rs-mls rs-revmls"><div class="rs-ml"><button class="rs-mlb" data-act="rsMailPrev" data-v="avis">${ico("rsMail")}<span><b>Voir l'e-mail après le repas</b><em>« Votre dîner s'est bien passé ? », étoiles animées</em></span>${ico("chev")}</button></div>
+    <div class="rs-ml"><button class="rs-mlb" data-act="rsMailPrev" data-v="paye">${ico("rsMail")}<span><b>Voir l'e-mail après paiement</b><em>« Merci de votre visite ! Pouvez-vous nous laisser un avis ? »</em></span>${ico("chev")}</button></div></div>
+    <div class="rs-revtest">
+      <b>Recevoir un e-mail de test</b>
+      <div class="rs-seg rs-revtk">${[["avis", "Après le repas"], ["paye", "Après paiement"]].map(([v, l]) => `<button class="${(R.revTk || "avis") === v ? "on" : ""}" data-act="rsRevTk" data-v="${v}">${l}</button>`).join("")}</div>
+      <div class="rs-revtr"><input class="input" id="rsRevTo" type="email" value="${esc(R.revTo != null ? R.revTo : rsMyEmail())}" maxlength="120" placeholder="vous@exemple.fr" inputmode="email" autocapitalize="off" autocomplete="email" spellcheck="false" aria-label="Adresse qui reçoit le test"><button class="btn acc" data-act="rsRevTest"${R.revSending ? " disabled" : ""}>${ico("rsMail")}${R.revSending ? "Envoi…" : "Envoyer le test"}</button></div>
+      ${R.revSent ? `<p class="rs-revok">Envoyé à <b>${esc(R.revSent)}</b>. Regardez votre boîte (et les spams, la première fois).</p>` : ""}
+    </div>
+    <ul class="rs-revrules"><li>Une seule fois par réservation ou par paiement, et pas plus d'une fois tous les 4 mois pour un même client.</li><li>Seulement les clients qui ont laissé leur e-mail et qui sont marqués <b>Arrivé</b> (ou dont vous avez ouvert la table en salle), ou qui ont réglé en ligne.</li><li>Sans e-mail ? Dans la fiche de la réservation, « Demander un avis » ouvre un SMS tout prêt.</li></ul>
     ${n ? `<div class="rs-revn"><b>${n}</b><span>${n > 1 ? "demandes d'avis envoyées" : "demande d'avis envoyée"} ces 30 derniers jours</span></div>` : ""}
     ${rsSrv() || DB.mode === "demo" ? "" : `<div class="rs-mail">${ico("rsMail")}<span>Bientôt actif : ces e-mails partiront tout seuls dès que l'envoi sera branché.</span></div>`}
   </div>`;
@@ -918,7 +962,7 @@ Object.assign(ACT, {
     a.disabled = true;
     /* keep what js/clients.js keeps in the same file (allergies, birthday, consent, loyalty stamps) */
     const { id: _cid, ...was } = R.clients.find((x) => x.id === c.id) || {};
-    try { await safe(DB.set("clients", c.id, DB.clean({ ...was, name: String(c.name || "").slice(0, 60), phone: String(c.phone || "").slice(0, 25), email: String(c.email || "").slice(0, 120), vip: !!c.vip, notes: c.notes, updatedAt: Date.now() }))); } catch (e) { a.disabled = false; return; }
+    try { await safe(DB.set("clients", c.id, DB.clean({ ...was, name: String(c.name || "").slice(0, 60), phone: String(c.phone || "").slice(0, 25), email: String(c.email || "").slice(0, 120), ...(c.vip !== c.vip0 ? { vip: !!c.vip, vipOff: !c.vip } : {}), notes: c.notes, updatedAt: Date.now() }))); } catch (e) { a.disabled = false; return; }
     R.cl = null; closeSheet(true); SFX.done(); toast("Fiche client enregistrée");
   },
   rsEdSug: (a, id, v) => {
@@ -931,12 +975,30 @@ Object.assign(ACT, {
   rsCeRem: () => { rsCeKeep(); R.ce.reminder = R.ce.reminder === false; R.ce.reminder ? SFX.ok() : SFX.tap(); rsCfgPaint(); },
   rsCeRevAsk: () => { rsCeKeep(); R.ce.reviewAsk = R.ce.reviewAsk === false; R.ce.reviewAsk ? SFX.ok() : SFX.tap(); buzz(6); rsCfgPaint(); },
   rsCeRevWhen: (a, id, v) => { rsCeKeep(); SFX.tick(); buzz(3); R.ce.reviewWhen = v === "lendemain" ? "lendemain" : "soir"; rsCfgPaint(); },
+  rsCeRevPay: () => { rsCeKeep(); R.ce.reviewPay = R.ce.reviewPay === false; R.ce.reviewPay ? SFX.ok() : SFX.tap(); buzz(6); rsCfgPaint(); },
+  rsRevTk: (a, id, v) => { rsCeKeep(); rsRevToKeep(); SFX.tick(); buzz(3); R.revTk = v === "paye" ? "paye" : "avis"; rsCfgPaint(); },
+  rsRevTest: async () => {
+    rsCeKeep(); rsRevToKeep(); const to = String(R.revTo || "").trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) { toast("Tapez une adresse e-mail valide.", "info"); const i = $("#rsRevTo"); if (i) i.focus(); return; }
+    if (DB.mode === "demo") { SFX.tap(); toast("En démo, rien n'est envoyé : créez votre compte pour recevoir le test.", "info"); return; }
+    R.revSending = true; R.revSent = ""; rsCfgPaint(); SFX.tap();
+    try {
+      await firebase.app().functions("europe-west9").httpsCallable("resaAvisTest", { timeout: 30000 })({ rid: S.rid, kind: R.revTk || "avis", to });
+      R.revSent = to; SFX.ok(); buzz(8);
+    } catch (x) {
+      const c = String((x && x.code) || ""); console.warn("resaAvisTest", x);
+      toast(/resource-exhausted/.test(c) ? "Déjà 5 tests aujourd'hui : réessayez demain." : /permission/.test(c) ? "Seule l'équipe du restaurant peut envoyer un test." : "L'envoi n'a pas marché. Réessayez dans un instant.", "info");
+    }
+    R.revSending = false; rsCfgPaint();
+  },
   rsRevHelp: () => { rsCeKeep(); SFX.tap(); R.revHelp = !R.revHelp; rsCfgPaint(); },
   rsRevSent: (a, id) => { const b = rsRows().find((x) => x.id === id); if (!b) return; SFX.ok(); rsSave(id, { reviewSmsAt: Date.now() }); },
   rsMailPrev: (a, id, v) => {
     rsCeKeep(); SFX.tap(); const c = R.ce || rsCfg(), d = addDays(dayKey(), 3);
     const b = { name: "Camille Martin", date: d, time: "20:00", covers: 4, notes: "Anniversaire", resaMsg: v === "refuse" ? "Complet ce soir-là, désolés ! Le lendemain nous avons encore de la place." : v === "annule" ? "Fermeture exceptionnelle, toutes nos excuses." : "" };
-    const html = rsMailHtml(v, b, { name: (S.resto && S.resto.name) || "Votre restaurant", address: c.address || "", phone: c.phone || "", logo: rsLogo() }, { manage: "#", ics: "#", book: "#", review: "#", avis: "#" });
+    if (v === "paye") { b.name = "Camille"; b.mode = "table"; }
+    rsRevToKeep();
+    const html = rsMailHtml(v, b, { name: (S.resto && S.resto.name) || "Votre restaurant", address: c.address || "", phone: c.phone || "", logo: rsLogo() }, { manage: "#", ics: "#", book: v === "paye" ? "" : "#", review: "#", avis: "#" });
     const K = RS_MAIL_KINDS[v] || RS_MAIL_KINDS.confirme;
     openSheet(`<div class="rs-mpv"><div class="rs-edh"><span class="h2">Aperçu</span><button class="iconbtn" data-act="rsMailBack" aria-label="Retour">${ico("x")}</button></div>
       <div class="rs-mpo"><span>Objet</span><b>${esc(K.s({ name: (S.resto && S.resto.name) || "Votre restaurant" }, b, rsMailDay(d)))}</b></div>

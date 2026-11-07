@@ -114,6 +114,11 @@
 .pu-bans{position:fixed;left:0;right:0;top:calc(env(safe-area-inset-top,0px) + 8px);z-index:96;display:flex;flex-direction:column;align-items:center;gap:8px;pointer-events:none;padding:0 10px}
 .pu-ban{pointer-events:auto;cursor:pointer;width:min(440px,100%);display:flex;gap:11px;align-items:flex-start;padding:12px 14px;border-radius:22px;background:rgba(255,255,255,.78);-webkit-backdrop-filter:blur(24px) saturate(1.8);backdrop-filter:blur(24px) saturate(1.8);color:#0E1330;box-shadow:0 0 0 .5px rgba(14,19,48,.08),0 18px 40px -16px rgba(20,10,80,.45);transform:translateY(-130%) scale(.92);opacity:0;transition:transform .6s var(--spring),opacity .3s var(--ease);touch-action:none;-webkit-user-select:none;user-select:none}
 .pu-ban.on{transform:none;opacity:1}
+.pu-bx{all:unset;cursor:pointer;flex:none;align-self:center;width:32px;height:32px;margin:-4px -6px -4px 0;border-radius:11px;display:grid;place-items:center;color:#6B6880;background:rgba(14,19,48,.06);position:relative;transition:background .2s,transform .2s var(--spring)}
+.pu-bx::before{content:"";position:absolute;inset:-5px}
+.pu-bx:hover{background:rgba(14,19,48,.12);color:#0E1330}
+.pu-bx:active{transform:scale(.88)}
+.pu-bx svg{width:15px;height:15px}
 .pu-ban.out{transform:translateY(-120%) scale(.96);opacity:0;transition:transform .4s var(--ease),opacity .3s}
 .pu-bi{flex:none;width:36px;height:36px;border-radius:11px;display:grid;place-items:center}
 .pu-bi .ico{width:19px;height:19px}
@@ -122,7 +127,7 @@
 .pu-bh b{font-size:14.5px;font-weight:750;line-height:1.25;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .pu-bh em{font-style:normal;font-size:11.5px;color:rgba(14,19,48,.5);white-space:nowrap}
 .pu-bb{font-size:13.5px;line-height:1.35;color:rgba(14,19,48,.78);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-@media (prefers-color-scheme:dark){:root:not([data-theme=light]) .pu-ban{background:rgba(36,38,78,.82);color:#EEF0FF;box-shadow:0 0 0 .5px rgba(255,255,255,.08),0 18px 40px -16px rgba(0,0,0,.7)}:root:not([data-theme=light]) .pu-bh em,:root:not([data-theme=light]) .pu-bb{color:rgba(238,240,255,.7)}}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]) .pu-bx{background:rgba(255,255,255,.1);color:#C9C3E6}:root:not([data-theme=light]) .pu-ban{background:rgba(36,38,78,.82);color:#EEF0FF;box-shadow:0 0 0 .5px rgba(255,255,255,.08),0 18px 40px -16px rgba(0,0,0,.7)}:root:not([data-theme=light]) .pu-bh em,:root:not([data-theme=light]) .pu-bb{color:rgba(238,240,255,.7)}}
 
 /* ── wider screens: text left, phone right ── */
 @media (min-width:760px){
@@ -141,3 +146,4 @@
 /* mode sombre de l'app (js/theme.js, html[data-theme=dark]) */
 html[data-theme=dark] .pu-ban{background:rgba(36,38,78,.86);color:#EEF0FF;box-shadow:0 0 0 .5px rgba(255,255,255,.08),0 18px 40px -16px rgba(0,0,0,.7)}
 html[data-theme=dark] .pu-bh em,html[data-theme=dark] .pu-bb{color:rgba(238,240,255,.7)}
+html[data-theme=dark] .pu-bx{background:rgba(255,255,255,.1);color:#C9C3E6}

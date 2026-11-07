@@ -10,12 +10,15 @@
      récapitulatif à taper sur la caisse, puis on libère la table. Le stock est déjà déduit par les ventes de la caisse (tickets Z).
    Data (members read/write, no rules change):
      restos/{rid}/salleTabs/{id}     { table, tableId, zone, covers, status:"open"|"closed", day, openedAt, by, byName, closedAt?, closedBy?,
-                                       note, booking?, total, items:[{ k, id, name, price, q, note, allergy:[id], course:0..3, cat, sent:ticketId|null, off? }] }
+                                       note, booking?, client?, clientName?, pass?:{k,at} (the counter visit it noted), total, items:[{ k, id, name, price, q, note, allergy:[id], course:0..3, cat, sent:ticketId|null, off? }] }
      restos/{rid}/clientOrders/{id}  the kitchen tickets, same collection as the QR orders so one kitchen screen shows both:
                                      { src:"salle", mode:"table", table, tableId, tabId, course, courseT, station:"cuisine"|"bar", covers,
                                        items:[{ k, id, name, price, q, note, allergy, ok? }], total, n, day, at, firedAt?, waiter, waiterName,
                                        status: attente (« à suivre ») → nouvelle → prep → prete → servie | annulee, call? (rappel), add? (ajout),
                                        pay:"place", paid:false }
+   Client de la table (sans réservation) : « Qui est à table ? » à l'ouverture, ou plus tard depuis la table. Choisir une fiche client
+   (ou en créer une) note tout seul un passage dans le fichier clients (js/clients.js), donc un tampon de fidélité et une visite
+   comptée pour le VIP. « Invité » ne note rien. Changer de client déplace le passage. Avec une réservation, c'est elle qui compte.
    Hooks into js/commande.js (loaded before): cmOnRows and cmAlert are wrapped (no edit of their bodies). */
 "use strict";
 
@@ -53,7 +56,7 @@ const SL_OFFER_WHY = ["Geste commercial", "Anniversaire", "Attente trop longue",
 const SL_CANCEL_WHY = ["Erreur de saisie", "Le client a changé d'avis", "Rupture", "Trop d'attente"];
 const SL_REFIRE_WHY = ["Retour client", "Assiette tombée", "Mauvaise cuisson", "Autre"];
 const SL_ST = { attente: "À suivre", nouvelle: "Envoyé", prep: "En cuisine", prete: "Prêt", servie: "Servi", annulee: "Annulé" };
-const SL = { rid: null, tabs: null, st: new Map(), stInit: false, mine: new Set(), cat: "tout", pane: null, paneTab: null, ed: null, pickT: null, station: "tout", wake: null, busy: {}, kTick: null, fTick: null, fr: null, bill: null, oq: "", q: "", move: null, merge: null,
+const SL = { rid: null, tabs: null, st: new Map(), stInit: false, mine: new Set(), cat: "tout", pane: null, paneTab: null, ed: null, pickT: null, station: "tout", wake: null, busy: {}, kTick: null, fTick: null, fr: null, bill: null, oq: "", q: "", move: null, merge: null, cl: null,
   print: (() => { try { return localStorage.getItem("gg-sl-print") === "1"; } catch (e) { return false; } })() };
 const slEur = (v) => (typeof cmEur === "function" ? cmEur(v) : (Math.round((+v || 0) * 100) / 100).toLocaleString("fr-FR", { minimumFractionDigits: 2 }) + " €");
 const slAgo = (at) => { const m = Math.max(0, Math.floor((Date.now() - (at || Date.now())) / 6e4)); return m < 1 ? "à l'instant" : m < 60 ? `${m} min` : `${Math.floor(m / 60)} h ${pad(m % 60)}`; };
@@ -235,13 +238,15 @@ function slTabView(tab) {
     : items.length ? `<button class="btn soft block sl-send" data-act="slBill">${ico("slBill")}Addition · ${slEur(slTotal(items))}</button>` : "";
   const carte = slCarte(tab), cmd = slOrder(tab, T);
   return `<div class="inner wide sl sl-t">${topBar(`Table ${esc(tab.table)}`, { right })}
-    <div class="sl-tsub st" style="--i:1">${tab.zone && tab.zone !== "salle" ? `<span>${esc((typeof plZones === "function" ? plZones(slTables().cfg) : []).find((z) => z.id === tab.zone)?.name || tab.zone)}</span>` : ""}<span>Ouverte <span class="sl-ago" data-at="${tab.openedAt}">${slAgo(tab.openedAt)}</span></span>${tab.byName ? `<span>${esc(firstName(tab.byName))}</span>` : ""}${tab.note ? `<span class="sl-tnote">${ico("rsNote")}${esc(tab.note)}</span>` : ""}</div>
+    <div class="sl-tsub st" style="--i:1">${tab.zone && tab.zone !== "salle" ? `<span>${esc((typeof plZones === "function" ? plZones(slTables().cfg) : []).find((z) => z.id === tab.zone)?.name || tab.zone)}</span>` : ""}<span>Ouverte <span class="sl-ago" data-at="${tab.openedAt}">${slAgo(tab.openedAt)}</span></span>${tab.byName ? `<span>${esc(firstName(tab.byName))}</span>` : ""}${slClOn() ? slClChip(tab) : ""}${tab.note ? `<span class="sl-tnote">${ico("rsNote")}${esc(tab.note)}</span>` : ""}</div>
     ${slStockBar()}
     ${seg}
     <div class="sl-cols">${wide || SL.pane === "carte" ? `<div class="sl-c1">${carte}</div>` : ""}${wide || SL.pane === "cmd" ? `<div class="sl-c2">${cmd}${wide && cta ? `<div class="sl-wcta">${cta}</div>` : ""}</div>` : ""}</div>
     ${!wide && cta ? `<div class="ctabar sl-cta">${cta}</div>` : ""}
   </div>`;
 }
+function slClChip(tab) { const p = tab.client && fdById(tab.client); const nm = (p && p.name) || tab.clientName || "";
+  return `<button class="sl-tcl${nm ? " on" : ""}" data-act="slClient" aria-label="Client de la table">${nm && p && p.vip ? `<b class="fd-vip">VIP</b>` : ico("users")}${nm ? esc(nm) : "Invité"}${p && p.allergens && p.allergens.length ? `<em>${ico("alert")}allergies</em>` : ""}</button>`; }
 function slDishes() { return typeof cmDishes === "function" ? cmDishes() : (S.notes || []).filter((n) => n.cat === "Recettes" && n.carte); }
 function slCarte(tab) {
   const D = slDishes(), today = dayKey();
@@ -382,13 +387,59 @@ function slLine(x) {
 /* ───────── sheets ───────── */
 function slOpenSheet(t) {
   const b = slBookingAt(t.id), seats = Math.max(2, +t.seats || 2), max = Math.max(8, seats + 2), def = b ? +b.covers || seats : seats;
-  SL.pickT = t.id;
+  SL.pickT = t.id; SL.cl = b || !slClOn() ? null : { mode: "open", sel: null, q: "", nw: null };
   openSheet(`<div class="sl-sh"><div class="sl-shh"><span class="h2">Table ${esc(t.n)}</span><button class="iconbtn" data-act="sheetClose" aria-label="Fermer">${ico("x")}</button></div>
     ${b ? `<div class="sl-bk">${ico("resa")}<span>Réservation <b>${esc(b.name || "")}</b> · ${esc(b.time)} · ${+b.covers || 0} pers.${b.notes ? `<em>${esc(b.notes)}</em>` : ""}</span></div>` : ""}
+    ${SL.cl ? `<div class="lbl">Qui est à table ?</div><div id="slCl">${slClHTML()}</div>` : ""}
     <div class="lbl">Combien de couverts ?</div>
     <div class="sl-covg">${Array.from({ length: max }, (_, i) => i + 1).map((n) => `<button class="${n === def ? "on" : ""}" data-act="slOpen" data-v="${n}">${n}</button>`).join("")}</div>
-  </div>`);
+  </div>`, slClBind);
 }
+/* ── client de la table : choisir une fiche, en créer une, ou « Invité » ── */
+const slClOn = () => typeof fdPeople === "function" && typeof fdWrite === "function" && !!VIEWS.clients;
+function slClHits(q) {
+  if (typeof fdWatch === "function") fdWatch(); const L = fdPeople(), t = q.trim();
+  return (t ? L.filter((p) => fdMatch(p, t)) : L.filter((p) => p.visits)).sort((a, b) => (b.vip ? 1 : 0) - (a.vip ? 1 : 0) || (b.visits || 0) - (a.visits || 0) || (b.last || "").localeCompare(a.last || "")).slice(0, 5);
+}
+function slClRow(p, on) {
+  const cfg = typeof fdCfg === "function" ? fdCfg() : { goal: 10 };
+  return `<button class="sl-clr${on ? " on" : ""}" data-act="slClPick" data-id="${esc(p.id)}" aria-pressed="${on}">${fdAva(p, 36)}<span class="tx"><b>${esc(p.name || p.phone)}${p.vip ? `<span class="fd-vip">VIP</span>` : ""}</b><em>${p.visits ? `${p.visits} visite${p.visits > 1 ? "s" : ""}` : "Pas encore venu"}${cfg.on !== false ? ` · ${Math.min(p.stamps, cfg.goal)}/${cfg.goal} tampons` : ""}${p.allergens && p.allergens.length ? ` · allergies` : ""}</em></span><i class="sl-clc">${on ? ico("check") : ""}</i></button>`;
+}
+function slClHTML() {
+  const C = SL.cl; if (!C) return ""; const sel = C.sel && (fdById(C.sel) || (C.pend && C.pend.k === C.sel ? { id: C.sel, name: C.pend.name, visits: 0, stamps: 0, allergens: [] } : null));
+  if (C.nw) return `<div class="sl-clnew"><input class="input" id="slClN" maxlength="60" placeholder="Nom du client" value="${esc(C.nw.name)}" autocomplete="off"><input class="input" id="slClP" type="tel" inputmode="tel" maxlength="25" placeholder="Téléphone" value="${esc(C.nw.phone)}" autocomplete="off">
+    <div class="sl-clna"><button class="btn soft sm" data-act="slClNew" data-v="0">Annuler</button><button class="btn acc sm" data-act="slClNewOk">${ico("check")}${C.mode === "tab" ? "Créer la fiche" : "C'est lui"}</button></div><p class="sl-cle" id="slClE" role="alert"></p></div>`;
+  const hits = slClHits(C.q).filter((p) => !sel || p.id !== sel.id);
+  return `<div class="sl-cl">
+    <button class="sl-clr guest${!C.sel ? " on" : ""}" data-act="slClPick" data-id="" aria-pressed="${!C.sel}"><span class="sl-clg">${ico("users")}</span><span class="tx"><b>Invité</b><em>Rien n'est noté dans le fichier clients</em></span><i class="sl-clc">${!C.sel ? ico("check") : ""}</i></button>
+    ${sel ? slClRow(sel, true) : ""}
+    <input class="input sl-clq" id="slClQ" type="search" placeholder="Nom ou téléphone du client" value="${esc(C.q)}" autocomplete="off" enterkeyhint="search">
+    <div id="slClR">${slClResHTML(hits)}</div></div>`;
+}
+function slClResHTML(hits) { const C = SL.cl; return hits.map((p) => slClRow(p, false)).join("") + (C.q.trim() ? `<button class="sl-clr add" data-act="slClNew" data-v="1"><span class="sl-clg">${ico("plus")}</span><span class="tx"><b>Nouveau client</b><em>Créer sa fiche : son premier tampon</em></span></button>` : ""); }
+function slClBind(b) {
+  const q = b && $("#slClQ", b); if (q) q.addEventListener("input", () => { if (!SL.cl) return; SL.cl.q = q.value; const sel = SL.cl.sel; const r = $("#slClR", b); if (r) r.innerHTML = slClResHTML(slClHits(q.value).filter((p) => p.id !== sel)); });
+  ["slClN", "slClP"].forEach((id) => { const i = b && $("#" + id, b); if (i) i.addEventListener("input", () => { if (SL.cl && SL.cl.nw) SL.cl.nw[id === "slClN" ? "name" : "phone"] = i.value; }); });
+}
+function slClPaint() { const w = $("#slCl"); if (!w) return; w.innerHTML = slClHTML(); slClBind(w); }
+/* the counter visit: one stamp in the client file, at that time (so it can be moved if the waiter picked the wrong person) */
+async function slClStamp(k, extra) {
+  const d = fdDocs().find((x) => x.id === k) || {}; const at = Date.now();
+  await fdWrite(k, { ...(extra || {}), passes: (Array.isArray(d.passes) ? d.passes : []).concat(at).slice(-120) });
+  logEvent("client", `a noté la venue de ${(extra && extra.name) || (fdById(k) || {}).name || "un client"} à table`); return at;
+}
+async function slClUnstamp(ps) { if (!ps || !ps.k) return; const d = fdDocs().find((x) => x.id === ps.k); if (!d || !Array.isArray(d.passes)) return; const passes = d.passes.filter((t) => +t !== +ps.at); if (passes.length !== d.passes.length) await fdWrite(ps.k, { passes }); }
+/* the chosen client (or a new one) → { k, name } ; null for a guest ; false when the new client is not complete */
+async function slClResolve() {
+  const C = SL.cl; if (!C) return null;
+  if (C.nw) { const name = C.nw.name.trim(), phone = C.nw.phone.trim(), k = fdKey(phone), e = $("#slClE");
+    if (name.length < 2) { SFX.err(); if (e) e.textContent = "Le nom du client, s'il vous plaît."; return false; }
+    if (!k) { SFX.err(); if (e) e.textContent = phone ? "Ce numéro semble incomplet." : "Son téléphone, pour le retrouver la prochaine fois."; return false; }
+    const ex = fdById(k); return ex && ex.doc ? { k, name: ex.name || name } : { k, name: name.slice(0, 60), fresh: { name: name.slice(0, 60), phone: phone.slice(0, 25), src: "salle" } }; }
+  if (!C.sel) return null; if (C.pend && C.pend.k === C.sel) return C.pend; const p = fdById(C.sel); return p ? { k: p.id, name: p.name || p.phone || "" } : null;
+}
+function slClToast(k) { const p = fdById(k), cfg = typeof fdCfg === "function" ? fdCfg() : null; if (!p) return; const full = cfg && typeof fdReward === "function" && fdReward(p, cfg);
+  toast(full ? `${firstName(p.name) || "Ce client"} : carte pleine, ${String(cfg.reward).toLowerCase()} à offrir` : `Venue notée pour ${firstName(p.name) || p.name}${cfg && cfg.on !== false ? ` · ${Math.min(p.stamps, cfg.goal)}/${cfg.goal}` : ""}`, full ? "info" : undefined); }
 /* one line of the order: everything a waiter may need, in one sheet */
 function slItemOpen(tab, x, mode) {
   SL.ed = { tab: tab.id, k: x.k, mode: mode || "edit", q: +x.q || 1, n: 1, note: x.note || "", al: [...(x.allergy || [])], course: +x.course, without: [...(x.without || [])], extras: (x.extras || []).map((e) => ({ ...e })),
@@ -743,12 +794,13 @@ Object.assign(ACT, {
   },
   slOpen: async (a, id, v) => {
     const t = slTableBy(SL.pickT); if (!t) return; const ex = slTabAt(t.id); if (ex) { closeSheet(); go("salle", { id: ex.id }); return; }
-    const b = slBookingAt(t.id), tid = slId("st");
+    const b = slBookingAt(t.id), tid = slId("st"); const who = !b && SL.cl ? await slClResolve() : null; if (who === false) return;
     /* a booking on joined tables opens on all of them */
     const bt = b && typeof plTblOf === "function" ? plTblOf(b).filter((id) => slTableBy(id) && !slTabAt(id)) : [], ids = bt.includes(t.id) && bt.length > 1 ? [t.id, ...bt.filter((x) => x !== t.id)] : [t.id];
-    const doc = { table: ids.length > 1 ? slJoinLbl(ids) : String(t.n), tableId: t.id, ...(ids.length > 1 ? { joined: ids.slice(1) } : {}), zone: t.zone || "", covers: +v, status: "open", day: dayKey(), openedAt: Date.now(), by: S.me.id, byName: (typeof esActorName === "function" && esActorName()) || S.me.name || "", items: [], total: 0, note: b && b.notes ? String(b.notes).slice(0, 140) : "", ...(b ? { booking: b.id } : {}) };
-    SFX.ok(); buzz(8); closeSheet(); SL.paneTab = null; SL.q = "";
+    const doc = { table: ids.length > 1 ? slJoinLbl(ids) : String(t.n), tableId: t.id, ...(ids.length > 1 ? { joined: ids.slice(1) } : {}), zone: t.zone || "", covers: +v, status: "open", day: dayKey(), openedAt: Date.now(), by: S.me.id, byName: (typeof esActorName === "function" && esActorName()) || S.me.name || "", items: [], total: 0, note: b && b.notes ? String(b.notes).slice(0, 140) : "", ...(b ? { booking: b.id } : {}), ...(who ? { client: who.k, clientName: who.name } : {}) };
+    SFX.ok(); buzz(8); closeSheet(); SL.paneTab = null; SL.q = ""; SL.cl = null;
     try { await safe(DB.set("salleTabs", tid, doc)); if (b && b.status !== "arrive" && typeof rsSave === "function") rsSave(b.id, { status: "arrive" }); } catch (e) { return; }
+    if (who) { try { const at = await slClStamp(who.k, who.fresh); await safe(DB.update("salleTabs", tid, { pass: { k: who.k, at } })); slClToast(who.k); } catch (e) {} }
     go("salle", { id: tid });
   },
   slGoCarte: () => { SFX.tap(); if (typeof CM !== "undefined") CM.tab = "carte"; go("commandes", { tab: "carte" }); },
@@ -851,7 +903,7 @@ Object.assign(ACT, {
   slServed: async (a, id) => {
     const o = (CM.orders || []).find((x) => x.id === id); if (!o) return; SFX.ok(); buzz(8);
     const row = a.closest(".sl-rd,.sl-kr,.sl-cb"); if (row) row.classList.add("go");
-    await safe(DB.update("clientOrders", id, { status: "servie", doneAt: Date.now(), by: S.me.id }));
+    await safe(DB.update("clientOrders", id, { status: "servie", doneAt: Date.now(), by: S.me.id, doneBy: S.me.id }));
     S.ui.undo = () => DB.update("clientOrders", id, { status: "prete", doneAt: null }); toastUndo(o.src === "salle" ? `Table ${o.table} · ${o.courseT} servi` : `${slWho(o)} remise`);
   },
   slBill: () => { const tab = slCurTab(); if (!tab) return; SFX.sheet ? SFX.sheet() : SFX.tap(); SL.bill = null; slBillSheet(tab); },
@@ -869,6 +921,24 @@ Object.assign(ACT, {
   },
   slCovers: () => { const tab = slCurTab(); if (!tab) return; SFX.tap(); openSheet(`<div class="sl-sh"><div class="sl-shh"><span class="h2">Couverts · Table ${esc(tab.table)}</span><button class="iconbtn" data-act="sheetClose" aria-label="Fermer">${ico("x")}</button></div><div class="sl-covg">${Array.from({ length: 12 }, (_, i) => i + 1).map((n) => `<button class="${n === +tab.covers ? "on" : ""}" data-act="slCovSet" data-v="${n}">${n}</button>`).join("")}</div></div>`); },
   slCovSet: async (a, id, v) => { const tab = slCurTab(); if (!tab) return; closeSheet(); SFX.ok(); await safe(DB.update("salleTabs", tab.id, { covers: +v })); },
+  slClPick: (a, id) => { const C = SL.cl; if (!C) return; C.sel = id || null; C.q = ""; SFX.tick(); buzz(3); if (C.mode === "tab") return ACT.slClSave(); slClPaint(); },
+  slClNew: (a, id, v) => { const C = SL.cl; if (!C) return; SFX.tap(); if (v === "1") { const q = C.q.trim(), dg = q.replace(/[^\d+ ]/g, "").trim(); const isPh = q.replace(/\D/g, "").length >= 6 && dg.length >= q.length - 1; C.nw = { name: isPh ? "" : q, phone: isPh ? q : "" }; } else C.nw = null; slClPaint(); if (C.nw) setTimeout(() => { const i = $(C.nw.name ? "#slClP" : "#slClN"); i && i.focus(); }, 60); },
+  slClNewOk: async () => { const C = SL.cl; if (!C || !C.nw) return; const who = await slClResolve(); if (!who) return; if (C.mode === "tab") return ACT.slClSave(null, null, null, who); C.sel = who.k; C.pend = who; C.nw = null; SFX.ok(); slClPaint(); },
+  /* from an open table: « Client de la table » */
+  slClient: () => { const tab = slCurTab(); if (!tab || !slClOn()) return; SFX.tap(); SL.cl = { mode: "tab", tab: tab.id, sel: tab.client || null, q: "", nw: null };
+    openSheet(`<div class="sl-sh"><div class="sl-shh"><span class="h2">Qui est à table ${esc(tab.table)} ?</span><button class="iconbtn" data-act="sheetClose" aria-label="Fermer">${ico("x")}</button></div>
+      ${tab.booking ? `<div class="sl-bk">${ico("resa")}<span>Table réservée : la visite compte déjà avec la réservation.</span></div>` : `<p class="sub">Choisissez sa fiche : sa venue est notée toute seule, avec un tampon sur sa carte de fidélité.</p>`}
+      <div id="slCl">${slClHTML()}</div></div>`, slClBind); },
+  slClSave: async (a, id, v, who0) => {
+    const C = SL.cl, tab = C && slTabOf(C.tab); if (!tab) return; const who = who0 || (C.sel ? await slClResolve() : null); if (who === false) return;
+    const same = (who && who.k) === (tab.client || null) || (!who && !tab.client); SL.cl = null; closeSheet(true); if (same) return;
+    try {
+      if (!tab.booking) await slClUnstamp(tab.pass);
+      let pass = null; if (who && !tab.booking) pass = { k: who.k, at: await slClStamp(who.k, who.fresh) };
+      await safe(DB.update("salleTabs", tab.id, { client: who ? who.k : null, clientName: who ? who.name : null, pass, updatedAt: Date.now() }));
+    } catch (e) { return; }
+    SFX.ok(); buzz(5); if (who && !tab.booking) slClToast(who.k); else toast(who ? `Table ${tab.table} : ${who.name}` : `Table ${tab.table} : invité`);
+  },
   slTabMenu: () => {
     const tab = slCurTab(); if (!tab) return; SFX.tap();
     openSheet(`<div class="sl-sh"><div class="sl-shh"><span class="h2">Table ${esc(tab.table)}</span><button class="iconbtn" data-act="sheetClose" aria-label="Fermer">${ico("x")}</button></div>
@@ -929,7 +999,7 @@ Object.assign(ACT, {
   },
   slKNext: async (a, id, v) => {
     const o = (CM.orders || []).find((x) => x.id === id); if (!o || SL.busy[id]) return; SL.busy[id] = true;
-    const patch = { status: v, by: S.me.id }; if (v === "prep") patch.prepAt = Date.now(); if (v === "prete") patch.readyAt = Date.now();
+    const patch = { status: v, by: S.me.id }; if (v === "prep") { patch.prepAt = Date.now(); patch.prepBy = S.me.id; } if (v === "prete") { patch.readyAt = Date.now(); patch.readyBy = S.me.id; }
     const card = a.closest(".sl-kcard"); if (v === "prete" && card) card.classList.add("go");
     v === "prete" ? (SFX.done(), buzz([14, 40, 14])) : (SFX.ok(), buzz(8));
     setTimeout(async () => {
