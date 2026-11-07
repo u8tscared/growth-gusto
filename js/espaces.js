@@ -174,10 +174,10 @@ function esSet(sp = esCur()) {
 const esHomeLbl = (sp = esCur()) => (sp === "pilotage" ? null : ES_SP[sp].t);
 /* the groups of a space: [title, routes]; pilotage keeps NAV's own sections */
 function esPlan(sp = esCur()) {
-  if (sp === "moi") return [["Mon espace", [...ES_MOI, "pointeuse", "consignes", "passation", "frais", "formation", "avis"]], ["Réglages", ["espaces", "reglages"]]];
+  if (sp === "moi") return [["Mon espace", [...ES_MOI, "pointeuse", "pourboires", "consignes", "passation", "frais", "formation", "avis"]], ["Réglages", ["espaces", "reglages"]]];
   if (esKioskOn()) { const k = ES_ST[esStation()]; return [[k.t, [k.route]]]; }
   const ps = esPoste(); const u = esUser(); const tools = u.tiles && Array.isArray(u.tiles[ps]) ? u.tiles[ps] : ES_POSTES[ps].tools;
-  return [[`${esShared() ? "Outils" : "Mes outils"} · ${ES_POSTES[ps].t}`, [...ES_POSTES[ps].tabs.map((t) => t[0]), ...tools]], ["Équipe", ["consignes", "passation", "pointeuse"]], ...(esLocked() ? [] : [["Réglages", ["espaces", "reglages"]]])];
+  return [[`${esShared() ? "Outils" : "Mes outils"} · ${ES_POSTES[ps].t}`, [...ES_POSTES[ps].tabs.map((t) => t[0]), ...tools]], ["Équipe", ["consignes", "passation", "pointeuse", "pourboires"]], ...(esLocked() ? [] : [["Réglages", ["espaces", "reglages"]]])];
 }
 function esFilterNav(list) {
   const sp = esCur(); const out = [];

@@ -174,7 +174,14 @@ service cloud.firestore {
       // ── everything else (fridges, readings, lots, stock, tickets, staff, finances…): members only ──
       match /{col}/{doc} {
         allow read: if !(col in ['members', 'sensorKeys', 'pennylane', 'plSent', 'plInv', 'qrPay', 'bankTx', 'bank', 'push', 'consignes', 'chatGroups', 'events', 'billPays']) && isMember(rid);
-        allow create, update, delete: if !(col in ['members', 'sensorKeys', 'pennylane', 'plSent', 'plInv', 'qrPay', 'bankTx', 'bank', 'push', 'consignes', 'chatGroups', 'events', 'billPays']) && isMemberAfter(rid);
+        allow create, update, delete: if !(col in ['members', 'sensorKeys', 'pennylane', 'plSent', 'plInv', 'qrPay', 'bankTx', 'bank', 'push', 'consignes', 'chatGroups', 'events', 'billPays', 'tipCfg', 'tipMonths']) && isMemberAfter(rid);
+      }
+      // pourboires (js/pourboires.js): everyone reads the split and the closed months; only the gérant changes the split or closes a month
+      match /tipCfg/{doc} {
+        allow write: if isGerant(rid);
+      }
+      match /tipMonths/{mk} {
+        allow write: if isGerant(rid);
       }
       // the action log (journal des actions, js/relais.js): append-only. Each line is signed by its author; nobody edits or erases it,
       // except the app's own « Annuler » right after a gesture (within 15 minutes), the « annulé ensuite » mark and the photo

@@ -10,7 +10,7 @@
    Data:
      restos/{rid}/clientOrders/{id}  written by the server (functions/src/commande.js orderApi); the team moves status on:
                                      nouvelle → prep → prete → servie (+ prepAt, readyAt, doneAt, by). Read by js/achats.js for forecasts.
-     restos/{rid}/qrMenu/cfg         { on, table, takeaway, payOnline, payPlace, tablePay: avant|choix|apres (à table), prepMin, tables, pickup:{days,windows:[{from,to}],step}, msg,
+     restos/{rid}/qrMenu/cfg         { on, table, takeaway, payOnline, payPlace, tablePay: avant|choix|apres (à table), tips (pourboire proposé au paiement en ligne, js/pourboires.js), prepMin, tables, pickup:{days,windows:[{from,to}],step}, msg,
                                        hidden:[noteId], out:{noteId:"YYYY-MM-DD"}, desc:{noteId:text}, veg:[noteId], setupAt }
      restos/{rid}/qrPay/link         Stripe account of the restaurant (server-written, members read)
      restos/{rid}/public/menu        projection read by the public page commande/ (cmPubDoc): never a client's data, never a cost price.
@@ -134,7 +134,7 @@ function cmPubDoc() {
   let size = JSON.stringify(items).length; items.slice().sort((a, b) => (b.ph || "").length - (a.ph || "").length).forEach((it) => { if (size > 700000 && it.ph && it.ph.startsWith("data:")) { size -= it.ph.length; delete it.ph; } });
   const rs = typeof rsCfg === "function" ? rsCfg() : {};
   return { v: 1, name: (S.resto && S.resto.name) || "", logo: cmLogo(), address: rs.address || "", phone: rs.phone || "", msg: c.msg || "",
-    cfg: { on: !!c.on, table: !!c.table, calls: c.calls !== false, takeaway: !!c.takeaway, payOnline: !!(c.payOnline && CM.link && CM.link.charges), payPlace: c.payPlace !== false || !(CM.link && CM.link.charges), tablePay: cmTablePay(c), prepMin: c.prepMin, tables: cmTablesN(), pickup: c.pickup },
+    cfg: { on: !!c.on, table: !!c.table, calls: c.calls !== false, takeaway: !!c.takeaway, payOnline: !!(c.payOnline && CM.link && CM.link.charges), payPlace: c.payPlace !== false || !(CM.link && CM.link.charges), tablePay: cmTablePay(c), tips: c.tips !== false, prepMin: c.prepMin, tables: cmTablesN(), pickup: c.pickup },
     cats: SECS.map(({ id, t }) => ({ id, t })), items, day: today, look: cmLookPub(c.look),
     /* prix dynamiques (js/prix.js): happy hours and the plat du jour, discounts already capped by the margin floor */
     promos: (() => { try { return typeof pxPubPromos === "function" ? pxPubPromos(items) : []; } catch (e) { return []; } })(),
