@@ -66,7 +66,7 @@
 .av-paste-h{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 10px 0 14px}
 .av-copy{all:unset;cursor:pointer;display:inline-flex;align-items:center;gap:6px;padding:7px 11px;border-radius:11px;background:var(--cream-2);font-size:13.5px;font-weight:700;color:var(--ink-2)}
 .av-copy svg{width:15px;height:15px}
-.av-paste textarea{display:block;width:100%;border:0;outline:none;resize:none;background:transparent;padding:10px 14px 14px;font-size:15.5px;line-height:1.5;color:var(--ink);min-height:96px}
+.av-paste textarea{display:block;width:100%;border:0;outline:none;resize:none;background:transparent;padding:10px 14px 14px;font-size:16px;line-height:1.5;color:var(--ink);min-height:96px}
 .av-g svg{fill:currentColor;stroke:none}
 .av-done .av-g:not(.soft){background:var(--ink);box-shadow:0 4px 0 #000}
 @media (hover:hover){.av-done .av-g:not(.soft):hover{background:#2A2346}}

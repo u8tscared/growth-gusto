@@ -666,14 +666,7 @@ function appHeight() {
 }
 appHeight();
 window.addEventListener("resize", appHeight); window.addEventListener("orientationchange", () => setTimeout(appHeight, 250));
-/* on-screen keyboard (iOS): lift the sheet above it and keep the focused field visible */
-(function kbLift() {
-  const vv = window.visualViewport; if (!vv) return;
-  const upd = () => { const de = document.documentElement; const kb = Math.max(0, (document.body.clientHeight || APPH.px || window.innerHeight) - vv.height - vv.offsetTop); const ae = document.activeElement; const typing = !!(ae && ae.matches && ae.matches("input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]),textarea,select,[contenteditable]")); const on = kb > 80 && typing; /* iOS 26 Safari also shrinks visualViewport when its toolbar moves: only a focused field means a keyboard */ de.style.setProperty("--kb", (on ? kb : 0) + "px"); de.style.setProperty("--vvh", vv.height + "px"); de.classList.toggle("kb", on); };
-  upd();
-  vv.addEventListener("resize", upd); vv.addEventListener("scroll", upd); document.addEventListener("focusin", () => setTimeout(upd, 50)); document.addEventListener("focusout", () => setTimeout(upd, 50));
-  document.addEventListener("focusin", (e) => { const t = e.target; if (t.matches && t.matches("input,textarea,select") && t.closest("#sheet")) setTimeout(() => { try { t.scrollIntoView({ block: "nearest", behavior: "smooth" }); } catch (x) {} }, 320); });
-})();
+/* on-screen keyboard (iPhone / iPad): js/clavier.js shrinks the app box above it and keeps the focused field in view */
 $("#scrim").addEventListener("click", () => closeSheet());
 document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeSheet(); });
 

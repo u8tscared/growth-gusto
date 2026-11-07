@@ -343,9 +343,15 @@ textarea.input{height:auto;min-height:180px;padding:14px;line-height:1.55;resize
 .sheet{position:absolute;z-index:51;left:max(8px,env(safe-area-inset-left,0px));right:max(8px,env(safe-area-inset-right,0px));bottom:calc(max(env(safe-area-inset-bottom,0px),var(--kb,0px)) + 8px);max-width:560px;margin:0 auto;max-height:calc(100% - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px) - 40px);display:flex;flex-direction:column;overflow:hidden;border-radius:34px;background:rgb(var(--w) / .92);-webkit-backdrop-filter:blur(30px) saturate(1.8);backdrop-filter:blur(30px) saturate(1.8);box-shadow:0 -20px 60px -20px rgb(var(--sk) / .45),0 0 0 1px rgb(var(--hl) / calc(.8 * var(--hla))) inset;transform:translateY(calc(100% + 40px));visibility:hidden;transition:transform .36s cubic-bezier(.4,0,.8,.4),visibility 0s .36s;will-change:transform}
 .sheet.open{transform:none;visibility:visible;transition:transform .6s cubic-bezier(.22,1.18,.36,1),visibility 0s}
 .sheet.drag{transition:none!important}
-/* keyboard up: the sheet sits on the keyboard and fits inside what is still visible */
-html.kb .sheet{max-height:calc(var(--vvh,100dvh) - env(safe-area-inset-top,0px) - 16px)}
-html.kb .tabbar{opacity:0;pointer-events:none}
+/* on-screen keyboard up (js/clavier.js): the app box (body) shrinks to the part of the screen left above the keyboard, so every
+   sticky action bar, sheet and full-screen layer lands on the keyboard instead of under it. Nothing to add per screen.
+   Below the keyboard there is no home indicator any more: bottom insets meant for it are dropped. */
+html.kb body,html.standalone.kb body{top:var(--vvt,0px);height:var(--vvh,100%);max-height:var(--vvh,100%)}
+html.kb .sheet{bottom:8px;max-height:calc(100% - env(safe-area-inset-top,0px) - 16px)}
+html.kb .sheet-body{padding-bottom:14px}
+html.kb .tabbar,html.kb .hl-cap,html.kb .au-net{opacity:0;pointer-events:none}
+html.kb .view{padding-bottom:20px;scroll-padding-bottom:96px}
+@media (max-width:959px){html.kb .view .ctabar,html.kb.tabs .view .ctabar{bottom:6px}html.kb.tabs .view .ctabar:last-child{margin-bottom:0}}
 .sheet .grab{flex:none;height:28px;display:grid;place-items:center;cursor:grab;touch-action:none}
 .sheet .grab i{display:block;width:40px;height:5px;border-radius:5px;background:rgb(var(--k) / .2);transition:width .25s var(--ease),background .25s}
 .sheet.drag .grab i{width:52px;background:rgba(74,31,230,.45)}

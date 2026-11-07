@@ -291,7 +291,7 @@ function foSheet(k) {
     <label class="field"><span>E-mail des commandes</span><input class="input" id="foMail" type="email" inputmode="email" value="${v(c.email)}" placeholder="commandes@…" autocomplete="off"></label>
     <label class="field"><span>Adresse</span><input class="input" id="foAd" value="${v(d.address)}" placeholder="Rue, code postal, ville" autocomplete="off"></label>
     <div class="grid2"><label class="field"><span>Site web</span><input class="input" id="foWeb" inputmode="url" value="${v(d.website)}" placeholder="www…" autocomplete="off"></label>
-      <label class="field"><span>N° client</span><input class="input mono" id="foAcc" value="${v(d.account)}" placeholder="Facultatif" autocomplete="off"></label></div>
+      <label class="field"><span>N° client</span><input class="input mono" id="foAcc" autocorrect="off" spellcheck="false" value="${v(d.account)}" placeholder="Facultatif" autocomplete="off"></label></div>
     <div class="fo-sec">Livraisons</div>
     <div class="field"><span>Jours de livraison</span><div class="ac-days">${AC_WEEK.map((w) => `<button class="ac-day${F.days.includes(w) ? " on" : ""}" data-act="foSDay" data-v="${w}" aria-pressed="${F.days.includes(w)}">${AC_DL[w]}</button>`).join("")}</div></div>
     <div class="grid2"><label class="field"><span>Livré entre</span><input class="input mono" id="foW1" type="time" value="${v(d.winFrom)}"></label><label class="field"><span>et</span><input class="input mono" id="foW2" type="time" value="${v(d.winTo)}"></label></div>

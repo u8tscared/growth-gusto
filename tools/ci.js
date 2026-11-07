@@ -33,3 +33,11 @@ for(const [nom,env] of [['téléphone',{}],['tablette',{TABLET:'1'}]]){
   const mm=o.match(/ERRORS: (\[[\s\S]*\])/);const ee=mm?JSON.parse(mm[1]):null;
   if(n.status!==0||/SCRIPT ERROR/.test(o)||!/LECONS OK/.test(o)||!ee||ee.length){console.log("\nUn écran du menu n'a pas sa leçon de prise en main (ou une leçon est mal formée) : voir ci-dessus et l'en-tête de js/lecons.js.");process.exit(1);}
 }
+// 6) clavier à l'écran (js/clavier.js), téléphone et tablette : l'app s'arrête au clavier, le champ reste visible, la barre d'action
+//    se pose sur le clavier, chaque champ a sa touche Entrée (tools/clavier-ui.js)
+for(const [nom,env] of [['téléphone',{}],['tablette',{TABLET:'1'}]]){
+  const n=spawnSync(process.execPath,['tools/run.js','tools/clavier-ui.js'],{encoding:'utf8',env:{...process.env,...env,OUT:path.join(ROOT,'tools/out/ci')},timeout:180000});
+  const o=(n.stdout||'')+(n.stderr||'');console.log('clavier '+nom+' : '+(o.match(/CLAVIER (OK|KO)[\s\S]*/)||[o.trim()])[0]);
+  const mm=o.match(/ERRORS: (\[[\s\S]*\])/);const ee=mm?JSON.parse(mm[1]):null;
+  if(n.status!==0||/SCRIPT ERROR/.test(o)||!/CLAVIER OK/.test(o)||!ee||ee.length){console.log("\nSaisie au clavier cassée sur "+nom+" : voir ci-dessus et l'en-tête de js/clavier.js.");process.exit(1);}
+}
