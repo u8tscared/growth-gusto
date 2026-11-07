@@ -611,7 +611,9 @@ function rsMailHtml(kind, b, r, L) {
 function rsAvisHtml(b, r, L, e) {
   const nm = e(String(b.name || "").trim().split(/\s+/)[0] || ""), rn = e(r.name || "le restaurant"), m = rsMeal(b);
   const lg = typeof r.logo === "string" && /^https:\/\/[^\s"'<>]+$/.test(r.logo) && r.logo.length <= 2000 ? r.logo : "";
-  const g = e(L.review || "#"), star = `<a href="${g}" style="text-decoration:none;color:#F5B700;font-size:38px;line-height:1;padding:0 3px">&#9733;</a>`;
+  const g = e(L.review || "#"), av = L.avis || "", sep = /\?/.test(av) ? "&" : "?";
+  /* the stars open « Comment nous avez-vous trouvés ? » (avis/ page) with that note already picked; no page link (old e-mails, preview): Google */
+  const star = (n) => `<a href="${e(av ? av + sep + "n=" + n : L.review || "#")}" style="text-decoration:none;color:#F5B700;font-size:40px;line-height:1;padding:0 3px" title="${n} sur 5">&#9733;</a>`;
   return `<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Votre ${m} s'est bien passé ?</title></head>
 <body style="margin:0;padding:0;background:#FBF6EC;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;color:#1B1530">
 <div style="max-width:500px;margin:0 auto;padding:24px 14px 32px">
@@ -622,9 +624,10 @@ function rsAvisHtml(b, r, L, e) {
  </div>
  <div style="background:#FFFDF8;border:1.5px solid #E9DFCD;border-top:0;border-radius:0 0 26px 26px;padding:22px 22px 24px;box-shadow:0 3px 0 #E2D6C2">
   <p style="margin:0 0 14px;font-size:16px;line-height:1.5;color:#4A4560">Bonjour ${nm}, merci d'être venu${+b.covers > 1 ? "s" : ""} chez <b>${rn}</b>. Toute l'équipe espère que vous vous êtes régalé${+b.covers > 1 ? "s" : ""} !</p>
-  <p style="margin:0 0 6px;font-size:16px;line-height:1.5;color:#4A4560">Votre avis compte énormément pour nous. Trente secondes sur Google aident d'autres gourmands à nous découvrir.</p>
-  <div style="text-align:center;margin:18px 0 6px">${star}${star}${star}${star}${star}</div>
-  <a href="${g}" style="display:block;text-align:center;text-decoration:none;font-weight:700;font-size:16px;padding:15px 18px;border-radius:16px;margin-top:10px;background:#5B2BFF;color:#ffffff;box-shadow:0 4px 0 #2A0BA6">Laisser un avis sur Google</a>
+  <p style="margin:0 0 6px;font-size:16px;line-height:1.5;color:#4A4560">Comment nous avez-vous trouvés ? Touchez une étoile : c'est fait en dix secondes, et votre avis aide d'autres gourmands à nous découvrir.</p>
+  <div style="text-align:center;margin:18px 0 6px">${[1, 2, 3, 4, 5].map(star).join("")}</div>
+  <a href="${av ? e(av) : g}" style="display:block;text-align:center;text-decoration:none;font-weight:700;font-size:16px;padding:15px 18px;border-radius:16px;margin-top:10px;background:#5B2BFF;color:#ffffff;box-shadow:0 4px 0 #2A0BA6">${av ? "Donner mon avis" : "Laisser un avis sur Google"}</a>
+  ${av && L.review ? `<div style="margin-top:12px;text-align:center"><a href="${g}" style="color:#3A10D8;font-weight:700;font-size:14px;text-decoration:none">Ou directement sur Google</a></div>` : ""}
   ${r.phone ? `<div style="margin-top:16px;font-size:14px;color:#4A4560;text-align:center;line-height:1.45">Quelque chose ne vous a pas plu ? Dites-le nous aussi, on veut s'améliorer : <a href="tel:${e(String(r.phone).replace(/[^\d+]/g, ""))}" style="color:#3A10D8;font-weight:700;text-decoration:none">${e(r.phone)}</a></div>` : ""}
   ${L.book ? `<div style="margin-top:14px;text-align:center"><a href="${e(L.book)}" style="color:#3A10D8;font-weight:700;font-size:14px;text-decoration:none">Réserver à nouveau</a></div>` : ""}
  </div>
@@ -933,7 +936,7 @@ Object.assign(ACT, {
   rsMailPrev: (a, id, v) => {
     rsCeKeep(); SFX.tap(); const c = R.ce || rsCfg(), d = addDays(dayKey(), 3);
     const b = { name: "Camille Martin", date: d, time: "20:00", covers: 4, notes: "Anniversaire", resaMsg: v === "refuse" ? "Complet ce soir-là, désolés ! Le lendemain nous avons encore de la place." : v === "annule" ? "Fermeture exceptionnelle, toutes nos excuses." : "" };
-    const html = rsMailHtml(v, b, { name: (S.resto && S.resto.name) || "Votre restaurant", address: c.address || "", phone: c.phone || "", logo: rsLogo() }, { manage: "#", ics: "#", book: "#", review: "#" });
+    const html = rsMailHtml(v, b, { name: (S.resto && S.resto.name) || "Votre restaurant", address: c.address || "", phone: c.phone || "", logo: rsLogo() }, { manage: "#", ics: "#", book: "#", review: "#", avis: "#" });
     const K = RS_MAIL_KINDS[v] || RS_MAIL_KINDS.confirme;
     openSheet(`<div class="rs-mpv"><div class="rs-edh"><span class="h2">Aperçu</span><button class="iconbtn" data-act="rsMailBack" aria-label="Retour">${ico("x")}</button></div>
       <div class="rs-mpo"><span>Objet</span><b>${esc(K.s({ name: (S.resto && S.resto.name) || "Votre restaurant" }, b, rsMailDay(d)))}</b></div>
