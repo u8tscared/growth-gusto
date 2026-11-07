@@ -40,6 +40,9 @@ NEW = {
     "achats": dict(img="achats", t="Commandes fournisseurs préparées",
         p="L'app prépare un bon par fournisseur d'après les couverts attendus, ce que vous consommez et ce qu'il reste en stock. Vous vérifiez, vous envoyez.",
         ul=["Calculé sur les réservations et l'historique", "Jours de livraison, heure limite, franco", "Envoi par e-mail, SMS, WhatsApp ou PDF", "Manquants repérés à la réception"]),
+    "fournisseurs": dict(img="fournisseurs", t="Annuaire des fournisseurs",
+        p="Tous vos fournisseurs au même endroit{0}: qui livre aujourd'hui, l'heure limite de la prochaine commande, et la commande prête envoyée en un geste.".format(N),
+        ul=["Appeler, SMS, e-mail, itinéraire d'un tap", "Jours et créneau de livraison, heure limite, franco", "Commande préparée envoyée en un clic", "Achats du mois, hausses de prix, livraisons complètes"]),
     "gaspillage": dict(img="gaspillage", t="Gaspillage en euros",
         p="Pertes, invendus, produits dont la DLC est passée{0}: tout est chiffré au coût de la recette, avec des pistes pour jeter moins.".format(N),
         ul=["Jeté du mois, part des achats", "Projection sur l'année", "Lots à jeter en un geste", "Les produits souvent jetés commandés au plus juste"]),
@@ -67,6 +70,9 @@ NEW = {
     "consignes": dict(img="consignes", t="Consignes et messagerie d'équipe",
         p="Plat du jour, rupture, info du service{0}: la consigne arrive sur le téléphone de ceux qui sont concernés et vous voyez qui l'a lue. La discussion d'équipe a ses groupes, Cuisine, Salle ou ceux que vous créez, sans groupe WhatsApp perso.".format(N),
         ul=["Groupes Toute l'équipe, Cuisine, Salle, et les vôtres", "Consigne pour tout le monde ou pour un groupe", "Vous choisissez qui peut publier", "Lu, et qui a lu", "Dictée vocale et notifications"]),
+    "defis": dict(img="defis", t="Défis d'équipe",
+        p="«{0}20 desserts ce soir{0}», «{0}2{0}000{0}€ aujourd'hui{0}», «{0}25 bons prêts en moins de 15 min{0}»{0}: vous lancez le défi, les ventes se comptent toutes seules depuis les commandes, et le classement bouge en direct jusqu'à la fête finale.".format(N),
+        ul=["Desserts, boissons, un plat précis, chiffre d'affaires, ticket moyen", "Classement en direct, au nom de chaque serveur", "Sur l'Accueil, la prise de commande et l'écran cuisine", "Trophée, confettis et récompense quand c'est gagné"]),
     "frais": dict(img="frais", t="Notes de frais pour vos clients",
         p="Un client demande une note pour sa société{0}? «{0}4 repas complets × 37,25{0}€{0}» ou le détail de la table, la TVA ventilée à 10{0}% et 20{0}%, numérotée. Imprimée ou envoyée par e-mail.".format(N),
         ul=["Depuis l'addition d'une table ou à la main", "TVA ventilée par taux", "Numérotation qui se suit, annulation tracée", "PDF imprimé ou envoyé par e-mail"]),
@@ -98,11 +104,11 @@ GROUPS = [
     ("g-salle", "r", "En salle", "Réservations, commandes et cuisine", "De la réservation au bon en cuisine, sans commission par couvert.", False,
         [("resa", SECOND, None), ("coupdefeu", SECOND, None), ("reserver", SECOND, None), ("zenchef", SECOND, IMPORT), ("salle", SECOND, None), ("cuisine", SECOND, None), ("menuqr", SECOND, None), ("carte", SECOND, None), ("clients", SECOND, None), ("avis", SECOND, None)]),
     ("g-achats", "t", "Chaque semaine", "Achats, marges et gaspillage", "Acheter juste, connaître sa marge, jeter moins.", True,
-        [("marges", None, None), ("factures", None, None), ("achats", None, None), ("gaspillage", None, None)]),
+        [("marges", None, None), ("factures", None, None), ("achats", None, None), ("fournisseurs", None, None), ("gaspillage", None, None)]),
     ("g-gestion", "s", "Au bureau", "Caisse, stock et chiffres", "Savoir ce que vous avez, ce que vous vendez, ce que vous gagnez.", False,
         [("caisse", SECOND, None), ("livraison", SECOND, IMPORT), ("tickets", SECOND, None), ("frais", SECOND, None), ("stock", SECOND, None), ("dashboard", SECOND, None), ("finance", CHEF, None), ("banque", CHEF, IMPORT), ("sites", CHEF, None)]),
     ("g-equipe", "v", "L'équipe", "Équipe, pointeuse et planning", "Chacun son compte, ses horaires, son planning.", True,
-        [("equipe", None, None), ("consignes", None, None), ("pointeuse", CHEF, None), ("planning", CHEF, None), ("staff", CHEF, None)]),
+        [("equipe", None, None), ("consignes", None, None), ("defis", SECOND, None), ("pointeuse", CHEF, None), ("planning", CHEF, None), ("staff", CHEF, None)]),
 ]
 
 PLUS = '<svg class="fi-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>'
