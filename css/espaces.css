@@ -604,3 +604,5 @@ html:has(.au-dbar.on) .es-lkfab{bottom:calc(max(14px,env(safe-area-inset-bottom,
 @media (min-width:960px){html:has(.au-dbar.on) .es-lkfab{bottom:max(14px,env(safe-area-inset-bottom,0px))}}
 .es-hrx{display:flex;flex-direction:column;align-items:center;gap:10px;margin:6px 0 4px}
 .es-hrx .hstack{justify-content:center;flex-wrap:wrap;gap:8px}
+/* doigt : liens et interrupteurs de la grille plus faciles à toucher, sans changer leur dessin */
+@media (pointer:coarse){.es-lnk{padding:12px 0;margin:-12px 0}.es-tg{position:relative}.es-tg::after{content:"";position:absolute;inset:-8px -2px}}

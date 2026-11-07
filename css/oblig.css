@@ -396,3 +396,5 @@
 .ob-more summary{font-family:var(--f);font-weight:700;color:var(--ink-2)}
 @media (prefers-reduced-motion:reduce){.ob-bar i,.ob-prog i,.ob-dot{animation:none}}
 @media (max-width:440px){.ob-stats{gap:6px}.ob-stat{padding:8px 8px 7px}.ob-stat span{font-size:11.5px}.ob-stat b{font-size:22px}}
+/* doigt : la pastille garde son dessin, la zone qu'on touche fait 44 px */
+@media (pointer:coarse){.ob-dot{position:relative}.ob-dot::after{content:"";position:absolute;inset:-11px}}

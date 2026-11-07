@@ -411,3 +411,5 @@
   .pa-tki .ico,.pa-sh .ico,.pa-hglow,.pa-wi .ico,.jr-fi,.ax-ring>.ico,.ax-pv .ico,.ax-enda i,.ax-enda span .ico,.pa-mic.on{animation:none!important}
   .rl-card{transition:none}
 }
+/* doigt : filtres par personne à 40 px de haut */
+@media (pointer:coarse){.jr-pp{min-height:40px;box-sizing:border-box}}
