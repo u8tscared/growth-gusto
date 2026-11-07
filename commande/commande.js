@@ -131,7 +131,7 @@
     if (op === "create") {
       const oid = "demo" + Date.now().toString(36), k = "0".repeat(32);
       const items = d.items.map((x) => { const it = st.pub.items.find((i) => i.id === x.id); return { id: x.id, name: it.t, price: it.p, q: x.q, note: x.note || "" }; });
-      const o = { id: oid, n: 1 + Math.floor(Math.random() * 40), mode: d.mode, table: d.table, items, total: items.reduce((a, x) => a + x.price * x.q, 0), pay: d.pay, paid: false,
+      const o = { id: oid, n: 1 + Math.floor(Math.random() * 40), mode: d.mode, table: d.table, items, total: items.reduce((a, x) => a + x.price * x.q, 0), tip: d.pay === "stripe" ? +d.tip || 0 : 0, pay: d.pay, paid: false,
         status: d.pay === "stripe" ? "apayer" : "nouvelle", at: Date.now(), slot: d.slot || "", name: d.name || "", note: d.note || "" };
       demo.orders[oid] = o;
       if (d.pay === "stripe") { setTimeout(() => { o.paid = true; o.status = "nouvelle"; o.paidAt = Date.now(); }, 1800); }
@@ -156,6 +156,11 @@
   const qtyOf = (id) => st.cart.filter((l) => l.id === id).reduce((a, l) => a + l.q, 0);
   const count = () => st.cart.reduce((a, l) => a + l.q, 0);
   const total = () => st.cart.reduce((a, l) => { const it = itemOf(l.id); return a + (it ? it.p * l.q : 0); }, 0);
+  /* pourboire for the team, offered with the online payment (cfg.tips, js/pourboires.js): 5, 10 or 15 %, rounded up to 10 cents */
+  const TIPS = [0, 5, 10, 15];
+  const tipOn = () => st.pay === "stripe" && cfg().tips !== false;
+  const tipOf = (pct, t = total()) => (pct ? Math.max(0.5, Math.ceil(t * pct * 0.1 - 1e-9) / 10) : 0);
+  const tipAmt = () => (tipOn() ? tipOf(st.tip || 0) : 0);
   const saveCart = () => { const s = store.get() || {}; s.cart = st.cart; s.mode = st.mode; s.table = st.table; s.at = Date.now(); store.set(s); };
   function addLine(id, q = 1, note = "") {
     note = String(note || "").trim().slice(0, 140);
@@ -349,7 +354,7 @@
     const slots = st.mode === "emporter" ? pickupSlots() : []; if (st.mode === "emporter" && !slots.includes(st.slot)) st.slot = slots[0] || "";
     const lines = st.cart.map((l, i) => { const it = itemOf(l.id); if (!it) return ""; return `<div class="qm-ln st" style="--i:${i}"><div class="qm-ln-tx"><b>${esc(it.t)}</b>${l.note ? `<em>${svg.note}${esc(l.note)}</em>` : ""}<span>${eur(it.p * l.q)}</span></div>
       <div class="qm-qty sm"><button data-a="lq" data-v="-1" data-i="${i}" aria-label="Moins">${l.q === 1 ? '<svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg>' : svg.minus}</button><b>${l.q}</b><button data-a="lq" data-v="1" data-i="${i}" aria-label="Plus">${svg.plus}</button></div></div>`; }).join("");
-    const t = total(), online = st.pay === "stripe";
+    const t = total(), online = st.pay === "stripe", tip = tipAmt();
     const ok = st.cart.length && (st.mode === "table" ? !!st.table : st.slot && st.name.trim().length >= 2 && st.phone.replace(/\D/g, "").length >= 8);
     openSheet(`<div class="qm-sh-sc">
       <div class="qm-sh-h"><div><h3>Votre commande</h3><p>${st.mode === "table" ? `${svg.table}Table ${esc(st.table)}` : `${svg.bag}À emporter`}</p></div><button class="qm-x in" data-a="close" aria-label="Fermer">${svg.x}</button></div>
@@ -363,10 +368,12 @@
       ${modes.length ? `<div class="qm-blk"><div class="qm-bh">${svg.card}<b>Paiement</b></div>${st.mode === "table" && modes.length === 1 ? `<p class="qm-payn">${modes[0] === "stripe" ? `${esc(st.pub.name || "Le restaurant")} demande de régler en commandant. La cuisine reçoit votre commande dès le paiement.` : "Vous réglez à la fin du repas, auprès du serveur. Rien à payer maintenant."}</p>` : ""}<div class="qm-pays">${modes.map((m) => m === "stripe"
         ? `<button class="qm-pay${st.pay === m ? " on" : ""}" data-a="pay" data-v="stripe"><span class="qm-radio"></span><span class="qm-pay-tx"><b>Payer maintenant</b><em>Carte bancaire, Apple Pay, Google Pay</em></span><span class="qm-cards"><i class="cb">CB</i><i class="vi">VISA</i><i class="mc"><s></s><s></s></i></span></button>`
         : `<button class="qm-pay${st.pay === m ? " on" : ""}" data-a="pay" data-v="place"><span class="qm-radio"></span><span class="qm-pay-tx"><b>${st.mode === "table" ? "Payer à la fin du repas" : "Payer au retrait"}</b><em>Carte, espèces ou titre-restaurant, sur place</em></span>${svg.coins}</button>`).join("")}</div></div>` : ""}
-      <div class="qm-tot"><span>Total</span><b class="mono">${eur(t)}</b></div>
+      ${tipOn() && t >= 0.5 ? `<div class="qm-blk qm-tipb"><div class="qm-bh">${svg.coins}<b>Un pourboire pour l'équipe ?</b></div><div class="qm-tips">${TIPS.map((p) => `<button class="qm-tip${(st.tip || 0) === p ? " on" : ""}" data-a="tip" data-v="${p}" aria-pressed="${(st.tip || 0) === p}">${p ? `<b>${p} %</b><em class="mono">${eur(tipOf(p, t))}</em>` : `<b>Non merci</b>`}</button>`).join("")}</div>${tip ? `<p class="qm-tipn">Merci ! Il revient en entier à l'équipe, en salle et en cuisine.</p>` : ""}</div>` : ""}
+      ${tip ? `<div class="qm-tot sub"><span>Commande</span><b class="mono">${eur(t)}</b></div><div class="qm-tot sub tip"><span>Pourboire</span><b class="mono">${eur(tip)}</b></div>` : ""}
+      <div class="qm-tot${tip ? " fin" : ""}"><span>Total</span><b class="mono">${eur(t + tip)}</b></div>
       ${st.err ? `<div class="qm-err">${svg.alert}<span>${esc(st.err)}</span></div>` : ""}
     </div>
-    <div class="qm-sh-cta col"><button class="qm-btn big grow" data-a="send" ${ok && !st.sending ? "" : "disabled"}>${st.sending ? `<span class="qm-spin"></span>Un instant…` : online ? `${svg.lock}Payer ${eur(t)}` : `Envoyer la commande · ${eur(t)}`}</button>
+    <div class="qm-sh-cta col"><button class="qm-btn big grow" data-a="send" ${ok && !st.sending ? "" : "disabled"}>${st.sending ? `<span class="qm-spin"></span>Un instant…` : online ? `${svg.lock}Payer ${eur(t + tip)}` : `Envoyer la commande · ${eur(t)}`}</button>
       ${online ? `<p class="qm-legal">Paiement sécurisé par Stripe. ${esc(st.pub.name || "Le restaurant")} reçoit directement votre paiement.</p>` : `<p class="qm-legal">La cuisine reçoit votre commande tout de suite.</p>`}</div>`, "cart");
     const bind = (id, k) => { const el = $("#" + id); if (el) el.addEventListener("input", () => { st[k] = el.value; if (k === "name" || k === "phone") { const b = $('[data-a="send"]'); const ok2 = st.cart.length && (st.mode === "table" ? !!st.table : st.slot && st.name.trim().length >= 2 && st.phone.replace(/\D/g, "").length >= 8); if (b && !st.sending) b.disabled = !ok2; } }); };
     bind("qmName", "name"); bind("qmPhone", "phone"); bind("qmNote", "note");
@@ -395,7 +402,8 @@
       ${!off ? `<ol class="qm-steps">${steps.map((x, k) => `<li class="${k < i ? "done" : k === i ? "now" : ""}"><span class="qm-dot">${k < i ? svg.check : ""}</span><b>${esc(x[1])}</b></li>`).join("")}</ol>` : ""}
       <div class="qm-ticket"><div class="qm-tk-h">${take ? `À emporter${o.slot ? ` · ${esc(o.slot)}` : ""}` : `Table ${esc(o.table || "")}`}${o.name ? ` · ${esc(o.name)}` : ""}</div>
         <div class="qm-tk-l">${(o.items || []).map((x) => `<div><span><b>${x.q}×</b> ${esc(x.name)}${x.note ? `<em>${esc(x.note)}</em>` : ""}</span><span class="mono">${eur(x.price * x.q)}</span></div>`).join("")}</div>
-        <div class="qm-tk-t"><span>Total</span><b class="mono">${eur(o.total)}</b></div>
+        ${o.tip > 0 ? `<div class="qm-tk-l tip"><div><span>Pourboire pour l'équipe</span><span class="mono">${eur(o.tip)}</span></div></div>` : ""}
+        <div class="qm-tk-t"><span>Total</span><b class="mono">${eur(o.total + (o.tip || 0))}</b></div>
         <div class="qm-tk-s ${o.paid ? "ok" : ""}">${o.paid ? `${svg.check}Payé en ligne` : o.pay === "stripe" && o.status === "apayer" ? "Paiement en cours" : take ? "À régler au retrait" : "À régler sur place"}</div></div>
       ${avisCard(o, take)}
       ${o.status === "abandonnee" || o.status === "servie" || (take && o.status === "prete") ? `<button class="qm-btn${o.status === "abandonnee" ? "" : " soft"}" data-a="again">Nouvelle commande</button>` : ""}
@@ -449,11 +457,12 @@
     lq: (el) => { const l = st.cart[+el.dataset.i]; if (!l) return; l.q = Math.max(0, Math.min(30, l.q + +el.dataset.v)); st.cart = st.cart.filter((x) => x.q > 0); saveCart(); pop(560, 0.05, 0.03); vib(6); if (!st.cart.length) { closeSheet(); st.view = "menu"; paintMenu(); return; } keepScroll(paintCart); },
     slot: (el) => { st.slot = el.dataset.v; pop(760, 0.05, 0.03); vib(6); keepScroll(paintCart); },
     pay: (el) => { st.pay = el.dataset.v; pop(760, 0.05, 0.03); vib(6); keepScroll(paintCart); },
+    tip: (el) => { st.tip = +el.dataset.v || 0; pop(st.tip ? 880 : 620, 0.05, 0.03); vib(st.tip ? [6, 30, 6] : 6); keepScroll(paintCart); },
     send: async (el, ev, resume) => {
       if (st.sending) return;
       /* the order being sent is kept on the phone (pend) with its request id: a page closed or reloaded during a network cut sends it
          again on the next visit, and a second tap on « Envoyer » with the same cart reuses the same id — never two orders */
-      const body = resume ? resume.body : { mode: st.mode, table: st.mode === "table" ? st.table : "", items: st.cart.map((l) => ({ id: l.id, q: l.q, note: l.note || "" })), name: st.name.trim(), phone: st.phone.trim(), slot: st.slot, note: st.note.trim(), pay: st.pay,
+      const body = resume ? resume.body : { mode: st.mode, table: st.mode === "table" ? st.table : "", items: st.cart.map((l) => ({ id: l.id, q: l.q, note: l.note || "" })), name: st.name.trim(), phone: st.phone.trim(), slot: st.slot, note: st.note.trim(), pay: st.pay, ...(tipAmt() ? { tip: tipAmt() } : {}),
         back: location.origin + location.pathname };
       const h = JSON.stringify({ ...body, back: "" }), s0 = store.get() || {};
       const rq = resume ? resume.rq : s0.pend && s0.pend.h === h && Date.now() - (s0.pend.at || 0) < 3 * 3600e3 ? s0.pend.rq : R.rid();

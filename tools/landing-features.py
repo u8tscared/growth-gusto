@@ -73,6 +73,9 @@ NEW = {
     "defis": dict(img="defis", t="Défis d'équipe",
         p="«{0}20 desserts ce soir{0}», «{0}2{0}000{0}€ aujourd'hui{0}», «{0}25 bons prêts en moins de 15 min{0}»{0}: vous lancez le défi, les ventes se comptent toutes seules depuis les commandes, et le classement bouge en direct jusqu'à la fête finale.".format(N),
         ul=["Desserts, boissons, un plat précis, chiffre d'affaires, ticket moyen", "Classement en direct, au nom de chaque serveur", "Sur l'Accueil, la prise de commande et l'écran cuisine", "Trophée, confettis et récompense quand c'est gagné"]),
+    "pourboires": dict(img="pourboires", t="Pourboires de l'équipe",
+        p="Les pourboires de l'addition, du menu QR et de la caisse arrivent dans une seule cagnotte du mois{0}; le bocal et le terminal se notent en deux taps. La répartition, c'est l'équipe qui la décide{0}: 60{0}% salle, 40{0}% cuisine, à parts égales ou selon les heures, et chacun voit sa part.".format(N),
+        ul=["Addition, menu QR, SumUp et Square, espèces", "Salle, cuisine, bar{0}: les pourcentages que vous voulez".format(N), "Parts égales ou selon les heures pointées", "Mois clôturé, versé, export pour la paie"]),
     "frais": dict(img="frais", t="Notes de frais pour vos clients",
         p="Un client demande une note pour sa société{0}? «{0}4 repas complets × 37,25{0}€{0}» ou le détail de la table, la TVA ventilée à 10{0}% et 20{0}%, numérotée. Imprimée ou envoyée par e-mail.".format(N),
         ul=["Depuis l'addition d'une table ou à la main", "TVA ventilée par taux", "Numérotation qui se suit, annulation tracée", "PDF imprimé ou envoyé par e-mail"]),
@@ -117,7 +120,7 @@ GROUPS = [
     ("g-gestion", "s", "Au bureau", "Caisse, stock et chiffres", "Savoir ce que vous avez, ce que vous vendez, ce que vous gagnez.", False,
         [("caisse", SECOND, None), ("livraison", SECOND, IMPORT), ("tickets", SECOND, None), ("frais", SECOND, None), ("stock", SECOND, None), ("dashboard", SECOND, None), ("finance", CHEF, None), ("banque", CHEF, IMPORT), ("sites", CHEF, None)]),
     ("g-equipe", "v", "L'équipe", "Équipe, pointeuse et planning", "Chacun son compte, ses horaires, son planning.", True,
-        [("equipe", None, None), ("consignes", None, None), ("defis", SECOND, None), ("passation", None, None), ("journal", None, None), ("acces", None, None), ("pointeuse", CHEF, None), ("planning", CHEF, None), ("staff", CHEF, None)]),
+        [("equipe", None, None), ("consignes", None, None), ("defis", SECOND, None), ("pourboires", SECOND, None), ("passation", None, None), ("journal", None, None), ("acces", None, None), ("pointeuse", CHEF, None), ("planning", CHEF, None), ("staff", CHEF, None)]),
 ]
 
 PLUS = '<svg class="fi-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>'

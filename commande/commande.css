@@ -251,6 +251,23 @@ button.qm-mc:active{transform:translateY(3px)}
 .qm-tot{display:flex;align-items:baseline;justify-content:space-between;padding:14px 4px 0;border-top:1.5px dashed var(--rim-2)}
 .qm-tot span{font-weight:700;color:var(--ink-2)}
 .qm-tot b{font-size:25px}
+.qm-tot.sub{padding:4px 4px 0;border-top:0}
+.qm-tot.sub:first-of-type{padding-top:14px;border-top:1.5px dashed var(--rim-2)}
+.qm-tot.sub span{font-weight:600;color:var(--muted)}
+.qm-tot.sub b{font-size:15px;color:var(--ink-2)}
+.qm-tot.sub.tip b{color:var(--accent-ink)}
+.qm-tot.fin{padding-top:8px;border-top:0}
+/* pourboire (js/pourboires.js): 5, 10, 15 % with the online payment */
+.qm-tips{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.qm-tip{all:unset;box-sizing:border-box;cursor:pointer;min-height:60px;padding:8px 4px;border-radius:16px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;background:#fff;box-shadow:0 0 0 1.5px var(--rim-2) inset,0 3px 0 var(--edge-b);transition:transform .22s var(--spring),background .2s,color .2s;text-align:center}
+.qm-tip:active{transform:translateY(3px)}
+.qm-tip b{font-family:var(--d);font-size:16px;font-weight:750;line-height:1.1}
+.qm-tip:first-child b{font-family:var(--f);font-size:13px;font-weight:700}
+.qm-tip em{font-style:normal;font-size:12px;font-weight:700;color:var(--muted)}
+.qm-tip.on{background:var(--accent);color:#fff;box-shadow:0 3px 0 var(--accent-edge)}
+.qm-tip.on em{color:#D9D2FF}
+.qm-tipn{margin:10px 0 0;font-size:13px;font-weight:600;color:var(--accent-ink);animation:qmRise .4s var(--soft) both}
+.qm-tk-l.tip{border-top:1px dashed var(--rim-2);padding-top:6px;margin-top:4px;color:var(--accent-ink)}
 
 /* ── order status ── */
 .qm-order{align-items:center;text-align:center;padding-top:28px}

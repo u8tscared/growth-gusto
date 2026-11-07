@@ -48,6 +48,7 @@ window.GG_DEMO = {
       ["demo-lucas", "Lucas Petit", "equipe", "#0B9B6A", "Commis", "CDD", 35, 12.4, "cuisine"],
       ["demo-sarah", "Sarah Lemoine", "equipe", "#1F7AE0", "Serveur", "CDI", 35, 12.6, "salle"],
       ["demo-hugo", "Hugo Martin", "equipe", "#0E8C9E", "Plongeur", "Extra", 20, 12.1, "plonge"],
+      ["demo-lea", "Léa Fontaine", "equipe", "#D9468F", "Serveur", "Extra", 15, 12.1, "salle"],
     ];
     /* each person's access, from their job (js/perms.js presets): « Voir comme » (js/espaces.js) shows the app exactly as they see it */
     const demoPerms = (mid, poste) => { if (mid === "demo-camille" || typeof pmPreset !== "function") return null; const p = pmPreset(mid === "demo-thomas" || mid === "demo-ines" ? "second" : poste); if (mid === "demo-thomas") p.caps.seeMoney = true, p.modules.dashboard = true, p.modules.finance = true; return p; };
@@ -235,8 +236,8 @@ window.GG_DEMO = {
     put("moves", { productId: "p-creme", name: "Crème liquide 35 %", qty: -0.5, unit: "L", kind: "perte", at: now - 2 * 864e5, uid: "demo-thomas", by: "Thomas Girard" });
 
     /* ── planning (this week and next) + time clock (last 14 days) ── */
-    const PLAN = { "demo-thomas": [["09:30", "15:00"], ["18:00", "23:00"]], "demo-ines": [["09:30", "15:00"], ["18:00", "23:00"]], "demo-lucas": [["10:00", "15:00"], ["18:30", "23:00"]], "demo-sarah": [["11:30", "15:00"], ["18:30", "23:30"]], "demo-hugo": [["19:00", "23:30"]], "demo-camille": [["10:00", "16:00"]] };
-    const OFF = { "demo-thomas": [1, 2], "demo-ines": [1, 0], "demo-lucas": [1, 3], "demo-sarah": [1, 4], "demo-hugo": [1, 2, 3], "demo-camille": [1, 0] };
+    const PLAN = { "demo-thomas": [["09:30", "15:00"], ["18:00", "23:00"]], "demo-ines": [["09:30", "15:00"], ["18:00", "23:00"]], "demo-lucas": [["10:00", "15:00"], ["18:30", "23:00"]], "demo-sarah": [["11:30", "15:00"], ["18:30", "23:30"]], "demo-hugo": [["19:00", "23:30"]], "demo-camille": [["10:00", "16:00"]], "demo-lea": [["18:30", "23:30"]] };
+    const OFF = { "demo-thomas": [1, 2], "demo-ines": [1, 0], "demo-lucas": [1, 3], "demo-sarah": [1, 4], "demo-hugo": [1, 2, 3], "demo-camille": [1, 0], "demo-lea": [1, 2, 3, 4] };
     const mon = (() => { const d = parseDay(today); const w = (d.getDay() + 6) % 7; return addDays(today, -w); })();
     for (let i = -14; i < 14; i++) {
       const day = addDays(mon, i), wd = parseDay(day).getDay();

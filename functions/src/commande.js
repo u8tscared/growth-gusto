@@ -2,7 +2,7 @@
  *
  * The public page commande/?r=<rid>&t=<table> reads restos/{rid}/public/menu (written by the app, js/commande.js) and calls:
  *   orderApi (callable, no account for the client ops)
- *     op "create"   { rid, mode:"table"|"emporter", table?, items:[{id,q,note?}], name?, phone?, slot?, note?, pay:"stripe"|"place", back, rq? }
+ *     op "create"   { rid, mode:"table"|"emporter", table?, items:[{id,q,note?}], name?, phone?, slot?, note?, pay:"stripe"|"place", tip?, back, rq? }
  *                   rq: the client's request id (js/reseau-client.js): the same rq sent again answers with the same order (orderReqs/{rid}_{rq}).
  *                   → checks every dish and price against public/menu (the client's numbers are never trusted), numbers the order of the day,
  *                   writes restos/{rid}/clientOrders/{id} and its private key orderKeys/{rid_id}, and for « payer maintenant » opens a
@@ -23,7 +23,8 @@
  *   listed in qrAccts/{acct} (created here) and sessions with metadata.kind === "order" are ever touched; everything else is ignored.
  *
  * Data (server-written; no client can read the private ones: firestore.rules)
- *   restos/{rid}/clientOrders/{id}  { n, day, at, mode, table, slot, name, phone, note, items:[{id,name,price,q,note}], total, pay, paid, paidAt,
+ *   restos/{rid}/tips/qr_{id}       { at, day, amount, method:"ligne", src:"qr", table, orderId } the client's tip, written when the payment is confirmed
+ *   restos/{rid}/clientOrders/{id}  { n, day, at, mode, table, slot, name, phone, note, items:[{id,name,price,q,note}], total, tip?, pay, paid, paidAt,
  *                                     status: apayer|nouvelle|prep|prete|servie|annulee|abandonnee, sid, pi, refunded, src:"qr", by? }
  *   restos/{rid}/qrPay/link         { acct, status: "pending"|"active"|"restricted", charges, payouts, name, live, at }   (members read)
  *   orderKeys/{rid}_{id}            { k, rid, oid, at }            the client's private status link
@@ -61,7 +62,7 @@ const okId = (x) => typeof x === "string" && /^[\w-]{1,64}$/.test(x);
 
 /* what the client sees of an order (no phone, no Stripe ids) */
 const pubView = (id, o) => ({ id, n: o.n, mode: o.mode, table: o.table || "", slot: o.slot || "", name: o.name || "", items: (o.items || []).map((x) => ({ name: x.name, price: x.price, q: x.q, note: x.note || "" })),
-  total: o.total, pay: o.pay, paid: !!o.paid, status: o.status, at: o.at, readyAt: o.readyAt || null, payUrl: o.status === "apayer" && o.payUrl && o.payExp > Date.now() ? o.payUrl : "" });
+  total: o.total, tip: o.tip || 0, pay: o.pay, paid: !!o.paid, status: o.status, at: o.at, readyAt: o.readyAt || null, payUrl: o.status === "apayer" && o.payUrl && o.payExp > Date.now() ? o.payUrl : "" });
 
 async function linkOf(rid) { const s = await db.doc(`restos/${rid}/qrPay/link`).get(); return s.exists ? s.data() : null; }
 const canCharge = (l) => !!(l && l.acct && l.charges);
@@ -103,6 +104,9 @@ async function create(d) {
   if (tp === "apres") pay = "place";
   if (pay === "stripe") { link = await linkOf(rid); if (!c.payOnline || !canCharge(link)) throw err("failed-precondition", "paiement"); if (total < 0.5) pay = "place"; }
   if (pay === "place" && total >= 0.5 && (tp === "avant" || (!tp && c.payPlace === false && c.payOnline))) throw err("failed-precondition", "paiement_oblig");
+  /* pourboire for the team (js/pourboires.js): only with an online payment, when the restaurant proposes it; capped (30 % or 20 €) */
+  let tip = 0;
+  if (pay === "stripe" && c.tips !== false && +d.tip > 0) { tip = r2(Math.floor(+d.tip * 100) / 100); if (!(tip >= 0.5) || tip > Math.max(20, r2(total * 0.3))) throw err("invalid-argument", "pourboire"); }
 
   /* the same request sent again (the client's network dropped before our answer reached it: js/reseau-client.js tries again with the
      same `rq`): answer with the order already created, never a second one */
@@ -124,7 +128,7 @@ async function create(d) {
     const cnt = q.min === minute ? (q.cnt || 0) + 1 : 1; if (cnt > PER_MIN) throw err("resource-exhausted", "trop");
     const nn = q.day === now.day ? (q.n || 0) + 1 : 1;
     t.set(seqRef, { day: now.day, n: nn, min: minute, cnt });
-    const o = { n: nn, day: now.day, at, mode, table, slot, name, phone, note, items, total, pay, paid: false, status: pay === "stripe" ? "apayer" : "nouvelle", src: "qr" };
+    const o = { n: nn, day: now.day, at, mode, table, slot, name, phone, note, items, total, pay, paid: false, status: pay === "stripe" ? "apayer" : "nouvelle", src: "qr", ...(tip ? { tip } : {}) };
     t.set(ref, o); t.set(db.doc(`orderKeys/${rid}_${ref.id}`), { k, rid, oid: ref.id, at });
     if (rqRef) t.set(rqRef, { oid: ref.id, k, rid, at });
     return nn;
@@ -141,7 +145,8 @@ async function create(d) {
   try {
     const ses = await S._stripeCall("/checkout/sessions", { method: "POST", account: link.acct, idem: "gg-order-" + ref.id, body: {
       mode: "payment", locale: "fr", expires_at: exp, client_reference_id: ref.id,
-      line_items: items.map((x) => ({ quantity: x.q, price_data: { currency: "eur", unit_amount: Math.round(x.price * 100), product_data: { name: x.name.slice(0, 120) } } })),
+      line_items: [...items.map((x) => ({ quantity: x.q, price_data: { currency: "eur", unit_amount: Math.round(x.price * 100), product_data: { name: x.name.slice(0, 120) } } })),
+        ...(tip ? [{ quantity: 1, price_data: { currency: "eur", unit_amount: Math.round(tip * 100), product_data: { name: "Pourboire pour l'équipe" } } }] : [])],
       metadata: { kind: "order", rid, oid: ref.id, app: "growth-gusto" },
       payment_intent_data: { description: `Commande n° ${n} · ${mode === "table" ? "table " + table : "à emporter " + slot}`, metadata: { kind: "order", rid, oid: ref.id, app: "growth-gusto" },
         ...(FEE_BPS ? { application_fee_amount: Math.floor((cents * FEE_BPS) / 10000) } : {}) },
@@ -166,7 +171,11 @@ async function settle(rid, oid, ses) {
   await db.runTransaction(async (t) => {
     const s = await t.get(ref); if (!s.exists) return; const o = s.data();
     if (o.sid && ses.id && o.sid !== ses.id) return;
-    if (paid && !o.paid) t.update(ref, { paid: true, paidAt: Date.now(), pi: typeof ses.payment_intent === "string" ? ses.payment_intent : (ses.payment_intent && ses.payment_intent.id) || null, status: o.status === "apayer" || o.status === "abandonnee" ? "nouvelle" : o.status, payUrl: null });
+    if (paid && !o.paid) {
+      t.update(ref, { paid: true, paidAt: Date.now(), pi: typeof ses.payment_intent === "string" ? ses.payment_intent : (ses.payment_intent && ses.payment_intent.id) || null, status: o.status === "apayer" || o.status === "abandonnee" ? "nouvelle" : o.status, payUrl: null });
+      /* the tip joins the team's pot (js/pourboires.js) */
+      if (+o.tip > 0) t.set(db.doc(`restos/${rid}/tips/qr_${oid}`), { at: Date.now(), day: parisNow().day, amount: r2(o.tip), method: "ligne", src: "qr", table: o.table || "", orderId: oid, n: o.n || null, service: parisNow().min < 16 * 60 ? "midi" : "soir", uid: "server", by: "Menu QR" });
+    }
     else if (dead && !o.paid && o.status === "apayer") t.update(ref, { status: "abandonnee", payUrl: null });
   });
   if (paid || dead) await db.doc(`payPending/${rid}_${oid}`).delete().catch(() => {});
@@ -371,6 +380,7 @@ const orderApi = onCall({ region: REGION, cors: true, secrets: S.STRIPE_SECRETS,
       let refunded = 0;
       if (o.paid && o.pi && o.acct && !o.refunded) { const rf = await S._stripeCall("/refunds", { method: "POST", account: o.acct, idem: "gg-refund-" + oid, body: { payment_intent: o.pi, metadata: { kind: "order", rid, oid, app: "growth-gusto" } } }); refunded = r2((rf.amount || 0) / 100); }
       await ref.update({ status: "annulee", cancelledAt: Date.now(), cancelledBy: req.auth.uid, ...(refunded ? { refunded, refundedAt: Date.now() } : {}) });
+      if (refunded) await db.doc(`restos/${rid}/tips/qr_${oid}`).delete().catch(() => {}); /* the whole payment was refunded, its tip with it */
       return { ok: true, refunded };
     }
     throw err("invalid-argument", "op");

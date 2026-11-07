@@ -13,6 +13,7 @@
  *
  * Writes (the app reads them, see js/caisse.js):
  *   restos/{rid}/sales/{provider}_{extId}  { provider, source:"api", extId, at, day (Europe/Paris), total TTC € (tips excluded), ht?, count:1, items:[{name, qty, amount}], payment?, status }
+ *   restos/{rid}/tips/pos_{provider}_{extId} { at, day, amount, method:"cb", src:"caisse", provider } the tip of a sale (SumUp, Square), js/pourboires.js
  *   restos/{rid}/caisse/{provider}         { provider, mode:"api", status:"connected"|"error"|"off", merchant, connectedAt, lastSync, lastError, active }
  * The app turns each day of sales into a Z ticket (tickets/pos_{provider}_{day}) and deducts the stock: nothing else to do here.
  *
@@ -132,7 +133,7 @@ P.sumup = {
           qty: first(p.quantity) || 1,
           amount: r2(first(p.total_with_vat, p.price_with_vat != null ? p.price_with_vat * (first(p.quantity) || 1) : null, p.total_price, (first(p.price) || 0) * (first(p.quantity) || 1)) || 0),
         }));
-        out.push({ extId: it.transaction_code || it.id, at, total, ht: vat != null ? r2(total - vat) : null, items, payment: it.payment_type || "", status: it.status === "REFUNDED" ? "refunded" : "successful" });
+        out.push({ extId: it.transaction_code || it.id, at, total, tip: r2(tip), ht: vat != null ? r2(total - vat) : null, items, payment: it.payment_type || "", status: it.status === "REFUNDED" ? "refunded" : "successful" });
       }
       const next = ((r && r.links) || []).find((l) => l.rel === "next");
       url = next && next.href ? (next.href.startsWith("http") ? next.href : "https://api.sumup.com/v0.1/me/transactions/history" + (next.href.startsWith("?") ? "" : "?") + next.href) : null;
@@ -164,7 +165,7 @@ P.square = {
         const cents = (m) => (m && n(m.amount) != null ? n(m.amount) / 100 : null);
         const total = r2((cents(o.total_money) || 0) - (cents(o.total_tip_money) || 0)); const tax = cents(o.total_tax_money);
         const items = (o.line_items || []).map((l) => ({ name: [l.name, l.variation_name && l.variation_name !== "Regular" ? l.variation_name : ""].filter(Boolean).join(" ").trim() || "Article", qty: n(l.quantity) || 1, amount: r2(cents(l.total_money) || 0) }));
-        out.push({ extId: o.id, at, total, ht: tax != null ? r2(total - tax) : null, items, payment: "", status: "successful" });
+        out.push({ extId: o.id, at, total, tip: r2(cents(o.total_tip_money) || 0), ht: tax != null ? r2(total - tax) : null, items, payment: "", status: "successful" });
       }
       c = r && r.cursor; if (!c) break;
     }
@@ -255,11 +256,16 @@ async function syncOne(rid, prov) {
     try { r = await p.fetchSales(T, since); }
     catch (e) { if (e.code !== "unauthorized" || p.key || !T.refresh) throw e; T = await p.refresh(T); await ref.set({ enc: seal(T) }, { merge: true }); r = await p.fetchSales(T, since); }
     let added = 0;
-    for (let i = 0; i < r.sales.length; i += 400) {
+    for (let i = 0; i < r.sales.length; i += 200) { /* ≤ 400 writes per batch: the sale, and its tip when there is one */
       const b = db.batch();
-      r.sales.slice(i, i + 400).forEach((s) => {
+      r.sales.slice(i, i + 200).forEach((s) => {
         if (s.at > (D.cursor || 0)) added++;
-        b.set(db.doc(`restos/${rid}/sales/${prov}_${String(s.extId).replace(/[\/#?\s]+/g, "_").slice(0, 120)}`), { provider: prov, source: "api", extId: String(s.extId), at: s.at, day: dayOf(s.at), total: s.total, ht: s.ht ?? null, count: 1, items: s.items.slice(0, 200), payment: s.payment || "", status: s.status || "successful", syncedAt: Date.now() });
+        const key = `${prov}_${String(s.extId).replace(/[\/#?\s]+/g, "_").slice(0, 120)}`;
+        b.set(db.doc(`restos/${rid}/sales/${key}`), { provider: prov, source: "api", extId: String(s.extId), at: s.at, day: dayOf(s.at), total: s.total, ht: s.ht ?? null, count: 1, items: s.items.slice(0, 200), payment: s.payment || "", status: s.status || "successful", syncedAt: Date.now() });
+        /* the tip left on the card terminal joins the team's pot (js/pourboires.js); a refunded sale takes it back */
+        const tipRef = db.doc(`restos/${rid}/tips/pos_${key}`);
+        if (s.tip > 0 && s.status !== "refunded") b.set(tipRef, { at: s.at, day: dayOf(s.at), amount: r2(s.tip), method: "cb", src: "caisse", provider: prov, extId: String(s.extId), uid: "server", by: prov });
+        else if (s.status === "refunded") b.delete(tipRef);
       });
       await b.commit();
     }
