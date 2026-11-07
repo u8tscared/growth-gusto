@@ -310,7 +310,7 @@ const PC_FAMILLES = [
   ["finance", "Finances & comptabilité", "Résultat du mois, banque, Pennylane", "euro", ["finance", "pennylane"], "Gestion"],
   ["consignes", "Consignes & discussion", "Ce que l'équipe doit savoir aujourd'hui", "csMega", ["consignes", "defis"], "Équipe"],
   ["pointeuse", "Pointeuse", "Heures justes, en un geste", "clock", ["pointeuse"], "Équipe"],
-  ["planning", "Planning & demandes", "Horaires, congés, échanges, Mon espace", "cal", ["planning", "esDemandes", "moiPlanning", "moiHeures", "moiActivite", "moiDemandes"], "Équipe"],
+  ["planning", "Planning & demandes", "Horaires, congés, échanges, Mon espace", "cal", ["planning", "planif", "esDemandes", "moiPlanning", "moiHeures", "moiActivite", "moiDemandes"], "Équipe"],
   ["salaires", "Employés & salaires", "Fiches, contrats, coût des heures", "users", ["equipe"], "Équipe"],
   ["alertes", "Alertes", "Frigo trop chaud, relevé oublié, DLC…", "alBell", ["alertes"], "Restaurant"],
   ["sites", "Plusieurs restaurants", "Comparer, transférer du stock", "store", ["sites"], "Restaurant"],
