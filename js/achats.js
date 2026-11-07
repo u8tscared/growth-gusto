@@ -510,7 +510,7 @@ Object.assign(ACT, {
     if (pl.draft) DB.del("orders", "br-" + pl.key).catch(() => {});
     logEvent("order", `a commandé chez ${pl.name} (${pl.on.length} produit${pl.on.length > 1 ? "s" : ""}${acMoney() ? `, ${acEur(pl.total, 0)} HT` : ""})`, { ref: oid });
     S.ui.acNote = null; closeSheet(true); SFX.done(); buzz([8, 40, 12]); burst();
-    toast(ch === "copie" ? "Texte copié, commande notée" : "Commande envoyée"); setTimeout(() => go("achats", {}, { replace: true }), 500);
+    toast(ch === "copie" ? "Texte copié, commande notée" : "Commande envoyée"); setTimeout(() => { if (S.route === "achat") go("achats", {}, { replace: true }); else refresh(true); }, 500);
   },
   acOrd: (a, id) => { const o = acOrders().find((x) => x.id === id); if (!o) return; SFX.tap(); openSheet(acOrderSheet(o)); },
   acRecv: (a, id) => {
