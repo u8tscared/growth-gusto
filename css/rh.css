@@ -631,3 +631,28 @@ html.rh-kiosk .side{display:none!important}
   .rh-hr{grid-template-columns:minmax(150px,220px) auto minmax(0,1fr);padding:10px 8px}
   .rh-hr-c{grid-column:auto;padding-left:0;justify-content:flex-end}
 }
+
+/* ticket d'heures au départ + relevé PDF */
+.rh-done.ask{cursor:default}
+.rh-done-c .rh-done-x{font-family:var(--d);font-size:22px;font-weight:760;letter-spacing:-.03em;color:var(--ink);margin-top:2px}
+.rh-done-q{display:flex;flex-direction:column;align-items:center;gap:12px;margin-top:18px;padding:16px 18px 18px;border-radius:24px;background:var(--paper);border:1.5px solid var(--rim);box-shadow:var(--sh);width:min(100%,380px);opacity:0;transform:translateY(14px);transition:opacity .35s .35s var(--ease),transform .55s .35s var(--spring)}
+.rh-done.on .rh-done-q{opacity:1;transform:none}
+.rh-done-q>span{font-size:16px;font-weight:700;color:var(--ink)}
+.rh-done-b{display:grid;grid-template-columns:1fr 1.7fr;gap:10px;width:100%}
+.rh-done-b .btn{min-height:52px;justify-content:center;white-space:nowrap;padding-left:12px;padding-right:12px}
+.rh-act-x{display:flex;flex-wrap:wrap;justify-content:center;gap:8px}
+.rh-tss .rh-act-x{margin-top:-4px}
+.rh-tkt.on .ico{color:var(--accent)}
+.rh-pdf{display:flex;flex-direction:column;gap:14px}
+.rh-pdf-ic{width:52px;height:52px;border-radius:18px;display:grid;place-items:center;background:var(--tint);color:var(--accent-ink);flex:none}
+.rh-pdf-ic .ico{width:24px;height:24px}
+.rh-pdf-l{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.rh-pdf-o{display:flex;align-items:center;gap:10px;text-align:left;padding:13px 12px;border-radius:18px;background:var(--paper);border:1.5px solid var(--rim);box-shadow:0 3px 0 var(--rim);color:var(--ink);font:inherit;cursor:pointer;min-height:64px;transition:transform .25s var(--spring),box-shadow .2s}
+.rh-pdf-o:active{transform:translateY(3px);box-shadow:0 0 0 transparent}
+.rh-pdf-o .ic{width:34px;height:34px;border-radius:12px;display:grid;place-items:center;background:var(--tint);color:var(--accent-ink);flex:none}
+.rh-pdf-o .ic .ico{width:17px;height:17px}
+.rh-pdf-o .tx{display:flex;flex-direction:column;min-width:0;flex:1}.rh-pdf-o b{font-size:14.5px;font-weight:750}
+.rh-pdf-o em{font-style:normal;font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rh-pdf-o>.ico{width:16px;height:16px;color:var(--faint);flex:none}
+.rh-pdf .note{margin:0}
+@media (max-width:560px){.rh-pdf-l{grid-template-columns:1fr;gap:8px}.rh-pdf-o{min-height:56px;padding:10px 12px}}
