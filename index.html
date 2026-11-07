@@ -108,7 +108,10 @@ location.replace("https://app.growthgusto.fr"+p+location.search+location.hash)}c
 <link rel="stylesheet" href="css/verrou.css">
 <link rel="stylesheet" href="css/horsligne.css">
 <link rel="stylesheet" href="css/defis.css">
-<style>html,body{margin:0;background:#FBF6EC}body{font:14px "Instrument Sans",system-ui}[hidden]{display:none!important}</style>
+<link rel="stylesheet" href="css/sombre.css">
+<style>html,body{margin:0;background:#FBF6EC}html[data-theme=dark],html[data-theme=dark] body{background:#0E0A19}body{font:14px "Instrument Sans",system-ui}[hidden]{display:none!important}</style>
+<script>/* mode sombre (js/theme.js) : posé avant le premier affichage, pour éviter un éclair clair */
+(function(){var d=document.documentElement,t="light";try{var p=localStorage.getItem("gg-theme")||"auto",h=new Date().getHours();if(p==="dark"||(p==="auto"&&matchMedia("(prefers-color-scheme: dark)").matches)||(p==="soir"&&(h>=19||h<7)))t="dark";}catch(e){}d.dataset.theme=t;if(t==="dark"){var m=document.querySelector('meta[name="theme-color"]');m&&m.setAttribute("content","#120E20")}})();</script>
 <script>try{if(matchMedia("(display-mode: standalone)").matches||navigator.standalone)document.documentElement.classList.add("standalone")}catch(e){}</script>
 </head>
 <body>
@@ -190,6 +193,8 @@ if(!ok){window.GG_OLD=1;document.addEventListener("DOMContentLoaded",function(){
 <script src="js/verrou.js"></script>
 <script src="js/horsligne.js"></script>
 <script src="js/defis.js"></script>
+<script src="js/sombre-map.js"></script>
+<script src="js/theme.js"></script>
 <script src="js/main.js"></script>
 </body>
 </html>
