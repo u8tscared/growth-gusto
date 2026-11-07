@@ -1,0 +1,141 @@
+/* ═══════════════════════ Growth Gusto · mode sombre « Aurore de nuit » ═══════════════════════
+   Pas une inversion : la même maison la nuit. Le papier crème devient une prune profonde, l'encre devient crème,
+   le violet s'allume, le safran reste le soleil, et l'aurore violette revient doucement derrière l'app.
+   Actif quand html[data-theme=dark] (js/theme.js : auto, clair, sombre, le soir ; écrans de service sombres par défaut).
+   Chargé en dernier. Les couleurs écrites en dur dans les autres feuilles sont traduites par js/theme.js (thPatch) ;
+   ici : les jetons de couleur et les retouches qui demandent un œil humain. */
+
+html:root[data-theme=dark]{
+  color-scheme:dark;
+  --k:236 228 214; --sk:0 0 0; --w:23 20 37; --hl:255 255 255; --hla:.07;
+  --bg:#0E0A19; --bg-2:#131020; --ink:#F5EDE1; --ink-2:#D6D0E2; --muted:#AFA9C2; --faint:#9A94AE;
+  --paper:#18142A; --cream-2:#221D33; --cream-3:#29233C; --rim:#2E2843; --rim-2:#3D3654; --edge-b:#07050F;
+  --glass:#18142A; --glass-2:#221D33; --glass-hi:#2A2440; --edge:#2E2843; --line:rgba(236,228,214,.085);
+  --solid:#1E1930; --raised:#2A2440; --pastel:18%; --well:#221D33; --ink-bg:#F5EDE1; --on-ink:#120E20;
+  --accent:#7C5CFF; --accent-2:#9B82FF; --accent-ink:#BDB0FF; --accent-solid:#6B44FF; --accent-edge:#2E1294; --wall:#3B17B0; --ice:#8CBAF7; --on:#FFFFFF;
+  --tint:#2A2350; --tint-2:#272047; --lilac:#3A3166;
+  --saffron:#F7B83D; --saffron-edge:#B07A12; --saffron-tint:#33240C; --saffron-ink:#F5CB70;
+  --tomato:#F56E4E; --tomato-edge:#8E2A16; --tomato-tint:#3A1A14; --mint:#7FE8B2; --sky:#8CBAF7; --sky-tint:#172A41;
+  --acc-grad:#7C5CFF;
+  --ok:#52DB9C; --warn:#F9B64F; --bad:#FD7466; --warn-ink:#F9C878;
+  --tint-ok:#0E2E21; --tint-warn:#33240C; --tint-bad:#3A1A14; --tint-acc:#2A2350;
+  --sh:0 2px 0 #07050F,0 16px 30px -18px rgba(0,0,0,.75);
+  --sh-lg:0 2px 0 #07050F,0 30px 60px -24px rgba(0,0,0,.85);
+  --sh-acc:0 4px 0 #2E1294;
+  --toast-bg:rgba(34,29,51,.97);
+  --duo:.3;
+  --wallbg:linear-gradient(rgba(255,255,255,.06) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.06) 1px,transparent 1px);
+  --aur1:#3A1FB0; --aur2:#123A72; --aur3:#4B1A8F; --aur4:#0B4A63; --aur-o:.42;
+  /* dark ink used as a fill (buttons, pills) → a raised plum key (js/theme.js swaps var(--ink) in fills for this) */
+  --th-inkfill:#352E4D;
+}
+html:root:not([data-theme=dark]){--th-inkfill:var(--ink)}
+html[data-theme=dark],html[data-theme=dark] body{background:var(--bg)}
+html[data-theme=dark] ::selection{background:#4A3A99;color:#fff}
+
+/* the aurora of the brand comes back at night, soft, behind everything */
+html[data-theme=dark] .aurora{display:block!important}
+html[data-theme=dark] .grain{display:block!important;opacity:.04;mix-blend-mode:overlay}
+html[data-theme=dark] .statusveil{background:linear-gradient(180deg,rgba(14,10,25,.85),rgba(14,10,25,0))}
+html[data-theme=dark] img{filter:none}
+
+/* chrome */
+html[data-theme=dark] .tabbar{background:rgba(24,20,42,.92);border-color:#2E2843;box-shadow:0 4px 0 #07050F,0 24px 40px -18px rgba(0,0,0,.9);-webkit-backdrop-filter:blur(18px) saturate(1.4);backdrop-filter:blur(18px) saturate(1.4)}
+html[data-theme=dark] .sheet{background:#1A162C;border-color:#302A46;box-shadow:0 -14px 60px -18px rgba(0,0,0,.9)}
+html[data-theme=dark] .sheet .grab i{background:rgba(236,228,214,.22)}
+html[data-theme=dark] .scrim{background:rgba(5,3,12,.62)}
+@media (min-width:960px){html[data-theme=dark] .side{background:#130F22;border-right-color:#231E35}}
+html[data-theme=dark] .btn{box-shadow:0 4px 0 #07050F}
+html[data-theme=dark] .btn.acc{background:var(--accent);box-shadow:0 4px 0 var(--accent-edge),0 10px 26px -12px rgba(124,92,255,.75)}
+@media (hover:hover){html[data-theme=dark] .btn.acc:hover{background:#8A6DFF}}
+html[data-theme=dark] .btn.soft,html[data-theme=dark] .btn.ghost{color:var(--ink)}
+html[data-theme=dark] .toast{background:var(--toast-bg);color:var(--ink);box-shadow:0 0 0 1px #302A46 inset,0 18px 40px -14px rgba(0,0,0,.9)}
+html[data-theme=dark] .wall{background-color:var(--wall)}
+html[data-theme=dark] .boot{background:radial-gradient(52vmax 44vmax at 4% 10%,rgba(58,31,176,.55),rgba(58,31,176,0) 70%),radial-gradient(46vmax 40vmax at 104% 36%,rgba(18,58,114,.5),rgba(18,58,114,0) 70%),var(--bg)}
+html[data-theme=dark] input::placeholder,html[data-theme=dark] textarea::placeholder{color:#7F7994}
+html[data-theme=dark] .input,html[data-theme=dark] input.input,html[data-theme=dark] select.input,html[data-theme=dark] textarea.input{color:var(--ink)}
+html[data-theme=dark] .cc-sw{background:#3D3654}
+html[data-theme=dark] .cc-sw.on{background:var(--accent)}
+
+/* inline colours written by templates (style="…"): the common ink and paper ones follow the night */
+html[data-theme=dark] :is([style*="color:#1B1530"],[style*="color: #1B1530"],[style*="color:#4A4560"],[style*="color:#615B74"],[style*="color:#6E6880"]):not([style*="background"]):not(.th-keep *){color:var(--ink-2)!important}
+html[data-theme=dark] :is([style*="color:#1B1530"],[style*="color: #1B1530"]):not([style*="background"]):not(.th-keep *){color:var(--ink)!important}
+html[data-theme=dark] :is([style*="background:#fff;"],[style*="background:#fff\""],[style*="background:#FFF;"],[style*="background:#FFFFFF"],[style*="background:#ffffff"],[style*="background:#FFFDF8"],[style*="background:#FBF6EC"]):not(.th-keep *){background:var(--paper)!important;color:var(--ink)}
+html[data-theme=dark] :is([style*="color:#3A10D8"],[style*="color:#5B2BFF"]):not([style*="background"]):not(.th-keep *){color:var(--accent-ink)!important}
+
+/* things that are paper in real life stay paper: label previews, printed documents, QR codes, receipts */
+html[data-theme=dark] .th-keep{color-scheme:light}
+
+/* ── switching: the new look spreads from the finger (View Transitions), or a quick cross-fade ── */
+::view-transition-old(root),::view-transition-new(root){animation:none;mix-blend-mode:normal}
+html.th-vt::view-transition-new(root){animation:th-reveal .7s cubic-bezier(.22,1,.36,1) both}
+@keyframes th-reveal{from{clip-path:circle(0px at var(--thx,50%) var(--thy,50%))}to{clip-path:circle(var(--thr,150vmax) at var(--thx,50%) var(--thy,50%))}}
+html.th-soft body,html.th-soft .view,html.th-soft .glass,html.th-soft .tabbar,html.th-soft .side,html.th-soft .btn,html.th-soft .li,html.th-soft .top{transition:background-color .5s ease,color .5s ease,border-color .5s ease,box-shadow .5s ease!important}
+
+/* ── Réglages › Apparence ── */
+.th-sheet .th-hd{display:flex;gap:14px;align-items:center;margin:2px 2px 16px}
+.th-sheet .th-hd .ic{width:48px;height:48px;border-radius:16px;flex:none}
+.th-sheet .th-hd .sub{margin:2px 0 0}
+.th-opts{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px}
+@media (min-width:640px){.th-opts{grid-template-columns:repeat(4,1fr)}}
+.th-opt{all:unset;box-sizing:border-box;cursor:pointer;display:flex;flex-direction:column;gap:2px;padding:10px 10px 12px;border-radius:20px;background:var(--paper);border:1.5px solid var(--rim);box-shadow:0 3px 0 var(--cream-3);transition:transform .3s var(--spring),border-color .2s,box-shadow .3s var(--spring)}
+.th-opt:active{transform:translateY(2px) scale(.98)}
+.th-opt b{font-family:var(--d);font-size:16px;font-weight:740;letter-spacing:-.02em;margin-top:8px;color:var(--ink)}
+.th-opt em{font-style:normal;font-size:12.5px;color:var(--muted);line-height:1.25}
+.th-opt.on{border-color:var(--accent);box-shadow:0 3px 0 var(--accent-edge),0 0 0 3px color-mix(in srgb,var(--accent) 22%,transparent)}
+.th-opt:focus-visible{outline:2.5px solid var(--accent);outline-offset:2px}
+/* mini screens: left half light, right half dark; light, dark and evening show one look */
+.th-pv{position:relative;display:block;height:86px;border-radius:14px;overflow:hidden;border:1.5px solid var(--rim)}
+.th-pv-s{position:absolute;inset:0;padding:10px}
+.th-pv-l{background:#FBF6EC}.th-pv-n{background:radial-gradient(70px 50px at 90% 10%,rgba(90,60,230,.55),transparent 70%),#0E0A19}
+.th-pv-s i{display:block;border-radius:6px}
+.th-pv-s .a{height:8px;width:46%;margin-bottom:8px}
+.th-pv-s .b{height:22px;width:100%;margin-bottom:6px;border-radius:7px}
+.th-pv-s .c{height:6px;width:72%;margin-bottom:5px}
+.th-pv-s .d{position:absolute;right:10px;bottom:10px;width:30px;height:12px;border-radius:6px;background:#5B2BFF}
+.th-pv-l .a{background:#1B1530}.th-pv-l .b{background:#FFFDF8;border:1px solid #E9DFCD}.th-pv-l .c{background:#DCCFB8}
+.th-pv-n .a{background:#F5EDE1}.th-pv-n .b{background:#18142A;border:1px solid #2E2843}.th-pv-n .c{background:#3D3654}.th-pv-n .d{background:#7C5CFF;box-shadow:0 0 12px rgba(124,92,255,.8)}
+.th-pv-auto .th-pv-n{clip-path:polygon(62% 0,100% 0,100% 100%,38% 100%)}
+.th-pv-light .th-pv-n{display:none}
+.th-pv-dark .th-pv-l,.th-pv-soir .th-pv-l{display:none}
+.th-pv-soir .th-pv-n{background:radial-gradient(90px 60px at 100% 0,rgba(246,185,59,.22),transparent 70%),radial-gradient(70px 50px at 10% 100%,rgba(90,60,230,.5),transparent 70%),#0E0A19}
+.th-pv-moon{position:absolute;right:12px;top:9px;width:16px;height:16px;border-radius:50%;box-shadow:inset -5px -2px 0 0 #F7B83D;transform:rotate(-20deg)}
+.th-pv-st i{position:absolute;width:2px;height:2px;border-radius:50%;background:#F5EDE1;opacity:.8;animation:th-tw 2.8s ease-in-out infinite}
+.th-pv-st i:nth-child(1){right:40px;top:12px}.th-pv-st i:nth-child(2){right:58px;top:22px;animation-delay:.9s}.th-pv-st i:nth-child(3){right:30px;top:30px;animation-delay:1.7s}
+@keyframes th-tw{50%{opacity:.15}}
+.th-opt.on .th-pv{border-color:transparent}
+.th-svc{margin-bottom:14px}
+.th-svc .li{align-items:center}
+/* Plus: quick 3-way switch under the profile */
+.th-seg{display:flex;gap:6px;padding:5px;margin:2px 0 6px;border-radius:18px;background:var(--cream-2);border:1.5px solid var(--rim)}
+.th-seg button{all:unset;box-sizing:border-box;cursor:pointer;flex:1;display:flex;align-items:center;justify-content:center;gap:7px;height:40px;border-radius:13px;font-weight:700;font-size:14px;color:var(--muted);transition:background-color .25s,color .25s,transform .3s var(--spring),box-shadow .25s}
+.th-seg button .ico{width:19px;height:19px}
+.th-seg button.on{background:var(--paper);color:var(--ink);box-shadow:0 2px 0 var(--rim-2)}
+.th-seg button:active{transform:scale(.96)}
+.th-seg .th-seg-more{flex:0 0 40px}
+.th-seg button:focus-visible{outline:2.5px solid var(--accent);outline-offset:1px}
+html[data-theme=dark] .th-seg button.on{background:#2E2843;box-shadow:0 2px 0 #07050F}
+.th-topbtn .ico{transition:transform .5s var(--spring)}
+.th-topbtn:active .ico{transform:rotate(-40deg) scale(.9)}
+
+/* ── accueil, connexion, création de compte (css/auth.css, ses propres couleurs) ── */
+html[data-theme=dark] .au{
+  --c-canvas:#0E0A19; --c-paper:#18142A; --c-ink:#F5EDE1; --c-ink2:#D6D0E2; --c-ink3:#AFA9C2; --c-ph:#7F7994;
+  --c-line:#2E2843; --c-line2:#3D3654; --c-line3:#4A4363; --c-edge:#07050F; --c-well:#221D33; --c-hover:#262038; --c-sep:#2A2440;
+  --c-v:#7C5CFF; --c-v2:#BDB0FF; --c-vedge:#2E1294; --c-vhov:#8A6DFF; --c-vtint:#2A2350; --c-vtx:#BDB0FF; --c-vring:rgba(124,92,255,.3); --c-focus:#9B82FF;
+  --c-tomato:#F56E4E; --c-tomato2:#FD7466; --c-err-bg:#3A1A14; --c-err-line:#6B2C20;
+  --c-saffron:#F7B83D; --c-saffron-edge:#B07A12; --c-saffron-tint:#33240C; --c-saffron-ink:#F5CB70;
+  --c-ok:#52DB9C; --c-ok-bg:#0E2E21;
+  --c-shadow:rgba(0,0,0,.7);
+  color-scheme:dark;
+}
+
+/* ── retouches à la main ── */
+/* plan de salle : tables = surfaces sur le sol de nuit */
+html[data-theme=dark] .pl-tb,html[data-theme=dark] .pl-t.sl-draft .pl-tb{fill:#2A2440}
+html[data-theme=dark] .rel-pt.soir,html[data-theme=dark] .rel-pt.bad.soir,html[data-theme=dark] .rel-pt.pk.soir{fill:var(--paper)}
+html[data-theme=dark] .rel-pt.midi,html[data-theme=dark] .rel-pt.bad.midi,html[data-theme=dark] .rel-pt.pk.midi{stroke:var(--paper)}
+/* planning : les postes (couleurs posées par js/rh.js) deviennent des blocs teintés */
+html[data-theme=dark] .rh-sh,html[data-theme=dark] .rh-posts button.on{background:color-mix(in srgb,var(--pc) 24%,#18142A);color:color-mix(in srgb,var(--pc) 40%,#F5EDE1)}
+html[data-theme=dark] .rh-sh{box-shadow:0 0 0 1px color-mix(in srgb,var(--pc) 40%,transparent) inset,0 2px 0 #07050F}
+html[data-theme=dark] .rh-sh em,html[data-theme=dark] .rh-sh b{color:color-mix(in srgb,var(--pc) 45%,#F5EDE1)}
