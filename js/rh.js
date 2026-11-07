@@ -31,7 +31,10 @@ Object.assign(IC, {
 const rhHash = (s) => { let h = 2166136261; for (const c of String(s)) { h ^= c.charCodeAt(0); h = Math.imul(h, 16777619) >>> 0; } return h.toString(36); };
 const rhPinHash = (id, code) => (typeof ccHash === "function" ? ccHash : rhHash)(id + ":" + code);
 const rhIsMgr = () => ["gerant", "chef"].includes(myRole());
-const rhIsBoss = () => (typeof canSee === "function" ? canSee("salaires") : myRole() === "gerant");
+/* salaires, coûts et export paie : pack Chef. Avec Second, la pointeuse et le planning restent complets, sans les euros. */
+const rhPaid = () => typeof abHas !== "function" || abHas("salaires");
+const rhCanEdit = () => (typeof canSee === "function" ? canSee("salaires") : myRole() === "gerant");
+const rhIsBoss = () => rhPaid() && rhCanEdit();
 const rhCanStaff = () => (typeof canSee === "function" ? canSee("staff") : myRole() === "gerant");
 const rhT2m = (t) => { const m = /^(\d{1,2}):(\d{2})/.exec(t || ""); return m ? +m[1] * 60 + +m[2] : null; };
 const rhDur = (min) => { min = Math.max(0, Math.round(min || 0)); if (min < 60) return `${min} min`; const h = Math.floor(min / 60), m = min % 60; return m ? `${h} h ${pad(m)}` : `${h} h`; };
@@ -796,12 +799,12 @@ VIEWS.staff = {
         <span class="rh-emp-t"><b>${esc(p.name)}</b><em>${esc(p.role || "Poste à préciser")} · ${RH_CONTRACTS[p.contract] || esc(p.contract)} · ${fmt(rhNum(p.weeklyHours, 35), 0)} h/sem.</em>
         ${boss ? (rate ? `<span class="rh-emp-m"><span><b class="mono">${fmt(rate, 2)} €</b>brut / h</span><span><b class="mono">${fmt(lr, 2)} €</b>chargé / h</span><span><b class="mono">${rhEur(mg)}</b>brut / mois</span><span><b class="mono">${rhEur(mg * (1 + rhCh(p) / 100))}</b>chargé / mois</span></span>` : `<span class="pill warn">Taux horaire à saisir</span>`) : ""}</span>${ico("chev")}</button>`;
     };
-    return `<div class="inner rh-staff">${topBar("Employés", { right: boss ? `<button class="btn acc sm" data-act="rhEmpNew">${ico("plus")}Ajouter</button>` : "" })}
+    return `<div class="inner rh-staff">${topBar("Employés", { right: rhCanEdit() ? `<button class="btn soft sm" data-act="rhBulk" aria-label="Ajouter plusieurs personnes">${ico("users")}<span class="rh-bt">Plusieurs</span></button><button class="btn acc sm" data-act="rhEmpNew">${ico("plus")}Ajouter</button>` : "" })}
       ${money}
       ${act.length ? `<div class="rh-emps">${act.map(card).join("")}</div>` : `<div class="glass empty st" style="--i:3"><span class="ic">${ico("rhid")}</span><b>Aucun employé</b>Créez une fiche par personne : poste, contrat, heures et taux horaire. Le planning et la pointeuse s'en servent.</div>`}
       ${old.length ? `<div class="lbl st" style="--i:30">Anciens employés</div><div class="rh-emps">${old.map((p, i) => card(p, i + 30)).join("")}</div>` : ""}
       <div class="rh-links st" style="--i:38"><button class="btn soft sm" data-go="planning">${ico("cal")}Planning</button><button class="btn soft sm" data-go="pointeuse">${ico("clock")}Pointeuse</button></div>
-      ${boss ? `<p class="note st" style="--i:40">Coûts indicatifs : brut mensuel = taux × heures du contrat × 52 / 12, avec la majoration HCR des heures au-delà de 35 h ; chargé = brut × (1 + charges patronales). Seul le gérant voit les salaires.</p>` : `<p class="note st" style="--i:40">Les salaires et les coûts ne sont visibles que par le gérant.</p>`}
+      ${boss ? `<p class="note st" style="--i:40">Coûts indicatifs : brut mensuel = taux × heures du contrat × 52 / 12, avec la majoration HCR des heures au-delà de 35 h ; chargé = brut × (1 + charges patronales). Seul le gérant voit les salaires.</p>` : `<p class="note st" style="--i:40">${rhCanEdit() && !rhPaid() ? "Salaires, coûts du personnel et export paie : pack Chef." : "Les salaires et les coûts ne sont visibles que par le gérant."}</p>`}
     </div>`;
   },
 };
@@ -809,7 +812,7 @@ function rhEmpSheet() {
   const F = S.ui.rhE; const boss = rhIsBoss(); const linkable = S.members.filter((m) => !S.staff.some((s) => s.memberId === m.id && s.id !== F.id));
   return `<div class="rh-es">
     <div class="rh-act-hd"><span id="rhEava">${rhAva({ name: F.name || "?", color: F.color }, 60)}</span><div><div class="h2">${F.id && !F._new ? "Fiche employé" : F._virtual ? "Compléter la fiche" : "Nouvel employé"}</div><div class="sub">${F.memberId ? "Compte lié : même code pour pointer" : "Pointe avec un code à 4 chiffres"}</div></div></div>
-    <label class="field"><span>Prénom et nom</span><input class="input" id="rhEn" value="${esc(F.name || "")}" maxlength="40" placeholder="Ex. Léa Martin" autocomplete="off"></label>
+    <label class="field"><span>Prénom et nom</span><input class="input" id="rhEn" autocapitalize="words" autocorrect="off" spellcheck="false" value="${esc(F.name || "")}" maxlength="40" placeholder="Ex. Léa Martin" autocomplete="off"></label>
     <label class="field"><span>Poste</span><input class="input" id="rhEr" value="${esc(F.role || "")}" list="rhRoles" maxlength="40" placeholder="Ex. Commis de cuisine"><datalist id="rhRoles">${RH_ROLES.map((r) => `<option value="${esc(r)}">`).join("")}</datalist></label>
     <div class="field"><span>Poste habituel au planning</span><div class="rh-posts">${Object.entries(RH_POSTS).map(([k, v]) => `<button class="${F.post === k ? "on" : ""}" style="--pc:${v.c};--pb:${v.bg};--pi:${v.ink}" data-act="rhEPost" data-v="${k}"><i></i>${v.t}</button>`).join("")}</div></div>
     <div class="field"><span>Contrat</span><div class="rh-opts">${Object.entries(RH_CONTRACTS).map(([k, v]) => `<button class="${F.contract === k ? "on" : ""}" data-act="rhEContract" data-v="${k}">${v}</button>`).join("")}</div></div>
@@ -853,7 +856,7 @@ document.addEventListener("input", (e) => {
     const r1 = VIEWS.equipe.render;
     VIEWS.equipe.render = function () {
       const h = r1.apply(this, arguments); if (h.includes("rh-eqlink")) return h;
-      const link = `<div class="glass pad rh-eqlink st" style="--i:3">${rhCanStaff() ? `<div class="li tap" data-go="staff"><span class="ic">${ico("rhid")}</span><div class="tx"><b>Fiches employés et salaires</b><em>Contrats, heures, coût chargé</em></div>${ico("chev")}</div>` : ""}<div class="li tap" data-go="planning"><span class="ic">${ico("cal")}</span><div class="tx"><b>Planning</b><em>Créneaux de la semaine</em></div>${ico("chev")}</div><div class="li tap" data-go="pointeuse"><span class="ic">${ico("clock")}</span><div class="tx"><b>Pointeuse</b><em>Arrivées, pauses, départs</em></div>${ico("chev")}</div></div>`;
+      const link = `<div class="glass pad rh-eqlink st" style="--i:3">${rhCanStaff() ? `<div class="li tap" data-go="staff"><span class="ic">${ico("rhid")}</span><div class="tx"><b>${rhPaid() ? "Fiches employés et salaires" : "Fiches employés"}</b><em>${rhPaid() ? "Contrats, heures, coût chargé" : "Contrats, heures, postes"}</em></div>${ico("chev")}</div>` : ""}${rhCanEdit() ? `<div class="li tap" data-act="rhBulk"><span class="ic">${ico("users")}</span><div class="tx"><b>Ajouter des extras ou saisonniers</b><em>Collez une liste de noms, en une fois</em></div>${ico("chev")}</div>` : ""}<div class="li tap" data-go="planning"><span class="ic">${ico("cal")}</span><div class="tx"><b>Planning</b><em>Créneaux de la semaine</em></div>${ico("chev")}</div><div class="li tap" data-go="pointeuse"><span class="ic">${ico("clock")}</span><div class="tx"><b>Pointeuse</b><em>Arrivées, pauses, départs</em></div>${ico("chev")}</div></div>`;
       const i = h.lastIndexOf("</div>"); return i > 0 ? h.slice(0, i) + link + h.slice(i) : h + link;
     };
   }
@@ -1040,7 +1043,7 @@ Object.assign(ACT, {
   rhHrOpen: (a, id) => { if (!rhIsMgr() || !rhStaff(id)) return; SFX.tap(); openSheet(rhHrSheet(id)); },
   rhHrJump: () => { const c = $(".rh-hrs"); if (!c) return; SFX.tap(); c.scrollIntoView({ behavior: "smooth", block: "start" }); c.classList.remove("rh-flash"); void c.offsetWidth; c.classList.add("rh-flash"); },
   rhPayExport: () => {
-    if (!rhIsMgr()) return; SFX.tap(); const t = dayKey(); const m0 = t.slice(0, 8) + "01"; const pm = parseDay(m0); pm.setMonth(pm.getMonth() - 1); const pm0 = dayKey(pm);
+    if (!rhIsMgr()) return; if (!rhPaid()) { SFX.tap(); toast("L'export paie fait partie du pack Chef.", "info"); if (typeof abGerant === "function" && abGerant()) go("abonnement"); return; } SFX.tap(); const t = dayKey(); const m0 = t.slice(0, 8) + "01"; const pm = parseDay(m0); pm.setMonth(pm.getMonth() - 1); const pm0 = dayKey(pm);
     const opt = [[m0, `Ce mois-ci (${MONTHS[parseDay(m0).getMonth()]})`], [pm0, `Mois dernier (${MONTHS[pm.getMonth()]})`]];
     openSheet(`<div class="h2">Export paie du mois</div><p class="sub">Un fichier CSV (Excel) pour le comptable : heures prévues et pointées, heures sup. par taux, repères HCR, par semaine et par personne.</p>
       <div>${opt.map(([k, l]) => { const w = rhPayWeeks(k); return `<div class="li tap" role="button" tabindex="0" data-act="rhPayGo" data-v="${k}"><span class="ic">${ico("download")}</span><div class="tx"><b>${l}</b><em>${w.length} semaine${w.length > 1 ? "s" : ""}${w.length ? ` · du ${shortDate(w[0])} au ${shortDate(addDays(w[w.length - 1], 6))}` : ""}</em></div>${ico("chev")}</div>`; }).join("")}</div>`);
@@ -1050,11 +1053,11 @@ Object.assign(ACT, {
   /* employés */
   rhEmp: (a, id) => {
     const p = rhStaff(id); if (!p) return;
-    if (!rhIsBoss()) { toast("Seul le gérant peut modifier les fiches.", "info"); return; }
+    if (!rhCanEdit()) { toast("Seul le gérant peut modifier les fiches.", "info"); return; }
     const { _virtual, ...doc } = p; S.ui.rhE = { ...doc, _new: !!_virtual, _virtual: !!_virtual }; SFX.tap(); openSheet(rhEmpSheet());
   },
   rhEmpNew: () => {
-    if (!rhIsBoss()) return; const used = rhPeople().map((p) => p.color);
+    if (!rhCanEdit()) return; const used = rhPeople().map((p) => p.color);
     S.ui.rhE = { id: null, _new: true, name: "", role: "", post: "cuisine", contract: "CDI", weeklyHours: 35, hourlyGross: "", chargesPct: 42, color: PALETTE.find((c) => !used.includes(c)) || PALETTE[used.length % PALETTE.length], start: dayKey(), active: true };
     SFX.tap(); openSheet(rhEmpSheet());
   },
@@ -1072,5 +1075,50 @@ Object.assign(ACT, {
     else await safe(DB.add("staff", { ...doc, createdAt: Date.now(), by: S.me.id }));
     const isNew = F._new && !F._virtual; closeSheet(true); SFX.done(); buzz([8, 30, 8]); toast(isNew ? `${firstName(name)} a rejoint l'équipe` : "Fiche enregistrée");
     logEvent("rh", isNew ? `a créé la fiche de ${firstName(name)}` : `a modifié la fiche de ${firstName(name)}`);
+  }),
+});
+
+/* ───────────── ajout groupé : extras et saisonniers (trouvé par la simulation de 15 restaurants : une crêperie qui embauche 8 saisonniers d'un coup) ───────────── */
+const rhBulkNames = (t) => { const seen = new Set(); return String(t || "").split(/[\n;]+|,(?=\s*[A-ZÀ-Ý])/).map((x) => x.replace(/^[\s\-•*\d.)]+/, "").replace(/\s+/g, " ").trim().slice(0, 40)).filter((x) => x.length > 1 && !seen.has(x.toLowerCase()) && seen.add(x.toLowerCase())); };
+function rhBulkSheet() {
+  const B = S.ui.rhB; const n = rhBulkNames(B.text); const have = new Set(rhPeople({ all: true }).map((p) => p.name.toLowerCase())); const dup = n.filter((x) => have.has(x.toLowerCase()));
+  return `<div class="rh-es rh-bulk">
+    <div class="h2">Ajouter plusieurs personnes</div>
+    <p class="sub">Un nom par ligne, ou collez la liste reçue par SMS ou e-mail. Chacun a sa fiche, apparaît au planning et pointe avec son code.</p>
+    <label class="field"><span>Les noms</span><textarea class="input" id="rhBt" rows="6" placeholder="Léa Martin&#10;Hugo Bernard&#10;Inès Diallo">${esc(B.text)}</textarea></label>
+    <p class="note" id="rhBn">${n.length ? `${n.length} personne${n.length > 1 ? "s" : ""}${dup.length ? ` · déjà dans l'équipe : ${esc(dup.slice(0, 3).join(", "))}${dup.length > 3 ? "…" : ""} (ignoré${dup.length > 1 ? "s" : ""})` : ""}` : "Aucun nom pour l'instant."}</p>
+    <div class="field"><span>Contrat</span><div class="rh-opts">${[["extra", "Extra"], ["CDD", "Saisonnier (CDD)"]].map(([k, v]) => `<button class="${B.contract === k ? "on" : ""}" data-act="rhBC" data-v="${k}">${v}</button>`).join("")}</div></div>
+    <div class="field"><span>Poste habituel au planning</span><div class="rh-posts">${Object.entries(RH_POSTS).map(([k, v]) => `<button class="${B.post === k ? "on" : ""}" style="--pc:${v.c};--pb:${v.bg};--pi:${v.ink}" data-act="rhBP" data-v="${k}"><i></i>${v.t}</button>`).join("")}</div></div>
+    <div class="grid2"><label class="field"><span>Poste</span><input class="input" id="rhBr" value="${esc(B.role)}" list="rhRoles" maxlength="40" placeholder="Ex. Serveur"><datalist id="rhRoles">${RH_ROLES.map((r) => `<option value="${esc(r)}">`).join("")}</datalist></label>
+      <label class="field"><span>Heures / semaine</span><input class="input mono" id="rhBh" inputmode="decimal" value="${esc(String(B.weeklyHours).replace(".", ","))}"></label></div>
+    <div class="grid2"><label class="field"><span>Début</span><input class="input" type="date" id="rhBs" value="${esc(B.start)}"></label><label class="field"><span>${B.contract === "CDD" ? "Fin de saison" : "Fin (facultatif)"}</span><input class="input" type="date" id="rhBe" value="${esc(B.end)}"></label></div>
+    ${rhIsBoss() ? `<label class="field"><span>Taux horaire brut (€), le même pour tous</span><input class="input mono" id="rhBw" inputmode="decimal" value="${esc(String(B.hourlyGross || "").replace(".", ","))}" placeholder="Ex. 12,10"></label>` : ""}
+    <button class="btn acc block" data-act="rhBulkSave" ${n.length - dup.length > 0 ? "" : "disabled"}>${ico("check")}${n.length - dup.length > 0 ? `Ajouter ${n.length - dup.length} personne${n.length - dup.length > 1 ? "s" : ""}` : "Ajouter"}</button>
+  </div>`;
+}
+function rhBRead() { const B = S.ui.rhB; if (!B) return; const g = (id) => $("#" + id)?.value; B.text = g("rhBt") ?? B.text; B.role = g("rhBr") ?? B.role; B.weeklyHours = g("rhBh") ?? B.weeklyHours; B.start = g("rhBs") ?? B.start; B.end = g("rhBe") ?? B.end; B.hourlyGross = g("rhBw") ?? B.hourlyGross; }
+const rhBRedraw = () => { const y = ($("#sheetBody") || {}).scrollTop; openSheet(rhBulkSheet()); const b = $("#sheetBody"); if (b && y) b.scrollTop = y; };
+document.addEventListener("input", (e) => { if (e.target && e.target.id === "rhBt" && S.ui.rhB) { rhBRead(); const n = $("#rhBn"), btn = $("[data-act=rhBulkSave]"); if (!n || !btn) return; const tmp = document.createElement("div"); tmp.innerHTML = rhBulkSheet(); n.innerHTML = $("#rhBn", tmp).innerHTML; btn.outerHTML = $("[data-act=rhBulkSave]", tmp).outerHTML; } });
+Object.assign(ACT, {
+  rhBulk: () => { if (!rhCanEdit()) { toast("Seul le gérant ajoute des fiches.", "info"); return; } SFX.tap(); const t = dayKey(); S.ui.rhB = S.ui.rhB && S.ui.rhB.text ? S.ui.rhB : { text: "", contract: "extra", post: "salle", role: "", weeklyHours: 0, start: t, end: "", hourlyGross: "" }; openSheet(rhBulkSheet()); },
+  rhBC: (a, id, v) => { const B = S.ui.rhB; if (!B) return; rhBRead(); B.contract = v; if (v === "CDD" && !rhNum(B.weeklyHours, 0)) B.weeklyHours = 35; if (v === "extra" && rhNum(B.weeklyHours, 0) === 35) B.weeklyHours = 0; SFX.tick(); rhBRedraw(); },
+  rhBP: (a, id, v) => { const B = S.ui.rhB; if (!B) return; rhBRead(); B.post = B.post === v ? "" : v; if (!B.role) B.role = { cuisine: "Commis", salle: "Serveur", plonge: "Plongeur", bar: "Barman" }[B.post] || ""; SFX.tick(); rhBRedraw(); },
+  rhBulkSave: () => rhOnce("rhBulkSave", async () => {
+    rhBRead(); const B = S.ui.rhB; if (!B || !rhCanEdit()) return;
+    const have = new Set(rhPeople({ all: true }).map((p) => p.name.toLowerCase())); const names = rhBulkNames(B.text).filter((x) => !have.has(x.toLowerCase()));
+    if (!names.length) { toast("Ajoutez au moins un nom.", "err"); return; }
+    if (B.end && B.start && B.end < B.start) { toast("La fin est avant le début.", "err"); return; }
+    const used = rhPeople().map((p) => p.color); const free = PALETTE.filter((c) => !used.includes(c)); const pal = free.length ? free : PALETTE;
+    const role = (B.role || "").trim() || (B.contract === "CDD" ? "Saisonnier" : "Extra");
+    let i = 0;
+    for (const name of names) {
+      const doc = { name, role, post: B.post || "", color: pal[i % pal.length], contract: B.contract === "CDD" ? "CDD" : "extra", weeklyHours: rhNum(B.weeklyHours, 0), chargesPct: 42, start: B.start || "", end: B.end || "", active: true, memberId: "", createdAt: Date.now(), by: S.me.id, bulk: true };
+      if (rhIsBoss() && rhNum(B.hourlyGross, 0)) doc.hourlyGross = rhNum(B.hourlyGross, 0);
+      await safe(DB.add("staff", doc)); i++;
+    }
+    S.ui.rhB = null; closeSheet(true); SFX.done(); buzz([8, 30, 8]);
+    toast(`${i} personne${i > 1 ? "s" : ""} ajoutée${i > 1 ? "s" : ""} à l'équipe`);
+    try { Promise.resolve(logEvent("staff", `a ajouté ${i} ${B.contract === "CDD" ? "saisonnier" : "extra"}${i > 1 ? "s" : ""} : ${names.slice(0, 4).join(", ")}${names.length > 4 ? "…" : ""}`)).catch(() => {}); } catch (e) {}
+    rerender();
   }),
 });

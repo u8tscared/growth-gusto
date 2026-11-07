@@ -13,7 +13,7 @@ TAB_OF.reception = "more";
 const REC_UNITS = ["kg", "PCE", "DZ", "carton", "L"];
 const REC_TYPES = [
   { k: "frais", t: "Frais", max: 4 },
-  { k: "ultra", t: "Ultra-frais", max: 2 },
+  { k: "ultra", t: "Haché, poisson", max: 2 },
   { k: "surg", t: "Surgelé", max: -18 },
   { k: "sec", t: "Sec", max: null },
 ];
@@ -440,16 +440,7 @@ document.addEventListener("keydown", (e) => {
   if (el.dataset.recsup) { e.preventDefault(); el.blur(); ACT.recSupGo(); return; }
   e.preventDefault(); el.blur();
 });
-/* keyboard: keep the sticky CTA above the on-screen keyboard, and the focused field in view */
-(function recKeyboard() {
-  const vv = window.visualViewport; if (!vv) return;
-  const fit = () => { const kb = Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop)); document.documentElement.style.setProperty("--rec-kb", kb + "px"); document.body.classList.toggle("rec-kb", kb > 80); };
-  vv.addEventListener("resize", fit); vv.addEventListener("scroll", fit);
-})();
-document.addEventListener("focusin", (e) => {
-  const el = e.target; if (S.route !== "reception" || !el.matches || !el.matches(".rec input:not([type=date])")) return;
-  setTimeout(() => { if (document.activeElement === el) el.scrollIntoView({ block: "center", behavior: "smooth" }); }, 320);
-});
+/* keyboard: js/clavier.js keeps the sticky CTA on the keyboard and the focused field in view (css: html.kb .rec-cta) */
 
 /* ───────── actions ───────── */
 /* a double tap on « Valider » must not land on the buttons that replace it */

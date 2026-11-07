@@ -256,7 +256,7 @@ function nfCfgSheet() {
     <label class="field"><span>Raison sociale ou enseigne</span><input class="input" id="nfcL" maxlength="80" value="${esc(c.legal)}"></label>
     <label class="field"><span>Adresse</span><input class="input" id="nfcA" maxlength="140" placeholder="12 rue des Vignes, 69002 Lyon" value="${esc(c.address)}" autocomplete="street-address"></label>
     <div class="grid2"><label class="field"><span>SIRET</span><input class="input mono" id="nfcS" inputmode="numeric" maxlength="20" placeholder="14 chiffres" value="${esc(c.siret)}"></label>
-    <label class="field"><span>N° de TVA</span><input class="input mono" id="nfcT" maxlength="20" placeholder="FR12345678901" value="${esc(c.tva)}"></label></div>
+    <label class="field"><span>N° de TVA</span><input class="input mono" id="nfcT" maxlength="20" autocapitalize="characters" autocorrect="off" spellcheck="false" placeholder="FR12345678901" value="${esc(c.tva)}"></label></div>
     <label class="field"><span>Mention en bas (forme, capital, RCS)</span><input class="input" id="nfcF" maxlength="140" placeholder="SAS au capital de 10 000 € · RCS Lyon 912 345 678" value="${esc(c.footer)}"></label>
     <button class="btn acc block" data-act="nfCfgSave">${ico("check")}Enregistrer</button></div>`);
 }

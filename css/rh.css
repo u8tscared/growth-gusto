@@ -656,3 +656,4 @@ html.rh-kiosk .side{display:none!important}
 .rh-pdf-o>.ico{width:16px;height:16px;color:var(--faint);flex:none}
 .rh-pdf .note{margin:0}
 @media (max-width:560px){.rh-pdf-l{grid-template-columns:1fr;gap:8px}.rh-pdf-o{min-height:56px;padding:10px 12px}}
+@media (max-width:440px){.rh-staff .rh-bt{display:none}}

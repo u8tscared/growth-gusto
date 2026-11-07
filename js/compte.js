@@ -403,11 +403,11 @@ function ccAccessHTML(m, edit) {
 function ccFormSheet() {
   const F = CC.form; const isNew = !F.id; const m = F.id ? ccMember(F.id) : null; const canRole = myRole() === "gerant" && !ccIsOwner(F.id);
   openSheet(`<div class="cc-fhead"><span id="ccfPrev">${ccAva({ id: F.id || "new", name: F.name || "?", color: F.color }, 72)}</span><div class="h2">${isNew ? "Nouvel équipier" : "Modifier le profil"}</div></div>
-    <label class="field"><span>Prénom</span><input class="input" id="ccfName" value="${esc(F.name)}" placeholder="Ex. Léa" autocomplete="off" maxlength="40" enterkeyhint="done"></label>
+    <label class="field"><span>Prénom</span><input class="input" id="ccfName" autocapitalize="words" autocorrect="off" spellcheck="false" value="${esc(F.name)}" placeholder="Ex. Léa" autocomplete="off" maxlength="40" enterkeyhint="done"></label>
     ${canRole && typeof PERMS === "undefined" ? `<div class="field"><span>Rôle</span><div class="cc-seg">${Object.entries(ROLES).map(([k, t]) => `<button class="${F.role === k ? "on" : ""}" data-act="ccFormRole" data-v="${k}">${t}</button>`).join("")}</div></div>` : ""}
     <div class="field"><span>Couleur</span><div class="cc-swatches">${PALETTE.map((c) => `<button class="${F.color === c ? "on" : ""}" style="--c:${c}" data-act="ccFormColor" data-v="${c}" aria-label="Couleur"></button>`).join("")}</div></div>
     ${!isNew && ccIsOwner(F.id) ? `<p class="note" style="margin-top:-4px">${ico("shield")}Propriétaire du restaurant : toujours gérant.</p>` : ""}
-    ${isNew ? `<label class="field"><span>Code à 4 chiffres <em class="cc-opt">facultatif</em></span><input class="input mono cc-pinin" id="ccfPin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off" placeholder="Sinon, créé à sa 1re connexion"></label>
+    ${isNew ? `<label class="field"><span>Code à 4 chiffres <em class="cc-opt">facultatif</em></span><input class="input mono cc-pinin" id="ccfPin" enterkeyhint="done" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off" placeholder="Sinon, créé à sa 1re connexion"></label>
     <span class="note" style="margin-top:-6px">${ccCloud() ? "Le code protège son pointage et ses signatures. Facultatif." : "Le code évite qu'un autre signe à sa place. Laissez vide : il le choisira lui-même en touchant son visage."}</span>`
     : `<div class="li cc-pinrow"><span class="ic">${ico("lock")}</span><div class="tx"><b>Code personnel</b><em>${ccHasPin(m) ? "Actif" : "À créer à la prochaine connexion"}</em></div>${F.id === S.me.id ? `<button class="btn soft sm" data-act="ccPinChange">${ccHasPin(m) ? "Changer" : "Créer"}</button>` : canRole && ccHasPin(m) ? `<button class="btn soft sm" data-act="ccPinReset" data-id="${F.id}">Réinitialiser</button>` : ""}</div>`}
     <button class="btn acc block" data-act="ccMemberSave">${isNew ? `${ico("plus")}Ajouter à l'équipe` : `${ico("check")}Enregistrer`}</button>`,
@@ -437,6 +437,7 @@ VIEWS.reglages = {
         ${typeof abRow === "function" ? abRow() : ""}
         <div class="li tap" data-go="equipe"><span class="ic w-mi">${ico("users")}</span><div class="tx"><b>Équipe</b><em>${S.members.length} personne${S.members.length > 1 ? "s" : ""}</em></div>${ico("chev")}</div>
         ${typeof pzRow === "function" ? pzRow() : ""}
+        ${typeof nfRow === "function" ? nfRow() : ""}
         ${typeof ACT.tourStart === "function" ? `<div class="li tap" data-act="tourStart"><span class="ic w-sa">${ico("sparkle")}</span><div class="tx"><b>Revoir la visite guidée</b><em>Les écrans clés en 1 minute</em></div>${ico("chev")}</div>` : ""}
         <div class="li tap" data-go="imprimante"><span class="ic w-nd">${ico("printer")}</span><div class="tx"><b>Imprimante</b><em>${esc(typeof lbPrinterCfg === "function" ? (lbPrinterCfg().name || "À choisir") : "À choisir")}</em></div>${ico("chev")}</div>
       </div></div><div class="cc-col">
@@ -687,7 +688,7 @@ Object.assign(ACT, {
   },
   ccReset: () => { openSheet(`<div style="text-align:center"><span class="ic bad" style="width:56px;height:56px;border-radius:20px;margin:0 auto">${ico("trash")}</span><div class="h2" style="margin-top:10px;font-size:21px">Tout effacer ?</div><p class="sub" style="margin:6px auto 0;max-width:36ch">Relevés, produits, stock, équipe, registre : tout sera supprimé de cet appareil. C'est définitif.</p></div>
     <button class="btn soft block" data-act="ccExport">${ico("download")}D'abord, sauvegarder</button>
-    <label class="field"><span>Pour confirmer, tapez EFFACER</span><input class="input mono" id="ccResetIn" autocomplete="off" autocapitalize="characters" placeholder="EFFACER"></label>
+    <label class="field"><span>Pour confirmer, tapez EFFACER</span><input class="input mono" id="ccResetIn" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" enterkeyhint="done" placeholder="EFFACER"></label>
     <button class="btn danger block" id="ccResetGo" data-act="ccResetOk" disabled>${ico("trash")}Effacer définitivement</button><button class="btn ghost block" data-act="sheetClose">Annuler</button>`); },
   ccResetOk: () => {
     if (($("#ccResetIn")?.value || "").trim().toUpperCase() !== "EFFACER") { ccShake($("#ccResetIn")); return; }

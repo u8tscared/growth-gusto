@@ -107,7 +107,7 @@ function ctStartDay() {
 function ctTempData(P) {
   const start = ctStartDay(); const eff = { from: P.from < start ? start : P.from, to: P.to };
   const days = eff.from <= eff.to ? ctDays(eff) : []; const today = dayKey();
-  const due = (d, slot) => d < today || (d === today && (slot === "midi" || slotNow() === "soir"));
+  const due = (d, slot) => !(typeof ggClosed === "function" && ggClosed(d)) && (d < today || (d === today && (slot === "midi" || slotNow() === "soir")));
   const fr = S.fridges.slice();
   const rd = S.readings.filter((r) => r.day >= P.from && r.day <= P.to);
   const exp = days.reduce((n, d) => n + fr.length * ["midi", "soir"].filter((s) => due(d, s)).length, 0);
@@ -257,7 +257,7 @@ function ctVueTemp(P) {
       <div class="ct-frs"><span><em>Min</em><b>${x.min != null ? fmt(x.min) : "–"}</b></span><span><em>Moyenne</em><b>${x.avg != null ? fmt(x.avg) : "–"}</b></span><span><em>Max</em><b>${x.max != null ? fmt(x.max) : "–"}</b></span><span><em>Relevés</em><b>${x.n}</b></span></div>${strip(x.f)}</div>`).join("");
   const nc = D.bad.length ? `<div class="glass pad st ct-card" style="--i:7"><h3 class="h3">Écarts et actions correctives</h3><div class="ct-list">${D.bad.map((r) => `<div class="ct-li"><span class="ct-v bad">${fmt(num(r.value))} °C</span><div class="tx"><b>${esc((D.fr.find((f) => f.id === r.fridgeId) || {}).name || r.fname || "Enceinte")} · ${ctSlot(r.slot)}</b><em>${esc(r.action || "Action non renseignée")}</em></div><span class="ct-when">${shortDate(r.day)}<small>${esc(firstName(nameOf(r.uid)))}</small></span></div>`).join("")}</div></div>` : `<div class="ct-okline st" style="--i:7">Aucun écart de température sur la période.</div>`;
   return `<div class="ct-kpis st" style="--i:2">${ctKpi("Relevés faits", D.exp ? `${Math.min(D.done, D.exp)} / ${D.exp}` : D.rd.length, D.rate != null ? `${D.rate} % des relevés attendus` : "", D.rate != null && D.rate < 90 ? "warn" : "")}${ctKpi("Conformité", D.conf != null ? `${fmt(D.conf, 1)} %` : "–", "relevés dans le seuil")}${ctKpi("Écarts", D.bad.length, D.bad.length ? "tous avec action" : "aucun", D.bad.length ? "warn" : "")}</div>
-    <div class="ct-legend st" style="--i:2"><span><i class="g"></i>Conforme</span><span><i class="r"></i>Hors seuil</span><span><i class="m"></i>Manquant</span><em>midi / soir, un jour par colonne</em></div>
+    <div class="ct-legend st" style="--i:2"><span><i class="g"></i>Conforme</span><span><i class="r"></i>Hors seuil</span><span><i class="m"></i>Manquant</span><em>${esc(slotName("midi", true))} / ${esc(slotName("soir", true))}, un jour par colonne</em></div>
     <div class="ct-frgrid">${per}</div>${nc}${ctPics(D.pics)}`;
 }
 function ctVueRec(P) {
@@ -344,7 +344,7 @@ function ctDocTemp(P) {
   if (!D.fr.length) return `<p class="rp-empty">Aucune enceinte froide déclarée.</p>`;
   const cell = (day, f, slot) => { const rs = D.rd.filter((r) => r.day === day && r.fridgeId === f.id && ctSlot(r.slot) === slot); if (!rs.length) return D.days.includes(day) && D.due(day, slot) ? `<td class="miss">—</td>` : `<td class="todo"></td>`; return `<td>${rs.map((r) => `<span class="${r.ok ? "" : "nc"}">${fmt(num(r.value))}${r.ok ? "" : "*"}</span>`).join(" / ")}<i>${rs.map((r) => esc(initials(nameOf(r.uid)))).join(" ")}</i></td>`; };
   const days = D.allDays.slice().reverse();
-  const grid = ctSc(`<table class="rp-t rp-temps"><thead><tr><th rowspan="2">Date</th>${D.fr.map((f) => `<th colspan="2">${esc(f.name)}<small>${esc(ctRange(f))}</small></th>`).join("")}</tr><tr>${D.fr.map(() => `<th>Midi</th><th>Soir</th>`).join("")}</tr></thead><tbody>${days.map((d) => `<tr><td class="nw">${esc(DAYS[parseDay(d).getDay()].slice(0, 3))}. ${shortDate(d)}</td>${D.fr.map((f) => cell(d, f, "midi") + cell(d, f, "soir")).join("")}</tr>`).join("")}</tbody></table>`);
+  const grid = ctSc(`<table class="rp-t rp-temps"><thead><tr><th rowspan="2">Date</th>${D.fr.map((f) => `<th colspan="2">${esc(f.name)}<small>${esc(ctRange(f))}</small></th>`).join("")}</tr><tr>${D.fr.map(() => `<th>${esc(slotName("midi"))}</th><th>${esc(slotName("soir"))}</th>`).join("")}</tr></thead><tbody>${days.map((d) => `<tr><td class="nw">${esc(DAYS[parseDay(d).getDay()].slice(0, 3))}. ${shortDate(d)}</td>${D.fr.map((f) => cell(d, f, "midi") + cell(d, f, "soir")).join("")}</tr>`).join("")}</tbody></table>`);
   const nc = D.bad.length ? ctT(["Date", "Heure", "Enceinte", "Relevé", "Seuil", "Action corrective", "Par"], D.bad.slice().reverse().map((r) => `<tr><td class="nw">${ctFull(r.day)}</td><td class="nw">${hm(r.at)}</td><td>${esc((D.fr.find((f) => f.id === r.fridgeId) || {}).name || r.fname || "–")}</td><td class="r nc nw">${fmt(num(r.value))} °C</td><td class="nw">${esc(ctRange(D.fr.find((f) => f.id === r.fridgeId)))}</td><td>${esc(r.action || "Non renseignée")}</td><td>${esc(nameOf(r.uid))}</td></tr>`)) : `<p class="rp-ok">Aucune non-conformité de température sur la période.</p>`;
   return `<div class="rp-kpis">${[["Relevés faits", D.exp ? `${Math.min(D.done, D.exp)} / ${D.exp}` : D.rd.length, D.rate != null ? `${D.rate} % des relevés attendus` : ""], ["Conformité", D.conf != null ? `${fmt(D.conf, 1)} %` : "–", "relevés dans le seuil"], ["Hors seuil", D.bad.length, "avec action corrective"], ["Enceintes", D.fr.length, "suivies matin et soir"]].map(([a, b, c]) => `<div class="rp-kpi"><span>${a}</span><b>${b}</b><em>${c}</em></div>`).join("")}</div>
     <h3>Relevés par jour</h3><p class="rp-note">Deux relevés par jour et par enceinte, en °C. * hors seuil · « — » relevé manquant. Initiales : personne ayant relevé.</p>${grid}
@@ -381,7 +381,7 @@ function ctDocForm() {
 function ctDocAlg() {
   const D = ctAlgData(); if (!D.R.length || typeof ALLERGENS === "undefined") return `<p class="rp-empty">Aucune fiche recette enregistrée.</p>`;
   const S2 = { gluten: "Gluten", crustaces: "Crustacés", oeufs: "Œufs", poissons: "Poissons", arachides: "Arachides", soja: "Soja", lait: "Lait", fruitscoque: "Fruits à coque", celeri: "Céleri", moutarde: "Moutarde", sesame: "Sésame", sulfites: "Sulfites", lupin: "Lupin", mollusques: "Mollusques" };
-  return `<p class="rp-note">Les 14 allergènes à déclarer (règlement UE 1169/2011, décret 2015-447), pour chaque plat, y compris ceux apportés par les produits et sous-recettes. Ce tableau est présenté au client qui le demande.</p>
+  return `<p class="rp-note">Les 14 allergènes à déclarer (règlement UE 1169/2011, décret 2015-447), pour chaque plat, y compris ceux apportés par les produits et sous-recettes. Ce tableau est mis à la disposition des clients par écrit, de façon lisible et visible en salle, sans qu'ils aient à le demander.</p>
     ${ctSc(`<table class="rp-t rp-alg"><thead><tr><th>Plat</th>${ALLERGENS.map((x) => `<th class="v"><span>${esc(S2[x.id] || x.t)}</span></th>`).join("")}</tr></thead><tbody>${D.R.map(({ n, a }) => `<tr><td>${esc(n.title || "Sans titre")}</td>${ALLERGENS.map((x) => `<td class="c${a.includes(x.id) ? " on" : ""}">${a.includes(x.id) ? "●" : ""}</td>`).join("")}</tr>`).join("")}</tbody></table>`)}`;
 }
 function ctDocPms() { const d = ctPmsDoc(); if (!d) return `<p class="rp-empty">Le plan de maîtrise sanitaire n'a pas encore été rédigé dans l'application.</p>`; return `<p class="rp-note">Version du ${ctFull(ctDayOf(d.updatedAt || d.generatedAt))}${d.updatedBy ? `, mise à jour par ${esc(d.updatedBy)}` : ""}.</p>${d.sections.map((s, i) => `<div class="ct-pmsd"><h3>${8}.${i + 1} ${esc(s.title)}</h3>${ctMd(s.text)}</div>`).join("")}`; }
@@ -461,7 +461,7 @@ const CT_Q = [
   { k: "tenue", t: "Qui lave les tenues de cuisine ?", kind: "one", o: [["presta", "Une blanchisserie"], ["place", "Lavées sur place"], ["salaries", "Chaque salarié chez lui"]] },
   { k: "dechets", t: "Vos déchets", kind: "multi", o: [["tri", "Tri sélectif"], ["huiles", "Huiles de friture collectées"], ["bio", "Biodéchets collectés"], ["local", "Local ou bacs dédiés"]] },
   { k: "desinf", t: "Quel produit pour désinfecter ?", s: "Le nom du produit, ou laissez le texte proposé.", kind: "text", ph: "Détergent-désinfectant contact alimentaire (norme EN 1276)" },
-  { k: "alg", t: "Comment informez-vous sur les allergènes ?", kind: "one", o: [["app", "Fiche allergènes de chaque plat"], ["carte", "Mention sur la carte ou l'ardoise"], ["affiche", "Affiche « demandez-nous »"], ["tous", "Plusieurs de ces moyens"]] },
+  { k: "alg", t: "Comment informez-vous sur les allergènes ?", kind: "one", o: [["app", "Fiche allergènes de chaque plat"], ["carte", "Mention sur la carte ou l'ardoise"], ["affiche", "Tableau ou classeur des allergènes visible en salle"], ["tous", "Plusieurs de ces moyens"]] },
 ];
 function ctPmsDefaults() {
   const nm = S.products.map((p) => ctNorm(p.name)).concat(S.notes.filter(ctIsRecipe).map((n) => ctNorm(n.title))).join(" | ");
@@ -500,7 +500,7 @@ function ctPmsBuild(A) {
   const ph = (k) => PH[k][A[k]] || ""; const phs = (k) => (A[k] || []).map((v) => PH[k][v]).filter(Boolean);
   const resp = A.respName || "le gérant";
   const avance = has("prod", "avance") || has("prod", "froide");
-  const fr = S.fridges.map((f) => `| ${f.name} | ${f.min != null && f.max != null ? `${fmt(f.min, 0)} à ${fmt(f.max, 0)} °C` : "à définir"} | 2 fois par jour (midi et soir) |`);
+  const fr = S.fridges.map((f) => `| ${f.name} | ${f.min != null && f.max != null ? `${fmt(f.min, 0)} à ${fmt(f.max, 0)} °C` : "à définir"} | 2 fois par jour (${slotName("midi", true)} et ${slotName("soir", true)}) |`);
   const chores = S.chores.map((c) => { let fq = c.freq || ""; if (typeof regFreqTx === "function") { try { fq = regFreqTx(c); } catch (e) {} } return `| ${c.name} | ${c.zone || "–"} | ${fq} |`; });
   const desinf = A.desinf || "Détergent-désinfectant pour surfaces au contact des denrées (norme EN 1276)";
   const sec = [];
@@ -554,7 +554,8 @@ function ctPmsBuild(A) {
     "| Plats cuisinés à l'avance, préparations réfrigérées | 0 à +3 °C |",
     "| Viandes hachées, préparations de viandes hachées | +2 °C |",
     "| Poissons, crustacés et produits de la pêche frais | 0 à +2 °C (glace fondante) |",
-    "| Abats, volailles et lapins découpés | +3 °C |",
+    "| Abats (volailles, lapins, gibier, ongulés) | +3 °C |",
+    "| Volailles, lapins, découpes | +4 °C |",
     "| Préparations de viandes | +4 °C |",
     "| Viandes, produits laitiers frais, crèmes, desserts | +4 °C |",
     "| Surgelés, glaces | -18 °C |",
@@ -572,7 +573,7 @@ function ctPmsBuild(A) {
     "## Déchets",
     `${labs("dechets").join(", ") || "Poubelles à commande non manuelle"}. Les poubelles de cuisine sont munies de couvercles à commande non manuelle et vidées au moins une fois par jour.${has("dechets", "huiles") ? " Les huiles de friture usagées sont stockées en bidons fermés et collectées par une entreprise agréée." : ""}`,
     "## Allergènes",
-    `Les 14 allergènes réglementaires sont identifiés pour chaque plat (fiches recettes de l'application). Information du client : ${lab("alg", A.alg).toLowerCase() || "sur demande"}. Les préparations sans allergène sont réalisées avec du matériel propre et à l'écart des autres préparations ; toute modification de recette entraîne la mise à jour de la fiche.`,
+    `Les 14 allergènes réglementaires sont identifiés pour chaque plat (fiches recettes de l'application). Information du client : ${lab("alg", A.alg).toLowerCase() || "par écrit, en salle"}. Les préparations sans allergène sont réalisées avec du matériel propre et à l'écart des autres préparations ; toute modification de recette entraîne la mise à jour de la fiche.`,
   ].join("\n") });
   /* HACCP: hazard analysis and CCP table, built from the answers */
   const ccp = [

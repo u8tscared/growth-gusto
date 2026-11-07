@@ -28,6 +28,9 @@ window.simApply = function simApply(D, P) {
     else if (P.plan === "expire") Object.assign(r, { plan: "essai", pack: P.pack, trialEnds: now - 40 * DAY });
     else Object.assign(r, { plan: P.plan, pack: P.plan, paidAt: now - 60 * DAY, paidUntil: null });
     if (P.sansModules.length) r.modsOff = P.sansModules.slice();
+    /* journée du restaurant (js/journee.js) : bar ouvert la nuit, hôtel au petit-déjeuner, cantine fermée le week-end */
+    if (P.day) r.day = { ...P.day };
+    if (P.closed) r.alertCfg = { ...(r.alertCfg || {}), closed: P.closed.slice() };
   });
   /* 3) équipe : les 7 personnes de la démo deviennent celles du profil (même rôle si possible), le reste est créé */
   const demoIds = ["demo-camille", "demo-thomas", "demo-ines", "demo-lucas", "demo-sarah", "demo-hugo", "demo-jade"];

@@ -46,7 +46,7 @@ Object.assign(IC, {
   /* « Prise en main » (js/lecons.js): one lesson per menu screen; run again once every script has loaded, whatever their order */
   const lecons = () => { if (typeof PC_LECONS === "object" && !PC_LECONS.passation) {
     PC_LECONS.passation = { t: "Passation de service", d: "En fin de service, un mot pour l'équipe suivante : ruptures, casse, client à rappeler. Elle le lit en arrivant et signe.", who: ["cuisine", "salle", "bar", "plonge", "boss"],
-      steps: ["En fin de service, touchez « Écrire la passation »", "Gardez ce que l'app a repris de la journée, ajoutez le reste", "En arrivant, lisez et touchez « J'ai lu, c'est parti »"],
+      steps: ["En fin de service, touchez « À passer » puis « Écrire la passation »", "En arrivant, ouvrez « Reçue », lisez et touchez « J'ai lu, je valide »", "Cochez ce qui est fait, puis « Clôturer » quand tout est traité"],
       q: ["Un client a oublié son écharpe et repasse demain. Où le noter pour l'équipe suivante ?", ["Dans la passation, en « Client à rappeler »", "Sur un post-it au passe", "Nulle part, elle s'en souviendra"], 0],
       tip: "Rien à signaler ? Un seul geste : l'équipe suivante le sait aussi.",
       sc: { k: "check", t: "Passation du midi", rows: [["Plus de bar de ligne", 1], ["Rappeler M. Bernard", 1], ["Fond de veau à refroidir", 0]] } };
@@ -105,7 +105,7 @@ const PA_ORDER = ["rupture", "rappel", "casse", "prep", "commande", "info"];
 const PA_MOOD = { calme: ["Calme", "paCalm", "Service tranquille"], charge: ["Chargé", "paBusy", "Ça a bien tourné"], feu: ["Coup de feu", "cfFlame", "On a été pris de vitesse"] };
 const PA = { rid: null, rows: null, F: null, R: null, seen: new Set(), pend: false, rec: null };
 const PA_SLOT = { midi: "midi", soir: "soir" };
-const paSlotT = (s) => (s === "soir" ? "du soir" : "du midi");
+const paSlotT = (s) => slotDu(s);
 const paNext = (day = dayKey(), slot = slotNow()) => (slot === "midi" ? { day, slot: "soir" } : { day: addDays(day, 1), slot: "midi" });
 function PA_ROWS() {
   if (!S.rid) return [];
@@ -119,12 +119,29 @@ function PA_ROWS() {
 function paForNow() {
   const L = PA_ROWS(); const t = dayKey(), s = slotNow();
   const h = L.find((x) => x.to && x.to.day === t && x.to.slot === s);
-  if (h) return h;
+  if (h) return h.closed && h.closed.at ? null : h;
   /* a handover written in the last 16 hours for a later service still counts (soir written at 23:30, read at 10:00) */
   return L.find((x) => x.to && x.to.day >= t && Date.now() - (x.at || 0) < 16 * 36e5 && !(x.day === t && x.slot === s)) || null;
 }
+/* the service running now: after midnight (until 5 h) it is still last night's « soir » */
+const paSvcNow = () => (new Date().getHours() < 5 ? { day: addDays(dayKey(), -1), slot: "soir" } : { day: dayKey(), slot: slotNow() });
+const paPrev = (sv) => (sv.slot === "soir" ? { day: sv.day, slot: "midi" } : { day: addDays(sv.day, -1), slot: "soir" });
+const paOf = (sv) => PA_ROWS().find((x) => x.day === sv.day && x.slot === sv.slot) || null;
 /* the one this service already wrote */
-const paWritten = () => PA_ROWS().find((x) => x.day === dayKey() && x.slot === slotNow()) || null;
+const paWritten = (sv = paSvcNow()) => paOf(sv);
+const paTeam = (s) => (s === "soir" ? "équipe du soir" : "équipe du midi");
+const paAud = (h) => paAudience(h.to || paNext(h.day, h.slot)).filter((m) => m.id !== h.byId && m.id !== h.uid);
+const paMine = (h) => { const w = rlWho().id; return !!h && (h.uid === w || h.byId === w || h.uid === S.me.id); };
+const paCanAdmin = (h) => rlIsMgr() || paMine(h);
+/* where it stands: à écrire → envoyée → validée (signée « J'ai lu ») → clôturée (tout est traité) */
+function paState(h) {
+  if (!h) return { k: "todo", t: "À écrire" };
+  if (h.closed && h.closed.at) return { k: "closed", t: "Clôturée" };
+  const aud = paAud(h); const rd = Object.keys(h.reads || {}).filter((k) => h.reads[k]).length;
+  const left = (h.items || []).filter((x) => !x.done && x.k !== "info").length;
+  if (!rd) return { k: "sent", t: "Pas encore lue", left };
+  return { k: "read", t: `Validée ${aud.length ? `${Math.min(rd, aud.length)}/${aud.length}` : `par ${rd}`}`, left };
+}
 const paReadAt = (h, pid) => (h && h.reads && h.reads[pid]) || 0;
 const paCount = (h) => (h ? (h.items || []).length + (h.note ? 1 : 0) : 0);
 /* the people of the next service: staff planned on it (their account or kitchen profile), else every active member */
@@ -174,9 +191,9 @@ function paSuggest() {
 /* ───────────── write ───────────── */
 function paWriteOpen(o = {}) {
   if (!S.resto) return;
-  const t = dayKey(), s = o.slot || slotNow(); const to = paNext(t, s);
-  const mine = paWritten();
-  PA.F = { day: t, slot: s, to, mood: (mine && mine.mood) || "", items: mine ? (mine.items || []).map((x) => ({ ...x })) : [], note: (mine && mine.note) || "", sug: mine ? [] : paSuggest(), edit: mine ? mine.id : null, add: null };
+  const sv = paSvcNow(); const t = o.day || sv.day, s = o.slot || sv.slot; const to = paNext(t, s);
+  const mine = paWritten({ day: t, slot: s });
+  PA.F = { day: t, slot: s, to, mood: (mine && mine.mood) || "", items: mine ? (mine.items || []).map((x) => ({ ...x })) : [], note: (mine && mine.note) || "", sug: mine ? [] : paSuggest(), edit: mine ? mine.id : null, add: null, gate: o.gate || null, by: o.by || null };
   const el = rlLayer("paWrite", "pa-w", "Passation de service"); paWritePaint(); void el.offsetWidth; el.classList.add("on"); SFX.sheet ? SFX.sheet() : SFX.tap(); buzz(6);
 }
 function paWriteRead() {
@@ -187,7 +204,7 @@ function paWriteRead() {
 }
 function paWritePaint(focus) {
   const F = PA.F; const el = $("#paWrite"); if (!F || !el) return;
-  const aud = paAudience(F.to); const who = rlWho();
+  const aud = paAudience(F.to); const who = F.by || rlWho();
   const kinds = PA_ORDER.map((k, i) => { const K = PA_K[k]; return `<button class="pa-kb ${K[2]}" style="--i:${i}" data-act="paAdd" data-v="${k}">${ico(K[1])}<span>${esc(K[0])}</span></button>`; }).join("");
   const lines = F.items.map((it, i) => { const K = PA_K[it.k] || PA_K.info; return `<div class="pa-line ${K[2]}${it.fresh ? " fresh" : ""}" style="--i:${i}">
       <span class="pa-li">${ico(K[1])}</span>
@@ -198,8 +215,9 @@ function paWritePaint(focus) {
       <div class="pa-sl">${F.sug.map((x, i) => { const K = PA_K[x.k] || PA_K.info; return `<button class="pa-sc ${K[2]}${x.on ? " on" : ""}" style="--i:${i}" data-act="paSug" data-id="${esc(x.id)}" aria-pressed="${x.on}"><span class="pa-scb">${ico(x.on ? "check" : "plus")}</span><span class="pa-sct"><b>${esc(x.t)}</b><em>${esc(x.src || K[0])}</em></span></button>`; }).join("")}</div></section>` : "";
   const n = F.items.filter((x) => (x.t || "").trim()).length + F.sug.filter((x) => x.on).length + ((F.note || "").trim() ? 1 : 0);
   el.innerHTML = `<div class="rl-card pa-card">
-    <div class="rl-top"><span class="pa-tk"><span class="pa-tki">${ico("paBaton")}</span><span><b>Passation ${paSlotT(F.slot)}</b><em>Pour l'équipe ${paSlotT(F.to.slot)}${F.to.day !== F.day ? " de demain" : ""}</em></span></span><button class="iconbtn" data-act="paWriteClose" aria-label="Fermer">${ico("x")}</button></div>
+    <div class="rl-top"><span class="pa-tk"><span class="pa-tki">${ico("paBaton")}</span><span><b>${rlCap(paTeam(F.slot))} → ${paTeam(F.to.slot)}</b><em>Passation ${paSlotT(F.slot)}${F.to.day !== F.day ? ", pour demain midi" : ""}</em></span></span><button class="iconbtn" data-act="paWriteClose" aria-label="${F.gate ? "Revenir sans pointer" : "Fermer"}">${ico("x")}</button></div>
     <div class="rl-body">
+      ${F.gate ? `<div class="pa-gate st" style="--i:0"><span class="pa-gi">${ico("clock")}</span><span><b>${esc(firstName(who.name) || "Vous")}, avant de pointer votre départ</b><em>Vous êtes responsable du service : la passation est obligatoire. Rien à signaler ? Un seul geste en bas.</em></span></div>` : ""}
       <div class="pa-aud st" style="--i:0"><span class="pa-avs">${aud.slice(0, 6).map((m, i) => `<span style="--j:${i}">${avatar(m.id, true)}</span>`).join("")}</span><span>${aud.length ? `${esc(aud.slice(0, 3).map((m) => firstName(m.name)).join(", "))}${aud.length > 3 ? ` et ${aud.length - 3} autres` : ""} le liront avant de commencer` : "L'équipe suivante la lira avant de commencer"}</span></div>
       <div class="lbl st" style="--i:1">Le service ${paSlotT(F.slot)}, c'était</div>
       <div class="pa-moods st" style="--i:1" role="radiogroup" aria-label="Le service">${Object.entries(PA_MOOD).map(([k, [t, ic, d]]) => `<button class="pa-mood m-${k}${F.mood === k ? " on" : ""}" role="radio" aria-checked="${F.mood === k}" data-act="paMood" data-v="${k}"><span class="pa-mi">${ico(ic)}</span><b>${t}</b><em>${d}</em></button>`).join("")}</div>
@@ -210,7 +228,7 @@ function paWritePaint(focus) {
       <label class="pa-note st" style="--i:5"><span class="lbl">Un mot pour l'équipe</span><div class="pa-nw"><textarea id="paNote" class="input" rows="3" maxlength="600" placeholder="Bon courage pour ce soir, la salle est prête.">${esc(F.note || "")}</textarea>${typeof csSR === "function" && csSR() ? `<button class="pa-mic" data-act="paMic" aria-label="Dicter">${ico(IC.csMic ? "csMic" : "edit")}</button>` : ""}</div></label>
     </div>
     <div class="rl-cta">${n ? `<button class="btn acc block pa-go" data-act="paSend">${ico("paBaton")}Passer le relais<span class="pa-gn mono">${n}</span></button>` : `<button class="btn acc block pa-go" data-act="paSend" data-v="ok">${ico("check")}Rien à signaler, tout est en ordre</button>`}
-      <p class="rl-fine">Signé ${esc(firstName(who.name) || "par vous")} · ${hm(Date.now())}${F.edit ? " · remplace la passation déjà écrite" : ""}</p></div></div>`;
+      <p class="rl-fine">${F.gate ? "Votre départ sera pointé juste après · " : ""}Signé ${esc(firstName(who.name) || "par vous")} · ${hm(Date.now())}${F.edit ? " · remplace la passation déjà écrite" : ""}</p></div></div>`;
   if (focus) setTimeout(() => { const i = $(`#paWrite [data-pa-line="${focus}"]`); if (i) { i.focus({ preventScroll: false }); i.scrollIntoView({ block: "center", behavior: rlReduce() ? "auto" : "smooth" }); } }, 60);
 }
 async function paSend(ok) {
@@ -219,7 +237,7 @@ async function paSend(ok) {
     .concat(F.items.filter((x) => (x.t || "").trim()).map((x) => ({ id: x.id, k: x.k, t: x.t.trim().slice(0, 160), ...(x.tel && x.tel.trim() ? { tel: x.tel.trim().slice(0, 24) } : {}), ...(x.done ? { done: x.done, doneBy: x.doneBy || "", doneAt: x.doneAt || 0 } : {}) })));
   const note = (F.note || "").trim().slice(0, 600);
   if (!ok && !items.length && !note) { SFX.err(); toast("Ajoutez au moins une ligne, ou touchez « Rien à signaler ».", "err"); return; }
-  F.busy = true; const who = rlWho(); const now = Date.now();
+  F.busy = true; const who = F.by || rlWho(); const now = Date.now();
   const text = ok && !items.length && !note ? "Rien à signaler, tout est en ordre." : [...items.map((x) => `${(PA_K[x.k] || PA_K.info)[0]} : ${x.t}`), note].filter(Boolean).join(" · ").slice(0, 400);
   const doc = { day: F.day, slot: F.slot, to: F.to, mood: F.mood || "", items, note, ok: !items.length && !note, text, at: now, uid: S.me.id, by: who.name || S.me.name || "", byId: who.id, reads: {} };
   const btn = $("#paWrite .pa-go"); if (btn) btn.disabled = true;
@@ -229,7 +247,7 @@ async function paSend(ok) {
     else id = await safe(DB.add("handovers", doc));
     logEvent("passation", `a passé le relais ${paSlotT(F.slot)} à l'équipe ${paSlotT(F.to.slot)}${items.length ? ` (${rlPl(items.length, "point")})` : " : rien à signaler"}`, { ref: id }).catch(() => {});
     if (!F.edit) paNotify(id);
-    paFly(() => { PA.F = null; rlLayerClose("paWrite"); toast(`Relais passé à l'équipe ${paSlotT(F.to.slot)}`); if (S.route === "passation" || S.route === "home") rerender(); });
+    paFly(() => { PA.F = null; rlLayerClose("paWrite", F.gate ? () => F.gate.done() : null); if (!F.gate) toast(`Relais passé à l'${paTeam(F.to.slot)}`); if (S.route === "passation" || S.route === "home") rerender(); });
   } catch (e) { console.warn("passation", e); F.busy = false; if (btn) btn.disabled = false; SFX.err(); toast("Envoi impossible, réessayez.", "err"); }
 }
 /* the card folds into the baton and flies to the next team */
@@ -258,34 +276,48 @@ function paReadOpen(h, pid, o = {}) {
   buzz([8, 30, 8]);
 }
 function paItemsHTML(h, live) {
-  const by = {}; (h.items || []).forEach((x) => (by[x.k] ||= []).push(x));
-  return PA_ORDER.filter((k) => by[k]).map((k, gi) => { const K = PA_K[k]; return `<section class="pa-grp ${K[2]} st" style="--i:${gi + 2}"><div class="pa-gh">${ico(K[1])}<b>${esc(K[0])}</b><span class="mono">${by[k].length}</span></div>
-    ${by[k].map((x) => { const can = live && ["rappel", "prep", "commande"].includes(k); return `<div class="pa-it${x.done ? " done" : ""}"><span class="pa-itt">${esc(x.t)}${x.done ? `<em>Fait par ${esc(firstName(rlName(x.doneBy, "")))} · ${hm(x.done)}</em>` : ""}</span>
+  const by = {}; (h.items || []).forEach((x) => (by[x.k] ||= []).push(x)); const open = live && !(h.closed && h.closed.at);
+  return PA_ORDER.filter((k) => by[k]).map((k, gi) => { const K = PA_K[k]; const left = by[k].filter((x) => !x.done).length; return `<section class="pa-grp ${K[2]} st" style="--i:${gi + 2}"><div class="pa-gh">${ico(K[1])}<b>${esc(K[0])}</b><span class="mono">${k === "info" || !left || left === by[k].length ? by[k].length : `${by[k].length - left}/${by[k].length} ${k === "rupture" ? "réglé" : "fait"}${by[k].length - left > 1 ? "s" : ""}`}</span></div>
+    ${by[k].map((x) => { const can = open && k !== "info"; return `<div class="pa-it${x.done ? " done" : ""}"><span class="pa-itt">${esc(x.t)}${x.done ? `<em>${k === "rupture" ? "Réglé" : "Fait"} par ${esc(firstName(rlName(x.doneBy, "")))} · ${hm(x.done)}</em>` : ""}</span>
       ${x.tel ? `<a class="pa-call" href="tel:${esc(String(x.tel).replace(/[^\d+]/g, ""))}" aria-label="Appeler ${esc(x.tel)}">${ico("paPhone")}<span class="mono">${esc(x.tel)}</span></a>` : ""}
-      ${can ? `<button class="pa-done${x.done ? " on" : ""}" data-act="paDone" data-id="${esc(h.id)}" data-v="${esc(x.id)}" aria-pressed="${!!x.done}">${ico("check")}<span>${x.done ? "Fait" : "C'est fait"}</span></button>` : ""}</div>`; }).join("")}</section>`; }).join("");
+      ${can ? `<button class="pa-done${x.done ? " on" : ""}" data-act="paDone" data-id="${esc(h.id)}" data-v="${esc(x.id)}" aria-pressed="${!!x.done}">${ico("check")}<span>${x.done ? (k === "rupture" ? "Réglé" : "Fait") : k === "rupture" ? "C'est réglé" : "C'est fait"}</span></button>` : ""}</div>`; }).join("")}</section>`; }).join("");
 }
 function paReadersHTML(h, big) {
-  const aud = paAudience(h.to || paNext(h.day, h.slot)).filter((m) => m.id !== h.byId && m.id !== h.uid);
-  const rd = Object.keys(h.reads || {}).filter((k) => h.reads[k]); const not = aud.filter((m) => !rd.includes(m.id));
+  const aud = paAud(h);
+  const rd = Object.keys(h.reads || {}).filter((k) => h.reads[k]).sort((a, b) => h.reads[a] - h.reads[b]); const not = aud.filter((m) => !rd.includes(m.id));
   return `<div class="pa-rds${big ? " big" : ""}"><span class="pa-avs">${rd.slice(0, 8).map((id, i) => `<span style="--j:${i}" title="${esc(rlName(id))}">${avatar(id, true)}</span>`).join("")}</span>
-    <span>${rd.length ? `Lu par ${esc(rd.slice(0, 3).map((id) => firstName(rlName(id))).join(", "))}${rd.length > 3 ? ` et ${rd.length - 3} autres` : ""}` : "Personne ne l'a encore lue"}${not.length && big ? ` · <b>pas encore : ${esc(not.slice(0, 4).map((m) => firstName(m.name)).join(", "))}${not.length > 4 ? "…" : ""}</b>` : ""}</span></div>`;
+    <span>${rd.length ? `Validée par ${esc(rd.slice(0, 3).map((id) => firstName(rlName(id))).join(", "))}${rd.length > 3 ? ` et ${rd.length - 3} autres` : ""}` : "Personne ne l'a encore validée"}${not.length && big ? ` · <b>pas encore : ${esc(not.slice(0, 4).map((m) => firstName(m.name)).join(", "))}${not.length > 4 ? "…" : ""}</b>` : ""}</span></div>`;
+}
+/* the steps a handover goes through, drawn as a small track: écrite → validée → clôturée */
+function paTrackHTML(h) {
+  const st = paState(h); const rd = Object.keys(h.reads || {}).filter((k) => h.reads[k]); const first = rd.length ? Math.min(...rd.map((k) => h.reads[k])) : 0;
+  const steps = [["Écrite", `${esc(firstName(h.by || rlName(h.uid)))} · ${hm(h.at)}`, true], ["Validée", rd.length ? `${esc(firstName(rlName(rd[0])))}${rd.length > 1 ? ` +${rd.length - 1}` : ""} · ${hm(first)}` : "par l'équipe qui arrive", rd.length > 0], ["Clôturée", st.k === "closed" ? `${esc(firstName(h.closed.name || rlName(h.closed.by)))} · ${hm(h.closed.at)}` : st.left ? `${rlPl(st.left, "point")} à traiter` : "quand tout est traité", st.k === "closed"]];
+  return `<ol class="pa-track" aria-label="Où en est la passation">${steps.map(([t, d, on], i) => `<li class="${on ? "on" : ""}${!on && (i === 0 || steps[i - 1][2]) ? " next" : ""}"><span class="pa-tdot">${on ? ico("check") : i + 1}</span><b>${t}</b><em>${d}</em></li>`).join("")}</ol>`;
 }
 function paReadPaint() {
   const R = PA.R; const el = $("#paRead"); if (!R || !el) return;
   const h = PA_ROWS().find((x) => x.id === R.id); if (!h) { rlLayerClose("paRead"); return; }
-  const M = PA_MOOD[h.mood]; const read = paReadAt(h, R.pid); const n = paCount(h);
-  el.innerHTML = `<div class="rl-card pa-card pa-rc">
-    <div class="rl-top"><span class="pa-tk"><span class="pa-tki">${ico("paBaton")}</span><span><b>Passation ${paSlotT(h.slot)}</b><em>${esc(rlCap(rlDayRel(h.day)))} · écrite à ${hm(h.at)}</em></span></span><button class="iconbtn" data-act="paReadClose" aria-label="Fermer">${ico("x")}</button></div>
+  const M = PA_MOOD[h.mood]; const read = paReadAt(h, R.pid); const n = paCount(h); const st = paState(h); const closed = st.k === "closed";
+  const author = h.uid === R.pid || h.byId === R.pid; const to = h.to || paNext(h.day, h.slot);
+  let cta;
+  if (closed) cta = `<div class="pa-signed cl">${ico("check")}<span>Clôturée par ${esc(firstName(h.closed.name || rlName(h.closed.by)))} ${esc(rlDayRel(dayKey(new Date(h.closed.at))))} à ${hm(h.closed.at)}</span></div><div class="pa-cta2"><button class="btn soft" data-act="paReopen" data-id="${esc(h.id)}">${ico("jrUndo")}Rouvrir</button><button class="btn acc" data-act="paReadClose">Fermer</button></div>`;
+  else if (!author && !read) cta = `<button class="btn acc block pa-sign" data-act="paSign"><span class="pa-sgi">${ico("check")}</span><span>J'ai lu${n > 1 ? ` les ${n} points` : ""}, je valide</span></button><button class="btn ghost block" data-act="paReadClose">${R.from ? "Plus tard" : "Fermer"}</button>`;
+  else cta = `${read ? `<div class="pa-signed">${ico("check")}<span>Validée par ${esc(firstName(R.name) || "vous")} à ${hm(read)}</span></div>` : ""}
+      <div class="pa-cta2"><button class="btn soft" data-act="paReadClose">Fermer</button><button class="btn acc" data-act="paClose" data-id="${esc(h.id)}">${ico("check")}${st.left ? `Clôturer (${st.left} non traité${st.left > 1 ? "s" : ""})` : "Clôturer, tout est traité"}</button></div>`;
+  const tools = paCanAdmin(h) ? `<div class="pa-tools">${!closed ? `<button class="pa-tl" data-act="paEdit" data-id="${esc(h.id)}">${ico("edit")}Modifier</button>` : ""}<button class="pa-tl bad" data-act="paDel" data-id="${esc(h.id)}">${ico("trash")}<span>Supprimer</span></button></div>` : "";
+  el.innerHTML = `<div class="rl-card pa-card pa-rc${closed ? " is-closed" : ""}">
+    <div class="rl-top"><span class="pa-tk"><span class="pa-tki">${ico("paBaton")}</span><span><b>${rlCap(paTeam(h.slot))} → ${paTeam(to.slot)}</b><em>${esc(rlCap(rlDayRel(h.day)))} · passation ${paSlotT(h.slot)} écrite à ${hm(h.at)}</em></span></span><button class="iconbtn" data-act="paReadClose" aria-label="Fermer">${ico("x")}</button></div>
     <div class="rl-body">
       <header class="pa-rh st" style="--i:0"><span class="pa-rav">${avatar(h.byId || h.uid)}<i>${ico("paBaton")}</i></span>
-        <div><span class="pa-rk">${R.name ? `${esc(firstName(R.name))}, à lire avant de commencer` : "À lire avant de commencer"}</span><h2 class="pa-rt">${esc(firstName(h.by || rlName(h.uid)))} vous passe le relais</h2>
+        <div><span class="pa-rk">${closed ? "Passation clôturée" : !author && !read ? (R.from || paForNow() === h ? `${R.name ? esc(firstName(R.name)) + ", à" : "À"} lire avant de commencer` : "À lire et valider") : author ? "Votre passation" : "Passation validée"}</span><h2 class="pa-rt">${author ? `Vous passez le relais à l'${paTeam(to.slot)}` : `${esc(firstName(h.by || rlName(h.uid)))} passe le relais à l'${paTeam(to.slot)}`}</h2>
         ${M ? `<span class="pa-mp m-${esc(h.mood)}">${ico(M[1])}${esc(M[0])} · ${esc(M[2].toLowerCase())}</span>` : ""}</div></header>
-      ${h.ok ? `<div class="pa-okc st" style="--i:2">${ico("paCalm")}<span><b>Rien à signaler</b><em>Tout est en ordre pour le service ${paSlotT((h.to || {}).slot)}.</em></span></div>` : paItemsHTML(h, true)}
+      <div class="st" style="--i:1">${paTrackHTML(h)}</div>
+      ${h.ok ? `<div class="pa-okc st" style="--i:2">${ico("paCalm")}<span><b>Rien à signaler</b><em>Tout est en ordre pour le service ${paSlotT(to.slot)}.</em></span></div>` : paItemsHTML(h, true)}
       ${h.note ? `<blockquote class="pa-q st" style="--i:8">${esc(h.note)}<cite>${esc(firstName(h.by || ""))}</cite></blockquote>` : ""}
-      <div class="st" style="--i:9">${paReadersHTML(h, false)}</div>
+      <div class="st" style="--i:9">${paReadersHTML(h, true)}</div>
+      ${tools ? `<div class="st" style="--i:10">${tools}</div>` : ""}
     </div>
-    <div class="rl-cta">${read ? `<div class="pa-signed">${ico("check")}<span>Lu par ${esc(firstName(R.name) || "vous")} à ${hm(read)}</span></div><button class="btn soft block" data-act="paReadClose">Fermer</button>`
-      : `<button class="btn acc block pa-sign" data-act="paSign"><span class="pa-sgi">${ico("check")}</span><span>J'ai lu${n > 1 ? ` les ${n} points` : ""}, c'est parti</span></button><button class="btn ghost block" data-act="paReadClose">Plus tard</button>`}</div></div>`;
+    <div class="rl-cta">${cta}</div></div>`;
 }
 async function paSign() {
   const R = PA.R; if (!R) return; const h = PA_ROWS().find((x) => x.id === R.id); if (!h) return;
@@ -293,10 +325,11 @@ async function paSign() {
   SFX.done(); buzz([10, 40, 10]);
   const reads = { ...(h.reads || {}), [R.pid]: Date.now() }; h.reads = reads;
   safe(DB.update("handovers", h.id, { reads })).catch(() => {});
+  logEvent("passation", `a validé la passation ${paSlotT(h.slot)} de ${firstName(h.by || rlName(h.uid))}`, { ref: h.id }).catch(() => {});
   setTimeout(() => { try { burst(innerWidth / 2, innerHeight * 0.75); } catch (e) {} }, 220);
-  setTimeout(() => { PA.R = null; rlLayerClose("paRead"); toast(`Bon service${R.name ? ", " + firstName(R.name) : ""} !`); if (S.route === "home" || S.route === "passation") rerender(); }, 900);
+  /* opened by itself as the person starts: it goes away; opened from the page: it stays, to tick and close */
+  setTimeout(() => { if (R.from) { PA.R = null; rlLayerClose("paRead"); toast(`Bon service${R.name ? ", " + firstName(R.name) : ""} !`); } else { paReadPaint(); toast("Passation validée"); } if (S.route === "home" || S.route === "passation") rerender(); }, 900);
 }
-/* « à lire avant de commencer »: opened by itself when the person starts (home of the space, takes over the restaurant device, clocks in) */
 function paAuto(pid, from) {
   try {
     if (!S.resto || PA.F || PA.R || $(".rl-layer.on") || $("#pmFlow.on") || $("#sheet").classList.contains("open")) return false;
@@ -324,48 +357,81 @@ function paHomeCard() {
     const to = paNext();
     return `<button class="pa-hm write st" style="--i:2" data-act="paWrite"><span class="pa-wi">${ico("paBaton")}</span><span><b>Fin du service ${paSlotT(slotNow())} ?</b><em>Passez le relais à l'équipe ${paSlotT(to.slot)} : ruptures, casse, clients à rappeler</em></span>${ico("chev")}</button>`;
   }
-  if (h && paReadAt(h, who.id)) return `<button class="pa-hm done st" style="--i:2" data-go="passation"><span class="pa-wi">${ico("paBaton")}</span><span><b>Passation ${paSlotT(h.slot)}</b><em>Lue à ${hm(paReadAt(h, who.id))} · ${rlPl(paCount(h) || 0, "point")}</em></span>${ico("chev")}</button>`;
+  if (h && paReadAt(h, who.id)) return `<button class="pa-hm done st" style="--i:2" data-go="passation"><span class="pa-wi">${ico("paBaton")}</span><span><b>Passation ${paSlotT(h.slot)}</b><em>Validée à ${hm(paReadAt(h, who.id))} · ${rlPl(paCount(h) || 0, "point")}</em></span>${ico("chev")}</button>`;
   return "";
 }
 function paPilotStrip() {
   if (!rlIsMgr()) return ""; const h = paWritten() || paForNow(); if (!h) return "";
   const aud = paAudience(h.to || paNext(h.day, h.slot)).filter((m) => m.id !== h.byId && m.id !== h.uid); const rd = aud.filter((m) => paReadAt(h, m.id));
-  return `<button class="es-pstrip pa-ps st" style="--i:1" data-go="passation"><span class="es-rqi">${ico("paBaton")}</span><span><b>Passation ${paSlotT(h.slot)} · ${rd.length}/${aud.length || 0} lue${rd.length > 1 ? "s" : ""}</b><em>${esc(firstName(h.by || ""))} · ${esc(String(h.text || "").slice(0, 90))}</em></span>${ico("chev")}</button>`;
+  return `<button class="es-pstrip pa-ps st" style="--i:1" data-go="passation"><span class="es-rqi">${ico("paBaton")}</span><span><b>Passation ${paSlotT(h.slot)} · validée ${rd.length}/${aud.length || 0}${paState(h).k === "closed" ? " · clôturée" : ""}</b><em>${esc(firstName(h.by || ""))} · ${esc(String(h.text || "").slice(0, 90))}</em></span>${ico("chev")}</button>`;
 }
 
-/* ───────────── the page ───────────── */
+/* ───────────── the page: today's relay (received / to pass), what is left to handle, the history ───────────── */
+function paLegHTML(kind, sv, h, i) {
+  const to = paNext(sv.day, sv.slot); const st = paState(h); const t0 = rlCap(paTeam(sv.slot)), t1 = rlCap(paTeam(to.slot));
+  const when = h ? `${esc(rlCap(rlDayRel(h.day)))} · ${esc(firstName(h.by || rlName(h.uid)))} · ${hm(h.at)}` : kind === "in" ? `${esc(rlCap(rlDayRel(sv.day)))} : pas de passation écrite` : "En fin de service, avant de partir";
+  const act = h ? `data-act="paView" data-id="${esc(h.id)}"` : kind === "out" ? `data-act="paWrite"` : "disabled";
+  const sub = !h ? (kind === "out" ? `<span class="pa-legc go">${ico("paBaton")}Écrire la passation</span>` : "") : st.k === "closed" ? "" : `<span class="pa-legc">${h.ok ? "Rien à signaler" : `${rlPl(paCount(h), "point")}${st.left ? ` · ${st.left} à traiter` : ""}`}</span>`;
+  return `<button class="pa-leg k-${kind} s-${st.k} st" style="--i:${i}" ${act}>
+    <span class="pa-legk">${kind === "in" ? "Reçue" : "À passer"}<span class="pa-st s-${st.k}">${esc(st.t)}</span></span>
+    <span class="pa-legt"><b>${t0}</b><span class="pa-arw">${ico("arrow")}</span><b>${t1}</b></span>
+    <span class="pa-legw">${when}</span>${sub}</button>`;
+}
+function paCardHTML(x, i) {
+  const M = PA_MOOD[x.mood]; const st = paState(x); const to = x.to || paNext(x.day, x.slot);
+  return `<button class="pa-hc s-${st.k} st" style="--i:${Math.min(i, 8) + 3}" data-act="paView" data-id="${esc(x.id)}"><div class="pa-hch"><span class="pa-rav sm">${avatar(x.byId || x.uid, true)}<i>${ico("paBaton")}</i></span><span><b>${rlCap(paSlotT(x.slot).replace("du ", ""))} → ${paSlotT(to.slot).replace("du ", "")}</b><em>${esc(firstName(x.by || rlName(x.uid)))} · ${hm(x.at)}${M ? ` · ${esc(M[0].toLowerCase())}` : ""}</em></span><span class="pa-st s-${st.k}">${esc(st.t)}</span></div>
+    ${x.ok ? `<p class="pa-hl">Rien à signaler.</p>` : `<div class="pa-hcl">${(x.items || []).slice(0, 3).map((y) => { const K = PA_K[y.k] || PA_K.info; return `<span class="pa-hi ${K[2]}${y.done ? " done" : ""}">${ico(K[1])}<span>${esc(y.t)}</span></span>`; }).join("")}${(x.items || []).length > 3 ? `<span class="pa-more">+ ${(x.items || []).length - 3}</span>` : ""}</div>`}
+    ${st.k !== "closed" && st.left ? `<div class="pa-hcf"><span class="pa-bar" style="--p:${Math.round((1 - st.left / Math.max(1, (x.items || []).filter((y) => y.k !== "info").length)) * 100)}%"><i></i></span><span class="mono">${st.left} à traiter</span></div>` : ""}</button>`;
+}
+/* « passation obligatoire au départ »: restos.paCfg = { force, who: [staff ids] } (who empty: the managers, chefs and seconds) */
+const paCfg = () => (S.resto && S.resto.paCfg) || {};
+const PA_RESP = /g[ée]rant|chef|second|responsable|manager|ma[iî]tre d|directeur|directrice/i;
+function paRespAuto(p) { if (!p) return false; const m = p.memberId ? rlMember(p.memberId) : null; return !!(m && ["gerant", "chef"].includes(m.role)) || PA_RESP.test(p.role || ""); }
+function paResp() { const C = paCfg(); const P = rlTry(() => rhPeople(), []); return C.who && C.who.length ? P.filter((p) => C.who.includes(p.id)) : P.filter(paRespAuto); }
+function paCfgHTML() {
+  const C = paCfg(); const R = paResp(); const gerant = rlTry(() => myRole() === "gerant", false) || DB.mode === "demo";
+  return `<section class="glass pa-cfg st" style="--i:4"><div class="li${gerant ? " tap" : ""}" ${gerant ? `data-act="paCfgSheet" role="button" tabindex="0"` : ""}><span class="ic w-in">${ico("clock")}</span><div class="tx"><b>Passation obligatoire au départ</b><em>${C.force ? `${R.length ? esc(R.slice(0, 3).map((p) => firstName(p.name)).join(", ")) + (R.length > 3 ? ` et ${R.length - 3} autres` : "") : "Aucun responsable choisi"} : pas de départ pointé sans passation` : "Non : la passation reste libre"}</em></div>${gerant ? ccSwTry(!!C.force) : ""}</div></section>`;
+}
+const ccSwTry = (on) => (typeof ccSw === "function" ? ccSw(on) : `<span class="pill ${on ? "acc" : "neu"}">${on ? "Oui" : "Non"}</span>`);
+function paCfgSheet() {
+  const C = S.ui.paCfg || (S.ui.paCfg = { force: !!paCfg().force, who: (paCfg().who || []).slice() }); const P = rlTry(() => rhPeople(), []);
+  const auto = !C.who.length; const sel = (p) => (auto ? paRespAuto(p) : C.who.includes(p.id));
+  openSheet(`<div class="pa-cfs"><div class="row"><span class="h2">Passation obligatoire</span><button class="iconbtn" data-act="sheetClose" aria-label="Fermer">${ico("x")}</button></div>
+    <p class="sub">Quand le responsable du service pointe son départ, l'app lui demande d'abord la passation pour l'équipe suivante. Il ne peut pas pointer sans. Si quelqu'un l'a déjà écrite pour ce service, rien ne lui est demandé.</p>
+    <div class="li tap" data-act="paCfgForce" role="switch" aria-checked="${C.force}"><span class="ic w-in">${ico("clock")}</span><div class="tx"><b>Obligatoire au départ</b><em>${C.force ? "Oui, pour les responsables ci-dessous" : "Non, la passation reste libre"}</em></div>${ccSwTry(C.force)}</div>
+    <div class="lbl" style="margin-top:14px">Qui est responsable du service ?</div>
+    <p class="note" style="margin:0 2px 8px">${auto ? "Par défaut : gérants, chefs, seconds et responsables de salle. Touchez pour choisir vous-même." : "Votre choix. Touchez « Par défaut » pour revenir au choix automatique."}</p>
+    <div class="pa-who">${P.map((p) => `<button class="pa-wb${sel(p) ? " on" : ""}" data-act="paCfgWho" data-id="${esc(p.id)}" aria-pressed="${sel(p)}">${typeof rhAva === "function" ? rhAva(p, 30) : ""}<span><b>${esc(firstName(p.name))}</b><em>${esc(p.role || "")}</em></span>${ico(sel(p) ? "check" : "plus")}</button>`).join("") || `<p class="note">Ajoutez d'abord votre équipe dans Employés.</p>`}</div>
+    ${auto ? "" : `<button class="btn ghost block sm" data-act="paCfgAuto">Par défaut</button>`}
+    <button class="btn acc block" data-act="paCfgSave" style="margin-top:10px">${ico("check")}Enregistrer</button></div>`);
+}
+/* the gate: true when this person must write the handover before clocking out */
+function paMustWrite(sid) {
+  const C = paCfg(); if (!C.force || !VIEWS.passation) return false;
+  const p = rlTry(() => rhStaff(sid), null); if (!p) return false;
+  const resp = C.who && C.who.length ? C.who.includes(sid) : paRespAuto(p); if (!resp) return false;
+  return !paWritten();
+}
 VIEWS.passation = {
   render() {
-    const L = PA_ROWS(); const h = paForNow(); const who = rlWho(); const mine = paWritten(); const to = paNext();
-    const toRead = h && h.uid !== who.id && h.byId !== who.id && !paReadAt(h, who.id);
-    const hero = `<section class="pa-hero st" style="--i:1"><span class="pa-hglow" aria-hidden="true"></span>
-      <div class="pa-hk"><span class="pa-tki">${ico("paBaton")}</span><span>Service ${paSlotT(slotNow())} · ${hm(Date.now())}</span></div>
-      <h2 class="pa-ht">${mine ? `Relais passé à l'équipe ${paSlotT(to.slot)}` : `En fin de service, laissez un mot à l'équipe ${paSlotT(to.slot)}`}</h2>
-      <p class="pa-hs">${mine ? `${esc(firstName(mine.by || ""))} l'a écrite à ${hm(mine.at)}. Vous pouvez la compléter.` : "Ruptures, casse, client à rappeler, ce qu'il reste à préparer : l'équipe suivante le lit avant de commencer et signe."}</p>
-      <div class="pa-hbs"><button class="btn acc" data-act="paWrite">${ico(mine ? "edit" : "paBaton")}${mine ? "Compléter la passation" : "Écrire la passation"}</button>${toRead ? `<button class="btn soft" data-act="paOpen" data-id="${esc(h.id)}">${ico("paBaton")}Lire celle ${paSlotT(h.slot)}</button>` : ""}</div></section>`;
-    const card = (x, i) => { const M = PA_MOOD[x.mood]; const rd = Object.keys(x.reads || {}).length; const aud = paAudience(x.to || paNext(x.day, x.slot)).filter((m) => m.id !== x.byId && m.id !== x.uid).length;
-      return `<button class="pa-hc st" style="--i:${Math.min(i, 8) + 3}" data-act="paDetail" data-id="${esc(x.id)}"><div class="pa-hch"><span class="pa-rav sm">${avatar(x.byId || x.uid, true)}<i>${ico("paBaton")}</i></span><span><b>${esc(rlCap(paSlotT(x.slot).replace("du ", "")))} → ${esc(paSlotT((x.to || {}).slot || "soir").replace("du ", ""))}</b><em>${esc(rlCap(rlDayRel(x.day)))} · ${esc(firstName(x.by || rlName(x.uid)))} · ${hm(x.at)}</em></span>${M ? `<span class="pa-mp sm m-${esc(x.mood)}">${ico(M[1])}${esc(M[0])}</span>` : ""}</div>
-        ${x.ok ? `<p class="pa-hl">Rien à signaler.</p>` : `<div class="pa-hcl">${(x.items || []).slice(0, 3).map((y) => { const K = PA_K[y.k] || PA_K.info; return `<span class="pa-hi ${K[2]}${y.done ? " done" : ""}">${ico(K[1])}<span>${esc(y.t)}</span></span>`; }).join("")}${(x.items || []).length > 3 ? `<span class="pa-more">+ ${(x.items || []).length - 3}</span>` : ""}</div>`}
-        <div class="pa-hcf"><span class="pa-bar" style="--p:${aud ? Math.min(100, Math.round((rd / aud) * 100)) : rd ? 100 : 0}%"><i></i></span><span class="mono">${rd}${aud ? "/" + aud : ""} lu${rd > 1 ? "s" : ""}</span></div></button>`; };
-    const cur = h || mine;
+    const L = PA_ROWS(); const sv = paSvcNow(); const prev = paPrev(sv); const hin = paOf(prev); const hout = paOf(sv);
+    const F = S.ui.paF || "todo"; const legs = new Set([hin && hin.id, hout && hout.id]);
+    const todo = L.filter((x) => paState(x).k !== "closed" && !legs.has(x.id)); const closed = L.filter((x) => paState(x).k === "closed");
+    const list = F === "todo" ? todo : F === "closed" ? closed : L;
+    const days = []; list.slice(0, 40).forEach((x) => { const g = days.find((d) => d[0] === x.day); g ? g[1].push(x) : days.push([x.day, [x]]); });
+    let k = 0;
+    const hist = days.length ? days.map(([d, xs]) => `<div class="pa-day lbl">${esc(rlCap(rlDayRel(d)))}</div>${xs.map((x) => paCardHTML(x, k++)).join("")}`).join("")
+      : `<div class="glass empty st" style="--i:6"><div class="ic">${ico("paBaton")}</div><b>${F === "todo" ? "Rien d'autre à traiter" : F === "closed" ? "Aucune passation clôturée" : "Pas encore de passation"}</b>${F === "todo" ? "Les passations encore ouvertes des jours précédents apparaissent ici." : "À la fin de chaque service, l'équipe qui part écrit un mot à celle qui arrive."}</div>`;
+    const chips = [["todo", "Encore ouvertes", todo.length], ["closed", "Clôturées", closed.length], ["all", "Toutes", L.length]];
     return `<div class="inner pa-page">${topBar("Passation de service")}
-      <div class="pa-cols"><div class="pa-col">${hero}
-        ${cur ? `<section class="glass pa-cur st" style="--i:2"><div class="row"><span class="lbl">${cur === mine ? "Celle de ce service" : "Pour ce service"}</span><span class="pill neu">${esc(paSlotT(cur.slot).replace("du ", ""))} · ${hm(cur.at)}</span></div>
-          ${cur.ok ? `<div class="pa-okc">${ico("paCalm")}<span><b>Rien à signaler</b><em>Tout est en ordre.</em></span></div>` : paItemsHTML(cur, true)}${cur.note ? `<blockquote class="pa-q">${esc(cur.note)}<cite>${esc(firstName(cur.by || ""))}</cite></blockquote>` : ""}${paReadersHTML(cur, true)}</section>` : ""}</div>
-      <div class="pa-col"><span class="lbl st" style="--i:3">Les dernières passations</span>
-        ${L.length ? `<div class="pa-hist">${L.slice(0, 20).map(card).join("")}</div>` : `<div class="glass empty st" style="--i:3"><div class="ic">${ico("paBaton")}</div><b>Pas encore de passation</b>À la fin du service, un mot à l'équipe suivante : elle le lit avant de commencer.</div>`}</div></div></div>`;
+      <p class="pa-intro st" style="--i:1">L'équipe qui part écrit, celle qui arrive lit et valide, puis on clôture quand tout est traité.</p>
+      <div class="pa-legs">${paLegHTML("in", prev, hin, 2)}${paLegHTML("out", sv, hout, 3)}</div>
+      ${rlIsMgr() ? paCfgHTML() : ""}
+      <div class="pa-hhd st" style="--i:5"><span class="lbl">Historique</span><div class="pa-chips" role="tablist">${chips.map(([v, t, n]) => `<button class="pa-chip${F === v ? " on" : ""}" role="tab" aria-selected="${F === v}" data-act="paFilter" data-v="${v}">${t}<span class="mono">${n}</span></button>`).join("")}</div></div>
+      <div class="pa-hist">${hist}</div></div>`;
   },
 };
-function paDetail(id) {
-  const x = PA_ROWS().find((h) => h.id === id); if (!x) return; const M = PA_MOOD[x.mood];
-  openSheet(`<div class="pa-dsh"><div class="row"><span class="h2">Passation ${esc(paSlotT(x.slot))}</span><button class="iconbtn" data-act="sheetClose" aria-label="Fermer">${ico("x")}</button></div>
-    <p class="sub">${esc(rlCap(rlDayRel(x.day)))} à ${hm(x.at)} · ${esc(x.by || rlName(x.uid))} pour l'équipe ${esc(paSlotT((x.to || {}).slot))}${M ? ` · ${esc(M[0].toLowerCase())}` : ""}</p>
-    ${x.ok ? `<div class="pa-okc">${ico("paCalm")}<span><b>Rien à signaler</b><em>Tout était en ordre.</em></span></div>` : paItemsHTML(x, true)}
-    ${x.note ? `<blockquote class="pa-q">${esc(x.note)}<cite>${esc(firstName(x.by || ""))}</cite></blockquote>` : ""}
-    ${paReadersHTML(x, true)}
-    ${!paReadAt(x, rlWho().id) && x.uid !== rlWho().id ? `<button class="btn acc block" data-act="paOpen" data-id="${esc(x.id)}">${ico("check")}Je la lis et je signe</button>` : ""}</div>`);
-}
-
+function paDetail(id) { const h = PA_ROWS().find((x) => x.id === id); if (!h) return; closeSheet(true); paReadOpen(h, null, {}); }
 /* ═══════════════════════════ JOURNAL DES ACTIONS ═══════════════════════════ */
 /* [label, icon, colour, sensitive] */
 const JR_CAT = {
@@ -617,7 +683,15 @@ function axPilotStrip() {
   /* restaurant device: the person who takes over reads it first */
   if (typeof esTookOver === "function") { const to0 = esTookOver; window.esTookOver = function (m) { const r = to0.apply(this, arguments); setTimeout(() => paAuto(m && m.id, "main"), 700); return r; }; }
   /* clock-in: the handover right after « Bon service » */
-  if (ACT.rhPunch) { const rp0 = ACT.rhPunch; ACT.rhPunch = async function (a, sid, kind) { const r = await rp0.apply(this, arguments); if (kind === "in") { const st = (S.staff || []).find((x) => x.id === sid); setTimeout(() => paAuto((st && st.memberId) || null, "pointage"), 2200); } return r; }; }
+  if (ACT.rhPunch) { const rp0 = ACT.rhPunch; ACT.rhPunch = async function (a, sid, kind) {
+    /* « passation obligatoire »: the person in charge writes it before the clock-out is recorded; the punch goes in right after */
+    if (kind === "out" && rlTry(() => paMustWrite(sid), false) && !(PA.F && PA.F.gate)) {
+      const p = rhStaff(sid); const args = arguments; const self = this; closeSheet(true); clearTimeout(RH.idleT);
+      const m = p.memberId ? rlMember(p.memberId) : null;
+      setTimeout(() => paWriteOpen({ by: { id: (m && m.id) || p.memberId || sid, name: p.name || (m && m.name) || "" }, gate: { sid, done: () => { RH.pin = { sid }; rp0.apply(self, args); } } }), 260);
+      SFX.tap(); return;
+    }
+    const r = await rp0.apply(this, arguments); if (kind === "in") { const st = (S.staff || []).find((x) => x.id === sid); setTimeout(() => paAuto((st && st.memberId) || null, "pointage"), 2200); } return r; }; }
   /* end of the coup de feu: write the handover from the recap */
   if (typeof cfRecapSheet === "function") { const cr0 = cfRecapSheet; window.cfRecapSheet = function () { const r = cr0.apply(this, arguments); try { const b = $("#sheetBody .cf-end > .btn:last-child"); if (b && !paWritten() && permOk("passation")) b.insertAdjacentHTML("beforebegin", `<button class="btn acc block pa-cfb" data-act="paWrite">${ico("paBaton")}Passer le relais à l'équipe suivante</button>`), b.classList.replace("acc", "soft"); } catch (e) {} return r; }; }
   /* demo « Voir comme »: the person sees the handover as they start */
@@ -625,6 +699,10 @@ function axPilotStrip() {
   try { if (typeof ES_PERSONAS !== "undefined" && !ES_PERSONAS.some((p) => p[0] === "demo-jade")) ES_PERSONAS.push(["demo-jade", "Stagiaire : son accès s'est fermé tout seul", null]); } catch (e) {}
   /* shared device: expired people disappear from « Qui prend la main ? » */
   if (typeof esTeam === "function") { const et0 = esTeam; window.esTeam = function () { return et0.apply(this, arguments).filter(axOn); }; }
+  /* Réglages: one row, next to « Équipe », that says whether the handover is required at clock-out */
+  if (VIEWS.reglages && VIEWS.reglages.render) { const rg0 = VIEWS.reglages.render; VIEWS.reglages.render = function () { const h = rg0.apply(this, arguments); if (!rlIsMgr() || !S.resto || h.includes("pa-rgrow")) return h;
+    const C = paCfg(); const row = `<div class="li tap pa-rgrow" data-go="passation"><span class="ic w-sa">${ico("paBaton")}</span><div class="tx"><b>Passation de service</b><em>${C.force ? "Obligatoire au départ du responsable" : "Libre · la rendre obligatoire au départ"}</em></div>${ico("chev")}</div>`;
+    const i = h.indexOf('data-go="equipe"'); if (i < 0) return h; const j = h.indexOf("</div>", h.indexOf(ico("chev"), i)); return j > 0 ? h.slice(0, j + 6) + row + h.slice(j + 6) : h; }; }
   /* the journal: only for those who run the restaurant */
   if (typeof PERMS !== "undefined" && PERMS.routeAllowed) { const ra0 = PERMS.routeAllowed; PERMS.routeAllowed = function (r) { if (r === "journal") return rlIsMgr() || !!rlTry(() => PERMS.isAdmin(), false); return ra0.apply(this, arguments); }; PERMS.can = (x) => PERMS.routeAllowed(x); }
   /* every action of a restaurant device says which device it was */
@@ -644,7 +722,7 @@ document.addEventListener("visibilitychange", () => { if (document.visibilitySta
 Object.assign(ACT, {
   /* passation */
   paWrite: () => { closeSheet(true); paWriteOpen(); },
-  paWriteClose: () => { paWriteRead(); PA.F = null; SFX.close(); rlLayerClose("paWrite"); },
+  paWriteClose: () => { paWriteRead(); const g = PA.F && PA.F.gate; PA.F = null; SFX.close(); rlLayerClose("paWrite"); if (g) { SFX.err(); toast("Départ pas encore pointé : la passation est obligatoire", "err"); } },
   paMood: (a, id, v) => { paWriteRead(); PA.F.mood = PA.F.mood === v ? "" : v; SFX.tick(); buzz(5); paWritePaint(); },
   paSug: (a, id) => { paWriteRead(); const x = PA.F.sug.find((s) => s.id === id); if (!x) return; x.on = !x.on; x.on ? SFX.ok() : SFX.tick(); buzz(4); paWritePaint(); },
   paAdd: (a, id, v) => { paWriteRead(); const F = PA.F; F.items.forEach((x) => delete x.fresh); const it = { id: "i" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), k: PA_K[v] ? v : "info", t: "", fresh: true }; F.items.push(it); SFX.tap(); buzz(5); paWritePaint(it.id); },
@@ -662,12 +740,49 @@ Object.assign(ACT, {
   paReadClose: () => { PA.R = null; SFX.close(); rlLayerClose("paRead"); if (S.route === "home" || S.route === "passation") rerender(); },
   paSign: () => paSign(),
   paDetail: (a, id) => paDetail(id),
+  paView: (a, id) => { SFX.tap(); paDetail(id); },
+  paFilter: (a, id, v) => { S.ui.paF = v; SFX.tick(); buzz(4); rerender(); },
+  paClose: async (a, id) => {
+    const h = PA_ROWS().find((x) => x.id === id); if (!h) return; const st = paState(h);
+    if (st.left && !a.dataset.sure) { a.dataset.sure = "1"; a.innerHTML = `${ico("check")}Toucher encore : clôturer quand même`; SFX.tap(); return; }
+    const who = rlWho(); const closed = { at: Date.now(), by: who.id, name: who.name || "" }; h.closed = closed;
+    /* the person who closes it has read it too */
+    const reads = paMine(h) || paReadAt(h, who.id) ? h.reads || {} : { ...(h.reads || {}), [who.id]: Date.now() }; h.reads = reads;
+    SFX.done(); buzz([10, 40, 18]); paReadPaint(); toast("Passation clôturée");
+    logEvent("passation", `a clôturé la passation ${paSlotT(h.slot)} de ${firstName(h.by || rlName(h.uid))}${st.left ? ` (${rlPl(st.left, "point")} non traité${st.left > 1 ? "s" : ""})` : ""}`, { ref: id }).catch(() => {});
+    await safe(DB.update("handovers", id, { closed, reads })).catch(() => {}); if (S.route === "passation" || S.route === "home") rerender();
+  },
+  paReopen: async (a, id) => {
+    const h = PA_ROWS().find((x) => x.id === id); if (!h) return; h.closed = null; SFX.tap(); paReadPaint(); toast("Passation rouverte");
+    logEvent("passation", `a rouvert la passation ${paSlotT(h.slot)} de ${firstName(h.by || rlName(h.uid))}`, { ref: id }).catch(() => {});
+    await safe(DB.update("handovers", id, { closed: null })).catch(() => {}); if (S.route === "passation") rerender();
+  },
+  paEdit: (a, id) => { const h = PA_ROWS().find((x) => x.id === id); if (!h) return; PA.R = null; rlLayerClose("paRead", () => paWriteOpen({ day: h.day, slot: h.slot })); },
+  paDel: async (a, id) => {
+    const h = PA_ROWS().find((x) => x.id === id); if (!h || !paCanAdmin(h)) return;
+    if (!a.dataset.sure) { a.dataset.sure = "1"; a.classList.add("sure"); a.lastChild.textContent = "Toucher encore pour supprimer"; SFX.tap(); buzz(8); return; }
+    PA.R = null; rlLayerClose("paRead"); SFX.close(); buzz([14, 30, 14]);
+    PA.rows = (PA.rows || []).filter((x) => x.id !== id);
+    await safe(DB.del("handovers", id)).catch(() => {});
+    logEvent("passation", `a supprimé la passation ${paSlotT(h.slot)} de ${firstName(h.by || rlName(h.uid))} (${rlDay(h.day)})`, { k: "suppr" }).catch(() => {});
+    toast("Passation supprimée"); rerender();
+  },
+  paCfgSheet: () => { S.ui.paCfg = null; SFX.tap(); paCfgSheet(); },
+  paCfgForce: () => { const C = S.ui.paCfg; if (!C) return; C.force = !C.force; SFX.tick(); buzz(5); paCfgSheet(); },
+  paCfgWho: (a, id) => { const C = S.ui.paCfg; if (!C) return; if (!C.who.length) C.who = rlTry(() => rhPeople(), []).filter(paRespAuto).map((p) => p.id); C.who = C.who.includes(id) ? C.who.filter((x) => x !== id) : [...C.who, id]; if (!C.who.length) C.who = ["-"]; SFX.tick(); buzz(4); paCfgSheet(); },
+  paCfgAuto: () => { const C = S.ui.paCfg; if (!C) return; C.who = []; SFX.tick(); paCfgSheet(); },
+  paCfgSave: async () => {
+    const C = S.ui.paCfg; if (!C) return; const cfg = { force: !!C.force, who: C.who.length > 1 ? C.who.filter((x) => x !== "-") : C.who.slice() };
+    await safe(DB.update("restos", S.rid, { paCfg: cfg })); if (S.resto) S.resto.paCfg = cfg; S.ui.paCfg = null;
+    logEvent("team", cfg.force ? `a rendu la passation obligatoire au départ du responsable` : `a rendu la passation libre au départ`, { k: "modif" }).catch(() => {});
+    closeSheet(true); SFX.ok(); buzz(8); toast(cfg.force ? "Passation obligatoire au départ du responsable" : "Passation libre au départ"); rerender();
+  },
   paDone: async (a, id, v) => {
     const h = PA_ROWS().find((x) => x.id === id); if (!h) return; const who = (PA.R && PA.R.pid) || rlWho().id;
     const items = (h.items || []).map((x) => (x.id !== v ? x : x.done ? (({ done, doneBy, doneAt, ...r }) => r)(x) : { ...x, done: Date.now(), doneBy: who }));
     h.items = items; const it = items.find((x) => x.id === v); it && it.done ? (SFX.ok(), buzz([6, 20, 6])) : SFX.tick();
     if (it && it.done) logEvent("passation", `a fait « ${String(it.t).slice(0, 60)} » (passation ${paSlotT(h.slot)})`, { ref: h.id }).catch(() => {});
-    if ($("#paRead.on")) paReadPaint(); else if ($("#sheet").classList.contains("open") && $("#sheetBody .pa-dsh")) paDetail(id); else rerender();
+    if ($("#paRead.on")) paReadPaint(); else rerender();
     await safe(DB.update("handovers", id, { items })).catch(() => {});
   },
   /* journal */

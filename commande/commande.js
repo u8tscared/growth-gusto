@@ -293,7 +293,7 @@
     app.innerHTML = `${hero("Bienvenue")}<section class="qm-card qm-mode">
       <h2>Comment souhaitez-vous commander ?</h2>
       ${c.table ? `<div class="qm-mc st" style="--i:0"><div class="qm-mc-ic">${svg.table}</div><div class="qm-mc-tx"><b>Je suis à table</b><em>On vous apporte tout à votre table.</em></div>
-        <div class="qm-tnum"><input id="qmT" inputmode="numeric" pattern="[0-9]*" maxlength="4" placeholder="N°" value="${esc(st.table)}" aria-label="Numéro de table"><button class="qm-btn" data-a="pickTable" aria-label="Valider la table">${svg.check}</button></div></div>` : ""}
+        <div class="qm-tnum"><input id="qmT" enterkeyhint="go" inputmode="numeric" pattern="[0-9]*" maxlength="4" placeholder="N°" value="${esc(st.table)}" aria-label="Numéro de table"><button class="qm-btn" data-a="pickTable" aria-label="Valider la table">${svg.check}</button></div></div>` : ""}
       ${c.takeaway ? `<button class="qm-mc st ${ta ? "" : "off"}" style="--i:1" data-a="pickTake" ${ta ? "" : "disabled"}><div class="qm-mc-ic sa">${svg.bag}</div><div class="qm-mc-tx"><b>À emporter</b><em>${ta ? `Prêt en ${+c.prepMin || 20} min environ. Vous choisissez l'heure.` : "Fermé pour le moment."}</em></div><span class="qm-chev">${svg.back}</span></button>` : ""}
       <button class="qm-link" data-a="browse">Voir la carte sans commander</button>
     </section>${foot()}`;
@@ -424,9 +424,9 @@
       <div class="qm-lines">${lines || `<div class="qm-none">Votre panier est vide.</div>`}</div>
       <button class="qm-more" data-a="close">${svg.plus}Ajouter autre chose</button>
       ${st.mode === "emporter" ? `<div class="qm-blk"><div class="qm-bh">${svg.clock}<b>À quelle heure ?</b></div><div class="qm-slots">${slots.slice(0, 24).map((s, i) => `<button class="qm-slot${s === st.slot ? " on" : ""}" style="--i:${i}" data-a="slot" data-v="${s}">${i === 0 ? `<i>au plus tôt</i>` : ""}${s}</button>`).join("")}</div></div>
-        <div class="qm-blk qm-g2"><label class="qm-f"><span>Prénom</span><input id="qmName" autocomplete="given-name" maxlength="40" value="${esc(st.name)}" placeholder="Camille"></label>
-        <label class="qm-f"><span>Téléphone</span><input id="qmPhone" type="tel" autocomplete="tel" inputmode="tel" maxlength="20" value="${esc(st.phone)}" placeholder="06 12 34 56 78"></label></div>`
-      : `<div class="qm-blk"><label class="qm-f"><span>Votre prénom <i>(facultatif)</i></span><input id="qmName" autocomplete="given-name" maxlength="40" value="${esc(st.name)}" placeholder="Pour qu'on vous reconnaisse"></label></div>`}
+        <div class="qm-blk qm-g2"><label class="qm-f"><span>Prénom</span><input id="qmName" autocomplete="given-name" autocapitalize="words" autocorrect="off" maxlength="40" value="${esc(st.name)}" placeholder="Camille"></label>
+        <label class="qm-f"><span>Téléphone</span><input id="qmPhone" enterkeyhint="done" type="tel" autocomplete="tel" inputmode="tel" maxlength="20" value="${esc(st.phone)}" placeholder="06 12 34 56 78"></label></div>`
+      : `<div class="qm-blk"><label class="qm-f"><span>Votre prénom <i>(facultatif)</i></span><input id="qmName" autocomplete="given-name" autocapitalize="words" autocorrect="off" maxlength="40" value="${esc(st.name)}" placeholder="Pour qu'on vous reconnaisse"></label></div>`}
       <div class="qm-blk"><label class="qm-f"><span>Un mot pour l'équipe <i>(facultatif)</i></span><input id="qmNote" maxlength="200" value="${esc(st.note)}" placeholder="${st.mode === "table" ? "Les desserts plus tard, merci" : "Couverts, sauce à part…"}"></label></div>
       ${modes.length ? `<div class="qm-blk"><div class="qm-bh">${svg.card}<b>Paiement</b></div>${st.mode === "table" && modes.length === 1 ? `<p class="qm-payn">${modes[0] === "stripe" ? `${esc(st.pub.name || "Le restaurant")} demande de régler en commandant. La cuisine reçoit votre commande dès le paiement.` : "Vous réglez à la fin du repas, auprès du serveur. Rien à payer maintenant."}</p>` : ""}<div class="qm-pays">${modes.map((m) => m === "stripe"
         ? `<button class="qm-pay${st.pay === m ? " on" : ""}" data-a="pay" data-v="stripe"><span class="qm-radio"></span><span class="qm-pay-tx"><b>Payer maintenant</b><em>Carte bancaire, Apple Pay, Google Pay</em></span><span class="qm-cards"><i class="cb">CB</i><i class="vi">VISA</i><i class="mc"><s></s><s></s></i></span></button>`

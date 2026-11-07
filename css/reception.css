@@ -45,8 +45,8 @@
 .rec-cta .btn{height:56px;padding:0 14px;white-space:nowrap;overflow:hidden}
 .rec-cta .btn .ico{flex:none}
 .rec-n{min-width:26px;height:26px;border-radius:13px;background:var(--ink);color:#fff;display:inline-grid;place-items:center;font-family:var(--d);font-size:13px;font-weight:760;padding:0 7px;box-sizing:border-box}
-body.rec-kb .rec-cta{bottom:calc(var(--rec-kb,0px) + 6px);padding:6px}
-body.rec-kb .rec-cta .btn{height:46px}
+html.kb .rec-cta{padding:6px}
+html.kb .rec-cta .btn{height:46px}
 
 /* step 1 — supplier: one big question, big tiles */
 .rec-q{padding:6px 2px 0}

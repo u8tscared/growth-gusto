@@ -511,7 +511,7 @@ function cmPrintMenu() {
   const html = `<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>La carte · ${esc(name)}</title><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wdth,wght@12..96,75..100,600..800&family=Fraunces:ital,opsz,wght@0,9..144,400..700;1,9..144,400..600&family=Instrument+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@700&display=swap"><style>${css}</style></head><body>
     <header>${lg ? `<img src="${esc(lg)}" alt="">` : ""}<h1>${esc(name)}</h1><p>La carte</p></header>
     <div class="cols">${sec.map(([x, L]) => `<section><h2>${esc(x.t)}</h2>${L.map((n) => `<div class="it"><div class="r"><b>${esc(n.title)}${c.veg.includes(n.id) ? `<span class="ic">végétarien</span>` : ""}</b><span class="d"></span><span class="p">${cmEur(num(n.price)).replace(",00", "")}</span></div>${c.desc[n.id] ? `<p class="ds">${esc(c.desc[n.id])}</p>` : ""}</div>`).join("")}</section>`).join("")}</div>
-    <footer>Prix nets, service compris. La liste des allergènes de chaque plat est disponible sur demande et sur notre carte en ligne.</footer></body></html>`;
+    <footer>Prix nets, service compris. Les allergènes de chaque plat sont indiqués dans notre tableau des allergènes, consultable en salle, et sur notre carte en ligne.</footer></body></html>`;
   const f = document.createElement("iframe"); f.setAttribute("aria-hidden", "true"); f.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden"; document.body.appendChild(f);
   const d = f.contentDocument; d.open(); d.write(html); d.close();
   const go2 = () => { try { f.contentWindow.focus(); f.contentWindow.print(); } catch (e) {} setTimeout(() => f.remove(), 60000); };

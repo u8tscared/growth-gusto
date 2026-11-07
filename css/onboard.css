@@ -369,8 +369,8 @@ button.onb-sumr:focus-visible{outline:3px solid var(--c-focus);outline-offset:-3
 /* short phones: tighter rhythm */
 @media (max-width:959px) and (max-height:700px){.onb-h2{font-size:27px}.onb-pane{gap:12px}.onb-input{height:50px}}
 @media (max-width:374px){.onb-h2{font-size:26px}.onb-form{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}.onb-top{padding-left:16px;padding-right:16px}.onb-row2{grid-template-columns:1fr}}
-/* on-screen keyboard: the CTA goes with the content, the field stays visible */
-html.kb .onb-cta{position:static}
+/* on-screen keyboard: the app box ends at the keyboard (js/clavier.js), so the CTA rests right on it; no home indicator to clear */
+html.kb .onb-cta{padding-bottom:8px}
 
 /* reduced motion: everything lands in place */
 @media (prefers-reduced-motion:reduce){
