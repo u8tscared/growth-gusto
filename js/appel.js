@@ -21,6 +21,13 @@ TAB_OF.ecran = "more";
   const i = NAV.findIndex((n) => n[0] === "cuisine");
   NAV.splice(i >= 0 ? i + 1 : NAV.length, 0, ["ecran", "apScreen", "Écran client"]);
 })();
+/* leçon de la Prise en main (js/lecons.js, vérifiée par tools/lecons-test.js) */
+if (typeof PC_LECONS === "object") PC_LECONS.ecran = { t: "Écran client", d: "Une tablette tournée vers le client : son addition, un QR pour payer avec son téléphone et un autre pour laisser un avis Google.", who: ["salle", "bar", "boss"],
+  steps: ["Faites d'une tablette l'écran client (Vues & appareils)", "Sur l'addition d'une table, touchez « Montrer sur l'écran client »", "Le client scanne et paie sa part, le serveur est prévenu"],
+  q: ["Le client a payé en ligne sur l'écran client. Que faites-vous à la caisse ?", ["Je le saisis en « CB en ligne »", "Rien, la caisse le sait déjà", "Je l'encaisse une deuxième fois"], 0],
+  tip: "L'écran reste verrouillé : seul le code du gérant permet d'en sortir.",
+  sc: { k: "ticket", t: "Table 5 · 2 couverts", lines: [["Burrata", "12,00 €"], ["Filet de bar", "24,00 €"]], total: "36,00 €" } };
+try { if (typeof PC_FAMILLES === "object") { const f = PC_FAMILLES.find((x) => x[0] === "commande"); if (f && !f[4].includes("ecran")) f[4].push("ecran"); } } catch (e) {}
 try { if (typeof AB_GATE !== "undefined") AB_GATE.ecran = ["pro", "Écran client"]; } catch (e) {}
 try { if (typeof BIG_ROUTES !== "undefined" && !BIG_ROUTES.includes("ecran")) BIG_ROUTES.push("ecran"); } catch (e) {}
 Object.assign(IC, {
