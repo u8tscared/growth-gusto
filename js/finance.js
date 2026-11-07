@@ -499,10 +499,15 @@ VIEWS.dashboard = {
 
     const ebeT = tile("fdb-ebe", "finance", 2, `<span class="lbl">Résultat estimé · ${mName}</span><b class="fdb-ebev mono ${MC.ebe < 0 ? "neg" : ""}">${finEur(MC.ebe, 0)}</b><div class="fdb-rv">${finDelta(MC.ebe, MD.ebe)}<span class="sub">vs ${MONTHS[parseDay(MQ.from).getMonth()]} à date</span></div><div class="fdb-mini"><span>CA HT <b class="mono">${finK(MC.sales.ht)}</b></span><span>Prime cost <b class="mono">${finPct(MC.prime, 0)}</b></span></div>`, "Résultat du mois");
 
+    /* js/previsions.js: the next 7 days from last year's sales, the trend and the bookings */
+    let pvT = ""; try { if (typeof PREV !== "undefined" && VIEWS.previsions) { const W = []; for (let i = 0; i < 7; i++) W.push(PREV.day(addDays(t, i)));
+      if (W.some((x) => x.ok && x.ca > 0)) { const ca = W.reduce((a, x) => a + x.ca, 0), cv = W.reduce((a, x) => a + x.covers, 0), n1 = W.reduce((a, x) => a + ((x.n1 && x.n1.s && x.n1.s.ttc) || 0), 0); const mx = Math.max(1, ...W.map((x) => x.ca));
+        pvT = tile("fdb-pv", "previsions", 2, `<span class="lbl">Prévision · 7 prochains jours</span><b class="fdb-ebev mono">${finEur(ca, 0)}</b><div class="fdb-rv">${n1 > 0 ? finDelta(ca, n1) : ""}<span class="sub">${cv.toLocaleString("fr-FR")} couverts${n1 > 0 ? " · vs l'an dernier" : ""}</span></div><div class="fdb-pvb" aria-hidden="true">${W.map((x) => `<i class="${x.closed ? "off" : ""}" style="height:${x.closed ? 4 : Math.max(8, (x.ca / mx) * 100)}%"></i>`).join("")}</div>`, "Prévisions des 7 prochains jours"); } } } catch (e) { pvT = ""; }
+
     const greet = `${finCap(DAYS[d.getDay()])} ${d.getDate()} ${MONTHS[d.getMonth()]}${S.resto?.name ? ` · ${esc(S.resto.name)}` : ""}`;
     return `<div class="inner wide fin fdb">${topBar("Tableau de bord", { right: `<button class="iconbtn" data-go="finance" aria-label="Finances">${ico("euro")}</button>` })}
       <p class="sub fdb-greet st" style="--i:0">${greet}</p>
-      <div class="fdb-grid">${hero}${ebeT}${ratioTile("food", "Food cost", MC.food, MD.food, MC.food != null ? `${finK(MC.mat)} de matières` : "Notez les montants à la réception", 3)}${ratioTile("labour", "Masse salariale", MC.labour, MD.labour, MC.staff ? `${finK(MC.sal)} chargés` : "Créez les fiches employés", 3)}${haccp}${dlc}${oblT}${team}${avis}</div></div>`;
+      <div class="fdb-grid">${hero}${ebeT}${pvT}${ratioTile("food", "Food cost", MC.food, MD.food, MC.food != null ? `${finK(MC.mat)} de matières` : "Notez les montants à la réception", 3)}${ratioTile("labour", "Masse salariale", MC.labour, MD.labour, MC.staff ? `${finK(MC.sal)} chargés` : "Créez les fiches employés", 3)}${haccp}${dlc}${oblT}${team}${avis}</div></div>`;
   },
 };
 

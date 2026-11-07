@@ -153,14 +153,16 @@ FEATURES = [
   kick="Caisse et stock", h1='Ce que vous vendez sort <span class="hl">du stock, tout seul.</span>',
   lede="Les ventes arrivent de la caisse, chaque plat vendu sort du stock selon sa recette, et le chiffre du jour est prêt. Les plateformes de livraison s'importent avec leurs commissions.",
   img="caisse", tags=[SECOND],
-  card="Ventes de la caisse, livraison, stock déduit, inventaire et tableau de bord.",
+  card="Ventes de la caisse, livraison, stock déduit, inventaire, tableau de bord et prévisions N-1.",
   blocks=[
    ("La caisse reliée", "Avec SumUp ou Square, les ventes arrivent toutes seules. Avec une autre caisse, importez le fichier des ventes ou photographiez le ticket Z.", ["SumUp et Square : en direct", "Autres caisses : import ou photo du ticket Z", "Zelty et Lightspeed en direct : bientôt"], "caisse", "s", ["En direct", "Par import"]),
    ("Uber Eats, Deliveroo, Just Eat", "Déposez le relevé de ventes : chiffre, commissions et versements vont dans vos finances, le stock est déduit et vous voyez la vraie marge de chaque plat livré.", ["Relevé de ventes, par import", "Commissions dans les finances", "Commandes en direct sur l'écran cuisine : bientôt"], "livraison", "t", ["Par import"]),
    ("Stock et inventaire", "L'inventaire du mois se fait zone par zone. L'app montre les écarts, la valeur du stock et ce qu'il faut commander.", ["Inventaire guidé", "Mouvements et rangement", "Valeur du stock"], "stock", "v", []),
    ("Le tableau de bord", "Le chiffre du jour et de la semaine, comparé à la semaine d'avant, avec le food cost et la masse salariale.", ["Chiffre d'affaires", "Food cost et prime cost", "Couverts"], "dashboard", "k", []),
+   ("Les prévisions d'après l'an dernier", "Le même jour l'an dernier, la tendance du moment et vos réservations donnent les couverts et le chiffre attendus, jour par jour. Les commandes fournisseurs suivent.", ["13 mois d'historique depuis SumUp ou Square, ou par fichier", "Fêtes et événements comparés à eux-mêmes", "Précision mesurée sur vos 4 dernières semaines"], "previsions", "v", ["En direct", "Par import"]),
   ],
-  faq=[("Ma caisse est-elle compatible ?", "SumUp et Square se relient en direct. Zelty et Lightspeed arrivent bientôt en direct. Pour toutes les autres caisses, importez le fichier des ventes ou photographiez le ticket Z."),
+  faq=[("Comment l'app prévoit-elle les couverts ?", "Elle prend le même jour l'an dernier (même jour de la semaine), le corrige de votre tendance des 4 dernières semaines, le mêle à votre habituel du jour, et ne descend jamais sous les réservations déjà prises. Avec SumUp ou Square, 13 mois de ventes se récupèrent en un geste ; sinon, importez l'export « CA par jour » de votre caisse."),
+       ("Ma caisse est-elle compatible ?", "SumUp et Square se relient en direct. Zelty et Lightspeed arrivent bientôt en direct. Pour toutes les autres caisses, importez le fichier des ventes ou photographiez le ticket Z."),
        ("Uber Eats et Deliveroo sont-ils reliés en direct ?", "Non, par import du relevé de ventes. Les commandes en direct sur l'écran cuisine arrivent bientôt, en option.")],
   related=["marges-achats", "finances", "prise-de-commande"], guides=[]),
 
