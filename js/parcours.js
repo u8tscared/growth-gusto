@@ -302,6 +302,7 @@ function pcScene(sc) {
 /* ═══════════════════════ 4. le lecteur ═══════════════════════ */
 /* PC.play({ mid, keys?, title?, from? }) : the plan of mid from its first lesson not done (or keys) */
 function pcPlay(o = {}) {
+  if (PC_VIEW) return;
   const mid = o.mid || S.me.id; const full = pcPlanFull(mid).filter((x) => !x.extra || (o.keys && o.keys.includes(x.k))); const r = pcRow(mid) || {}; const done = r.done || {};
   let list = o.keys ? full.filter((x) => o.keys.includes(x.k)).concat(o.keys.filter((k) => !full.some((x) => x.k === k)).map((k) => ({ k, ch: pcChapOf(k) }))) : full;
   list = list.filter((x) => pcL(x.k)); if (!list.length) { toast("Rien à apprendre ici pour l'instant"); return; }
@@ -311,10 +312,10 @@ function pcPlay(o = {}) {
   try { if (typeof closeSheet === "function" && $("#sheet.open")) closeSheet(true); } catch (e) {}
   let root = $("#pcp"); if (!root) { root = document.createElement("div"); root.id = "pcp"; document.body.appendChild(root); }
   root.className = "pcp"; root.setAttribute("role", "dialog"); root.setAttribute("aria-modal", "true"); root.setAttribute("aria-label", "Prise en main");
-  root.innerHTML = `<div class="pcp-aur" aria-hidden="true"><i></i><i></i><i></i></div><div class="pcp-in"><header class="pcp-top"><div class="pcp-bars" id="pcpBars"></div><button class="pcp-x" data-act="pcClose" aria-label="Fermer">${ico("x")}</button></header><main class="pcp-main" id="pcpMain"></main><footer class="pcp-foot" id="pcpFoot"></footer></div>`;
+  root.innerHTML = `<div class="pcp-aur" aria-hidden="true"><i></i><i></i><i></i></div><div class="pcp-in"><header class="pcp-top"><div class="pcp-bars" id="pcpBars"></div><button class="pcp-x" data-act="pcClose" aria-label="Fermer">${ico("x")}</button></header><div class="pcp-body"><div class="pcp-stage" id="pcpStage" aria-hidden="true"><div class="pcp-dev" id="pcpDev"><div class="pcp-scr" id="pcpScr"><div class="pcp-fake" id="pcpFake"></div></div></div></div><main class="pcp-main" id="pcpMain"></main></div><footer class="pcp-foot" id="pcpFoot"></footer></div>`;
   document.documentElement.classList.add("pcp-open");
   requestAnimationFrame(() => root.classList.add("on")); SFX.sheet && SFX.sheet(); buzz(8);
-  pcPaint(true); pcSwipe(root);
+  pcPaint(true); pcSwipe(root); pcMirror(root);
 }
 PC.play = pcPlay;
 const pcCur = () => PC.run && PC.run.list[PC.run.i];
@@ -342,10 +343,10 @@ function pcPaint(first) {
     cta = `<button class="pcp-go" data-act="pcNext">Commencer${ico("arrow")}</button>${R.list.some((x, j) => j > R.i && x.ch !== cur.ch) ? `<button class="pcp-later" data-act="pcSkipCh">Passer ce chapitre</button>` : ""}`;
   } else {
     const slide = R.slide; const pos = `${R.list.filter((x) => x.ch === cur.ch).findIndex((x) => x.k === cur.k) + 1}/${nInCh}`;
-    const stage = `<div class="pcp-stage"><div class="pcp-dev${slide === "won" ? " won" : ""}" id="pcpDev">${pcScene(L.sc)}</div>${slide === "won" ? `<span class="pcp-seal">${ico("check")}</span>` : ""}</div>`;
+    const stage = "";
     let card = "";
     if (slide === "intro") card = `<span class="pcp-kick">${esc(cur.ch)} · ${pos}</span><h2 class="pcp-h sm"><span class="pcp-hic">${pcIco(pcLIc(cur.k))}</span>${esc(L.t)}</h2><p class="pcp-p">${esc(L.d)}</p>`;
-    else if (slide === "steps") card = `<span class="pcp-kick">Comment faire</span><h2 class="pcp-h sm">${esc(L.t)}</h2><ol class="pcp-steps">${L.steps.map((s, j) => `<li class="${j === R.step ? "on" : j < R.step ? "past" : ""}" data-act="pcStep" data-v="${j}" style="--j:${j}"><i class="mono">${j + 1}</i><span>${esc(s)}</span></li>`).join("")}</ol>${L.tip ? `<p class="pcp-tip">${pcIco("pcSpark")}${esc(L.tip)}</p>` : ""}`;
+    else if (slide === "steps") card = `<span class="pcp-kick">Comment faire</span><h2 class="pcp-h sm">${esc(L.t)}</h2><ol class="pcp-steps">${L.steps.map((s, j) => `<li class="${j === R.step ? "on" : j < R.step ? "past" : ""}" data-act="pcStep" data-v="${j}" style="--j:${j}"><i class="mono">${j + 1}</i><span>${esc(s)}</span></li>`).join("")}</ol><div class="pcp-dots">${L.steps.map((_, j) => `<i class="${j === R.step ? "on" : ""}" data-act="pcStep" data-v="${j}"></i>`).join("")}</div>${L.tip ? `<p class="pcp-tip">${pcIco("pcSpark")}${esc(L.tip)}</p>` : ""}`;
     else if (slide === "quiz") { const [q, ans] = L.q; const ord = R.ord || (R.ord = pcShuffle(ans.map((_, j) => j))); card = `<span class="pcp-kick">À vous</span><h2 class="pcp-h sm">${esc(q)}</h2><div class="pcp-ans" role="group">${ord.map((j, n) => `<button type="button" class="pcp-a${R.ans === j ? (j === L.q[2] ? " ok" : " ko") : ""}${R.ans != null && R.ans !== L.q[2] && j === L.q[2] && R.tries > 1 ? " hint" : ""}" data-act="pcAns" data-v="${j}" style="--j:${n}"><i>${"ABC"[n]}</i><span>${esc(ans[j])}</span></button>`).join("")}</div>`; }
     else if (slide === "won") { const n = R.list.filter((x) => R.done[x.k]).length; card = `<span class="pcp-kick ok">Leçon validée</span><h2 class="pcp-h sm">${esc(L.t)}</h2><p class="pcp-p">${n} sur ${R.list.length} · ${R.list.length - n ? `encore ${pcPl(R.list.length - n, "leçon")}` : "tout est fait"}</p>`; }
     html = `<section class="pcp-les" data-slide="${slide}">${stage}<div class="pcp-card" id="pcpCard">${card}</div></section>`;
@@ -360,16 +361,22 @@ function pcPaint(first) {
   if (!first && !reduce && main.lastElementChild) { while (main.children.length > 1) main.firstElementChild.remove(); const old = main.lastElementChild; old.classList.add("pcp-leave"); old.removeAttribute("id"); setTimeout(() => old.remove(), 340); const t = document.createElement("div"); t.innerHTML = html; const nu = t.firstElementChild; nu.classList.add("pcp-enter"); main.appendChild(nu); }
   else main.innerHTML = html;
   foot.innerHTML = cta;
+  pcStage(root, R, cur, L);
   if (R.slide === "intro" || R.slide === "steps" || R.slide === "won" || R.slide === "quiz") pcSceneRun();
   if (R.slide === "won") { setTimeout(() => { const s = $(".pcp-seal", root); if (s) { const b = s.getBoundingClientRect(); burst(b.left + b.width / 2, b.top + b.height / 2); } }, reduce ? 0 : 260); }
 }
 function pcShuffle(a) { const b = a.slice(); for (let i = b.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [b[i], b[j]] = [b[j], b[i]]; } return b; }
 /* the scene plays the gestures: the finger moves to the step's element, taps, it lights up */
+/* the phone plays the gestures: on the real screen (the app itself, in the demo, see « vrais écrans » below) the finger goes to
+   the button the step talks about; on the drawn scene (before the real one is ready, or a lesson with no screen) as before */
 function pcSceneRun() {
-  const R = PC.run; const dev = $("#pcp .pcp-main > :last-child #pcpDev") || $("#pcpDev"); if (!R || !dev) return;
-  const sc = $(".pcs", dev); if (!sc) return; const L = pcL(pcCur().k);
-  const typeIt = () => { const v = $(".pcs-val", sc); if (!v) return; const s = v.dataset.type || ""; let n = 0; v.textContent = ""; clearInterval(R.typeT); if (pcReduce()) { v.textContent = s; return; } R.typeT = setInterval(() => { n++; v.textContent = s.slice(0, n); if (n >= s.length) clearInterval(R.typeT); }, 170); };
+  const R = PC.run, root = $("#pcp"); if (!R || !root) return; clearTimeout(R.stepT);
+  const L = pcL(pcCur().k), real = root.classList.contains("pcp-real"), V = pcMirrorWin();
+  const sc = real ? null : $("#pcpFake .pcs", root);
+  const typeIt = () => { const v = sc && $(".pcs-val", sc); if (!v) return; const s = v.dataset.type || ""; let n = 0; v.textContent = ""; clearInterval(R.typeT); if (pcReduce()) { v.textContent = s; return; } R.typeT = setInterval(() => { n++; v.textContent = s.slice(0, n); if (n >= s.length) clearInterval(R.typeT); }, 170); };
   const at = (j) => {
+    if (real) { try { V.pcView.step(j, L.steps[j] || "", (L.tap || [])[j]); } catch (e) {} return; }
+    if (!sc) return;
     $$("[data-s]", sc).forEach((e) => e.classList.toggle("on", +e.dataset.s === j));
     $$("[data-s]", sc).forEach((e) => e.classList.toggle("past", +e.dataset.s < j));
     const el = $(`[data-s="${j}"]`, sc), f = $(".pcs-fing", sc); if (!el || !f) return;
@@ -378,17 +385,127 @@ function pcSceneRun() {
     f.classList.remove("tap"); void f.offsetWidth; setTimeout(() => f.classList.add("tap"), pcReduce() ? 0 : 420);
     if (j === 0 && sc.dataset.k === "keypad") typeIt();
   };
-  sc.classList.add("play");
-  if (R.slide === "intro") { setTimeout(() => sc.classList.add("live"), 60); if (sc.dataset.k === "keypad") setTimeout(typeIt, 500); return; }
-  if (R.slide === "quiz") { sc.classList.add("live", "dim"); const v = $(".pcs-val", sc); if (v) v.textContent = v.dataset.type || ""; return; }
-  if (R.slide === "won") { sc.classList.add("live", "all"); $$("[data-s]", sc).forEach((e) => e.classList.add("past")); const v = $(".pcs-val", sc); if (v) v.textContent = v.dataset.type || ""; return; }
-  sc.classList.add("live");
-  const n = Math.min(L.steps.length, 3); const loop = () => { if (!PC.run || PC.run.slide !== "steps") return; at(Math.min(R.step, n - 1)); $$("#pcp .pcp-steps li").forEach((li, j) => { li.classList.toggle("on", j === R.step); li.classList.toggle("past", j < R.step); }); R.stepT = setTimeout(() => { R.step = (R.step + 1) % L.steps.length; SFX.tick && SFX.tick(); loop(); }, pcReduce() ? 2600 : 1900); };
-  setTimeout(loop, 380);
+  if (real) { try { V.pcView.clear(); } catch (e) {} }
+  if (sc) { sc.classList.remove("live", "dim", "all"); sc.classList.add("play"); }
+  if (R.slide === "intro") { if (sc) { setTimeout(() => sc.classList.add("live"), 60); if (sc.dataset.k === "keypad") setTimeout(typeIt, 500); } return; }
+  if (R.slide === "quiz" || R.slide === "won") { if (sc) { sc.classList.add("live", R.slide === "quiz" ? "dim" : "all"); if (R.slide === "won") $$("[data-s]", sc).forEach((e) => e.classList.add("past")); const v = $(".pcs-val", sc); if (v) v.textContent = v.dataset.type || ""; } return; }
+  if (sc) sc.classList.add("live");
+  const n = real ? L.steps.length : Math.min(L.steps.length, 3);
+  const loop = () => { if (!PC.run || PC.run.slide !== "steps") return; at(Math.min(R.step, n - 1)); $$("#pcp .pcp-steps li").forEach((li, j) => { li.classList.toggle("on", j === R.step); li.classList.toggle("past", j < R.step); }); $$("#pcp .pcp-dots i").forEach((d, j) => d.classList.toggle("on", j === R.step)); R.stepT = setTimeout(() => { R.step = (R.step + 1) % L.steps.length; SFX.tick && SFX.tick(); loop(); }, pcReduce() ? 3200 : 2800); };
+  R.stepT = setTimeout(loop, real ? 520 : 380);
 }
+
+/* ═══════════════════════ vrais écrans ═══════════════════════
+   The phone of the player shows the real app: index.html?demo=1&pcview=1 in an iframe (the demo of « Le Bistrot Démo », kept in
+   memory only, nothing saved, its own sessionStorage), 390 px wide like a phone and scaled down into the device. Touches never reach
+   it (pointer-events: none): it is driven from here through window.pcView of the iframe. Lessons may name the element of each
+   step (L.tap: [selector, …]); otherwise the element whose words match the step, else the first buttons of the screen. */
+const PC_VIEW = /[?&]pcview\b/.test(location.search);
+if (PC_VIEW) { document.documentElement.classList.add("gg-pcview"); try { SFX.on = false; } catch (e) {} }
+const PC_META_ROUTE = { "@bases": "home", "@service": "home", "@moi": "moiPlanning", "@pilotage": "dashboard", "@partage": "espaces", "@kiosque": "cuisine", "@code": "pointeuse", "@fonctions": "fonctions", "@equipe": "priseEnMain" };
+function pcMirrorWin() { try { return (PC.mirror && PC.mirror.contentWindow) || null; } catch (e) { return null; } }
+function pcMirrorReady() { try { const w = pcMirrorWin(); return !!(w && w.pcView && w.pcView.ready()); } catch (e) { return false; } }
+function pcRealRoute(k) { const r = k[0] === "@" ? PC_META_ROUTE[k] : k; const w = pcMirrorWin(); try { return r && w && w.pcView.has(r) ? r : ""; } catch (e) { return ""; } }
+function pcMirror(root) {
+  if (PC_VIEW) return; const scr = $("#pcpScr", root); if (!scr) return;
+  const f = document.createElement("iframe"); f.className = "pcp-ifr"; f.tabIndex = -1; f.setAttribute("aria-hidden", "true"); f.title = "Aperçu";
+  f.src = "index.html?demo=1&nointro&pcview=1"; PC.mirror = f; scr.prepend(f); pcFit();
+  /* the stage grows with an animation: refit at every size it goes through */
+  try { new ResizeObserver(() => pcFit()).observe(scr); } catch (e) {}
+  const t0 = Date.now();
+  const poll = () => {
+    if (!PC.run || PC.mirror !== f || !document.contains(f)) return;
+    if (!pcMirrorReady()) { if (Date.now() - t0 < 25000) setTimeout(poll, 200); return; }
+    try { pcMirrorWin().pcView.prep(); } catch (e) {}
+    const R = PC.run, cur = pcCur(); pcFit(); pcStage(root, R, cur, pcL(cur.k));
+    if (root.classList.contains("pcp-real") && ["steps", "intro"].includes(R.slide)) pcSceneRun();
+  };
+  poll();
+}
+function pcFit() {
+  const f = PC.mirror, scr = $("#pcpScr"); if (!f || !scr) return; const W = scr.clientWidth, H = scr.clientHeight; if (!W || !H) return;
+  const vw = 390, z = W / vw; f.style.width = vw + "px"; f.style.height = Math.round(H / z) + "px"; f.style.transform = `scale(${z})`;
+}
+window.addEventListener("resize", () => { if (PC.run) pcFit(); });
+/* what the device shows for this slide: nothing on « bonjour » and chapters (the phone folds away), the real screen of the lesson,
+   or the drawn scene */
+function pcStage(root, R, cur, L) {
+  const les = ["intro", "steps", "quiz", "won"].includes(R.slide);
+  root.dataset.stage = les ? "on" : "off"; root.dataset.slide = R.slide;
+  const dev = $("#pcpDev", root), st = $("#pcpStage", root); if (!dev || !st) return;
+  dev.classList.toggle("won", R.slide === "won");
+  let seal = $(".pcp-seal", st);
+  if (R.slide === "won") { if (!seal) { seal = document.createElement("span"); seal.className = "pcp-seal"; seal.innerHTML = ico("check"); st.appendChild(seal); } } else if (seal) seal.remove();
+  if (!les) return;
+  { const fk = $("#pcpFake", root); if (fk && fk.dataset.k !== cur.k && !root.classList.contains("pcp-real")) { fk.dataset.k = cur.k; fk.innerHTML = pcScene(L.sc); } }
+  const route = pcMirrorReady() ? pcRealRoute(cur.k) : "";
+  /* the first real screen appears once it has drawn itself (the drawn scene stays until then) */
+  if (route && !root.classList.contains("pcp-real") && !R.realOk) { R.realOk = true; R.shown = cur.k; try { pcMirrorWin().pcView.show(route); } catch (e) {} setTimeout(() => { if (PC.run !== R) return; root.classList.add("pcp-real"); if (R.slide === "steps") pcSceneRun(); }, 650); return; }
+  root.classList.toggle("pcp-real", !!route);
+  if (route) { if (R.shown !== cur.k) { R.shown = cur.k; try { pcMirrorWin().pcView.show(route); } catch (e) {} } }
+  else { const fk = $("#pcpFake", root); if (fk && fk.dataset.k !== cur.k) { fk.dataset.k = cur.k; fk.innerHTML = pcScene(L.sc); } }
+  requestAnimationFrame(pcFit);
+}
+/* inside the iframe: the app being shown */
+const PCV_STOP = new Set(["dans", "pour", "avec", "votre", "vous", "puis", "elle", "elles", "tout", "toute", "tous", "touchez", "ouvrez", "choisissez", "regardez", "faites", "comme", "chaque", "plus", "sans", "sont", "cette", "leur", "quand", "besoin", "fois", "seul", "geste", "gestes"]);
+window.pcView = {
+  used: [],
+  ready() { try { return PC_VIEW && DB.mode === "demo" && !!S.resto && !!document.querySelector("#viewport > *"); } catch (e) { return false; } },
+  has(r) { try { return !!VIEWS[r] && (typeof canSee !== "function" || canSee(r)); } catch (e) { return false; } },
+  prep() { try { SFX.on = false; } catch (e) {} try { if (typeof closeSheet === "function" && document.querySelector("#sheet.open")) closeSheet(true); } catch (e) {} },
+  show(route) {
+    this.clear(); this.used = [];
+    try { if (typeof closeSheet === "function" && document.querySelector("#sheet.open")) closeSheet(true); } catch (e) {}
+    try { S.history = []; go(route, {}, { replace: true }); } catch (e) {}
+    setTimeout(() => this.top(), 40); setTimeout(() => this.top(), 300);
+  },
+  top() { try { (document.scrollingElement || document.documentElement).scrollTo(0, 0); const m = document.getElementById("main"); if (m && m.scrollTo) m.scrollTo(0, 0); } catch (e) {} },
+  dots() {
+    let r = document.getElementById("pcvR"), f = document.getElementById("pcvF");
+    if (!r) { r = document.createElement("div"); r.id = "pcvR"; r.className = "pcv-ring"; document.body.appendChild(r); }
+    if (!f) { f = document.createElement("div"); f.id = "pcvF"; f.className = "pcv-fing"; f.innerHTML = "<i></i>"; document.body.appendChild(f); }
+    return [r, f];
+  },
+  clear() { ["pcvR", "pcvF"].forEach((id) => { const e = document.getElementById(id); if (e) e.classList.remove("show", "tap"); }); },
+  target(j, txt, sel) {
+    const vp = document.getElementById("viewport") || document.body;
+    if (sel) { const e = vp.querySelector(sel) || document.querySelector(sel); if (e) return e; }
+    const H = innerHeight;
+    const all = [...vp.querySelectorAll("[data-act],[data-go],button,a[href],input,select,.li,.card,.tile")].filter((e) => {
+      const r = e.getBoundingClientRect(); if (r.width < 36 || r.height < 22 || r.height > H * 0.6) return false;
+      const cs = getComputedStyle(e); return cs.visibility !== "hidden" && cs.display !== "none" && +cs.opacity !== 0;
+    });
+    const leaf = all.filter((e) => !all.some((o) => o !== e && e.contains(o) && !o.matches(".card,.tile")));
+    const norm = (x) => String(x || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+    const words = norm(txt).split(/[^a-z0-9]+/).filter((w) => w.length > 3 && !PCV_STOP.has(w));
+    let best = null, bs = 0;
+    leaf.forEach((e, i) => {
+      const t = norm(e.textContent + " " + (e.getAttribute("aria-label") || "") + " " + (e.getAttribute("title") || ""));
+      let s = 0; words.forEach((w) => { if (t.includes(w.slice(0, Math.max(4, w.length - 2)))) s++; });
+      if (!s) return; s -= i * 0.003 + (this.used.includes(e) ? 0.5 : 0); if (s > bs) { bs = s; best = e; }
+    });
+    if (best && bs >= 0.9) return best;
+    const free = leaf.filter((e) => !this.used.includes(e)).slice(0, 8);
+    return free[Math.min(free.length - 1, j * 2)] || leaf[0] || null;
+  },
+  step(j, txt, sel) {
+    const e = this.target(j, txt, sel); if (!e) { this.clear(); return; } this.used.push(e);
+    const [ring, fing] = this.dots(); const r0 = e.getBoundingClientRect();
+    const tb = document.getElementById("tabbar"), bottom = tb && tb.getBoundingClientRect().height ? tb.getBoundingClientRect().top : innerHeight;
+    const off = r0.top < 64 || r0.bottom > bottom - 10;
+    if (off) { try { e.scrollIntoView({ block: "center", behavior: "smooth" }); } catch (x) { e.scrollIntoView(); } }
+    setTimeout(() => {
+      const r = e.getBoundingClientRect();
+      ring.style.width = r.width + 8 + "px"; ring.style.height = r.height + 8 + "px"; ring.style.transform = `translate(${r.left - 4}px, ${r.top - 4}px)`;
+      const fx = r.left + Math.min(r.width * 0.62, r.width - 18), fy = r.top + r.height * 0.6;
+      fing.style.transform = `translate(${fx}px, ${fy}px)`; ring.classList.add("show"); fing.classList.add("show");
+      fing.classList.remove("tap"); void fing.offsetWidth; setTimeout(() => { fing.classList.add("tap"); e.classList.add("pcv-hit"); setTimeout(() => e.classList.remove("pcv-hit"), 600); }, 560);
+    }, off ? 520 : 60);
+  },
+};
 function pcClose(silent) {
   const R = PC.run, root = $("#pcp"); if (R) { clearTimeout(R.stepT); clearInterval(R.typeT); }
-  PC.run = null; document.documentElement.classList.remove("pcp-open");
+  PC.run = null; PC.mirror = null; document.documentElement.classList.remove("pcp-open");
   if (root) { root.id = ""; root.classList.remove("on"); root.classList.add("off"); setTimeout(() => root.remove(), pcReduce() ? 0 : 380); }
   if (!silent) { SFX.close && SFX.close(); buzz(4); }
   try { if (["priseEnMain", "home"].includes(S.route)) rerender(); } catch (e) {}
