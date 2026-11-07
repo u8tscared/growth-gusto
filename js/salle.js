@@ -850,7 +850,7 @@ Object.assign(ACT, {
   slServed: async (a, id) => {
     const o = (CM.orders || []).find((x) => x.id === id); if (!o) return; SFX.ok(); buzz(8);
     const row = a.closest(".sl-rd,.sl-kr,.sl-cb"); if (row) row.classList.add("go");
-    await safe(DB.update("clientOrders", id, { status: "servie", doneAt: Date.now(), by: S.me.id }));
+    await safe(DB.update("clientOrders", id, { status: "servie", doneAt: Date.now(), by: S.me.id, doneBy: S.me.id }));
     S.ui.undo = () => DB.update("clientOrders", id, { status: "prete", doneAt: null }); toastUndo(o.src === "salle" ? `Table ${o.table} · ${o.courseT} servi` : `${slWho(o)} remise`);
   },
   slBill: () => { const tab = slCurTab(); if (!tab) return; SFX.sheet ? SFX.sheet() : SFX.tap(); SL.bill = null; slBillSheet(tab); },
@@ -928,7 +928,7 @@ Object.assign(ACT, {
   },
   slKNext: async (a, id, v) => {
     const o = (CM.orders || []).find((x) => x.id === id); if (!o || SL.busy[id]) return; SL.busy[id] = true;
-    const patch = { status: v, by: S.me.id }; if (v === "prep") patch.prepAt = Date.now(); if (v === "prete") patch.readyAt = Date.now();
+    const patch = { status: v, by: S.me.id }; if (v === "prep") { patch.prepAt = Date.now(); patch.prepBy = S.me.id; } if (v === "prete") { patch.readyAt = Date.now(); patch.readyBy = S.me.id; }
     const card = a.closest(".sl-kcard"); if (v === "prete" && card) card.classList.add("go");
     v === "prete" ? (SFX.done(), buzz([14, 40, 14])) : (SFX.ok(), buzz(8));
     setTimeout(async () => {
