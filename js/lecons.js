@@ -9,7 +9,8 @@
          d: "Une phrase : à quoi ça sert, pour qui.",
          steps: ["Geste 1", "Geste 2", "Geste 3"],  // 2 à 4 gestes, verbe à l'impératif, courts
          q: ["Une question simple ?", ["Bonne réponse", "Piège 1", "Piège 2"], 0],   // index de la bonne réponse
-         sc: { k: "list", t: "Titre de l'écran", rows: [["icone", "Libellé", "valeur", "ok"]] },  // la mini-scène animée
+         sc: { k: "list", t: "Titre de l'écran", rows: [["icone", "Libellé", "valeur", "ok"]] },  // dessin de secours (le téléphone montre le vrai écran de la démo)
+         tap: ["[data-act=x]", ".classe", ""],  // facultatif : l'élément que le doigt touche à chaque étape (sinon deviné d'après le texte)
          who: ["cuisine", "salle", "bar", "plonge", "boss"],  // facultatif : postes concernés (déduit des postes sinon)
          tip: "Le réflexe à retenir (facultatif).",
        };
@@ -36,6 +37,7 @@ const PC_LECONS = {
     steps: ["Ouvrez le relevé du service", "Tapez la température lue sur le frigo", "Validez : vert c'est bon, rouge l'app vous guide"],
     q: ["Le frigo affiche 7 °C pour une limite à 4 °C. Que faites-vous ?", ["Je le note : l'app propose l'action corrective", "Je ne note rien", "J'écris 4 °C"], 0],
     tip: "Notez toujours la vraie valeur : c'est ce qui vous protège en cas de contrôle.",
+    tap: ["[data-act=frOpen]", ".rel-vw, .rel-lcd", "[data-act=saveReading]"],
     sc: { k: "keypad", t: "Chambre froide", v: "3,2", unit: "°C", ok: "Conforme" } },
   frigos: { t: "Frigos", d: "Chaque frigo, chambre froide ou congélateur, avec ses seuils et tout son historique.",
     steps: ["Touchez un frigo pour voir sa courbe", "Réglez ses seuils une fois pour toutes", "Ajoutez un équipement avec le +"],

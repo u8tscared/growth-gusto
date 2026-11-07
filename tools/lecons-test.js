@@ -31,5 +31,15 @@ module.exports = async (page) => {
   });
   if (r.missing && r.missing.length) throw new Error(`écran du menu sans leçon de prise en main : ${r.missing.join(', ')}. Ajoutez PC_LECONS.<route> = { t, d, steps, q, sc } dans le fichier du module (modèle en tête de js/lecons.js).`);
   if (r.bad.length) throw new Error('leçons mal formées :\n  ' + r.bad.join('\n  '));
-  console.log(`LECONS OK : ${r.n} écrans du menu, tous avec leur leçon · parcours ${JSON.stringify(r.plans)}`);
+  /* le téléphone du lecteur montre le vrai écran (la démo dans une iframe) : chaque leçon doit l'ouvrir */
+  await page.evaluate(() => { PC.play({ keys: ['releve'] }); ACT.pcNext(); });
+  await page.waitForFunction(() => document.querySelector('#pcp.pcp-real'), null, { timeout: 30000 }).catch(() => {});
+  const real = await page.evaluate(async () => {
+    const out = []; const keys = Object.keys(PC_LECONS).concat(Object.keys(PC_META)); const w = pcMirrorWin();
+    if (!w || !pcMirrorReady()) return ['la démo ne s\'ouvre pas dans le téléphone du lecteur'];
+    for (const k of keys) { const r = pcRealRoute(k); if (!r) { out.push(k + ' : pas d\'écran'); continue; } w.pcView.show(r); await new Promise((ok) => setTimeout(ok, 250)); const now = w.eval('S.route'); if (now !== r) out.push(k + ' : ouvre ' + now + ' au lieu de ' + r); }
+    PC.close(true); return out;
+  });
+  if (real.length) throw new Error('vrais écrans de la prise en main :\n  ' + real.join('\n  '));
+  console.log(`LECONS OK : ${r.n} écrans du menu, tous avec leur leçon et leur vrai écran · parcours ${JSON.stringify(r.plans)}`);
 };
