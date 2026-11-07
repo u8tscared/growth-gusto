@@ -438,3 +438,25 @@ html:not([data-acc="violet"]) .qm-k,html:not([data-acc="violet"]) .qm-hn p{color
 [data-look="elegant"] .qm-it-ph:not(:has(img)){order:5;width:auto;height:auto;background:none}
 [data-look="elegant"].noph .qm-it-ph{order:5;width:auto;height:auto;margin-top:2px}
 [data-look="elegant"].noph .qm-add,[data-look="elegant"].noph .qm-step{position:static;transform:none}
+
+/* ── prix dynamiques (js/prix.js): happy hour and plat du jour, the old price struck through ── */
+.qm-was{font-family:var(--m);font-size:12.5px;color:var(--faint);text-decoration-thickness:1.5px;text-decoration-color:var(--tomato)}
+.qm-pr.deal{color:var(--tomato)}
+.qm-tag.deal{background:var(--tomato-tint);color:var(--bad)}
+.qm-tag.deal.jour{background:var(--tint);color:var(--accent-ink)}
+.qm-pr2.deal{color:var(--tomato)}.qm-pr2 s{color:var(--faint);font-size:.82em;font-weight:600;margin-right:2px}
+.qm-deal{all:unset;box-sizing:border-box;margin:14px 14px 0;display:flex;align-items:center;gap:13px;padding:12px 14px;border-radius:20px;background:var(--tomato);color:#fff;box-shadow:0 4px 0 #A8341C;position:relative;overflow:hidden}
+.qm-deal::after{content:"";position:absolute;inset:-40% auto -40% -30%;width:40%;background:linear-gradient(100deg,transparent,rgba(255,255,255,.28),transparent);transform:skewX(-18deg);animation:qmShine 3.6s ease-in-out infinite;pointer-events:none}
+.qm-deal.jour{cursor:pointer;background:var(--ink);box-shadow:0 4px 0 #000}
+.qm-deal.jour::after{display:none}
+.qm-deal-pc{flex:none;min-width:58px;height:52px;padding:0 8px;border-radius:16px;background:rgba(255,255,255,.18);display:flex;align-items:center;justify-content:center;white-space:nowrap;font-family:var(--m);font-weight:800;font-size:19px;letter-spacing:-.04em}
+.qm-deal-pc small{font-size:12px;margin-left:1px}
+.qm-deal.jour .qm-deal-pc{background:var(--saffron);color:var(--ink)}
+.qm-deal.jour .qm-deal-pc svg{width:24px;height:24px}
+.qm-deal-tx{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.qm-deal-tx b{font-size:15px;letter-spacing:-.01em}
+.qm-deal-tx em{font-style:normal;font-size:13px;opacity:.92}
+.qm-deal-tx em s{margin-right:6px;opacity:.7}
+.qm-deal .qm-chev{color:#fff}
+@keyframes qmShine{0%,55%{left:-40%}100%{left:130%}}
+@media (prefers-reduced-motion:reduce){.qm-deal::after{animation:none;display:none}}
