@@ -799,7 +799,7 @@ VIEWS.staff = {
         <span class="rh-emp-t"><b>${esc(p.name)}</b><em>${esc(p.role || "Poste à préciser")} · ${RH_CONTRACTS[p.contract] || esc(p.contract)} · ${fmt(rhNum(p.weeklyHours, 35), 0)} h/sem.</em>
         ${boss ? (rate ? `<span class="rh-emp-m"><span><b class="mono">${fmt(rate, 2)} €</b>brut / h</span><span><b class="mono">${fmt(lr, 2)} €</b>chargé / h</span><span><b class="mono">${rhEur(mg)}</b>brut / mois</span><span><b class="mono">${rhEur(mg * (1 + rhCh(p) / 100))}</b>chargé / mois</span></span>` : `<span class="pill warn">Taux horaire à saisir</span>`) : ""}</span>${ico("chev")}</button>`;
     };
-    return `<div class="inner rh-staff">${topBar("Employés", { right: rhCanEdit() ? `<button class="btn acc sm" data-act="rhEmpNew">${ico("plus")}Ajouter</button>` : "" })}
+    return `<div class="inner rh-staff">${topBar("Employés", { right: rhCanEdit() ? `<button class="btn soft sm" data-act="rhBulk" aria-label="Ajouter plusieurs personnes">${ico("users")}<span class="rh-bt">Plusieurs</span></button><button class="btn acc sm" data-act="rhEmpNew">${ico("plus")}Ajouter</button>` : "" })}
       ${money}
       ${act.length ? `<div class="rh-emps">${act.map(card).join("")}</div>` : `<div class="glass empty st" style="--i:3"><span class="ic">${ico("rhid")}</span><b>Aucun employé</b>Créez une fiche par personne : poste, contrat, heures et taux horaire. Le planning et la pointeuse s'en servent.</div>`}
       ${old.length ? `<div class="lbl st" style="--i:30">Anciens employés</div><div class="rh-emps">${old.map((p, i) => card(p, i + 30)).join("")}</div>` : ""}
@@ -856,7 +856,7 @@ document.addEventListener("input", (e) => {
     const r1 = VIEWS.equipe.render;
     VIEWS.equipe.render = function () {
       const h = r1.apply(this, arguments); if (h.includes("rh-eqlink")) return h;
-      const link = `<div class="glass pad rh-eqlink st" style="--i:3">${rhCanStaff() ? `<div class="li tap" data-go="staff"><span class="ic">${ico("rhid")}</span><div class="tx"><b>Fiches employés et salaires</b><em>Contrats, heures, coût chargé</em></div>${ico("chev")}</div>` : ""}<div class="li tap" data-go="planning"><span class="ic">${ico("cal")}</span><div class="tx"><b>Planning</b><em>Créneaux de la semaine</em></div>${ico("chev")}</div><div class="li tap" data-go="pointeuse"><span class="ic">${ico("clock")}</span><div class="tx"><b>Pointeuse</b><em>Arrivées, pauses, départs</em></div>${ico("chev")}</div></div>`;
+      const link = `<div class="glass pad rh-eqlink st" style="--i:3">${rhCanStaff() ? `<div class="li tap" data-go="staff"><span class="ic">${ico("rhid")}</span><div class="tx"><b>${rhPaid() ? "Fiches employés et salaires" : "Fiches employés"}</b><em>${rhPaid() ? "Contrats, heures, coût chargé" : "Contrats, heures, postes"}</em></div>${ico("chev")}</div>` : ""}${rhCanEdit() ? `<div class="li tap" data-act="rhBulk"><span class="ic">${ico("users")}</span><div class="tx"><b>Ajouter des extras ou saisonniers</b><em>Collez une liste de noms, en une fois</em></div>${ico("chev")}</div>` : ""}<div class="li tap" data-go="planning"><span class="ic">${ico("cal")}</span><div class="tx"><b>Planning</b><em>Créneaux de la semaine</em></div>${ico("chev")}</div><div class="li tap" data-go="pointeuse"><span class="ic">${ico("clock")}</span><div class="tx"><b>Pointeuse</b><em>Arrivées, pauses, départs</em></div>${ico("chev")}</div></div>`;
       const i = h.lastIndexOf("</div>"); return i > 0 ? h.slice(0, i) + link + h.slice(i) : h + link;
     };
   }
@@ -1075,5 +1075,50 @@ Object.assign(ACT, {
     else await safe(DB.add("staff", { ...doc, createdAt: Date.now(), by: S.me.id }));
     const isNew = F._new && !F._virtual; closeSheet(true); SFX.done(); buzz([8, 30, 8]); toast(isNew ? `${firstName(name)} a rejoint l'équipe` : "Fiche enregistrée");
     logEvent("rh", isNew ? `a créé la fiche de ${firstName(name)}` : `a modifié la fiche de ${firstName(name)}`);
+  }),
+});
+
+/* ───────────── ajout groupé : extras et saisonniers (trouvé par la simulation de 15 restaurants : une crêperie qui embauche 8 saisonniers d'un coup) ───────────── */
+const rhBulkNames = (t) => { const seen = new Set(); return String(t || "").split(/[\n;]+|,(?=\s*[A-ZÀ-Ý])/).map((x) => x.replace(/^[\s\-•*\d.)]+/, "").replace(/\s+/g, " ").trim().slice(0, 40)).filter((x) => x.length > 1 && !seen.has(x.toLowerCase()) && seen.add(x.toLowerCase())); };
+function rhBulkSheet() {
+  const B = S.ui.rhB; const n = rhBulkNames(B.text); const have = new Set(rhPeople({ all: true }).map((p) => p.name.toLowerCase())); const dup = n.filter((x) => have.has(x.toLowerCase()));
+  return `<div class="rh-es rh-bulk">
+    <div class="h2">Ajouter plusieurs personnes</div>
+    <p class="sub">Un nom par ligne, ou collez la liste reçue par SMS ou e-mail. Chacun a sa fiche, apparaît au planning et pointe avec son code.</p>
+    <label class="field"><span>Les noms</span><textarea class="input" id="rhBt" rows="6" placeholder="Léa Martin&#10;Hugo Bernard&#10;Inès Diallo">${esc(B.text)}</textarea></label>
+    <p class="note" id="rhBn">${n.length ? `${n.length} personne${n.length > 1 ? "s" : ""}${dup.length ? ` · déjà dans l'équipe : ${esc(dup.slice(0, 3).join(", "))}${dup.length > 3 ? "…" : ""} (ignoré${dup.length > 1 ? "s" : ""})` : ""}` : "Aucun nom pour l'instant."}</p>
+    <div class="field"><span>Contrat</span><div class="rh-opts">${[["extra", "Extra"], ["CDD", "Saisonnier (CDD)"]].map(([k, v]) => `<button class="${B.contract === k ? "on" : ""}" data-act="rhBC" data-v="${k}">${v}</button>`).join("")}</div></div>
+    <div class="field"><span>Poste habituel au planning</span><div class="rh-posts">${Object.entries(RH_POSTS).map(([k, v]) => `<button class="${B.post === k ? "on" : ""}" style="--pc:${v.c};--pb:${v.bg};--pi:${v.ink}" data-act="rhBP" data-v="${k}"><i></i>${v.t}</button>`).join("")}</div></div>
+    <div class="grid2"><label class="field"><span>Poste</span><input class="input" id="rhBr" value="${esc(B.role)}" list="rhRoles" maxlength="40" placeholder="Ex. Serveur"><datalist id="rhRoles">${RH_ROLES.map((r) => `<option value="${esc(r)}">`).join("")}</datalist></label>
+      <label class="field"><span>Heures / semaine</span><input class="input mono" id="rhBh" inputmode="decimal" value="${esc(String(B.weeklyHours).replace(".", ","))}"></label></div>
+    <div class="grid2"><label class="field"><span>Début</span><input class="input" type="date" id="rhBs" value="${esc(B.start)}"></label><label class="field"><span>${B.contract === "CDD" ? "Fin de saison" : "Fin (facultatif)"}</span><input class="input" type="date" id="rhBe" value="${esc(B.end)}"></label></div>
+    ${rhIsBoss() ? `<label class="field"><span>Taux horaire brut (€), le même pour tous</span><input class="input mono" id="rhBw" inputmode="decimal" value="${esc(String(B.hourlyGross || "").replace(".", ","))}" placeholder="Ex. 12,10"></label>` : ""}
+    <button class="btn acc block" data-act="rhBulkSave" ${n.length - dup.length > 0 ? "" : "disabled"}>${ico("check")}${n.length - dup.length > 0 ? `Ajouter ${n.length - dup.length} personne${n.length - dup.length > 1 ? "s" : ""}` : "Ajouter"}</button>
+  </div>`;
+}
+function rhBRead() { const B = S.ui.rhB; if (!B) return; const g = (id) => $("#" + id)?.value; B.text = g("rhBt") ?? B.text; B.role = g("rhBr") ?? B.role; B.weeklyHours = g("rhBh") ?? B.weeklyHours; B.start = g("rhBs") ?? B.start; B.end = g("rhBe") ?? B.end; B.hourlyGross = g("rhBw") ?? B.hourlyGross; }
+const rhBRedraw = () => { const y = ($("#sheetBody") || {}).scrollTop; openSheet(rhBulkSheet()); const b = $("#sheetBody"); if (b && y) b.scrollTop = y; };
+document.addEventListener("input", (e) => { if (e.target && e.target.id === "rhBt" && S.ui.rhB) { rhBRead(); const n = $("#rhBn"), btn = $("[data-act=rhBulkSave]"); if (!n || !btn) return; const tmp = document.createElement("div"); tmp.innerHTML = rhBulkSheet(); n.innerHTML = $("#rhBn", tmp).innerHTML; btn.outerHTML = $("[data-act=rhBulkSave]", tmp).outerHTML; } });
+Object.assign(ACT, {
+  rhBulk: () => { if (!rhCanEdit()) { toast("Seul le gérant ajoute des fiches.", "info"); return; } SFX.tap(); const t = dayKey(); S.ui.rhB = S.ui.rhB && S.ui.rhB.text ? S.ui.rhB : { text: "", contract: "extra", post: "salle", role: "", weeklyHours: 0, start: t, end: "", hourlyGross: "" }; openSheet(rhBulkSheet()); },
+  rhBC: (a, id, v) => { const B = S.ui.rhB; if (!B) return; rhBRead(); B.contract = v; if (v === "CDD" && !rhNum(B.weeklyHours, 0)) B.weeklyHours = 35; if (v === "extra" && rhNum(B.weeklyHours, 0) === 35) B.weeklyHours = 0; SFX.tick(); rhBRedraw(); },
+  rhBP: (a, id, v) => { const B = S.ui.rhB; if (!B) return; rhBRead(); B.post = B.post === v ? "" : v; if (!B.role) B.role = { cuisine: "Commis", salle: "Serveur", plonge: "Plongeur", bar: "Barman" }[B.post] || ""; SFX.tick(); rhBRedraw(); },
+  rhBulkSave: () => rhOnce("rhBulkSave", async () => {
+    rhBRead(); const B = S.ui.rhB; if (!B || !rhCanEdit()) return;
+    const have = new Set(rhPeople({ all: true }).map((p) => p.name.toLowerCase())); const names = rhBulkNames(B.text).filter((x) => !have.has(x.toLowerCase()));
+    if (!names.length) { toast("Ajoutez au moins un nom.", "err"); return; }
+    if (B.end && B.start && B.end < B.start) { toast("La fin est avant le début.", "err"); return; }
+    const used = rhPeople().map((p) => p.color); const free = PALETTE.filter((c) => !used.includes(c)); const pal = free.length ? free : PALETTE;
+    const role = (B.role || "").trim() || (B.contract === "CDD" ? "Saisonnier" : "Extra");
+    let i = 0;
+    for (const name of names) {
+      const doc = { name, role, post: B.post || "", color: pal[i % pal.length], contract: B.contract === "CDD" ? "CDD" : "extra", weeklyHours: rhNum(B.weeklyHours, 0), chargesPct: 42, start: B.start || "", end: B.end || "", active: true, memberId: "", createdAt: Date.now(), by: S.me.id, bulk: true };
+      if (rhIsBoss() && rhNum(B.hourlyGross, 0)) doc.hourlyGross = rhNum(B.hourlyGross, 0);
+      await safe(DB.add("staff", doc)); i++;
+    }
+    S.ui.rhB = null; closeSheet(true); SFX.done(); buzz([8, 30, 8]);
+    toast(`${i} personne${i > 1 ? "s" : ""} ajoutée${i > 1 ? "s" : ""} à l'équipe`);
+    try { Promise.resolve(logEvent("staff", `a ajouté ${i} ${B.contract === "CDD" ? "saisonnier" : "extra"}${i > 1 ? "s" : ""} : ${names.slice(0, 4).join(", ")}${names.length > 4 ? "…" : ""}`)).catch(() => {}); } catch (e) {}
+    rerender();
   }),
 });
