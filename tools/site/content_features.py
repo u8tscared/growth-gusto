@@ -107,6 +107,7 @@ FEATURES = [
   ],
   faq=[("Peut-on encaisser dans Growth Gusto ?", "Non. L'addition est préparée dans l'app, l'encaissement se fait sur votre caisse habituelle. Encaisser dans l'app demanderait une certification NF525."),
        ("Faut-il du matériel spécial ?", "Non : les téléphones des serveurs et une tablette en cuisine suffisent. Une imprimante d'étiquettes peut imprimer les bons."),
+       ("Et si le Wi-Fi tombe pendant le service ?", "Le service continue. Le serveur prend ses commandes, la cuisine garde ses bons à l'écran, et tout ce qui a été fait sans réseau part tout seul dès que la connexion revient. Une bulle « Hors ligne » indique ce qui attend, et un téléphone en 4G garde la salle reliée à la cuisine."),
        ("Comment faire une note de frais avec TVA ?", "Dans l'addition de la table, activez « Note de frais » et indiquez la société : quand la table est réglée, la facture est éditée à son nom, « 4 repas complets » ou le détail des plats, avec la TVA à 10 % et 20 %. Numérotation continue, avoir en cas d'erreur, impression ou e-mail. Inclus dans les packs Second et Chef.")],
   related=["menu-qr", "reservations", "caisse-stock"], guides=[]),
 

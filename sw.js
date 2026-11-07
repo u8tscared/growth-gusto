@@ -1,10 +1,10 @@
 /* Growth Gusto service worker: offline shell. Network-first, no-store, for pages/js/css/json (updates arrive at once), cache fallback offline. Bump VERSION to drop old caches. */
-const VERSION = "gg-v69";
+const VERSION = "gg-v70";
 const SHELL = [
   "./", "./index.html", "./manifest.webmanifest",
   "./css/base.css", "./css/compte.css", "./css/abo.css", "./css/onboard.css", "./css/home.css", "./css/releve.css", "./css/labels.css", "./css/reception.css", "./css/stock.css", "./css/tickets.css", "./css/registre.css", "./css/notes.css", "./css/menage.css", "./css/finance.css", "./css/pennylane.css", "./css/oblig.css", "./css/rh.css", "./css/avis.css", "./css/auth.css", "./css/v2.css", "./css/tour.css", "./css/perms.css", "./css/perso.css", "./css/saisie.css", "./css/alertes.css", "./css/sondes.css", "./css/hygiene.css", "./css/caisse.css", "./css/import.css", "./css/resa.css", "./css/plan.css", "./css/resaimport.css", "./css/marge.css", "./css/commande.css", "./css/cmimport.css", "./css/controle.css", "./css/formation.css",
   "./js/config.js", "./js/core.js", "./js/icons.js", "./js/compte.js", "./js/abo.js", "./js/onboard.js", "./js/home.js", "./js/releve.js", "./js/labels.js", "./js/reception.js", "./js/stock.js", "./js/tickets.js", "./js/registre.js", "./js/notes.js", "./js/menage.js", "./js/finance.js", "./js/banque.js", "./js/pennylane.js", "./js/oblig.js", "./js/rh.js", "./js/avis.js", "./js/auth.js", "./js/tour.js", "./js/perms.js", "./js/perso.js", "./js/saisie.js", "./js/alertes.js", "./js/sondes.js", "./js/hygiene.js", "./js/caisse.js", "./js/import.js", "./js/resa.js", "./js/rzparse.js", "./js/resaimport.js", "./js/plan.js", "./js/marge.js", "./js/commande.js", "./js/cmimport.js", "./js/formation.js", "./js/controle.js", "./js/demo.js", "./js/main.js",
-  "./css/achats.css", "./css/gaspi.css", "./js/achats.js", "./js/fournisseurs.js", "./css/fournisseurs.css", "./js/gaspi.js", "./css/salle.css", "./js/salle.js", "./css/clients.css", "./js/clients.js", "./css/consignes.css", "./js/consignes.js", "./css/rush.css", "./js/rush.js", "./css/livraison.css", "./js/livraison.js", "./css/multi.css", "./js/multi.js", "./css/frais.css", "./js/frais.js", "./css/intro.css", "./js/intro.js", "./css/grand.css", "./js/grand.js", "./css/espaces.css", "./js/espaces.js", "./css/verrou.css", "./js/verrou.js",
+  "./css/achats.css", "./css/gaspi.css", "./js/achats.js", "./js/fournisseurs.js", "./css/fournisseurs.css", "./js/gaspi.js", "./css/salle.css", "./js/salle.js", "./css/clients.css", "./js/clients.js", "./css/consignes.css", "./js/consignes.js", "./css/rush.css", "./js/rush.js", "./css/livraison.css", "./js/livraison.js", "./css/multi.css", "./js/multi.js", "./css/frais.css", "./js/frais.js", "./css/intro.css", "./js/intro.js", "./css/grand.css", "./js/grand.js", "./css/espaces.css", "./js/espaces.js", "./css/verrou.css", "./js/verrou.js", "./css/horsligne.css", "./js/horsligne.js",
   "./vendor/qrcode.js", "./vendor/jsQR.js",
   "./icons/icon.svg", "./icons/icon-192.png", "./icons/icon-512.png", "./icons/apple-touch-icon.png", "./icons/favicon-32.png",
 ];
@@ -12,8 +12,16 @@ const FONT_HOSTS = ["fonts.googleapis.com", "fonts.gstatic.com"];
 /* the Firebase SDK (exact version in the URL, so a cached copy never goes stale): cached for offline launches in the kitchen */
 const SDK = (url) => url.hostname === "www.gstatic.com" && url.pathname.startsWith("/firebasejs/");
 
+/* offline launch must never miss a file: besides SHELL, every css/js that index.html links is cached too (a new module added to the page
+   but forgotten here would otherwise break the first launch without network) */
+async function pageAssets() {
+  try {
+    const html = await (await fetch("./index.html", { cache: "reload" })).text();
+    return [...html.matchAll(/(?:src|href)="((?:js|css|vendor|icons)\/[^"?#]+)"/g)].map((m) => "./" + m[1]);
+  } catch (e) { return []; }
+}
 self.addEventListener("install", (e) => {
-  e.waitUntil(caches.open(VERSION).then((c) => Promise.all(SHELL.map((u) => c.add(new Request(u, { cache: "reload" })).catch(() => {})))).then(() => self.skipWaiting()));
+  e.waitUntil(caches.open(VERSION).then(async (c) => { const all = [...new Set([...SHELL, ...(await pageAssets())])]; await Promise.all(all.map((u) => c.add(new Request(u, { cache: "reload" })).catch(() => {}))); }).then(() => self.skipWaiting()));
 });
 self.addEventListener("activate", (e) => {
   e.waitUntil(caches.keys().then((ks) => Promise.all(ks.filter((k) => k !== VERSION).map((k) => caches.delete(k)))).then(() => self.clients.claim()));
@@ -49,6 +57,7 @@ self.addEventListener("fetch", (e) => {
   const req = e.request; if (req.method !== "GET") return;
   const url = new URL(req.url);
   if (url.origin === location.origin) {
+    if (url.searchParams.has("ggping")) return; /* js/horsligne.js asks the real network whether it answers: never from the cache */
     if (!url.pathname.startsWith(new URL(self.registration.scope).pathname)) return;
     e.respondWith(isFresh(url, req) ? networkFirst(req, e) : staleWhileRevalidate(req, e));
   } else if (FONT_HOSTS.includes(url.hostname) || SDK(url)) {
