@@ -154,12 +154,12 @@ function homeSteps() {
   return [
     { done: S.fridges.length > 0, t: "Ajouter vos frigos", s: "Avec leurs seuils de température", attrs: `data-go="frigos"` },
     { done: S.readings.length > 0, t: "Faire le premier relevé", s: "Une température par frigo, en 10 secondes", attrs: S.fridges.length ? `data-act="homeFridge" data-id="${S.fridges[0].id}"` : `data-go="frigos"` },
-    { done: S.receptions.length > 0, t: "Enregistrer une réception", s: "Température, DLC et photo de l'étiquette", attrs: `data-go="reception" data-fresh="1"` },
-    { done: S.chores.length > 0, t: "Charger le plan de nettoyage", s: "Un plan type prêt à l'emploi, en un geste", attrs: `data-act="homeStarter"` },
-    { done: S.members.length > 1, t: "Ajouter l'équipe", s: "Chaque action porte le nom de son auteur", attrs: `data-go="equipe"` },
+    { done: S.receptions.length > 0, t: "Enregistrer une réception", s: "Température, DLC et photo de l'étiquette", attrs: `data-go="reception" data-fresh="1"`, r: "reception" },
+    { done: S.chores.length > 0, t: "Charger le plan de nettoyage", s: "Un plan type prêt à l'emploi, en un geste", attrs: `data-act="homeStarter"`, r: "menage" },
+    { done: S.members.length > 1, t: "Ajouter l'équipe", s: "Chaque action porte le nom de son auteur", attrs: `data-go="equipe"`, r: "equipe" },
     ...(DB.mode === "local" && typeof ccHasPin === "function" && typeof ACT.ccPinChange === "function" && S.members.some((m) => m.id === S.me.id)
       ? [{ done: ccHasPin(S.members.find((m) => m.id === S.me.id)), t: "Créer votre code", s: "4 chiffres pour entrer dans votre session", attrs: `data-act="ccPinChange"` }] : []),
-  ];
+  ].filter((x) => !x.r || typeof pcRouteOff !== "function" || !pcRouteOff(x.r)); /* une fonction coupée (Réglages › Fonctionnalités) ne s'affiche pas dans les premiers pas */
 }
 function homeStepsCard(i) {
   const st = homeSteps(); const n = st.filter((x) => x.done).length;

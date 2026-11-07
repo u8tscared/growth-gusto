@@ -13,10 +13,11 @@ const COMMON = {
   },
   /* le créneau du relevé (midi / soir) colle aux heures réelles du restaurant */
   async creneaux(page, P) {
+    /* journée du restaurant (js/journee.js) : après minuit on reste sur la veille, au second relevé ; les noms suivent le réglage */
     const hours = P.services.flatMap((s) => s.split("-").map((x) => +x.split(":")[0]));
-    const r = await page.evaluate((hs) => { const G = Date.prototype.getHours; const out = {}; hs.forEach((h) => { Date.prototype.getHours = function () { return h; }; try { out[h] = slotNow(); } catch (e) { out[h] = "err"; } }); Date.prototype.getHours = G; return out; }, hours);
-    const bad = Object.entries(r).filter(([h, s]) => (+h < 5 && s === "midi") || (+h >= 5 && +h < 11 && s === "midi" && P.services.some((x) => /^0[5-9]/.test(x))));
-    return { ok: !bad.length, titre: "Créneaux de relevé (midi/soir) adaptés aux horaires", detail: bad.length ? "à " + bad.map(([h, s]) => h + " h → « " + s + " »").join(", ") + " alors que le service est " + P.services.join(" / ") : JSON.stringify(r) };
+    const r = await page.evaluate((hs) => { const G = Date.prototype.getHours; const out = {}; hs.forEach((h) => { Date.prototype.getHours = function () { return h; }; try { out[h] = slotNow() + ":" + slotName(slotNow()); } catch (e) { out[h] = "err"; } }); Date.prototype.getHours = G; return out; }, hours);
+    const bad = Object.entries(r).filter(([h, s]) => s === "err" || (+h < 5 && s.startsWith("midi") && +h < (P.day ? P.day.start : 4)));
+    return { ok: !bad.length, titre: "Relevés adaptés aux horaires", detail: bad.length ? "à " + bad.map(([h, s]) => h + " h → « " + s + " »").join(", ") + " alors que le service est " + P.services.join(" / ") : Object.entries(r).map(([h, s]) => h + " h → " + s.split(":")[1]).join(", ") };
   },
 };
 
@@ -50,8 +51,8 @@ const SPECIFIC = {
     return { ok: Math.round(r.min) === 495 && r.sh === 450, titre: "Service qui finit à 2 h : heures pointées et planning", detail: `pointé 18 h → 2 h 15 : ${Math.round(r.min || 0)} min (attendu 495) · créneau 18 h–2 h pause 30 : ${r.sh} min (attendu 450)` };
   },
   async marques(page, P) {
-    const r = await page.evaluate(() => { const txt = []; ["livraison", "dashboard", "notes", "marges"].forEach((x) => { try { go(x); txt.push(document.querySelector("#viewport .view").innerText); } catch (e) {} }); const all = txt.join(" "); return { brand: /\bmarque|enseigne|concept\b/i.test(all) }; });
-    return { ok: r.brand, titre: "Plusieurs marques dans une seule cuisine (" + P.marques.join(", ") + ")", detail: r.brand ? "notion de marque trouvée" : "aucune notion de marque : chiffre, carte, fiches et livraisons ne se séparent pas par marque" };
+    const r = await page.evaluate(() => { if (typeof mqList !== "function" || !VIEWS.marques) return { brand: false }; try { go("marques"); } catch (e) { return { brand: false, err: e.message }; } const t = document.querySelector("#viewport .view").innerText; return { brand: true, n: mqList().length, seen: mqList().filter((b) => t.includes(b.name)).length, gate: /fait partie du pack/.test(t) }; });
+    return { ok: r.brand && (r.gate || r.seen === r.n), titre: "Plusieurs marques dans une seule cuisine (" + P.marques.join(", ") + ")", detail: !r.brand ? "aucune notion de marque" : r.gate ? "écran Marques proposé avec le pack Chef" : `écran Marques : ${r.seen}/${r.n} marques avec leur chiffre, food cost et marge` };
   },
   async pointsDeVente(page, P) { return SPECIFIC.marques(page, P).then((x) => ({ ...x, titre: "Plusieurs points de vente au même endroit (" + P.marques.join(", ") + ")" })); },
   async multiSites(page, P) {
@@ -59,7 +60,8 @@ const SPECIFIC = {
     return { ok: !r.err && r.seen === r.n && r.n === P.sites.length, titre: "Mes établissements : les " + P.sites.length + " sites comparés", detail: r.err ? r.err : `${r.n} restaurants sur l'appareil, ${r.seen} visibles dans la comparaison` };
   },
   async employeDeuxSites(page) {
-    return { ok: false, info: true, titre: "Une personne qui travaille sur deux sites", detail: "chaque restaurant a sa propre fiche, son planning et sa pointeuse : la même serveuse a deux fiches et ses heures ne s'additionnent pas pour les heures sup" };
+    const r = await page.evaluate(() => ({ fn: typeof rhElsewhere === "function", n: S.restos.length, pick: typeof rhSitesPick === "function" && /Travaille aussi dans/.test(rhSitesPick({ sites: [], name: "X" })) }));
+    return { ok: r.fn && r.pick, titre: "Une personne qui travaille sur deux sites", detail: r.pick ? "fiche partagée entre les établissements (« Travaille aussi dans »), heures additionnées pour l'HCR et les heures sup." : `pas de fiche partagée (${r.n} restaurants)` };
   },
   async grosseEquipe(page, P) {
     const r = await page.evaluate(async () => { const out = {}; for (const x of ["planning", "pointeuse", "equipe", "staff"]) { const t = performance.now(); try { go(x); } catch (e) { out[x] = "err"; continue; } await new Promise((r) => requestAnimationFrame(() => setTimeout(r, 0))); out[x] = Math.round(performance.now() - t); } return { out, n: S.members.length, st: S.staff.length }; });
@@ -104,11 +106,12 @@ const SPECIFIC = {
   },
   async saisonniers(page, P) { return SPECIFIC.extras(page, P); },
   async petitDej(page, P) {
-    const r = await page.evaluate(() => { const G = Date.prototype.getHours; Date.prototype.getHours = () => 7; const s = slotNow(); Date.prototype.getHours = G; return s; });
-    return { ok: false, info: true, titre: "Trois services (petit-déjeuner, midi, soir)", detail: `le relevé de 7 h est rangé en « ${r} » : l'app ne connaît que midi et soir (relevés, ménage, notifications de fin de service)` };
+    const r = await page.evaluate(() => { const G = Date.prototype.getHours; Date.prototype.getHours = () => 7; const s = slotName(slotNow()); Date.prototype.getHours = G; return s; });
+    return { ok: !/midi/i.test(r), info: true, titre: "Trois services (petit-déjeuner, midi, soir)", detail: `le relevé de 7 h est « ${r} » (Réglages › Journée et fermetures) ; deux relevés de température par jour restent la règle` };
   },
   async serviceContinu(page, P) {
-    return { ok: false, info: true, titre: "Ouverture continue (" + P.services.join(", ") + ")", detail: "relevés et ménage restent découpés en midi / soir (coupure fixe à 16 h)" };
+    const r = await page.evaluate(() => typeof JN_PRESETS !== "undefined" && JN_PRESETS.some((x) => x[0] === "continu"));
+    return { ok: r, info: true, titre: "Ouverture continue (" + P.services.join(", ") + ")", detail: r ? "rythme « Ouvert en continu » dans Réglages › Journée et fermetures" : "relevés découpés en midi / soir (coupure fixe à 16 h)" };
   },
   async beaucoupDeFrigos(page, P) {
     const r = await page.evaluate(async () => { go("releve"); await new Promise((r) => setTimeout(r, 300)); const v = document.querySelector("#viewport .view"); return { n: S.fridges.length, h: Math.round(v.scrollHeight / innerHeight * 10) / 10 }; });
