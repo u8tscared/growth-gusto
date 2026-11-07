@@ -13,9 +13,9 @@
   const Q = new URLSearchParams(location.search);
   const RID = (Q.get("r") || "").trim();
   const DEMO = RID === "demo";
-  const BID = (Q.get("b") || "").trim(), OID = (Q.get("o") || "").trim(), KEY = (Q.get("k") || "").trim().toLowerCase();
+  const BID = (Q.get("b") || "").trim(), OID = (Q.get("o") || "").trim(), PID = (Q.get("p") || "").trim(), KEY = (Q.get("k") || "").trim().toLowerCase();
   const N0 = Math.round(+Q.get("n") || 0);
-  const ANON = !BID && !OID;
+  const ANON = !BID && !OID && !PID;
   const $ = (s, el = document) => el.querySelector(s);
   const esc = (v) => String(v == null ? "" : v).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const initials = (n) => (n || "?").trim().split(/\s+/).map((w) => w[0]).slice(0, 2).join("").toUpperCase();
@@ -64,7 +64,7 @@
     if (!firebase.functions) await script(SDK + "firebase-functions-compat.js");
     if (!firebase.apps.length) firebase.initializeApp(window.GG_FIREBASE);
     const call = firebase.app().functions(REGION).httpsCallable("avisClient");
-    const r = await call({ op, rid: RID, ...(BID ? { bid: BID } : {}), ...(OID ? { oid: OID } : {}), ...(KEY ? { k: KEY } : {}), ...(extra || {}) }); return r.data || {};
+    const r = await call({ op, rid: RID, ...(BID ? { bid: BID } : {}), ...(OID ? { oid: OID } : {}), ...(PID ? { pid: PID } : {}), ...(KEY ? { k: KEY } : {}), ...(extra || {}) }); return r.data || {};
   }
   const errText = (e) => { const c = String((e && e.code) || "").replace(/^functions\//, ""), m = String((e && e.message) || "");
     if (c === "permission-denied" || m === "lien") return "Ce lien n'est plus valide. Merci quand même d'avoir pensé à nous !";

@@ -3,7 +3,8 @@
    Export:
      avisClient  callable, no account. Who may write:
                  · a booking:  ?r=&b=&k=  checked against resaKeys/{rid}/keys/{bid} (the same private key as the « gérer » link of the e-mails);
-                 · a QR order: ?r=&o=&k=  checked against orderKeys/{rid}_{oid} (functions/src/commande.js);
+                 · a QR order: ?r=&o=&k=  checked against orderKeys/{rid}_{oid} (functions/src/commande.js) or avisKeys/{rid}_o_{oid};
+                 · a bill paid online: ?r=&p=&k=  checked against avisKeys/{rid}_p_{id} (the « Merci de votre visite » e-mail);
                  · the table card QR: ?r= alone (anonymous), capped at 40 a day per restaurant.
                  ops: "get"    → { name, logo, first, meal, google, done? }
                       "send"   { rating 1-5, tags[], text, recontact } → writes restos/{rid}/feedback/{c_<kind>_<id>} (one per booking or order,
@@ -37,7 +38,7 @@ function googleUrl(v) { try { return require("./resa")._googleUrl(v); } catch (e
 /* who is writing: { kind, id, src, contact } or an HttpsError */
 async function who(d) {
   const rid = String(d.rid || ""); if (!okId(rid)) throw new HttpsError("invalid-argument", "lien");
-  const k = String(d.k || "").toLowerCase(), bid = String(d.bid || ""), oid = String(d.oid || "");
+  const k = String(d.k || "").toLowerCase(), bid = String(d.bid || ""), oid = String(d.oid || ""), pid = String(d.pid || "");
   if (bid) {
     if (!okId(bid) || !/^[a-f0-9]{32}$/.test(k)) throw new HttpsError("invalid-argument", "lien");
     const ks = await db().doc(`resaKeys/${rid}/keys/${bid}`).get(); if (!ks.exists || !same(ks.get("k"), k)) throw new HttpsError("permission-denied", "lien");
@@ -47,10 +48,20 @@ async function who(d) {
   }
   if (oid) {
     if (!okId(oid) || !/^[a-f0-9]{32}$/.test(k)) throw new HttpsError("invalid-argument", "lien");
-    const ks = await db().doc(`orderKeys/${rid}_${oid}`).get(); if (!ks.exists || !same(ks.get("k"), k)) throw new HttpsError("permission-denied", "lien");
+    /* the order's status key (lives 2 days), or the key of the « Merci de votre visite » e-mail (avisKeys, 30 days) */
+    const ks = await db().doc(`orderKeys/${rid}_${oid}`).get();
+    if (!ks.exists || !same(ks.get("k"), k)) { const ak = await db().doc(`avisKeys/${rid}_o_${oid}`).get(); if (!ak.exists || !same(ak.get("k"), k)) throw new HttpsError("permission-denied", "lien"); }
     const s = await db().doc(`restos/${rid}/clientOrders/${oid}`).get(); if (!s.exists) throw new HttpsError("not-found", "absente");
     const o = s.data(); const h = parisHour(o.at || Date.now());
-    return { rid, kind: "o", id: oid, channel: o.mode === "emporter" ? "emporter" : "qr", name: clean(o.name, 60), email: "", phone: clean(o.phone, 30), meal: o.mode === "emporter" ? "repas" : h < 16 ? "déjeuner" : "dîner", day: parisDay(o.at || Date.now()), table: clean(o.table, 4), ref: { orderId: oid, ...(o.table ? { table: String(o.table) } : {}) } };
+    return { rid, kind: "o", id: oid, channel: o.mode === "emporter" ? "emporter" : "qr", name: clean(o.name, 60), email: clean(o.email, 120), phone: clean(o.phone, 30), meal: o.mode === "emporter" ? "repas" : h < 16 ? "déjeuner" : "dîner", day: parisDay(o.at || Date.now()), table: clean(o.table, 4), ref: { orderId: oid, ...(o.table ? { table: String(o.table) } : {}) } };
+  }
+  if (pid) {
+    /* the bill (or a share) paid from the table's QR: the link of the « Merci de votre visite » e-mail, avisKeys/{rid}_p_{id} */
+    if (!okId(pid) || !/^[a-f0-9]{32}$/.test(k)) throw new HttpsError("invalid-argument", "lien");
+    const ak = await db().doc(`avisKeys/${rid}_p_${pid}`).get(); if (!ak.exists || !same(ak.get("k"), k)) throw new HttpsError("permission-denied", "lien");
+    const s = await db().doc(`restos/${rid}/billPays/${pid}`).get(); if (!s.exists) throw new HttpsError("not-found", "absente");
+    const p = s.data(); const at = +p.paidAt || +p.at || Date.now();
+    return { rid, kind: "p", id: pid, channel: "table", name: "", email: clean(p.email, 120), phone: "", meal: parisHour(at) < 16 ? "déjeuner" : "dîner", day: parisDay(at), table: clean(p.table, 4), ref: { billPayId: pid, ...(p.table ? { table: String(p.table) } : {}) } };
   }
   return { rid, kind: "a", id: "", channel: "table", name: "", email: "", phone: "", meal: parisHour() < 16 ? "déjeuner" : "dîner", day: parisDay(), ref: {} };
 }
