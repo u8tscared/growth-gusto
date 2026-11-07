@@ -1,0 +1,16 @@
+/* Marques et points de vente (js/marques.js) */
+.mq-seg{max-width:260px;margin-bottom:12px}
+.mq-sum{display:flex;flex-wrap:wrap;gap:4px 14px;align-items:baseline;padding:14px 16px;margin-bottom:12px}
+.mq-sum span{display:flex;gap:8px;align-items:baseline;font-size:13px;color:var(--muted)}.mq-sum b{font-size:22px;color:var(--ink);letter-spacing:-.02em}
+.mq-sum em{font-style:normal;font-size:12.5px;color:var(--muted)}.mq-sum a{color:var(--accent-ink);font-weight:700}
+.mq-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px}
+.mq-card{padding:16px;display:flex;flex-direction:column;gap:10px;border-top:4px solid var(--mq)}
+.mq-hd{display:flex;align-items:center;gap:10px}.mq-hd .tx{flex:1;min-width:0}.mq-hd .tx b{display:block;font-weight:800;font-size:16px;letter-spacing:-.015em}.mq-hd .tx em{display:block;font-style:normal;font-size:12.5px;color:var(--muted)}
+.mq-dot{flex:none;width:14px;height:14px;border-radius:50%;background:var(--mq)}
+.mq-kpi{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.mq-kpi span{display:flex;flex-direction:column;font-size:11.5px;color:var(--muted)}.mq-kpi b{font-size:17px;color:var(--ink)}
+.mq-bar{height:6px;border-radius:999px;background:rgb(var(--k) / .07);overflow:hidden}.mq-bar i{display:block;height:100%;border-radius:inherit;background:var(--mq)}
+.mq-share{margin:0;font-size:12px;color:var(--muted);line-height:1.4}
+.mq-card .btn{align-self:flex-start}
+.mq-ds button.li,.mq-es button.li{appearance:none;-webkit-appearance:none;background:none;border:0;font:inherit;color:inherit;text-align:left;width:calc(100% + 20px)}
+.mq-ck{flex:none;width:26px;height:26px;border-radius:8px;display:grid;place-items:center;box-shadow:0 0 0 1.5px var(--line) inset;color:#fff}
+.mq-di.on .mq-ck{background:var(--accent-solid);box-shadow:none}.mq-ck svg{width:16px;height:16px}

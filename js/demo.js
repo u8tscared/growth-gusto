@@ -40,7 +40,7 @@ window.GG_DEMO = {
     const hourNow = new Date().getHours();
 
     /* ── restaurant + team ── */
-    D.restos = { [RID]: { name: "Le Bistrot Démo", type: "bistrot", owner: "demo-camille", plan: "essai", createdAt: now - 420 * 864e5, demo: true } };
+    D.restos = { [RID]: { name: "Le Bistrot Démo", type: "bistrot", owner: "demo-camille", plan: "essai", createdAt: now - 420 * 864e5, demo: true, brands: [{ id: "b-huitres", name: "Le Comptoir à huîtres", color: "#2F7BEA" }] } };
     const team = [
       ["demo-camille", "Camille Laurent", "gerant", "#4A1FE6", "Gérant", "CDI", 39, 0, "salle"],
       ["demo-thomas", "Thomas Girard", "chef", "#E0752F", "Chef de cuisine", "CDI", 42, 19.5, "cuisine"],
@@ -168,16 +168,16 @@ window.GG_DEMO = {
     /* ── recipes (ingredients linked to products, allergens) + a procedure ── */
     const ing = (pid, qty, unit) => ({ name: PR.find((p) => p[0] === pid)[1], qty: String(qty), unit, productId: pid });
     const NOTES = [
-      ["n-croq", { title: "Croquettes de jambon", cat: "Recettes", portions: 6, carte: true, carteCat: "partage", price: 9, allergens: ["gluten", "lait", "oeufs"], body: "Servies par 5 avec une mayonnaise fumée. Se congèlent panées, crues.",
+      ["n-croq", { title: "Croquettes de jambon", brand: "b-huitres", cat: "Recettes", portions: 6, carte: true, carteCat: "partage", price: 9, allergens: ["gluten", "lait", "oeufs"], body: "Servies par 5 avec une mayonnaise fumée. Se congèlent panées, crues.",
         ingredients: [ing("p-jambon", "0,6", "kg"), ing("p-lait", "1", "L"), ing("p-beurre", "0,1", "kg"), ing("p-farine", "0,12", "kg"), ing("p-oeufs", "4", "pièce"), ing("p-chapelure", "0,3", "kg")],
         steps: ["Hacher finement le jambon.", "Roux blanc : beurre et farine, mouiller au lait chaud, cuire 10 min.", "Ajouter le jambon, refroidir 4 h filmé au contact.", "Façonner des boules de 35 g.", "Paner à l'anglaise : farine, œuf, panko.", "Frire 3 min à 175 °C."] }],
-      ["n-planche", { title: "Planche de charcuterie", cat: "Recettes", portions: 1, carte: true, carteCat: "partage", price: 19, allergens: ["gluten", "lait", "oeufs", "sulfites", "moutarde", "sesame"], body: "Pour 2 personnes. Indiquer les allergènes au client : terrine (œufs, lait), cornichons (moutarde, sulfites), pain (gluten, sésame).",
+      ["n-planche", { title: "Planche de charcuterie", brand: "b-huitres", cat: "Recettes", portions: 1, carte: true, carteCat: "partage", price: 19, allergens: ["gluten", "lait", "oeufs", "sulfites", "moutarde", "sesame"], body: "Pour 2 personnes. Indiquer les allergènes au client : terrine (œufs, lait), cornichons (moutarde, sulfites), pain (gluten, sésame).",
         ingredients: [ing("p-jambonc", "0,06", "kg"), ing("p-saucisson", "0,05", "kg"), ing("p-terrine", "0,08", "kg"), ing("p-rillettes", "0,05", "kg"), ing("p-cornich", "0,03", "kg"), ing("p-pain", "0,25", "pièce")],
         steps: ["Sortir la charcuterie 15 min avant.", "Trancher le jambon et le saucisson à la minute.", "Dresser sur planche avec cornichons et pain grillé."] }],
       ["n-bourgui", { title: "Bœuf bourguignon", cat: "Recettes", portions: 10, carte: true, carteCat: "plat", price: 22, allergens: ["gluten", "lait", "sulfites", "celeri"], body: "Meilleur réchauffé le lendemain. Servir avec des pommes vapeur.",
         ingredients: [ing("p-paleron", "2", "kg"), ing("p-vin", "1", "L"), ing("p-carotte", "0,6", "kg"), ing("p-oignon", "0,4", "kg"), ing("p-lardons", "0,25", "kg"), ing("p-champi", "0,4", "kg"), ing("p-farine", "0,04", "kg"), ing("p-fond", "0,5", "L"), ing("p-beurre", "0,05", "kg")],
         steps: ["Couper le bœuf en cubes de 5 cm.", "Mariner 12 h au froid avec le vin et la garniture.", "Saisir, singer à la farine.", "Mouiller avec la marinade et le fond, cuire 3 h à frémissement.", "Rissoler lardons et champignons, ajouter en fin de cuisson."] }],
-      ["n-huitres", { title: "Huîtres fines de claire (la douzaine)", cat: "Recettes", portions: 1, carte: true, carteCat: "entree", price: 24, allergens: ["mollusques", "sulfites"], body: "Ouvrir à la minute. Servir sur glace pilée avec citron et mignonnette. Stocker les huîtres À PART, loin des œufs et du lait.",
+      ["n-huitres", { title: "Huîtres fines de claire (la douzaine)", brand: "b-huitres", cat: "Recettes", portions: 1, carte: true, carteCat: "entree", price: 24, allergens: ["mollusques", "sulfites"], body: "Ouvrir à la minute. Servir sur glace pilée avec citron et mignonnette. Stocker les huîtres À PART, loin des œufs et du lait.",
         ingredients: [ing("p-huitre", "0,25", "bourriche"), ing("p-citron", "0,05", "kg"), ing("p-echalote", "0,01", "kg")],
         steps: ["Sortir de la chambre froide au début du service : frigo de service.", "Ouvrir à la minute, retirer la première eau.", "Dresser sur glace pilée.", "En fin de service, remettre les bourriches en chambre froide."] }],
       ["n-cafe", { title: "Café gourmand", cat: "Recettes", portions: 10, carte: true, carteCat: "dessert", price: 9.5, allergens: ["lait", "oeufs", "gluten"], body: "Un café, une boule de glace vanille, un mini financier et une crème brûlée.",
