@@ -185,3 +185,33 @@ html:not(.vr-locked) #app{transition:filter .45s var(--ease)}
 .vr-tb[data-o=r] .vr-tb-tx{right:22px;bottom:calc(9% + 18px);animation:vrTbNudgeXr 1.4s ease-in-out infinite}
 .vr-tb[data-o=r] .vr-tb-tx::before{right:-5px;bottom:16px}
 @media (prefers-reduced-motion:reduce){.vr-tb-btn,.vr-tb-tx{animation:none!important}}
+
+/* ── the restaurant's logo as a fingerprint (top of the lock screen) ── */
+.vr-time.sm{margin-top:0}
+.vr-time.sm b{font-size:clamp(40px,6.4vh,60px)}
+.vr-time.sm span{font-size:14.5px;margin-top:2px}
+.vr-crest{display:flex;flex-direction:column;align-items:center;gap:8px;margin-top:1vh}
+.vr-rname{font-family:var(--d);font-weight:700;font-size:19px;letter-spacing:-.015em;color:#fff;text-align:center;max-width:28ch;line-height:1.2;text-shadow:0 6px 24px rgba(20,6,90,.45)}
+.vr-emb{width:clamp(150px,29vh,256px);aspect-ratio:1;position:relative;flex:none}
+.vr-emb svg{width:100%;height:100%;display:block;overflow:visible;filter:drop-shadow(0 0 16px rgba(196,178,255,.5)) drop-shadow(0 14px 30px rgba(20,6,90,.35));transition:transform .5s var(--spring),filter .4s}
+.vr-er path{fill:none;stroke:#fff;stroke-linecap:round;stroke-dasharray:1 1;stroke-dashoffset:1;animation:vrRidge 1s var(--ease) forwards;animation-delay:calc(var(--d) * 1ms + 120ms)}
+.vr-er.fr path{stroke-width:3.3}
+.vr-er.bk{opacity:.3}
+.vr-er.bk path{stroke-width:2.4}
+.vr-efill{opacity:0;animation:vrEFill 1.2s var(--ease) .9s forwards}
+.vr-esw{opacity:0;transform-box:view-box;animation:vrESweep 5.2s var(--ease) 1.7s infinite}
+.vr-emb.scan .vr-esw{animation-duration:1.1s;animation-delay:0s}
+.vr-emb.scan svg{transform:scale(.97)}
+.vr-emb.ok svg{transform:scale(1.05);filter:drop-shadow(0 0 26px rgba(214,200,255,.85)) drop-shadow(0 14px 30px rgba(20,6,90,.35))}
+.vr-emb.ok .vr-efill{animation:none;opacity:.32;transition:opacity .3s}
+@keyframes vrRidge{to{stroke-dashoffset:0}}
+@keyframes vrEFill{to{opacity:.09}}
+@keyframes vrESweep{0%{opacity:0;transform:translateY(0)}12%{opacity:1}70%{opacity:1}82%,100%{opacity:0;transform:translateY(340px)}}
+/* the classic Face ID / Touch ID button stays, a little smaller under the logo */
+.vr-crest~.vr-mid{gap:8px}
+.vr-crest~.vr-mid .vr-gbtn{width:96px;height:96px;padding:22px;border-radius:32px}
+.vr-crest~.vr-mid .vr-gbtn::after{border-radius:40px}
+.vr-crest~.vr-mid .vr-h{font-size:23px}
+@media (max-height:700px){.vr-emb{width:clamp(110px,22vh,150px)}.vr-crest~.vr-mid .vr-gbtn{width:80px;height:80px;padding:18px;border-radius:26px}.vr-rname{font-size:17px}.vr-time.sm b{font-size:40px}}
+@media (min-width:700px) and (min-height:900px){.vr-emb{width:260px}.vr-crest{margin-top:4vh}}
+@media (prefers-reduced-motion:reduce){.vr-er path{animation:none;stroke-dashoffset:0}.vr-efill{animation:none;opacity:.09}.vr-esw{animation:none}}
