@@ -107,7 +107,7 @@ function ctStartDay() {
 function ctTempData(P) {
   const start = ctStartDay(); const eff = { from: P.from < start ? start : P.from, to: P.to };
   const days = eff.from <= eff.to ? ctDays(eff) : []; const today = dayKey();
-  const due = (d, slot) => d < today || (d === today && (slot === "midi" || slotNow() === "soir"));
+  const due = (d, slot) => !(typeof ggClosed === "function" && ggClosed(d)) && (d < today || (d === today && (slot === "midi" || slotNow() === "soir")));
   const fr = S.fridges.slice();
   const rd = S.readings.filter((r) => r.day >= P.from && r.day <= P.to);
   const exp = days.reduce((n, d) => n + fr.length * ["midi", "soir"].filter((s) => due(d, s)).length, 0);
@@ -257,7 +257,7 @@ function ctVueTemp(P) {
       <div class="ct-frs"><span><em>Min</em><b>${x.min != null ? fmt(x.min) : "–"}</b></span><span><em>Moyenne</em><b>${x.avg != null ? fmt(x.avg) : "–"}</b></span><span><em>Max</em><b>${x.max != null ? fmt(x.max) : "–"}</b></span><span><em>Relevés</em><b>${x.n}</b></span></div>${strip(x.f)}</div>`).join("");
   const nc = D.bad.length ? `<div class="glass pad st ct-card" style="--i:7"><h3 class="h3">Écarts et actions correctives</h3><div class="ct-list">${D.bad.map((r) => `<div class="ct-li"><span class="ct-v bad">${fmt(num(r.value))} °C</span><div class="tx"><b>${esc((D.fr.find((f) => f.id === r.fridgeId) || {}).name || r.fname || "Enceinte")} · ${ctSlot(r.slot)}</b><em>${esc(r.action || "Action non renseignée")}</em></div><span class="ct-when">${shortDate(r.day)}<small>${esc(firstName(nameOf(r.uid)))}</small></span></div>`).join("")}</div></div>` : `<div class="ct-okline st" style="--i:7">Aucun écart de température sur la période.</div>`;
   return `<div class="ct-kpis st" style="--i:2">${ctKpi("Relevés faits", D.exp ? `${Math.min(D.done, D.exp)} / ${D.exp}` : D.rd.length, D.rate != null ? `${D.rate} % des relevés attendus` : "", D.rate != null && D.rate < 90 ? "warn" : "")}${ctKpi("Conformité", D.conf != null ? `${fmt(D.conf, 1)} %` : "–", "relevés dans le seuil")}${ctKpi("Écarts", D.bad.length, D.bad.length ? "tous avec action" : "aucun", D.bad.length ? "warn" : "")}</div>
-    <div class="ct-legend st" style="--i:2"><span><i class="g"></i>Conforme</span><span><i class="r"></i>Hors seuil</span><span><i class="m"></i>Manquant</span><em>midi / soir, un jour par colonne</em></div>
+    <div class="ct-legend st" style="--i:2"><span><i class="g"></i>Conforme</span><span><i class="r"></i>Hors seuil</span><span><i class="m"></i>Manquant</span><em>${esc(slotName("midi", true))} / ${esc(slotName("soir", true))}, un jour par colonne</em></div>
     <div class="ct-frgrid">${per}</div>${nc}${ctPics(D.pics)}`;
 }
 function ctVueRec(P) {
@@ -344,7 +344,7 @@ function ctDocTemp(P) {
   if (!D.fr.length) return `<p class="rp-empty">Aucune enceinte froide déclarée.</p>`;
   const cell = (day, f, slot) => { const rs = D.rd.filter((r) => r.day === day && r.fridgeId === f.id && ctSlot(r.slot) === slot); if (!rs.length) return D.days.includes(day) && D.due(day, slot) ? `<td class="miss">—</td>` : `<td class="todo"></td>`; return `<td>${rs.map((r) => `<span class="${r.ok ? "" : "nc"}">${fmt(num(r.value))}${r.ok ? "" : "*"}</span>`).join(" / ")}<i>${rs.map((r) => esc(initials(nameOf(r.uid)))).join(" ")}</i></td>`; };
   const days = D.allDays.slice().reverse();
-  const grid = ctSc(`<table class="rp-t rp-temps"><thead><tr><th rowspan="2">Date</th>${D.fr.map((f) => `<th colspan="2">${esc(f.name)}<small>${esc(ctRange(f))}</small></th>`).join("")}</tr><tr>${D.fr.map(() => `<th>Midi</th><th>Soir</th>`).join("")}</tr></thead><tbody>${days.map((d) => `<tr><td class="nw">${esc(DAYS[parseDay(d).getDay()].slice(0, 3))}. ${shortDate(d)}</td>${D.fr.map((f) => cell(d, f, "midi") + cell(d, f, "soir")).join("")}</tr>`).join("")}</tbody></table>`);
+  const grid = ctSc(`<table class="rp-t rp-temps"><thead><tr><th rowspan="2">Date</th>${D.fr.map((f) => `<th colspan="2">${esc(f.name)}<small>${esc(ctRange(f))}</small></th>`).join("")}</tr><tr>${D.fr.map(() => `<th>${esc(slotName("midi"))}</th><th>${esc(slotName("soir"))}</th>`).join("")}</tr></thead><tbody>${days.map((d) => `<tr><td class="nw">${esc(DAYS[parseDay(d).getDay()].slice(0, 3))}. ${shortDate(d)}</td>${D.fr.map((f) => cell(d, f, "midi") + cell(d, f, "soir")).join("")}</tr>`).join("")}</tbody></table>`);
   const nc = D.bad.length ? ctT(["Date", "Heure", "Enceinte", "Relevé", "Seuil", "Action corrective", "Par"], D.bad.slice().reverse().map((r) => `<tr><td class="nw">${ctFull(r.day)}</td><td class="nw">${hm(r.at)}</td><td>${esc((D.fr.find((f) => f.id === r.fridgeId) || {}).name || r.fname || "–")}</td><td class="r nc nw">${fmt(num(r.value))} °C</td><td class="nw">${esc(ctRange(D.fr.find((f) => f.id === r.fridgeId)))}</td><td>${esc(r.action || "Non renseignée")}</td><td>${esc(nameOf(r.uid))}</td></tr>`)) : `<p class="rp-ok">Aucune non-conformité de température sur la période.</p>`;
   return `<div class="rp-kpis">${[["Relevés faits", D.exp ? `${Math.min(D.done, D.exp)} / ${D.exp}` : D.rd.length, D.rate != null ? `${D.rate} % des relevés attendus` : ""], ["Conformité", D.conf != null ? `${fmt(D.conf, 1)} %` : "–", "relevés dans le seuil"], ["Hors seuil", D.bad.length, "avec action corrective"], ["Enceintes", D.fr.length, "suivies matin et soir"]].map(([a, b, c]) => `<div class="rp-kpi"><span>${a}</span><b>${b}</b><em>${c}</em></div>`).join("")}</div>
     <h3>Relevés par jour</h3><p class="rp-note">Deux relevés par jour et par enceinte, en °C. * hors seuil · « — » relevé manquant. Initiales : personne ayant relevé.</p>${grid}
@@ -500,7 +500,7 @@ function ctPmsBuild(A) {
   const ph = (k) => PH[k][A[k]] || ""; const phs = (k) => (A[k] || []).map((v) => PH[k][v]).filter(Boolean);
   const resp = A.respName || "le gérant";
   const avance = has("prod", "avance") || has("prod", "froide");
-  const fr = S.fridges.map((f) => `| ${f.name} | ${f.min != null && f.max != null ? `${fmt(f.min, 0)} à ${fmt(f.max, 0)} °C` : "à définir"} | 2 fois par jour (midi et soir) |`);
+  const fr = S.fridges.map((f) => `| ${f.name} | ${f.min != null && f.max != null ? `${fmt(f.min, 0)} à ${fmt(f.max, 0)} °C` : "à définir"} | 2 fois par jour (${slotName("midi", true)} et ${slotName("soir", true)}) |`);
   const chores = S.chores.map((c) => { let fq = c.freq || ""; if (typeof regFreqTx === "function") { try { fq = regFreqTx(c); } catch (e) {} } return `| ${c.name} | ${c.zone || "–"} | ${fq} |`; });
   const desinf = A.desinf || "Détergent-désinfectant pour surfaces au contact des denrées (norme EN 1276)";
   const sec = [];

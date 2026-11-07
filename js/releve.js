@@ -63,8 +63,8 @@ function relTouched() {
   return S.ui.relTouched;
 }
 const relIn = (f, t) => t >= f.min && t <= f.max;
-const relSlotName = (s) => (s === "soir" ? "soir" : "midi");
-const relSlotCap = (s) => (s === "soir" ? "Soir" : "Midi");
+const relSlotName = (s) => slotName(s, true);
+const relSlotCap = (s) => slotName(s);
 function relAgo(ts) {
   if (!ts) return "jamais";
   const m = Math.floor((Date.now() - ts) / 60000);
@@ -242,11 +242,11 @@ VIEWS.releve = {
     const done = S.fridges.length - pending.length, exp = S.fridges.length, full = !pending.length;
     const celeb = S.ui.relCeleb; S.ui.relCeleb = false;
     const sum = full
-      ? `<div class="glass pad rel-sum full st ${celeb ? "celeb" : ""}" style="--i:2"><div class="rel-sumrow">${relRing(done, exp)}<div class="rel-sumtx"><b class="h3">Relevé du ${relSlotName(slot)} terminé</b><div class="sub">${exp} frigo${exp > 1 ? "s" : ""} signé${exp > 1 ? "s" : ""}${rs.some((r) => !r.ok) ? ` · <span style="color:var(--bad)">${rs.filter((r) => !r.ok).length} hors seuil</span>` : ", tout est conforme"}. Touchez un frigo pour le corriger.</div></div></div>${slot === "midi" && readingsFor(day, "soir").length < exp ? `<button class="btn soft block" data-act="slot" data-v="soir">Passer au relevé du soir${ico("chev")}</button>` : ""}</div>`
+      ? `<div class="glass pad rel-sum full st ${celeb ? "celeb" : ""}" style="--i:2"><div class="rel-sumrow">${relRing(done, exp)}<div class="rel-sumtx"><b class="h3">Relevé ${slotDu(slot)} terminé</b><div class="sub">${exp} frigo${exp > 1 ? "s" : ""} signé${exp > 1 ? "s" : ""}${rs.some((r) => !r.ok) ? ` · <span style="color:var(--bad)">${rs.filter((r) => !r.ok).length} hors seuil</span>` : ", tout est conforme"}. Touchez un frigo pour le corriger.</div></div></div>${slot === "midi" && readingsFor(day, "soir").length < exp ? `<button class="btn soft block" data-act="slot" data-v="soir">Passer au relevé du soir${ico("chev")}</button>` : ""}</div>`
       : `<div class="glass pad rel-sum st" style="--i:2"><div class="rel-sumrow">${relRing(done, exp)}<div class="rel-sumtx"><b class="h3">${done ? `${done} relevé${done > 1 ? "s" : ""} sur ${exp}` : `${exp} frigo${exp > 1 ? "s" : ""} à relever`}</b><div class="sub rel-ell">Reste : ${pending.map((f) => esc(f.name)).join(", ")}</div></div></div><div id="relAllW" class="rel-allw">${relAllBtn(pending)}</div></div>`;
     return `<div class="inner rel-page">${topBar("Relevé des frigos")}
       ${relDayStrip(day)}
-      <div class="seg st" style="--i:1" id="slotSeg"><span class="knob" style="width:calc(50% - 4px);transform:translateX(${slot === "soir" ? "100%" : "0"})"></span><button class="${slot === "midi" ? "on" : ""}" data-act="slot" data-v="midi">Midi</button><button class="${slot === "soir" ? "on" : ""}" data-act="slot" data-v="soir">Soir</button></div>
+      <div class="seg st" style="--i:1" id="slotSeg"><span class="knob" style="width:calc(50% - 4px);transform:translateX(${slot === "soir" ? "100%" : "0"})"></span><button class="${slot === "midi" ? "on" : ""}" data-act="slot" data-v="midi">${esc(slotName("midi"))}</button><button class="${slot === "soir" ? "on" : ""}" data-act="slot" data-v="soir">${esc(slotName("soir"))}</button></div>
       ${typeof saisieBar === "function" ? saisieBar() : ""}
       ${sum}
       <div class="rel-grid">${cards}</div>
@@ -355,7 +355,7 @@ function relEvents(f) {
     const vers = [...(r.prev || []), { value: r.value, at: r.editedAt || r.at, uid: r.editedBy || r.uid, why: r.editReason || "" }];
     const first = vers[0]; const ok = relROk(f, r);
     E.push({ at: r.at, k: "temp", ic: "therm", tone: ok ? (r.peak ? "warn" : "ok") : "bad", t: `${fmt(r.value)} °C · ${r.mid ? "pendant le service" : relSlotName(r.slot)}`, s: `${firstName(nameOf(r.uid, r))}${ok ? (r.peak ? " · pic de service" : "") : ` · ${r.action || "hors seuil"}`}${r.editedAt ? ` · corrigé (avant ${fmt(first.value)} °C)` : ""}`, act: `data-act="relEdit" data-id="${r.id}"`, ph: relPhThumb(r) });
-    for (let j = 1; j < vers.length; j++) E.push({ at: vers[j].at, k: "fix", ic: "edit", tone: "warn", t: `Correction · ${fmt(vers[j - 1].value)} → ${fmt(vers[j].value)} °C`, s: `${firstName(nameOf(vers[j].uid))} · relevé du ${relSlotName(r.slot)} ${shortDate(r.day)}${vers[j].why ? ` · ${vers[j].why}` : ""}`, act: `data-act="relEdit" data-id="${r.id}"` });
+    for (let j = 1; j < vers.length; j++) E.push({ at: vers[j].at, k: "fix", ic: "edit", tone: "warn", t: `Correction · ${fmt(vers[j - 1].value)} → ${fmt(vers[j].value)} °C`, s: `${firstName(nameOf(vers[j].uid))} · relevé ${slotDu(r.slot)} ${shortDate(r.day)}${vers[j].why ? ` · ${vers[j].why}` : ""}`, act: `data-act="relEdit" data-id="${r.id}"` });
   });
   const mv = (S.moves || []).filter((m) => m.kind === "transfert" && !m.cancelled);
   mv.filter((m) => m.fridgeId === id || m.toFridgeId === id).forEach((m) => {
@@ -630,7 +630,7 @@ Object.assign(ACT, {
   relFixSvc: async (a, rid) => {
     const r = S.readings.find((x) => x.id === rid); if (!r) return; const f = relFr(r.fridgeId); const t = S.temp["e-" + rid];
     if (!f || t == null || !relOnce(a, 2000)) return;
-    await relApplyEdit(r, { value: t, ok: true, action: "", ctx: "service", peak: true }, S.ui.relWhy || "Pic pendant le service", `a corrigé ${f.name} · ${fmt(r.value)} → ${fmt(t)} °C, pic pendant le service (relevé du ${relSlotName(r.slot)} ${shortDate(r.day)})`, `Corrigé · ${fmt(t)} °C`);
+    await relApplyEdit(r, { value: t, ok: true, action: "", ctx: "service", peak: true }, S.ui.relWhy || "Pic pendant le service", `a corrigé ${f.name} · ${fmt(r.value)} → ${fmt(t)} °C, pic pendant le service (relevé ${slotDu(r.slot)} ${shortDate(r.day)})`, `Corrigé · ${fmt(t)} °C`);
   },
   relCtx: (a, key, v) => {
     const f = relFridgeForKey(key); if (!f) return; (S.ui.relCtx ||= {})[key] = v; SFX.tick(); buzz(4);
@@ -713,7 +713,7 @@ Object.assign(ACT, {
     const vers = [...(r.prev || []), { value: r.value, slot: r.slot, ok: r.ok, at: r.editedAt || r.at, uid: r.editedBy || r.uid, why: r.editReason || "", cur: true }];
     const multiSlot = new Set(vers.map((x) => x.slot || r.slot)).size > 1;
     SFX.tap();
-    openSheet(`<div class="rel-eh"><span class="ic ${r.ok ? (r.peak ? "warn" : "ok") : "bad"}">${relIco(f)}</span><div style="flex:1;min-width:0"><b class="h3">${esc(f.name)}</b><div class="sub">Relevé du ${relSlotName(r.slot)} · ${relDayLabel(r.day).toLowerCase()}</div></div><span class="mono rel-ev" style="color:${r.ok ? "var(--ok)" : "var(--bad)"}">${fmt(r.value)}°</span></div>
+    openSheet(`<div class="rel-eh"><span class="ic ${r.ok ? (r.peak ? "warn" : "ok") : "bad"}">${relIco(f)}</span><div style="flex:1;min-width:0"><b class="h3">${esc(f.name)}</b><div class="sub">Relevé ${slotDu(r.slot)} · ${relDayLabel(r.day).toLowerCase()}</div></div><span class="mono rel-ev" style="color:${r.ok ? "var(--ok)" : "var(--bad)"}">${fmt(r.value)}°</span></div>
       ${r.ok ? (r.peak ? `<div class="rel-warn pk">${ico("clock")}<span>Pic pendant le service · toléré jusqu'à ${relDeg(relSvcMax(f) ?? 8)} °C</span></div>` : "") : `<div class="rel-warn">${ico("alert")}<span>${esc(r.action || "Hors seuil")}</span></div>`}
       <div class="rel-opts">
         <button class="rel-opt" data-act="relFix" data-id="${r.id}"><span class="ic">${ico("therm")}</span><span class="tx"><b>Corriger la température</b><em>L'ancienne valeur reste dans l'historique</em></span>${ico("chev")}</button>
@@ -731,13 +731,13 @@ Object.assign(ACT, {
     if (!f || t == null || isNaN(t) || !relOnce(a, 2000)) return;
     const ctx = relIsService(f) ? relCtxOf("e-" + rid, f) : "";
     if (t === r.value && ctx === (r.ctx || "")) { closeSheet(); toast("Valeur inchangée"); return; }
-    if (!relIn(f, t)) { if (relPeakOk(f, t, ctx)) { await relApplyEdit(r, { value: t, ok: true, action: "", ctx, peak: true }, S.ui.relWhy || "Pic pendant le service", `a corrigé ${f.name} · ${fmt(r.value)} → ${fmt(t)} °C, pic pendant le service (relevé du ${relSlotName(r.slot)} ${shortDate(r.day)})`, `Corrigé · ${fmt(t)} °C`); return; } relCorrSheet(f, t, "relFixCorr", rid); return; }
-    await relApplyEdit(r, { value: t, ok: true, action: "", ctx, peak: false }, S.ui.relWhy, `a corrigé ${f.name} · ${fmt(r.value)} → ${fmt(t)} °C (relevé du ${relSlotName(r.slot)} ${shortDate(r.day)})`, `Corrigé · ${fmt(t)} °C`);
+    if (!relIn(f, t)) { if (relPeakOk(f, t, ctx)) { await relApplyEdit(r, { value: t, ok: true, action: "", ctx, peak: true }, S.ui.relWhy || "Pic pendant le service", `a corrigé ${f.name} · ${fmt(r.value)} → ${fmt(t)} °C, pic pendant le service (relevé ${slotDu(r.slot)} ${shortDate(r.day)})`, `Corrigé · ${fmt(t)} °C`); return; } relCorrSheet(f, t, "relFixCorr", rid); return; }
+    await relApplyEdit(r, { value: t, ok: true, action: "", ctx, peak: false }, S.ui.relWhy, `a corrigé ${f.name} · ${fmt(r.value)} → ${fmt(t)} °C (relevé ${slotDu(r.slot)} ${shortDate(r.day)})`, `Corrigé · ${fmt(t)} °C`);
   },
   relFixCorr: async (a, rid, v) => {
     const r = S.readings.find((x) => x.id === rid); if (!r) return; const f = relFr(r.fridgeId); const t = S.temp["e-" + rid];
     v = relPickedAction(v); if (!f || !v || t == null || isNaN(t) || !relOnce(a, 2000)) return;
-    await relApplyEdit(r, { value: t, ok: false, action: v }, S.ui.relWhy, `a corrigé ${f.name} · ${fmt(r.value)} → ${fmt(t)} °C, hors seuil, ${v.toLowerCase()} (relevé du ${relSlotName(r.slot)} ${shortDate(r.day)})`, `Corrigé · ${fmt(t)} °C`);
+    await relApplyEdit(r, { value: t, ok: false, action: v }, S.ui.relWhy, `a corrigé ${f.name} · ${fmt(r.value)} → ${fmt(t)} °C, hors seuil, ${v.toLowerCase()} (relevé ${slotDu(r.slot)} ${shortDate(r.day)})`, `Corrigé · ${fmt(t)} °C`);
   },
   relSlot: async (a, rid) => {
     const r = S.readings.find((x) => x.id === rid); if (!r || a.disabled || !relOnce(a, 2000)) return; const f = relFr(r.fridgeId); if (!f) return; const other = r.slot === "midi" ? "soir" : "midi";
@@ -855,7 +855,7 @@ function relFixOpen(rid, keep) {
   const r = S.readings.find((x) => x.id === rid); if (!r) return; const f = relFr(r.fridgeId); if (!f) return; const key = "e-" + rid;
   if (!keep || S.temp[key] == null) { S.temp[key] = r.value; S.ui.relWhy = ""; }
   const t = S.temp[key];
-  openSheet(`<div class="row" style="justify-content:flex-start"><button class="iconbtn" data-act="relEdit" data-id="${rid}" aria-label="Retour">${ico("back")}</button><div style="flex:1;min-width:0"><b class="h3 rel-ell" style="display:block">Corriger ${esc(f.name)}</b><div class="sub">Relevé du ${relSlotName(r.slot)} · avant ${fmt(r.value)} °C</div></div></div>
+  openSheet(`<div class="row" style="justify-content:flex-start"><button class="iconbtn" data-act="relEdit" data-id="${rid}" aria-label="Retour">${ico("back")}</button><div style="flex:1;min-width:0"><b class="h3 rel-ell" style="display:block">Corriger ${esc(f.name)}</b><div class="sub">Relevé ${slotDu(r.slot)} · avant ${fmt(r.value)} °C</div></div></div>
     <div class="dz rel-fixdz">${relDial(key, f, t)}${relIsService(f) ? relCtxHtml(key, f) : ""}${typeof saisieProbeBtn === "function" ? saisieProbeBtn(key) : ""}</div>
     <div class="field"><span>Pourquoi ? (facultatif)</span><div class="rel-why">${["Faute de frappe", "Thermomètre mal lu", "Nouvelle mesure", "Mauvais frigo"].map((w) => `<button class="chip ${S.ui.relWhy === w ? "on" : ""}" data-act="relWhy" data-v="${w}">${w}</button>`).join("")}</div></div>
     <button class="btn acc block" data-act="relFixSave" data-id="${rid}">${ico("check")}<span data-tlv="${key}" data-pre="Enregistrer">Enregistrer ${fmt(t)} °C</span></button>`);
