@@ -96,8 +96,12 @@ async function create(d) {
   total = r2(total);
   let pay = d.pay === "stripe" ? "stripe" : "place";
   let link = null;
+  /* à table: the restaurant's choice (cfg.tablePay « avant » required when ordering, « choix », « apres » at the end of the meal);
+     takeaway, or an older menu doc: payOnline / payPlace */
+  const tp = mode === "table" && ["avant", "choix", "apres"].includes(c.tablePay) ? (c.payOnline ? c.tablePay : "apres") : "";
+  if (tp === "apres") pay = "place";
   if (pay === "stripe") { link = await linkOf(rid); if (!c.payOnline || !canCharge(link)) throw err("failed-precondition", "paiement"); if (total < 0.5) pay = "place"; }
-  if (pay === "place" && c.payPlace === false && c.payOnline) throw err("failed-precondition", "paiement");
+  if (pay === "place" && total >= 0.5 && (tp === "avant" || (!tp && c.payPlace === false && c.payOnline))) throw err("failed-precondition", "paiement_oblig");
 
   /* number of the day + flood cap, in one transaction */
   const seqRef = db.doc(`orderSeq/${rid}`), ref = db.collection(`restos/${rid}/clientOrders`).doc(), k = crypto.randomBytes(16).toString("hex"), at = Date.now();
