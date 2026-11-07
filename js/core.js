@@ -93,18 +93,19 @@ function ico(name, cls = "") {
   return `<svg class="ico ${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${parts}</svg>`;
 }
 
-/* ───────────────────────── logo (redrawn: geometric G + growth arrow on one 8-unit grid) ───────────────────────── */
+/* ───────────────────────── logo (redrawn: geometric G + growth arrow on one 8-unit grid) ─────────────────────────
+   The drawn ink spans x 9–88.25, y 9–87.92: the <g> shifts it so its box sits dead centre in the 100×100 viewBox. */
 let gidN = 0;
 function logoMark({ mono = null, grad = false } = {}) {
   const id = "lg" + gidN++;
   const paint = mono || (grad ? `url(#${id})` : "#5B2BFF");
   return `<svg viewBox="0 0 100 100" class="mk" aria-hidden="true"><defs><linearGradient id="${id}" x1="12" y1="10" x2="88" y2="90" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#8F63FF"/><stop offset="1" stop-color="#3B16D9"/></linearGradient></defs>
-  <path d="M86 16H50A34 34 0 0 0 25.96 74.04" fill="none" stroke="${paint}" stroke-width="14"/>
-  <path d="M40.5 83.5 80 44M52 42h30v30" fill="none" stroke="${paint}" stroke-width="12.5" stroke-linejoin="miter" stroke-miterlimit="4"/></svg>`;
+  <g transform="translate(1.375 1.54)"><path d="M86 16H50A34 34 0 0 0 25.96 74.04" fill="none" stroke="${paint}" stroke-width="14"/>
+  <path d="M40.5 83.5 80 44M52 42h30v30" fill="none" stroke="${paint}" stroke-width="12.5" stroke-linejoin="miter" stroke-miterlimit="4"/></g></svg>`;
 }
 function appIcon(size = 40) {
   /* « Crème et violet »: cream tile, soft rim, violet G, sitting on a sand edge */
-  return `<span class="gg-appic" style="width:${size}px;height:${size}px;border-radius:${size * 0.28}px;display:grid;place-items:center;background:#FFFDF8;box-shadow:0 0 0 ${size > 60 ? 2 : 1.5}px #DCCFB8 inset,0 ${Math.max(2, Math.round(size / 18))}px 0 #E2D6C2;flex:none"><span style="width:${size * 0.62}px;height:${size * 0.62}px;display:block">${logoMark({ mono: "#5B2BFF" })}</span></span>`;
+  return `<span class="gg-appic" style="width:${size}px;height:${size}px;border-radius:${size * 0.28}px;display:grid;place-items:center;background:#FFFDF8;box-shadow:0 0 0 ${size > 60 ? 2 : 1.5}px #DCCFB8 inset,0 ${Math.max(2, Math.round(size / 18))}px 0 #E2D6C2;flex:none"><span style="width:${size * 0.62}px;height:${size * 0.62}px;display:block">${logoMark({ mono: "#5B2BFF" }).replace('class="mk"', 'class="mk" style="width:100%;height:100%;display:block"')}</span></span>`;
 }
 
 /* the restaurant's own logo (r.logo: data:image or http(s) URL, set in onboarding or Réglages › Logo), "" when none */

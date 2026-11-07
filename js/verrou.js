@@ -49,7 +49,9 @@ function vrSave(c, memberId) {
   try { localStorage.setItem("gg-vr", JSON.stringify(all)); } catch (e) {}
 }
 /* the app's own lock (cloud and demo). Local mode has the profile lock of compte.js. */
-const vrOn = () => !vrLocal() && !!S.resto && !!vrCfg() && !!vrCfg().pinSha;
+/* a restaurant device shared by the team (js/espaces.js « Appareil du restaurant ») never gets one person's lock: each one takes over with their own code there */
+const vrSharedDev = () => { try { return typeof esShared === "function" && !!esShared(); } catch (e) { return false; } };
+const vrOn = () => !vrLocal() && !vrSharedDev() && !!S.resto && !!vrCfg() && !!vrCfg().pinSha;
 const vrBioOn = () => { const c = vrCfg(); return !!(c && (c.cred || c.sim)); };
 /* local mode: the profiles of this restaurant that added Face ID on this device */
 function vrLocalCreds() { if (!vrLocal() || !S.rid) return []; const p = "l:" + S.rid + ":"; return Object.entries(vrAll()).filter(([k, v]) => k.startsWith(p) && v && v.cred && S.members.some((m) => m.id === k.slice(p.length))).map(([k, v]) => ({ memberId: k.slice(p.length), cred: v.cred })); }
@@ -76,9 +78,9 @@ async function vrCreate0() {
   const who = (u && u.email) || (S.me && S.me.name) || "Growth Gusto";
   const c = await navigator.credentials.create({ publicKey: {
     rp: { name: "Growth Gusto" }, challenge: chal,
-    user: { id: vrRand(16), name: who, displayName: `Verrouillage · ${(S.me && S.me.name) || who}` },
+    user: { id: vrRand(16), name: `Déverrouillage · ${who}`, displayName: `Déverrouillage de l'app · ${(S.me && S.me.name) || who}` },
     pubKeyCredParams: [{ type: "public-key", alg: -7 }, { type: "public-key", alg: -257 }],
-    authenticatorSelection: { authenticatorAttachment: "platform", userVerification: "required", residentKey: "preferred", requireResidentKey: false },
+    authenticatorSelection: { authenticatorAttachment: "platform", userVerification: "required", residentKey: "discouraged", requireResidentKey: false },
     timeout: 60000, attestation: "none",
   } });
   if (!c || !vrClientOk(c.response.clientDataJSON, "webauthn.create", chal)) throw Object.assign(new Error("bad"), { name: "BadData" });
@@ -305,6 +307,7 @@ if (typeof ccLock === "function") {
 /* ═════════════ Réglages row + screen ═════════════ */
 function vrRow() {
   const k = vrKind();
+  if (vrSharedDev()) return `<div class="li tap" data-go="verrou"><span class="ic w-vi vr-rowic">${ico(k.ic)}</span><div class="tx"><b>${esc(k.t)}</b><em>Coupé : appareil du restaurant, chacun prend la main avec son code</em></div>${ico("chev")}</div>`;
   if (vrLocal()) {
     if (!ccMember(S.me.id)) return "";
     const on = !!vrCfg(); return `<div class="li tap" data-go="verrou"><span class="ic w-vi vr-rowic">${ico(k.ic)}</span><div class="tx"><b>${esc(k.t)}</b><em>${on ? "Votre profil s'ouvre sans code" : "Ouvrir votre profil sans taper de code"}</em></div>${on ? `<span class="pill acc">Activé</span>` : ico("chev")}</div>`;
@@ -319,6 +322,10 @@ VIEWS.verrou = {
   after() { const was = vrAvail; if (!vrSupported() || !PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable) return; PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable().then((v) => { vrAvail = !!v; if (vrAvail !== was && S.route === "verrou") rerender(); }).catch(() => {}); },
   render() {
     const k = vrKind(); const av = vrAvail; const demo = vrDemo(); const local = vrLocal();
+    if (vrSharedDev()) return `<div class="inner cc-wide vr-page">${topBar("Verrouillage")}<div class="vr-hero wall st" style="--i:1"><div class="vr-hsky" aria-hidden="true"><i></i><i></i></div><div class="vr-hg">${vrGlyph("idle")}</div>
+      <div class="vr-ht"><b>Appareil du restaurant</b><span>Toute l'équipe s'en sert : ${esc(k.t)} n'y verrouille rien. Chacun prend la main avec son propre code, et l'app s'ouvre sur ses outils.</span></div></div>
+      <div class="glass pad st" style="--i:2">${VIEWS.espaces ? `<div class="li tap" data-go="espaces"><span class="ic w-sk">${ico("users")}</span><div class="tx"><b>Vues & appareils</b><em>Changer le type de cet appareil</em></div>${ico("chev")}</div>` : ""}</div>
+      <p class="note st" style="--i:3;margin:0 4px">${esc(k.t)} est fait pour votre téléphone à vous : activez-le dessus, il verrouille votre compte et votre tableau de bord.</p></div>`;
     const on = local ? !!vrCfg() : vrOn(); const c = vrCfg() || {}; const bio = vrBioOn();
     const canBio = demo || av === true;
     const hero = `<div class="vr-hero wall st" style="--i:1"><div class="vr-hsky" aria-hidden="true"><i></i><i></i></div>
