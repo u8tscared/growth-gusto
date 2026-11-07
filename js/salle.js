@@ -510,7 +510,7 @@ async function slSend(tab) {
     }
     const id = slId("sl"); SL.mine.add(id);
     const doc = { src: "salle", mode: "table", table: String(tab.table), tableId: tab.tableId || "", tabId: tab.id, course: c, courseT: slCourseT(c), station: c === 0 ? "bar" : "cuisine", covers: +tab.covers || 0,
-      items: lines, total: slTotal(lines), n: n++, day: dayKey(), at: now, waiter: S.me.id, waiterName: S.me.name || "", status: fire ? "nouvelle" : "attente", pay: "place", paid: false, name: "", phone: "", slot: "", note: tab.note || "",
+      items: lines, total: slTotal(lines), n: n++, day: dayKey(), at: now, waiter: S.me.id, waiterName: (typeof esActorName === "function" && esActorName()) || S.me.name || "", status: fire ? "nouvelle" : "attente", pay: "place", paid: false, name: "", phone: "", slot: "", note: tab.note || "",
       ...(fire ? { firedAt: now } : {}), ...(T.some((o) => o.course === c) ? { add: true } : {}), ...(rush ? { rush: true } : {}) };
     await safe(DB.set("clientOrders", id, doc));
     L.forEach((x) => { x.sent = id; x.sentAt = now; });
@@ -734,7 +734,7 @@ Object.assign(ACT, {
     const b = slBookingAt(t.id), tid = slId("st");
     /* a booking on joined tables opens on all of them */
     const bt = b && typeof plTblOf === "function" ? plTblOf(b).filter((id) => slTableBy(id) && !slTabAt(id)) : [], ids = bt.includes(t.id) && bt.length > 1 ? [t.id, ...bt.filter((x) => x !== t.id)] : [t.id];
-    const doc = { table: ids.length > 1 ? slJoinLbl(ids) : String(t.n), tableId: t.id, ...(ids.length > 1 ? { joined: ids.slice(1) } : {}), zone: t.zone || "", covers: +v, status: "open", day: dayKey(), openedAt: Date.now(), by: S.me.id, byName: S.me.name || "", items: [], total: 0, note: b && b.notes ? String(b.notes).slice(0, 140) : "", ...(b ? { booking: b.id } : {}) };
+    const doc = { table: ids.length > 1 ? slJoinLbl(ids) : String(t.n), tableId: t.id, ...(ids.length > 1 ? { joined: ids.slice(1) } : {}), zone: t.zone || "", covers: +v, status: "open", day: dayKey(), openedAt: Date.now(), by: S.me.id, byName: (typeof esActorName === "function" && esActorName()) || S.me.name || "", items: [], total: 0, note: b && b.notes ? String(b.notes).slice(0, 140) : "", ...(b ? { booking: b.id } : {}) };
     SFX.ok(); buzz(8); closeSheet(); SL.paneTab = null; SL.q = "";
     try { await safe(DB.set("salleTabs", tid, doc)); if (b && b.status !== "arrive" && typeof rsSave === "function") rsSave(b.id, { status: "arrive" }); } catch (e) { return; }
     go("salle", { id: tid });
@@ -814,7 +814,7 @@ Object.assign(ACT, {
     const id = slId("sl"), now = Date.now(), k = slId("i"); SL.mine.add(id);
     const line = { ...slLineOut(x), k, q: e.n, price: 0, refire: e.why, rush: true };
     await safe(DB.set("clientOrders", id, { src: "salle", mode: "table", table: String(tab.table), tableId: tab.tableId || "", tabId: tab.id, course: +x.course, courseT: slCourseT(x.course), station: +x.course === 0 ? "bar" : "cuisine", covers: +tab.covers || 0,
-      items: [line], total: 0, n: slNextN(), day: dayKey(), at: now, firedAt: now, waiter: S.me.id, waiterName: S.me.name || "", status: "nouvelle", pay: "place", paid: false, name: "", phone: "", slot: "", note: "", rush: true, refire: true, add: true }));
+      items: [line], total: 0, n: slNextN(), day: dayKey(), at: now, firedAt: now, waiter: S.me.id, waiterName: (typeof esActorName === "function" && esActorName()) || S.me.name || "", status: "nouvelle", pay: "place", paid: false, name: "", phone: "", slot: "", note: "", rush: true, refire: true, add: true }));
     tab.items.splice(tab.items.indexOf(x) + 1, 0, { ...x, k, q: e.n, refire: e.why, rush: true, free: { why: "Refait" }, sent: id });
     if (DB.mode === "demo") slDemoCook(id);
     SFX.done(); buzz([16, 40, 16]); logEvent && logEvent("salle", `a fait refaire ${e.n} × ${x.name} (table ${tab.table}, ${e.why})`, { ref: tab.id }); await slAfterEd(tab, `${x.name} : la cuisine refait, en priorité`);
@@ -825,7 +825,7 @@ Object.assign(ACT, {
   },
   slEdMoveNew: async (a, tid) => {
     const { e, tab, x } = slEdItem(), t = slTableBy(tid); if (!x || !t) return; const y = slSplit(tab, x, e.n); tab.items.splice(tab.items.indexOf(y), 1);
-    const nid = slId("st"); await safe(DB.set("salleTabs", nid, { table: String(t.n), tableId: t.id, zone: t.zone || "", covers: 1, status: "open", day: dayKey(), openedAt: Date.now(), by: S.me.id, byName: S.me.name || "", items: [{ ...y, movedFrom: tab.table }], total: slTotal([y]), note: "" }));
+    const nid = slId("st"); await safe(DB.set("salleTabs", nid, { table: String(t.n), tableId: t.id, zone: t.zone || "", covers: 1, status: "open", day: dayKey(), openedAt: Date.now(), by: S.me.id, byName: (typeof esActorName === "function" && esActorName()) || S.me.name || "", items: [{ ...y, movedFrom: tab.table }], total: slTotal([y]), note: "" }));
     SFX.ok(); buzz(8); closeSheet(); await slSaveTab(tab); toast(`${y.q} × ${y.name} → table ${t.n}`);
   },
   slSend: async (a) => { const tab = slCurTab(); if (!tab || SL.busy.send) return; SL.busy.send = true; a.disabled = true; try { await slSend(tab); } catch (e) { console.warn(e); } SL.busy.send = false; onData(); },
