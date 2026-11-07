@@ -47,9 +47,9 @@ const ES_POSTES = {
   plonge: { t: "Plonge", ic: "pmDrop", tools: ["menage", "hygiene", "gaspillage", "releve", "notes", "scan"], tabs: [["menage", "spray", "Ménage"], ["scan", "scan", "Scanner"], ["hygiene", "hygPot", "Hygiène"]], cta: ["menage", "spray", "Cocher le ménage"] },
 };
 const ES_POSTE_OF = { cuisine: "cuisine", second: "cuisine", salle: "salle", bar: "bar", plonge: "plonge" };
-const ES_ALWAYS = ["consignes", "pointeuse", "espaces", "reglages"];
+const ES_ALWAYS = ["consignes", "notifs", "pointeuse", "espaces", "reglages"];
 const ES_MOI = ["moiPlanning", "moiHeures", "moiActivite", "moiDemandes"];
-const ES_MOI_SET = ["home", ...ES_MOI, "pointeuse", "consignes", "frais", "formation", "avis", "espaces", "reglages"];
+const ES_MOI_SET = ["home", ...ES_MOI, "pointeuse", "consignes", "notifs", "frais", "formation", "avis", "espaces", "reglages"];
 const ES_TABS_MOI = [["moiPlanning", "cal", "Planning"], ["pointeuse", "clock", "Pointer"], ["moiHeures", "esHist", "Heures"]];
 /* request kinds: [id, icon, title, verb] */
 const ES_REQ = [["conge", "esSun", "Congé", "un congé"], ["absence", "esBand", "Absence", "une absence"], ["echange", "esSwap", "Échange de service", "un échange"], ["dispo", "esHand", "Disponibilités", "mes disponibilités"]];
@@ -174,10 +174,10 @@ function esSet(sp = esCur()) {
 const esHomeLbl = (sp = esCur()) => (sp === "pilotage" ? null : ES_SP[sp].t);
 /* the groups of a space: [title, routes]; pilotage keeps NAV's own sections */
 function esPlan(sp = esCur()) {
-  if (sp === "moi") return [["Mon espace", [...ES_MOI, "pointeuse", "pourboires", "consignes", "passation", "frais", "formation", "avis"]], ["Réglages", ["espaces", "reglages"]]];
+  if (sp === "moi") return [["Mon espace", [...ES_MOI, "pointeuse", "pourboires", "consignes", "notifs", "passation", "frais", "formation", "avis"]], ["Réglages", ["espaces", "reglages"]]];
   if (esKioskOn()) { const k = ES_ST[esStation()]; return [[k.t, [k.route]]]; }
   const ps = esPoste(); const u = esUser(); const tools = u.tiles && Array.isArray(u.tiles[ps]) ? u.tiles[ps] : ES_POSTES[ps].tools;
-  return [[`${esShared() ? "Outils" : "Mes outils"} · ${ES_POSTES[ps].t}`, [...ES_POSTES[ps].tabs.map((t) => t[0]), ...tools]], ["Équipe", ["consignes", "passation", "pointeuse", "pourboires"]], ...(esLocked() ? [] : [["Réglages", ["espaces", "reglages"]]])];
+  return [[`${esShared() ? "Outils" : "Mes outils"} · ${ES_POSTES[ps].t}`, [...ES_POSTES[ps].tabs.map((t) => t[0]), ...tools]], ["Équipe", ["consignes", "notifs", "passation", "pointeuse", "pourboires"]], ...(esLocked() ? [] : [["Réglages", ["espaces", "reglages"]]])];
 }
 function esFilterNav(list) {
   const sp = esCur(); const out = [];

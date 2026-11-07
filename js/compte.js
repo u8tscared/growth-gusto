@@ -437,6 +437,7 @@ VIEWS.reglages = {
         ${typeof abRow === "function" ? abRow() : ""}
         <div class="li tap" data-go="equipe"><span class="ic w-mi">${ico("users")}</span><div class="tx"><b>Équipe</b><em>${S.members.length} personne${S.members.length > 1 ? "s" : ""}</em></div>${ico("chev")}</div>
         ${typeof pzRow === "function" ? pzRow() : ""}
+        ${typeof nfRow === "function" ? nfRow() : ""}
         ${typeof ACT.tourStart === "function" ? `<div class="li tap" data-act="tourStart"><span class="ic w-sa">${ico("sparkle")}</span><div class="tx"><b>Revoir la visite guidée</b><em>Les écrans clés en 1 minute</em></div>${ico("chev")}</div>` : ""}
         <div class="li tap" data-go="imprimante"><span class="ic w-nd">${ico("printer")}</span><div class="tx"><b>Imprimante</b><em>${esc(typeof lbPrinterCfg === "function" ? (lbPrinterCfg().name || "À choisir") : "À choisir")}</em></div>${ico("chev")}</div>
       </div></div><div class="cc-col">

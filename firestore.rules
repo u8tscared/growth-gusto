@@ -173,8 +173,8 @@ service cloud.firestore {
 
       // ── everything else (fridges, readings, lots, stock, tickets, staff, finances…): members only ──
       match /{col}/{doc} {
-        allow read: if !(col in ['members', 'sensorKeys', 'pennylane', 'plSent', 'plInv', 'qrPay', 'bankTx', 'bank', 'push', 'consignes', 'chatGroups', 'events', 'billPays']) && isMember(rid);
-        allow create, update, delete: if !(col in ['members', 'sensorKeys', 'pennylane', 'plSent', 'plInv', 'qrPay', 'bankTx', 'bank', 'push', 'consignes', 'chatGroups', 'events', 'billPays', 'tipCfg', 'tipMonths']) && isMemberAfter(rid);
+        allow read: if !(col in ['members', 'sensorKeys', 'pennylane', 'plSent', 'plInv', 'qrPay', 'bankTx', 'bank', 'push', 'consignes', 'chatGroups', 'events', 'billPays', 'notifs']) && isMember(rid);
+        allow create, update, delete: if !(col in ['members', 'sensorKeys', 'pennylane', 'plSent', 'plInv', 'qrPay', 'bankTx', 'bank', 'push', 'consignes', 'chatGroups', 'events', 'billPays', 'tipCfg', 'tipMonths', 'notifs']) && isMemberAfter(rid);
       }
       // pourboires (js/pourboires.js): everyone reads the split and the closed months; only the gérant changes the split or closes a month
       match /tipCfg/{doc} {
@@ -237,6 +237,12 @@ service cloud.firestore {
       // push tokens (js/consignes.js): each person writes only their own phone tokens; the server (functions/src/equipe.js) reads them with admin rights
       match /push/{mid} {
         allow read, write: if mid == me() && isMember(rid);
+      }
+      // notifications asked by the app (js/notifs.js « essai », other modules): written once by a member, sent and deleted by the server
+      // (functions/src/notifs.js onNotifCreated); nobody reads them back
+      match /notifs/{nid} {
+        allow create: if isMemberAfter(rid) && request.resource.data.uid == me() && request.resource.data.kind is string
+                      && request.resource.data.keys().hasOnly(['kind', 'title', 'body', 'url', 'to', 'uid', 'at']);
       }
       // sensor cloud accounts (keys, passwords) and the gateway token: gérants only; the server reads them with admin rights
       match /sensorKeys/{doc} {
