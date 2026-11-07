@@ -123,7 +123,7 @@ service cloud.firestore {
                     && !request.resource.data.keys().hasAny(billKeys());
       allow update: if isGerant(rid) && unchanged(['owner', 'createdAt', 'server', 'alertMail', 'alertState']) && unchanged(billKeys())
                        && (unchanged(['plan', 'trialEnds']) || trialStamp())
-                    || isMember(rid) && unchanged(['owner', 'createdAt', 'server', 'alertMail', 'alertState', 'alertCfg', 'resaCfg', 'csCfg', 'trainingRequired', 'chorePhotoStaff', 'uiDefault', 'name', 'plan', 'pack', 'trialEnds']) && unchanged(billKeys())
+                    || isMember(rid) && unchanged(['owner', 'createdAt', 'server', 'alertMail', 'alertState', 'alertCfg', 'resaCfg', 'csCfg', 'trainingRequired', 'chorePhotoStaff', 'uiDefault', 'modsOff', 'profil', 'name', 'plan', 'pack', 'trialEnds']) && unchanged(billKeys())
                     || isAdmin() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(adminKeys());
       allow delete: if signedIn() && resource.data.owner == me();
 
