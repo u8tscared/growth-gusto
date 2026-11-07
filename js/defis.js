@@ -23,6 +23,15 @@ TAB_OF.defis = "more";
   NAV.splice(j >= 0 ? j + (i >= 0 ? 1 : 0) : NAV.length, 0, ["defis", "dfCup", "Défis d'équipe"]);
 })();
 try { if (typeof AB_GATE !== "undefined") AB_GATE.defis = ["pro", "Défis d'équipe"]; } catch (e) {}
+/* the lesson of the « Prise en main » (js/lecons.js, js/parcours.js) */
+if (typeof PC_LECONS === "object") PC_LECONS.defis = {
+  t: "Défis d'équipe", d: "Un objectif pour le service, « 20 desserts ce soir » : les ventes se comptent toutes seules et le classement bouge en direct.",
+  who: ["salle", "bar", "cuisine", "boss"],
+  steps: ["Regardez le défi du service sur l'accueil", "Vendez : chaque plat envoyé compte à votre nom", "Suivez le classement, la fête est pour toute l'équipe"],
+  q: ["Comment vos ventes comptent-elles pour le défi ?", ["Toutes seules, quand la commande part en cuisine", "Il faut les noter à la main", "Le chef les compte le soir"], 0],
+  tip: "Les plats offerts ou annulés ne comptent pas.",
+  sc: { k: "list", t: "20 desserts ce soir", rows: [["dfCup", "Sarah", "6", "acc"], ["dfCup", "Camille", "5", "ok"], ["dfCup", "Hugo", "3", "ok"]] },
+};
 try { if (typeof BIG_ROUTES !== "undefined" && !BIG_ROUTES.includes("defis")) BIG_ROUTES.push("defis"); } catch (e) {}
 Object.assign(IC, {
   dfCup: ["f:M7 3.5h10v5.5a5 5 0 0 1-10 0z", "M7 3.5h10v5.5a5 5 0 0 1-10 0z", "M7 5.5H4.5v1.5A3 3 0 0 0 7.4 10", "M17 5.5h2.5v1.5a3 3 0 0 1-2.9 3", "M12 14v3.5", "M8.5 20.5h7", "M9.5 17.5h5l.6 3h-6.2z"],
