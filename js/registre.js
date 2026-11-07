@@ -33,7 +33,7 @@ const regPhotoStore = () => S.cap.assets || (typeof PHOTOS !== "undefined" ? PHO
 const regLineRes = (L) => !L.refused && (!!L.reserve || L.ok === false);
 const regLineSt = (L) => (L.refused ? "bad" : regLineRes(L) ? "warn" : "ok");
 const regLineTx = (L) => (L.refused ? "Refusé" : regLineRes(L) ? "Avec réserve" : "Conforme");
-const REG_TYPES = { frais: "Frais", ultra: "Ultra-frais", surg: "Surgelé", sec: "Sec" };
+const REG_TYPES = { frais: "Frais", ultra: "Haché, poisson", surg: "Surgelé", sec: "Sec" };
 const regLineWhy = (L) => (L.refused || regLineRes(L) ? String(L.reason || (typeof L.reserve === "string" ? L.reserve : "") || "").trim() : "");
 const regBl = (bl) => String(bl || "").trim().replace(/^BL[\s:°n.-]*(?=\S)/i, "");
 const regSlot = (s) => (s === "soir" ? "soir" : "midi");

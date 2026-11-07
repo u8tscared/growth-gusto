@@ -13,7 +13,7 @@ TAB_OF.reception = "more";
 const REC_UNITS = ["kg", "PCE", "DZ", "carton", "L"];
 const REC_TYPES = [
   { k: "frais", t: "Frais", max: 4 },
-  { k: "ultra", t: "Ultra-frais", max: 2 },
+  { k: "ultra", t: "Haché, poisson", max: 2 },
   { k: "surg", t: "Surgelé", max: -18 },
   { k: "sec", t: "Sec", max: null },
 ];
