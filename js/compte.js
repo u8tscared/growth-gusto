@@ -442,6 +442,7 @@ VIEWS.reglages = {
         <div class="li tap" data-act="ccHaptics" role="switch" aria-checked="${ccHaptics()}"><span class="ic">${ico("vibe")}</span><div class="tx"><b>Vibrations</b><em>${ccVib0 ? (ccHaptics() ? "Activées" : "Coupées") : "Non prises en charge sur cet appareil"}</em></div>${ccSw(ccHaptics())}</div>
         ${ccCanInstall() ? `<div class="li tap" data-act="ccInstall"><span class="ic w-sa">${ico("download")}</span><div class="tx"><b>Installer sur l'écran d'accueil</b><em>Plein écran, même sans réseau</em></div>${ico("chev")}</div>` : ""}
         ${typeof vrRow === "function" ? vrRow() : ""}
+        ${typeof hlRow === "function" ? hlRow() : ""}
         ${local ? `<div class="li tap" data-act="ccAutoLockSheet"><span class="ic w-nd">${ico("lock")}</span><div class="tx"><b>Code à l'ouverture</b><em>${al ? `Redemandé après ${al >= 60 ? al / 60 + " h" : al + " min"} sans utiliser l'app` : "Demandé seulement à l'ouverture"}</em></div><span class="pill acc">${al ? (al >= 60 ? al / 60 + " h" : al + " min") : "Ouverture"}</span></div>` : ""}
       </div>
       ${local ? `<div class="lbl st cc-sec" style="--i:4">Données</div>
