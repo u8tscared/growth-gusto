@@ -626,7 +626,7 @@ function rsAvisHtml(b, r, L, e, pay) {
   const W = ["Bof", "Moyen", "Bien", "Très bien", "Parfait"];
   /* the stars open « Comment nous avez-vous trouvés ? » (avis/ page) with that note already picked; no page link (preview, test): Google */
   const sh = (n) => e(av ? av + sep + "n=" + n : L.review || "#");
-  const star = (n) => `<td class="gg-s gg-s${n}" align="center" style="padding:0 3px"><a href="${sh(n)}" style="display:block;text-decoration:none;background:#F6F1FF;border:1.5px solid #E4DAFF;border-radius:16px;padding:10px 0 8px;width:58px" title="${n} sur 5"><span style="display:block;font-size:30px;line-height:1;color:#F5B700">&#9733;</span><span style="display:block;font-size:11px;font-weight:700;color:#6E6880;margin-top:5px;letter-spacing:.2px">${W[n - 1]}</span></a></td>`;
+  const star = (n) => `<td class="gg-s gg-s${n}" align="center" style="padding:0 3px"><a href="${sh(n)}" style="display:block;text-decoration:none;background:#F6F1FF;border:1.5px solid #E4DAFF;border-radius:16px;padding:10px 0 8px;width:58px" title="${n} sur 5"><span style="display:block;font-size:30px;line-height:1;color:#F5B700">&#9733;</span><span style="display:block;font-size:11px;font-weight:700;color:#6E6880;margin-top:5px;letter-spacing:.1px;white-space:nowrap">${W[n - 1]}</span></a></td>`;
   return `<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light only"><meta name="supported-color-schemes" content="light"><title>${e(title)}</title>
 <style>
 @keyframes ggUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
@@ -638,7 +638,7 @@ function rsAvisHtml(b, r, L, e, pay) {
 .gg-s a:hover{background:#FFF6D6!important;border-color:#F5B700!important}
 .gg-cta{background-image:linear-gradient(110deg,#5B2BFF 0%,#5B2BFF 40%,#9C7BFF 50%,#5B2BFF 60%,#5B2BFF 100%)!important;background-size:250% 100%!important;animation:ggShine 3.2s ease-in-out 1.2s infinite,ggGlow 3.2s ease-in-out infinite}
 @media (prefers-reduced-motion:reduce){.gg-up,.gg-s a,.gg-cta{animation:none!important}}
-@media (max-width:480px){.gg-s a{width:50px!important}.gg-h1{font-size:27px!important}}
+@media (max-width:480px){.gg-s a{width:52px!important}.gg-s span+span{font-size:10px!important}.gg-h1{font-size:27px!important}}
 </style></head>
 <body style="margin:0;padding:0;background:#EFE9FB;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;color:#1B1530;-webkit-font-smoothing:antialiased">
 <div style="display:none;max-height:0;overflow:hidden;opacity:0">${e(ask)} Dix secondes, cinq étoiles, et vous aidez ${rn} à se faire connaître.</div>
