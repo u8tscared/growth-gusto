@@ -53,6 +53,7 @@ const PU_KINDS = [
   ["ca", "patron", "puEuro", "ok", "Chiffre du service", "À la fin du midi et du soir"],
   ["haccp", "patron", "therm", "bad", "Alertes frigos et hygiène", "Température, relevé oublié, DLC, sondes"],
   ["geste", "patron", "puGift", "w-sa", "Offerts et annulations", "Un plat offert ou annulé après l'envoi"],
+  ["heures", "patron", "hsGauge", "warn", "Heures sup.", "Un employé dépasse vos seuils ou va sortir du cadre légal"],
   ["consigne", "equipe", "csMega", "w-vi", "Consignes", "Plat du jour, rupture, info"],
   ["chat", "equipe", "csChat", "w-sk", "Discussion", "Les messages de vos groupes"],
 ];
@@ -60,8 +61,8 @@ const PU_K = Object.fromEntries(PU_KINDS.map((k) => [k[0], k]));
 const PU_GROUPS = [["cuisine", "En cuisine"], ["bar", "Au bar"], ["salle", "En salle"], ["patron", "Pour le patron"], ["equipe", "Toute l'équipe"]];
 /* same table as DEF in functions/src/notifs.js */
 const PU_DEF = {
-  patron: ["qr", "resa", "ca", "haccp", "geste", "consigne", "chat"],
-  chef: ["k_new", "k_rush", "k_mod", "haccp", "consigne", "chat"],
+  patron: ["qr", "resa", "ca", "haccp", "geste", "heures", "consigne", "chat"],
+  chef: ["k_new", "k_rush", "k_mod", "haccp", "heures", "consigne", "chat"],
   cuisine: ["k_new", "k_rush", "k_mod", "consigne", "chat"],
   salle: ["s_ready", "s_call", "qr", "resa", "consigne", "chat"],
   bar: ["b_new", "s_ready", "s_call", "consigne", "chat"],
@@ -197,6 +198,7 @@ function puEx() {
     ca: ["Aujourd'hui : 2 340 € TTC", "68 couverts · ticket moyen 34,40 € · +12 % vs la semaine dernière"],
     haccp: ["Chambre froide à 6,2 °C", "Au-dessus de 4 °C depuis 25 min"],
     geste: ["Offert · Table 8", `1 ${sh(D[2])} (7,50 €) · « anniversaire »`],
+    heures: [`${firstName((S.members || []).find((m) => m.role !== "gerant")?.name) || "Lucas"} va sortir du cadre légal`, "D'après le planning : 49 h cette semaine, 48 h maximum (HCR)"],
     consigne: ["Rupture · Thomas", `Plus de ${sh(D[1])} ce soir, proposez le ${sh(D[3] || D[0])}`],
     chat: ["Inès · Cuisine", "Je passe chez le primeur à 16h, il vous faut quelque chose ?"],
   };
