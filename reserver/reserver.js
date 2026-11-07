@@ -94,10 +94,15 @@
     fs = firebase.firestore(); return fs;
   }
   /* the client's own booking: callable resaManage (functions/src/resa.js), checked against the private key */
+  /* network cuts (js/reseau-client.js): « Petit souci de réseau » → « Nous renvoyons votre réservation… » → « C'est reparti ! » */
+  const R = window.GGR || { run: (f) => f(), faking: () => false };
   async function manage(action, extra) {
+    return R.run(() => manage1(action, extra), { kind: action === "get" ? "lecture" : "reservation", pending: action !== "get" });
+  }
+  async function manage1(action, extra) {
     if (DEMO) { await new Promise((r) => setTimeout(r, 700)); const b = { ...st.mb, ...(extra || {}) }; if (action === "cancel") { b.status = "annule"; b.cancelledBy = "client"; } else if (action === "modify" && cfg().validate && CONF.includes(b.status)) b.status = "avalider"; return { b }; }
     await fb(); if (!firebase.functions) await script(SDK + "firebase-functions-compat.js");
-    const call = firebase.app().functions(REGION).httpsCallable("resaManage");
+    const call = firebase.app().functions(REGION).httpsCallable("resaManage", { timeout: 25000 });
     const r = await call({ rid: RID, bid: BID, k: KEY, action, ...(extra || {}) }); return r.data || {};
   }
   const errText = (e) => { const c = String((e && e.code) || "").replace(/^functions\//, ""), m = String((e && e.message) || "");
@@ -123,7 +128,7 @@
     if (!RID) return paintMsg("Lien incomplet", "Ce lien de réservation n'est pas complet. Demandez le bon lien au restaurant.");
     try {
       if (DEMO) st.pub = demoPub();
-      else { const db = await fb(); const snap = await db.doc(`restos/${RID}/public/resa`).get(); st.pub = snap.exists ? snap.data() : null; }
+      else { const snap = await R.run(async () => (await fb()).doc(`restos/${RID}/public/resa`).get(), { kind: "lecture" }); st.pub = snap.exists ? snap.data() : null; }
     } catch (e) { console.warn(e); return paintMsg("Connexion impossible", "Vérifiez votre connexion internet, puis réessayez.", true); }
     if (!st.pub) return paintMsg("Lien introuvable", "Ce restaurant n'a pas (ou plus) de réservation en ligne.");
     if (MANAGE) return loadMine();
@@ -163,7 +168,7 @@
     app.innerHTML = `${st.pub ? hero() : `<header class="rv-hero slim"></header>`}<section class="rv-card rv-msg"><div class="rv-msg-ic">${svg.alert}</div><h2>${esc(title)}</h2><p>${esc(text)}</p>
       ${st.pub && st.pub.phone ? `<a class="rv-btn" href="tel:${esc(String(st.pub.phone).replace(/[^\d+]/g, ""))}">${svg.phone}Appeler le ${esc(st.pub.phone)}</a>` : ""}${retry ? `<button class="rv-btn soft" data-a="retry">Réessayer</button>` : ""}</section>${foot()}`;
   }
-  const foot = () => `<footer class="rv-foot">Réservations par <a href="https://growthgusto.fr" target="_blank" rel="noopener">Growth Gusto</a></footer>`;
+  const foot = () => `<footer class="rv-foot">Réservations par <a href="https://growthgusto.fr" target="_blank" rel="noopener">Growth Gusto</a>${DEMO && !EMBED && window.GGR ? `<br><button type="button" class="ggr-demo" data-a="netTest"><svg viewBox="0 0 24 24"><path d="M2 8.8a15 15 0 0 1 20 0M5.2 12.4a10 10 0 0 1 13.6 0M8.6 15.9a5 5 0 0 1 6.8 0"/><path d="M3 3l18 18"/></svg>Simuler une coupure réseau</button>` : ""}</footer>`;
   function paint() {
     const p = st.pub, c = cfg();
     const ED = MANAGE && st.mview === "edit";
@@ -282,6 +287,7 @@
     const b = e.target.closest("[data-a]"); if (!b || b.disabled || b.tagName === "INPUT") return;
     const a = b.dataset.a, v = b.dataset.v; keep(); vib(6);
     if (a === "retry") { location.reload(); return; }
+    if (a === "netTest") { if (window.GGR) GGR.fake(9000); return; }
     if (a === "cov") { st.covers = +v; st.err = ""; if (st.time && st.date) { const s = svcsOn(st.date).find((x) => slotsOf(x).includes(st.time)); if (!s || (slotState(st.date, st.time, s) !== "ok" && !(WL() && !MANAGE))) st.time = null; else if (s) st.wait = slotState(st.date, st.time, s) !== "ok"; } if (st.date && !dayFree(st.date)) st.date = firstFree(st.date) || st.date; paint(); return; }
     if (a === "date") { const had = !!st.time; st.date = v; st.time = null; st.wait = false; st.err = ""; paint(); if (had || b.classList.contains("rv-link")) scrollTo("#rvTimes"); return; }
     if (a === "time") { const first = !st.time; st.time = v; st.wait = b.dataset.w === "1"; st.err = ""; paint(); if (first) scrollTo(".rv-form"); return; }
@@ -311,22 +317,28 @@
     const wait = st.wait && WL(), status = wait ? "attente" : cfg().validate ? "avalider" : "en ligne";
     const data = { date: st.date, time: st.time, covers: st.covers, name, phone, status, source: "web", createdAt: Date.now(), at: atOf(st.date, st.time) };
     if (email) data.email = email; if (notes) data.notes = notes; if (st.optin) data.optin = true;
-    let id = "demo", k = newKey();
+    let id = "demo", k = newKey(), pc = null;
     try {
-      if (DEMO) await new Promise((r) => setTimeout(r, 900));
-      else {
-        const db = await fb(); const FV = firebase.firestore.FieldValue;
-        const ref = db.collection(`restos/${RID}/bookings`).doc(); const pub = db.doc(`restos/${RID}/public/resa`); id = ref.id;
-        const b = db.batch(); b.set(ref, data);
-        /* a booking takes its seats on the public counter; a waiting-list entry takes none */
-        if (!wait) b.update(pub, new firebase.firestore.FieldPath("days", st.date, st.time), FV.increment(st.covers), "last", ref.id);
-        /* its private key, for the « Modifier ou annuler » link: never readable by anyone but the server */
-        b.set(db.doc(`resaKeys/${RID}/keys/${ref.id}`), { k, at: Date.now() });
-        await b.commit();
-      }
+      /* the booking's id is chosen here, once: if the network drops, Firestore keeps the write and sends it when it comes back (the card
+         says so), and a try again awaits that same write — never a second booking */
+      if (DEMO) await R.run(async () => { await new Promise((r) => setTimeout(r, 900)); if (R.faking()) throw Object.assign(new Error("network"), { code: "unavailable", ggNet: true }); }, { kind: "reservation", pending: true });
+      else await R.run(async () => {
+        if (!pc) {
+          const db = await fb(); const FV = firebase.firestore.FieldValue;
+          const ref = db.collection(`restos/${RID}/bookings`).doc(); const pub = db.doc(`restos/${RID}/public/resa`); id = ref.id;
+          const b = db.batch(); b.set(ref, data);
+          /* a booking takes its seats on the public counter; a waiting-list entry takes none */
+          if (!wait) b.update(pub, new firebase.firestore.FieldPath("days", st.date, st.time), FV.increment(st.covers), "last", ref.id);
+          /* its private key, for the « Modifier ou annuler » link: never readable by anyone but the server */
+          b.set(db.doc(`resaKeys/${RID}/keys/${ref.id}`), { k, at: Date.now() });
+          pc = b.commit().catch((e) => { pc = null; throw e; });
+        }
+        return pc;
+      }, { kind: "reservation", pending: true });
       st.sending = false; st.wait = false; st.done = { ...data, id, k: DEMO ? "" : k }; vib([12, 50, 20]); paintDone(); window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (e) {
       console.warn(e); st.sending = false;
+      if (e && e.ggStop) { st.err = "Envoi arrêté. Rien n'a été réservé : réessayez quand le réseau revient, ou appelez le restaurant."; paint(); return; }
       try { if (!DEMO) { const snap = await (await fb()).doc(`restos/${RID}/public/resa`).get(); if (snap.exists) st.pub = snap.data(); } } catch (x) {}
       const s = st.pub && svcsOn(st.date).find((x) => slotsOf(x).includes(st.time));
       if (!cfg().online) { paint(); return; }
