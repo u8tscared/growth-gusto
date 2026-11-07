@@ -19,6 +19,10 @@ TAB_OF.bar = "more";
   NAV.splice(i >= 0 ? i + 1 : NAV.length, 0, ["bar", "slGlass", "Écran bar"]);
 })();
 try { if (typeof AB_GATE !== "undefined") AB_GATE.bar = ["pro", "Écran bar"]; } catch (e) {}
+/* the lesson of the screen (js/lecons.js), when the onboarding lessons are there */
+try { if (typeof PC_LECONS === "object") PC_LECONS.bar = { t: "Écran bar", d: "Les boissons de la salle et du menu QR arrivent au comptoir, la cuisine ne voit plus que ses plats.",
+  steps: ["Une boisson touchée est faite : elle se barre.", "« Prêt » prévient le serveur sur son téléphone.", "Le livre ouvre la recette du cocktail, pas à pas, avec le bon verre."],
+  q: ["Où voir combien de spritz préparer pour toutes les tables ?", ["Dans « À préparer », à côté des bons", "Sur l'écran cuisine", "Dans le menu QR"], 0], sc: { k: "board" }, who: "bar" }; } catch (e) {}
 try { if (typeof BIG_ROUTES !== "undefined" && !BIG_ROUTES.includes("bar")) BIG_ROUTES.push("bar"); } catch (e) {}
 Object.assign(IC, {
   brShaker: ["M8 8h8l-1.2 12.2a1 1 0 0 1-1 .8h-3.6a1 1 0 0 1-1-.8z", "M7.5 8h9", "M9 8V6.5a3 3 0 0 1 6 0V8", "M11 3.5h2", "f:M8 8h8l-1.2 12.2a1 1 0 0 1-1 .8h-3.6a1 1 0 0 1-1-.8z"],

@@ -5,8 +5,11 @@
 const {chromium}=require('playwright');const http=require('http');const fs=require('fs');const path=require('path');
 const ROOT=path.resolve(__dirname,'..');const OUT=path.resolve(process.env.OUT||path.join(__dirname,'out'));fs.mkdirSync(OUT,{recursive:true});
 const TYPES={'.html':'text/html','.js':'application/javascript','.css':'text/css','.svg':'image/svg+xml','.png':'image/png','.webmanifest':'application/manifest+json','.json':'application/json'};
+/* css/*.css are served as they go online: with their dark twins (tools/sombre.js, run by the firebase.json predeploy hook). RAW=1 serves the sources. */
+const SB=require('./sombre.js');const prep=(f)=>{const b=fs.readFileSync(f);if(process.env.RAW||path.dirname(f)!==path.join(ROOT,'css')||!f.endsWith('.css'))return b;
+ const n=path.basename(f);if(n==='sombre.css')return b.toString()+'\n'+SB.BUILT;return SB.SKIP_FILES.has(n)?b:SB.transform(b.toString()).css;};
 const srv=http.createServer((q,r)=>{let u=decodeURIComponent(q.url.split('?')[0]);if(u.endsWith('/'))u+='index.html';const f=path.join(ROOT,u);
- if(f.startsWith(ROOT)&&fs.existsSync(f)&&fs.statSync(f).isFile()){r.setHeader('content-type',TYPES[path.extname(f)]||'application/octet-stream');return r.end(fs.readFileSync(f));}r.statusCode=404;r.end();});
+ if(f.startsWith(ROOT)&&fs.existsSync(f)&&fs.statSync(f).isFile()){r.setHeader('content-type',TYPES[path.extname(f)]||'application/octet-stream');return r.end(prep(f));}r.statusCode=404;r.end();});
 srv.listen(0,async()=>{const port=srv.address().port;const b=await chromium.launch();
  const opts=process.env.DESKTOP?{viewport:{width:1366,height:860}}:process.env.TABLET?{viewport:{width:820,height:1180},deviceScaleFactor:1,isMobile:true,hasTouch:true}:{viewport:{width:390,height:844},deviceScaleFactor:1,isMobile:true,hasTouch:true};
  const ctx=await b.newContext({...opts,...(process.env.UA?{userAgent:process.env.UA}:{}),permissions:['camera']});
