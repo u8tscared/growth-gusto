@@ -14,6 +14,7 @@
                                        hidden:[noteId], out:{noteId:"YYYY-MM-DD"}, desc:{noteId:text}, veg:[noteId], setupAt }
      restos/{rid}/qrPay/link         Stripe account of the restaurant (server-written, members read)
      restos/{rid}/public/menu        projection read by the public page commande/ (cmPubDoc): never a client's data, never a cost price.
+                                     + promos (js/prix.js pxPubPromos): happy hours and plat du jour, applied by the page and by orderApi.
    Exposed: cmOrdersToday() → orders of the day (live ones first), CMD.unseen(). */
 "use strict";
 
@@ -134,7 +135,9 @@ function cmPubDoc() {
   const rs = typeof rsCfg === "function" ? rsCfg() : {};
   return { v: 1, name: (S.resto && S.resto.name) || "", logo: cmLogo(), address: rs.address || "", phone: rs.phone || "", msg: c.msg || "",
     cfg: { on: !!c.on, table: !!c.table, takeaway: !!c.takeaway, payOnline: !!(c.payOnline && CM.link && CM.link.charges), payPlace: c.payPlace !== false || !(CM.link && CM.link.charges), tablePay: cmTablePay(c), tips: c.tips !== false, prepMin: c.prepMin, tables: cmTablesN(), pickup: c.pickup },
-    cats: SECS.map(({ id, t }) => ({ id, t })), items, day: today, look: cmLookPub(c.look) };
+    cats: SECS.map(({ id, t }) => ({ id, t })), items, day: today, look: cmLookPub(c.look),
+    /* prix dynamiques (js/prix.js): happy hours and the plat du jour, discounts already capped by the margin floor */
+    promos: (() => { try { return typeof pxPubPromos === "function" ? pxPubPromos(items) : []; } catch (e) { return []; } })() };
 }
 const cmLookPub = (l) => ({ style: CM_STYLES.some((x) => x[0] === l.style) ? l.style : "moderne", acc: CM_ACCS.some((x) => x[0] === l.acc) ? l.acc : "violet", photos: l.photos !== false, cover: typeof l.cover === "string" && (/^https:\/\//.test(l.cover) && l.cover.length < 2000 || /^data:image\//.test(l.cover) && l.cover.length <= 170000) ? l.cover : "" });
 const cmSig = (d) => { if (!d) return ""; const { updatedAt, ...x } = d; return JSON.stringify(x); };

@@ -252,7 +252,7 @@ function slCarte(tab) {
   const tile = (n, i) => {
     const left0 = slAvail(n.id), o = slOut(n.id) || left0 === 0, left = left0, al = slDishAl(n.id), q = qty[n.id] || 0, hay = slNorm(n.title || "");
     return `<button class="sl-d${o ? " out" : ""}${q ? " has" : ""}${left != null && left <= 3 && !o ? " low" : ""}" style="--i:${Math.min(i, 18)}" data-act="slAdd" data-id="${esc(n.id)}" data-hay="${esc(hay)}" ${o ? "disabled" : ""}>
-      <b>${esc(n.title || "Sans nom")}</b><span class="sl-dp mono">${num(n.price) > 0 ? slEur(num(n.price)) : "—"}</span>
+      <b>${esc(n.title || "Sans nom")}</b><span class="sl-dp mono">${num(n.price) > 0 ? (() => { const dl = typeof pxNowDeal === "function" ? pxNowDeal(n) : null; return dl && dl.pct > 0 ? `<s class="sl-dpo">${slEur(num(n.price))}</s> ${slEur(pxNowPrice(n))}` : slEur(num(n.price)); })() : "—"}</span>
       ${o ? `<em class="sl-dout">${slOut(n.id) ? "Épuisé" : "Plus rien à vendre"}</em>` : left != null ? `<em class="sl-dleft">Plus que ${left}</em>` : al.length ? `<em class="sl-dal">${ico("slWarn")}${al.length}</em>` : ""}${q ? `<i class="sl-dq mono">${q}</i>` : ""}</button>`;
   };
   void today;
@@ -759,8 +759,8 @@ Object.assign(ACT, {
     const inOrder = (tab.items || []).filter((x) => !x.sent && !x.off && x.id === id).reduce((s, x) => s + (+x.q || 0), 0), av = slAvail(id), le = slLeftE(id);
     if (av != null && av < 1) { SFX.err(); buzz([20, 40, 20]); toast(`${n.title} : plus rien à vendre (${slPend(id)} déjà commandé${slPend(id) > 1 ? "s" : ""})`, "err"); return; }
     const c = slCourseOf(n.carteCat || "plat"); tab.items = tab.items || [];
-    const ex = tab.items.find((x) => !x.sent && !x.off && x.id === id && +x.course === c && !x.note && !(x.allergy || []).length && !(x.without || []).length && !(x.extras || []).length && !x.seat && !x.free && !x.rush && (!le || (x.at || 0) >= (+le.at || 0)));
-    if (ex) ex.q = (+ex.q || 0) + 1; else tab.items.push({ k: slId("i"), id, name: n.title || "Article", price: num(n.price), q: 1, note: "", allergy: [], course: c, cat: n.carteCat || "plat", sent: null, at: Date.now() });
+    const ex = tab.items.find((x) => !x.sent && !x.off && x.id === id && (+x.price || 0) === (typeof pxNowPrice === "function" ? pxNowPrice(n) : num(n.price)) && +x.course === c && !x.note && !(x.allergy || []).length && !(x.without || []).length && !(x.extras || []).length && !x.seat && !x.free && !x.rush && (!le || (x.at || 0) >= (+le.at || 0)));
+    if (ex) ex.q = (+ex.q || 0) + 1; else tab.items.push({ k: slId("i"), id, name: n.title || "Article", price: typeof pxNowPrice === "function" ? pxNowPrice(n) : num(n.price), q: 1, note: "", allergy: [], course: c, cat: n.carteCat || "plat", sent: null, at: Date.now() });
     if (av != null && av - 1 <= 3) setTimeout(() => toast(av - 1 ? `${n.title} : plus que ${av - 1} à vendre` : `${n.title} : c'était le dernier`, av - 1 ? "info" : "warn"), 60);
     SFX.tick(); buzz(6);
     let badge = a.querySelector(".sl-dq"); if (!badge) { badge = document.createElement("i"); badge.className = "sl-dq mono"; a.appendChild(badge); } badge.textContent = inOrder + 1; a.classList.add("has"); badge.classList.remove("pop"); void badge.offsetWidth; badge.classList.add("pop");

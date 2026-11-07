@@ -132,20 +132,22 @@ FEATURES = [
 
  dict(slug="marges-achats", short="Marges, achats et gaspillage", ic="scale", icc="t",
   title="Marge par plat, factures fournisseurs, commandes et gaspillage · Growth Gusto",
-  desc="Food cost et marge de chaque plat, factures scannées qui mettent les prix à jour, commandes fournisseurs préparées et gaspillage chiffré en euros.",
+  desc="Food cost et marge de chaque plat, factures scannées qui mettent les prix à jour, happy hour et plat du jour automatiques, commandes fournisseurs préparées et gaspillage chiffré en euros.",
   kick="Achats et marges", h1='Acheter juste, <span class="hl">connaître sa marge.</span>',
   lede="Le food cost de la carte et la marge de chaque assiette. Une facture photographiée met les prix à jour. Les commandes fournisseurs se préparent toutes seules, vos fournisseurs sont réunis dans un annuaire, et le gaspillage est chiffré en euros.",
   img="marges", tags=[COMMIS],
-  card="Marge par plat, factures scannées, commandes et annuaire fournisseurs, gaspillage en euros.",
+  card="Marge par plat, factures scannées, prix dynamiques, commandes et annuaire fournisseurs, gaspillage en euros.",
   blocks=[
    ("La marge de chaque plat", "Food cost de la carte, marge par assiette, coefficient, prix conseillé. Quand un prix fournisseur monte, vous voyez ce que ça coûte par mois.", ["Fiche technique chiffrée, export PDF", "Hausses de prix et leur coût", "Carte en 4 cases : ventes × marge"], "marges", "t", []),
    ("Factures scannées", "Une photo ou le PDF : les lignes sont lues sur votre téléphone, reliées au stock, et les prix d'achat se mettent à jour.", ["Photo ou PDF, lu sur l'appareil", "Historique des prix", "Dépense ajoutée aux achats"], "factures", "s", ["Par import"]),
+   ("Prix dynamiques", "Le happy hour se met en route tout seul sur le menu QR, le plat du jour écoule ce qui arrive à date, et une hausse fournisseur vous alerte avec le prix qui rattrape la marge.", ["Happy hour programmé, prix barrés sur le menu QR", "Plat du jour choisi selon les DLC", "Remise plafonnée pour garder votre marge"], "prix", "v", []),
    ("Commandes fournisseurs préparées", "Un bon par fournisseur, calculé sur les couverts attendus, votre consommation et le stock. Vous vérifiez, vous envoyez.", ["Jours de livraison, heure limite, franco", "E-mail, SMS, WhatsApp ou PDF", "Manquants repérés à la réception"], "achats", "v", []),
    ("L'annuaire des fournisseurs", "Le poissonnier, le boucher, la cave : coordonnées, jours et créneau de livraison, heure limite et franco. La commande préparée part en un clic.", ["Appeler, écrire, itinéraire d'un tap", "Livraisons de la semaine d'un coup d'œil", "Achats, hausses de prix, livraisons complètes"], "fournisseurs", "s", []),
    ("Le gaspillage en euros", "Pertes, invendus, DLC passées : tout est chiffré au coût recette, avec des pistes pour jeter moins.", ["Part des achats, projection sur l'année", "Lots à jeter en un geste", "Produits souvent jetés commandés au plus juste"], "gaspillage", "k", []),
   ],
   faq=[("D'où viennent les prix d'achat ?", "De vos factures (photo ou PDF lus sur l'appareil), de la réception des livraisons, ou saisis à la main. L'historique des prix est gardé par produit."),
-       ("Les ventes sont-elles prises en compte ?", "Oui, avec une caisse reliée ou un import des ventes (pack Second) : la carte en 4 cases croise ventes et marge.")],
+       ("Les ventes sont-elles prises en compte ?", "Oui, avec une caisse reliée ou un import des ventes (pack Second) : la carte en 4 cases croise ventes et marge."),
+       ("Le happy hour s'applique-t-il aussi à ma caisse ?", "Le prix réduit s'applique au menu QR et à la prise de commande de Growth Gusto, et c'est ce prix qui est encaissé en ligne. Sur une autre caisse, programmez la même remise.")],
   related=["caisse-stock", "recettes-allergenes", "finances"], guides=[]),
 
  dict(slug="caisse-stock", short="Caisse, stock et ventes", ic="box", icc="s",
@@ -230,7 +232,7 @@ BY = {f["slug"]: f for f in FEATURES}
 def build():
     # hub
     cards = "".join(card(f"/fonctionnalites/{f['slug']}", e(f["short"]), e(f["card"]), f["ic"], f["icc"], [t for t in f["tags"] if t != COMMIS] or ["Tous les packs"], dl=i % 3) for i, f in enumerate(FEATURES))
-    words = ["Relevés de températures", "Sondes sans fil", "Étiquettes DLC", "Réception", "Plan de nettoyage", "PMS", "Mode contrôle", "Rappel de lot", "14 allergènes", "Process HACCP", "Formation", "Réservations", "Plan de salle", "Prise de commande", "Écran cuisine", "Menu QR", "Carte importée", "Marge par plat", "Factures scannées", "Commandes fournisseurs", "Gaspillage", "Caisse", "Uber Eats", "Stock", "Tableau de bord", "Finances", "Pennylane", "Pointeuse", "Planning", "Planning intelligent", "Consignes", "Passation de service", "Journal des actions", "Accès temporaires", "Fidélité"]
+    words = ["Relevés de températures", "Sondes sans fil", "Étiquettes DLC", "Réception", "Plan de nettoyage", "PMS", "Mode contrôle", "Rappel de lot", "14 allergènes", "Process HACCP", "Formation", "Réservations", "Plan de salle", "Prise de commande", "Écran cuisine", "Menu QR", "Carte importée", "Marge par plat", "Factures scannées", "Happy hour", "Commandes fournisseurs", "Gaspillage", "Caisse", "Uber Eats", "Stock", "Tableau de bord", "Finances", "Pennylane", "Pointeuse", "Planning", "Planning intelligent", "Consignes", "Passation de service", "Journal des actions", "Accès temporaires", "Fidélité"]
     mq = '<div class="mq" aria-hidden="true"><div class="mq-t">' + "".join(f"<span>{w}</span>" for w in words * 2) + "</div></div>"
     body = hero([("/", "Accueil"), ("/fonctionnalites", "Fonctionnalités")], "Fonctionnalités",
                 'Tout le restaurant, <span class="hl">une seule app.</span>',
