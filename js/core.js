@@ -566,7 +566,7 @@ function afterRender(v) { const V = VIEWS[S.route]; V && V.after && V.after(v); 
 /* desktop / iPad landscape: a top-level route (one of the side nav entries) opened from the side nav has nowhere to go back to, so no « Retour » */
 const DESK_MQ = window.matchMedia("(min-width:960px)");
 const isTopLevel = () => DESK_MQ.matches && !S.history.length && NAV.some((n) => n[0] === S.route);
-const topBar = (title, opts = {}) => `<div class="top st" style="--i:0">${opts.noBack || isTopLevel() ? "" : `<button class="iconbtn" data-act="back" aria-label="Retour">${ico("back")}</button>`}<span class="h2">${title}</span>${opts.right || ""}${typeof bigBtn === "function" && !opts.noBig ? bigBtn() : ""}</div>`;
+const topBar = (title, opts = {}) => `<div class="top st" style="--i:0">${opts.noBack || isTopLevel() ? "" : `<button class="iconbtn" data-act="back" aria-label="Retour">${ico("back")}</button>`}<span class="h2">${title}</span>${opts.right || ""}${typeof thTopBtn === "function" ? thTopBtn() : ""}${typeof bigBtn === "function" && !opts.noBig ? bigBtn() : ""}</div>`;
 try { DESK_MQ.addEventListener("change", () => { if (S.ready && S.resto) rerender(); }); } catch (e) {}
 /* banner(): nothing in the standalone build except, on Accueil, the one-time « Installer l'app » card. */
 const banner = () => (S.slow && DB.mode === "db" ? (typeof NET !== "undefined" && NET.off ? `<div class="banner st tap" data-act="hlOpen">${ico("wifi")}<span>Hors ligne : vous voyez les dernières données de cet appareil. Tout ce que vous faites est gardé et partira au retour du réseau.</span></div>` : `<div class="banner st">${ico("clock")}<span>Connexion lente : les données affichées peuvent ne pas être à jour.</span></div>`) : "") + (S.route === "home" ? installHint() : "");
@@ -861,7 +861,7 @@ function registerSW() {
    to the foreground. A new v means the code running here is old: with nothing in progress the app reloads silently (caches dropped,
    so the reload is guaranteed fresh); otherwise a toast offers « Mettre à jour ». sessionStorage guards against reload loops:
    one reload attempt per version per session, after which the version is simply adopted. */
-const APP_V = "2026-11-07.13";
+const APP_V = "2026-11-07.14";
 /* logos of the tools Growth Gusto connects to (img/logos/<id>.svg|png): caisses, réservations, comptabilité, banque, paiement */
 const BRAND_LOGOS = { sumup: "svg", zelty: "png", lightspeed: "svg", tiller: "svg", square: "svg", innovorder: "svg", popina: "png", zenchef: "svg", thefork: "png", sevenrooms: "png", guestonline: "png", resy: "svg", opentable: "svg", formitable: "svg", google: "svg", pennylane: "svg", qonto: "svg", quickbooks: "svg", sage: "svg", odoo: "svg", stripe: "svg", zebra: "svg" };
 const brandLogo = (id) => BRAND_LOGOS[id] ? `<img class="brand-logo" src="img/logos/${id}.${BRAND_LOGOS[id]}" alt="" loading="lazy" decoding="async" draggable="false">` : "";
