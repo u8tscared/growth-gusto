@@ -9,6 +9,7 @@
      onTabNotif     trigger on restos/{rid}/salleTabs/{id}: a line offered or cancelled after it was sent (geste, for the boss).
      onAlertNotif   trigger on a new restos/{rid}/alerts doc: fridge, DLC, sensor, obligation (haccp); a client cancels a booking (resa).
      onResaNotif    trigger on restos/{rid}/bookings/{id}: a new online or imported booking (resa).
+     onHsAlertNotif trigger on a new restos/{rid}/hsAlerts doc: overtime threshold or legal frame (heures), to the chosen managers.
      onNotifCreated trigger on restos/{rid}/notifs/{id}: a notification asked by the app (the « essai » button, other modules), then deleted.
      notifsTick     plain function for the single 15-min job: the takings of the service, at the end of lunch and of dinner (ca).
      _notify(rid, ev) helper for other server modules: ev = { kind, title, body, url, tag, only?:[memberId], except?:uid }.
@@ -23,10 +24,10 @@ const db = () => admin.firestore();
 const REGION = "europe-west9", TZ = "Europe/Paris";
 
 /* ───────── what each role gets by default (same as NF_DEF in js/notifs.js) ───────── */
-const KINDS = ["k_new", "k_rush", "k_mod", "b_new", "s_ready", "s_call", "qr", "resa", "ca", "haccp", "geste", "consigne", "chat"];
+const KINDS = ["k_new", "k_rush", "k_mod", "b_new", "s_ready", "s_call", "qr", "resa", "ca", "haccp", "geste", "heures", "consigne", "chat"];
 const DEF = {
-  patron: ["qr", "resa", "ca", "haccp", "geste", "consigne", "chat"],
-  chef: ["k_new", "k_rush", "k_mod", "haccp", "consigne", "chat"],
+  patron: ["qr", "resa", "ca", "haccp", "geste", "heures", "consigne", "chat"],
+  chef: ["k_new", "k_rush", "k_mod", "haccp", "heures", "consigne", "chat"],
   cuisine: ["k_new", "k_rush", "k_mod", "consigne", "chat"],
   salle: ["s_ready", "s_call", "qr", "resa", "consigne", "chat"],
   bar: ["b_new", "s_ready", "s_call", "consigne", "chat"],
@@ -212,6 +213,24 @@ const onResaNotif = onDocumentWritten({ document: "restos/{rid}/bookings/{bid}",
   try { await _notify(ev.params.rid, { kind: "resa", title: ask ? "Demande de réservation à valider" : "Nouvelle réservation", body: `${b.name || "Client"} · ${+b.covers || "?"} pers.${when ? " · " + when : ""}${b.ext ? ` · via ${b.ext}` : ""}`, url: "./?go=resa", tag: `gg-resa-${ev.params.bid}`.slice(0, 60), ttl: 12 * 3600 }); } catch (e) { logger.error("onResaNotif", e); }
 });
 
+/* ───────── overtime and working time (js/heuressup.js): one doc per finding, written once by any device of the team ─────────
+   Sent on creation only, to the managers the gérant chose (restos/{rid}.hsCfg.to, gérants and chefs only), by default every gérant. */
+async function hsTargets(rid, T) {
+  const r = (await db().doc(`restos/${rid}`).get()).data() || {}; const cfg = r.hsCfg || {}; if (cfg.on === false) return [];
+  const mgr = Object.entries(T.members).filter(([, m]) => m && (m.role === "gerant" || m.role === "chef")).map(([id]) => id);
+  const to = Array.isArray(cfg.to) ? cfg.to.filter((id) => mgr.includes(id)) : [];
+  return to.length ? to : Object.entries(T.members).filter(([, m]) => m && m.role === "gerant").map(([id]) => id);
+}
+const onHsAlertNotif = onDocumentCreated({ document: "restos/{rid}/hsAlerts/{aid}", region: REGION, memory: "256MiB", maxInstances: 5 }, async (ev) => {
+  const x = ev.data && ev.data.data(); if (!x || x.seen || x.quiet || typeof x.title !== "string" || (x.at && Date.now() - x.at > 24 * 3600e3)) return;
+  const more = Math.min(99, Math.max(0, Math.floor(+x.more || 0)));
+  const rid = ev.params.rid;
+  try {
+    const T = await teamOf(rid); const only = await hsTargets(rid, T); if (!only.length) return;
+    await _notify(rid, { kind: "heures", title: cut(x.title, 80), body: cut(x.body || "", 170) + (more ? ` · et ${more} autre${more > 1 ? "s" : ""} alerte${more > 1 ? "s" : ""}` : ""), url: "./?go=planning", tag: `gg-hs-${String(ev.params.aid).slice(-40)}`, only, ttl: 24 * 3600 });
+  } catch (e) { logger.error("onHsAlertNotif", e); }
+});
+
 /* ───────── a notification asked by the app (essai, other modules) ───────── */
 const APP_KINDS = new Set(["test", ...KINDS]);
 const onNotifCreated = onDocumentCreated({ document: "restos/{rid}/notifs/{nid}", region: REGION, memory: "256MiB", maxInstances: 5 }, async (ev) => {
@@ -258,4 +277,4 @@ async function notifsTick() {
   }
 }
 
-module.exports = { onOrderNotif, onTabNotif, onAlertNotif, onResaNotif, onNotifCreated, notifsTick, _notify, _orderEvents: orderEvents, _tabEvents: tabEvents, _wants: wants, _quietNow: quietNow };
+module.exports = { onOrderNotif, onTabNotif, onAlertNotif, onResaNotif, onNotifCreated, onHsAlertNotif, notifsTick, _notify, _orderEvents: orderEvents, _tabEvents: tabEvents, _wants: wants, _quietNow: quietNow };

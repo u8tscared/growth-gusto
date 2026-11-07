@@ -629,7 +629,7 @@ VIEWS.planning = {
     }
     const hrs = mgr ? rhHoursCard(st, mon) : "";
     const legend = `<div class="rh-legend st" style="--i:6">${Object.values(RH_POSTS).map((p) => `<span><i style="background:${p.c}"></i>${p.t}</span>`).join("")}</div>`;
-    return `<div class="inner wide rh-plan">${topBar("Planning", { right })}${nav}${kpi}${hint}${body}${hrs}${legend}
+    return `<div class="inner wide rh-plan">${topBar("Planning", { right })}${nav}${kpi}${hint}${body}${hrs}${mgr && typeof hsCard === "function" ? hsCard() : ""}${legend}
       ${st.boss && st.noRate ? `<p class="note st" style="--i:7">${st.noRate} personne${st.noRate > 1 ? "s" : ""} sans taux horaire : coût incomplet. <button class="btn ghost" data-go="staff">Compléter les fiches</button></p>` : ""}
       <p class="note st" style="--i:8">Repères HCR (indicatifs, jamais bloquants) : 11 h de travail par jour en cuisine, 11 h 30 en salle, 11 h de repos entre deux journées, 48 h par semaine, 46 h en moyenne sur 12 semaines, 2 jours de repos.${st.boss ? " Coût chargé estimé avec les charges de chaque fiche." : ""}</p></div>`;
   },
@@ -815,7 +815,7 @@ VIEWS.staff = {
         ${boss ? (rate ? `<span class="rh-emp-m"><span><b class="mono">${fmt(rate, 2)} €</b>brut / h</span><span><b class="mono">${fmt(lr, 2)} €</b>chargé / h</span><span><b class="mono">${rhEur(mg)}</b>brut / mois</span><span><b class="mono">${rhEur(mg * (1 + rhCh(p) / 100))}</b>chargé / mois</span></span>` : `<span class="pill warn">Taux horaire à saisir</span>`) : ""}</span>${ico("chev")}</button>`;
     };
     return `<div class="inner rh-staff">${topBar("Employés", { right: rhCanEdit() ? `<button class="btn soft sm" data-act="rhBulk" aria-label="Ajouter plusieurs personnes">${ico("users")}<span class="rh-bt">Plusieurs</span></button><button class="btn acc sm" data-act="rhEmpNew">${ico("plus")}Ajouter</button>` : "" })}
-      ${money}
+      ${money}${typeof hsCard === "function" ? hsCard() : ""}
       ${act.length ? `<div class="rh-emps">${act.map(card).join("")}</div>` : `<div class="glass empty st" style="--i:3"><span class="ic">${ico("rhid")}</span><b>Aucun employé</b>Créez une fiche par personne : poste, contrat, heures et taux horaire. Le planning et la pointeuse s'en servent.</div>`}
       ${old.length ? `<div class="lbl st" style="--i:30">Anciens employés</div><div class="rh-emps">${old.map((p, i) => card(p, i + 30)).join("")}</div>` : ""}
       <div class="rh-links st" style="--i:38"><button class="btn soft sm" data-go="planning">${ico("cal")}Planning</button><button class="btn soft sm" data-go="pointeuse">${ico("clock")}Pointeuse</button></div>

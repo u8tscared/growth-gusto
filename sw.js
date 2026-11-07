@@ -1,5 +1,5 @@
 /* Growth Gusto service worker: offline shell. Network-first, no-store, for pages/js/css/json (updates arrive at once), cache fallback offline. Bump VERSION to drop old caches. */
-const VERSION = "gg-v88";
+const VERSION = "gg-v89";
 const SHELL = [
   "./", "./index.html", "./manifest.webmanifest",
   "./css/base.css", "./css/compte.css", "./css/abo.css", "./css/onboard.css", "./css/home.css", "./css/releve.css", "./css/labels.css", "./css/reception.css", "./css/stock.css", "./css/tickets.css", "./css/registre.css", "./css/notes.css", "./css/menage.css", "./css/finance.css", "./css/pennylane.css", "./css/oblig.css", "./css/rh.css", "./css/avis.css", "./css/auth.css", "./css/v2.css", "./css/tour.css", "./css/perms.css", "./css/perso.css", "./css/saisie.css", "./css/alertes.css", "./css/sondes.css", "./css/hygiene.css", "./css/caisse.css", "./css/import.css", "./css/resa.css", "./css/plan.css", "./css/resaimport.css", "./css/marge.css", "./css/commande.css", "./css/cmimport.css", "./css/controle.css", "./css/formation.css",
@@ -7,7 +7,7 @@ const SHELL = [
   "./css/achats.css", "./css/gaspi.css", "./js/achats.js", "./js/fournisseurs.js", "./css/fournisseurs.css", "./js/previsions.js", "./css/previsions.css", "./js/prix.js", "./css/prix.css", "./js/gaspi.js", "./css/salle.css", "./js/salle.js", "./css/clients.css", "./js/clients.js", "./css/consignes.css", "./js/consignes.js", "./css/rush.css", "./js/rush.js", "./css/livraison.css", "./js/livraison.js", "./css/multi.css", "./js/multi.js", "./css/frais.css", "./js/frais.js", "./css/intro.css", "./js/intro.js", "./css/grand.css", "./js/grand.js", "./css/espaces.css", "./js/espaces.js", "./css/verrou.css", "./js/verrou.js", "./css/bar.css", "./js/bar.js", "./css/recette.css", "./js/recette.js", "./css/sombre.css", "./js/theme.js", "./js/sombre-map.js", "./css/horsligne.css", "./js/horsligne.js", "./css/planif.css", "./js/planif.js", "./css/journee.css", "./js/journee.js",
   "./css/defis.css", "./js/defis.js", "./css/relais.css", "./js/relais.js", "./css/avisclients.css", "./js/avisclients.js", "./css/evenement.css", "./js/evenement.js", "./css/pourboires.css", "./js/pourboires.js",
   "./css/appel.css", "./css/ecran-client.css", "./js/appel.js",
-  "./css/notifs.css", "./js/notifs.js",
+  "./css/notifs.css", "./js/notifs.js", "./css/heuressup.css", "./js/heuressup.js",
   "./vendor/qrcode.js", "./vendor/jsQR.js",
   "./icons/icon.svg", "./icons/icon-192.png", "./icons/icon-512.png", "./icons/apple-touch-icon.png", "./icons/favicon-32.png",
 ];
