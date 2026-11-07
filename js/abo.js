@@ -11,15 +11,15 @@
 const AB_DAY = 864e5, AB_TRIAL = 14;
 const AB_PACKS = {
   essentiel: { t: "Commis", price: 59, tag: "L'hygiène carrée, sans y penser", feats: ["Relevés et sondes", "Étiquettes & DLC", "Réception des livraisons", "Plan de nettoyage", "Fiches recettes & allergènes", "Mode contrôle & PMS", "Registre & rappel de lot", "Équipe illimitée"] },
-  pro: { t: "Second", price: 109, tag: "La salle et la caisse en plus", feats: ["Tout Commis", "Réservations", "Plan de salle", "Prise de commande & écran cuisine", "Notes de frais avec TVA", "Caisse connectée & tickets Z", "Stock & inventaire", "Tableau de bord"] },
-  complet: { t: "Chef", price: 169, tag: "Toute la maison tourne", feats: ["Tout Second", "Pointeuse", "Planning", "Employés & salaires", "Finances & banque", "Pennylane", "Plusieurs restaurants"] },
+  pro: { t: "Second", price: 109, tag: "La salle et la caisse en plus", feats: ["Tout Commis", "Réservations", "Plan de salle", "Prise de commande & écran cuisine", "Notes de frais avec TVA", "Caisse connectée & tickets Z", "Stock & inventaire", "Tableau de bord", "Pointeuse & planning"] },
+  complet: { t: "Chef", price: 169, tag: "Toute la maison tourne", feats: ["Tout Second", "Planning intelligent", "Coûts & export paie", "Employés & salaires", "Finances & banque", "Pennylane", "Plusieurs restaurants"] },
 };
 const AB_ORDER = ["essentiel", "pro", "complet"], AB_LVL = { essentiel: 1, pro: 2, complet: 3 };
 const abPk = (x) => AB_LVL[x] ? x : "complet";
 /* areas that need a higher pack: with a paid Commis or Second they show an upgrade card instead (during the trial everything is open) */
 const AB_GATE = {
   resa: ["pro", "Réservations"], commandes: ["pro", "Commande en ligne"], plan: ["pro", "Plan de salle"], stock: ["pro", "Stock & inventaire"], tickets: ["pro", "Tickets de caisse"], tzEdit: ["pro", "Tickets de caisse"], dashboard: ["pro", "Tableau de bord"], caisse: ["pro", "Caisse connectée"], caisseMap: ["pro", "Caisse connectée"],
-  finance: ["complet", "Finances"], pennylane: ["complet", "Pennylane"], pointeuse: ["complet", "Pointeuse"], planning: ["complet", "Planning"], staff: ["complet", "Employés & salaires"], sites: ["complet", "Multi-restaurant"],
+  finance: ["complet", "Finances"], pennylane: ["complet", "Pennylane"], pointeuse: ["pro", "Pointeuse"], planning: ["pro", "Planning"], staff: ["pro", "Employés"], salaires: ["complet", "Salaires & coûts"], sites: ["complet", "Multi-restaurant"],
 };
 const abHas = (route, p = abPlan()) => !AB_GATE[route] || AB_LVL[p.feat] >= AB_LVL[AB_GATE[route][0]];
 const AB_MONTHS = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"];

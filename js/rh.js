@@ -31,7 +31,10 @@ Object.assign(IC, {
 const rhHash = (s) => { let h = 2166136261; for (const c of String(s)) { h ^= c.charCodeAt(0); h = Math.imul(h, 16777619) >>> 0; } return h.toString(36); };
 const rhPinHash = (id, code) => (typeof ccHash === "function" ? ccHash : rhHash)(id + ":" + code);
 const rhIsMgr = () => ["gerant", "chef"].includes(myRole());
-const rhIsBoss = () => (typeof canSee === "function" ? canSee("salaires") : myRole() === "gerant");
+/* salaires, coûts et export paie : pack Chef. Avec Second, la pointeuse et le planning restent complets, sans les euros. */
+const rhPaid = () => typeof abHas !== "function" || abHas("salaires");
+const rhCanEdit = () => (typeof canSee === "function" ? canSee("salaires") : myRole() === "gerant");
+const rhIsBoss = () => rhPaid() && rhCanEdit();
 const rhCanStaff = () => (typeof canSee === "function" ? canSee("staff") : myRole() === "gerant");
 const rhT2m = (t) => { const m = /^(\d{1,2}):(\d{2})/.exec(t || ""); return m ? +m[1] * 60 + +m[2] : null; };
 const rhDur = (min) => { min = Math.max(0, Math.round(min || 0)); if (min < 60) return `${min} min`; const h = Math.floor(min / 60), m = min % 60; return m ? `${h} h ${pad(m)}` : `${h} h`; };
@@ -796,12 +799,12 @@ VIEWS.staff = {
         <span class="rh-emp-t"><b>${esc(p.name)}</b><em>${esc(p.role || "Poste à préciser")} · ${RH_CONTRACTS[p.contract] || esc(p.contract)} · ${fmt(rhNum(p.weeklyHours, 35), 0)} h/sem.</em>
         ${boss ? (rate ? `<span class="rh-emp-m"><span><b class="mono">${fmt(rate, 2)} €</b>brut / h</span><span><b class="mono">${fmt(lr, 2)} €</b>chargé / h</span><span><b class="mono">${rhEur(mg)}</b>brut / mois</span><span><b class="mono">${rhEur(mg * (1 + rhCh(p) / 100))}</b>chargé / mois</span></span>` : `<span class="pill warn">Taux horaire à saisir</span>`) : ""}</span>${ico("chev")}</button>`;
     };
-    return `<div class="inner rh-staff">${topBar("Employés", { right: boss ? `<button class="btn acc sm" data-act="rhEmpNew">${ico("plus")}Ajouter</button>` : "" })}
+    return `<div class="inner rh-staff">${topBar("Employés", { right: rhCanEdit() ? `<button class="btn acc sm" data-act="rhEmpNew">${ico("plus")}Ajouter</button>` : "" })}
       ${money}
       ${act.length ? `<div class="rh-emps">${act.map(card).join("")}</div>` : `<div class="glass empty st" style="--i:3"><span class="ic">${ico("rhid")}</span><b>Aucun employé</b>Créez une fiche par personne : poste, contrat, heures et taux horaire. Le planning et la pointeuse s'en servent.</div>`}
       ${old.length ? `<div class="lbl st" style="--i:30">Anciens employés</div><div class="rh-emps">${old.map((p, i) => card(p, i + 30)).join("")}</div>` : ""}
       <div class="rh-links st" style="--i:38"><button class="btn soft sm" data-go="planning">${ico("cal")}Planning</button><button class="btn soft sm" data-go="pointeuse">${ico("clock")}Pointeuse</button></div>
-      ${boss ? `<p class="note st" style="--i:40">Coûts indicatifs : brut mensuel = taux × heures du contrat × 52 / 12, avec la majoration HCR des heures au-delà de 35 h ; chargé = brut × (1 + charges patronales). Seul le gérant voit les salaires.</p>` : `<p class="note st" style="--i:40">Les salaires et les coûts ne sont visibles que par le gérant.</p>`}
+      ${boss ? `<p class="note st" style="--i:40">Coûts indicatifs : brut mensuel = taux × heures du contrat × 52 / 12, avec la majoration HCR des heures au-delà de 35 h ; chargé = brut × (1 + charges patronales). Seul le gérant voit les salaires.</p>` : `<p class="note st" style="--i:40">${rhCanEdit() && !rhPaid() ? "Salaires, coûts du personnel et export paie : pack Chef." : "Les salaires et les coûts ne sont visibles que par le gérant."}</p>`}
     </div>`;
   },
 };
@@ -1040,7 +1043,7 @@ Object.assign(ACT, {
   rhHrOpen: (a, id) => { if (!rhIsMgr() || !rhStaff(id)) return; SFX.tap(); openSheet(rhHrSheet(id)); },
   rhHrJump: () => { const c = $(".rh-hrs"); if (!c) return; SFX.tap(); c.scrollIntoView({ behavior: "smooth", block: "start" }); c.classList.remove("rh-flash"); void c.offsetWidth; c.classList.add("rh-flash"); },
   rhPayExport: () => {
-    if (!rhIsMgr()) return; SFX.tap(); const t = dayKey(); const m0 = t.slice(0, 8) + "01"; const pm = parseDay(m0); pm.setMonth(pm.getMonth() - 1); const pm0 = dayKey(pm);
+    if (!rhIsMgr()) return; if (!rhPaid()) { SFX.tap(); toast("L'export paie fait partie du pack Chef.", "info"); if (typeof abGerant === "function" && abGerant()) go("abonnement"); return; } SFX.tap(); const t = dayKey(); const m0 = t.slice(0, 8) + "01"; const pm = parseDay(m0); pm.setMonth(pm.getMonth() - 1); const pm0 = dayKey(pm);
     const opt = [[m0, `Ce mois-ci (${MONTHS[parseDay(m0).getMonth()]})`], [pm0, `Mois dernier (${MONTHS[pm.getMonth()]})`]];
     openSheet(`<div class="h2">Export paie du mois</div><p class="sub">Un fichier CSV (Excel) pour le comptable : heures prévues et pointées, heures sup. par taux, repères HCR, par semaine et par personne.</p>
       <div>${opt.map(([k, l]) => { const w = rhPayWeeks(k); return `<div class="li tap" role="button" tabindex="0" data-act="rhPayGo" data-v="${k}"><span class="ic">${ico("download")}</span><div class="tx"><b>${l}</b><em>${w.length} semaine${w.length > 1 ? "s" : ""}${w.length ? ` · du ${shortDate(w[0])} au ${shortDate(addDays(w[w.length - 1], 6))}` : ""}</em></div>${ico("chev")}</div>`; }).join("")}</div>`);
@@ -1050,11 +1053,11 @@ Object.assign(ACT, {
   /* employés */
   rhEmp: (a, id) => {
     const p = rhStaff(id); if (!p) return;
-    if (!rhIsBoss()) { toast("Seul le gérant peut modifier les fiches.", "info"); return; }
+    if (!rhCanEdit()) { toast("Seul le gérant peut modifier les fiches.", "info"); return; }
     const { _virtual, ...doc } = p; S.ui.rhE = { ...doc, _new: !!_virtual, _virtual: !!_virtual }; SFX.tap(); openSheet(rhEmpSheet());
   },
   rhEmpNew: () => {
-    if (!rhIsBoss()) return; const used = rhPeople().map((p) => p.color);
+    if (!rhCanEdit()) return; const used = rhPeople().map((p) => p.color);
     S.ui.rhE = { id: null, _new: true, name: "", role: "", post: "cuisine", contract: "CDI", weeklyHours: 35, hourlyGross: "", chargesPct: 42, color: PALETTE.find((c) => !used.includes(c)) || PALETTE[used.length % PALETTE.length], start: dayKey(), active: true };
     SFX.tap(); openSheet(rhEmpSheet());
   },

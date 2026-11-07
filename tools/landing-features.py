@@ -152,7 +152,7 @@ GROUPS = [
     ("g-app", "l", "Pendant le service", "Une app qui tient le coup", "Sans réseau, de nuit, et facile à prendre en main.", True,
         [("horsligne", None, None), ("sombre", None, None), ("parcours", None, None)]),
     ("g-equipe", "v", "L'équipe", "Équipe, pointeuse et planning", "Chacun son compte, ses horaires, son planning.", False,
-        [("equipe", None, None), ("consignes", None, None), ("notifs", None, None), ("defis", SECOND, None), ("pourboires", SECOND, None), ("passation", None, None), ("journal", None, None), ("acces", None, None), ("pointeuse", CHEF, None), ("planning", CHEF, None), ("staff", CHEF, None)]),
+        [("equipe", None, None), ("consignes", None, None), ("notifs", None, None), ("defis", SECOND, None), ("pourboires", SECOND, None), ("passation", None, None), ("journal", None, None), ("acces", None, None), ("pointeuse", SECOND, None), ("planning", CHEF, None), ("staff", CHEF, None)]),
 ]
 
 PLUS = '<svg class="fi-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>'
