@@ -47,3 +47,11 @@ for(const [nom,env] of [['téléphone',{}],['tablette',{TABLET:'1'}]]){
   const mm=o.match(/ERRORS: (\[[\s\S]*\])/);const ee=mm?JSON.parse(mm[1]):null;
   if(n.status!==0||/SCRIPT ERROR/.test(o)||!/CLAVIER OK/.test(o)||!ee||ee.length){console.log("\nSaisie au clavier cassée sur "+nom+" : voir ci-dessus et l'en-tête de js/clavier.js.");process.exit(1);}
 }
+// 7) écrans figés (js/core.js FIGE), téléphone et tablette : une fenêtre ou un écran ne suit jamais le doigt, une longue page défile (tools/fige-ui.js)
+//    et la caisse d'événement reste à part, plein écran, sans rien de la salle (tools/ev-ui.js)
+for(const [nom,env] of [['téléphone',{}],['tablette',{TABLET:'1'}]])for(const [t,k] of [['tools/fige-ui.js','FIGE'],['tools/ev-ui.js','EV']]){
+  const n=spawnSync(process.execPath,['tools/run.js',t],{encoding:'utf8',env:{...process.env,...env,OUT:path.join(ROOT,'tools/out/ci')},timeout:180000});
+  const o=(n.stdout||'')+(n.stderr||'');console.log(k.toLowerCase()+' '+nom+' : '+(o.match(new RegExp(k+' (OK|KO)[\\s\\S]*'))||[o.trim()])[0]);
+  const mm=o.match(/ERRORS: (\[[\s\S]*\])/);const ee=mm?JSON.parse(mm[1]):null;
+  if(n.status!==0||/SCRIPT ERROR/.test(o)||!new RegExp(k+' OK').test(o)||!ee||ee.length){console.log("\n"+(k==='FIGE'?"L'écran bouge sous le doigt":"Le mode événement ne reste pas à part")+" sur "+nom+" : voir ci-dessus ("+t+").");process.exit(1);}
+}

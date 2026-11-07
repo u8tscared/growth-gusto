@@ -550,6 +550,31 @@ function scrollBusy() { return SCRL.touch > 0 || performance.now() - SCRL.last <
 function scrollSettle() { clearTimeout(SCRL.t); SCRL.t = setTimeout(() => { if (scrollBusy()) return scrollSettle(); if (SCRL.pendR) { SCRL.pendR = false; rerender(); } else if (SCRL.pend) { SCRL.pend = false; refresh(); } }, 380); }
 document.addEventListener("touchstart", (e) => { SCRL.touch = e.touches.length; const t = e.touches[0]; if (e.touches.length === 1) SCRL.touch = 1; if (e.touches.length === 1 && t) { SCRL.x0 = t.clientX; SCRL.y0 = t.clientY; SCRL.dist = 0; SCRL.scrolled = performance.now() - SCRL.last < 120; SCRL.t0 = performance.now(); } }, { passive: true, capture: true });
 document.addEventListener("touchmove", (e) => { const t = e.touches[0]; if (t && SCRL.x0 != null) SCRL.dist = Math.max(SCRL.dist || 0, Math.hypot(t.clientX - SCRL.x0, t.clientY - SCRL.y0)); }, { passive: true, capture: true });
+/* Screens stay put (Marceau 2026-11-07, standing rule): a finger only ever scrolls a list or a page that really has more to show, in the
+   direction it can go. Everywhere else (a screen that fits, a sheet, a list already at its top or bottom, an iPad with the keyboard up),
+   the move is cancelled, so iPhone and iPad never drag the whole app around or rubber-band it. Decided once per gesture, on its first
+   move. Fields being edited, canvases, videos, maps and anything marked [data-free] keep their own gestures; pinch is left alone.
+   Pairs with overscroll-behavior:none on .view, .sheet-body and .au-scroll (base.css, auth.css). Test: tools/fige-ui.js. */
+const FIGE = { x: 0, y: 0, d: null };
+function figeCanScroll(el, dx, dy) {
+  const v = Math.abs(dy) >= Math.abs(dx);
+  for (let n = el; n && n.nodeType === 1 && n !== document.documentElement; n = n.parentElement) {
+    if (n.matches("canvas,video,iframe,[data-free],[contenteditable=''],[contenteditable=true]") || ((n.tagName === "TEXTAREA" || n.tagName === "INPUT") && n === document.activeElement)) return true;
+    const cs = getComputedStyle(n);
+    if (cs.touchAction === "none" || cs.touchAction === "pinch-zoom") return true;
+    if (v) { if (/(auto|scroll|overlay)/.test(cs.overflowY) && n.scrollHeight > n.clientHeight + 1 && (dy > 0 ? n.scrollTop > 0.5 : n.scrollTop + n.clientHeight < n.scrollHeight - 1)) return true; }
+    else if (/(auto|scroll|overlay)/.test(cs.overflowX) && n.scrollWidth > n.clientWidth + 1 && (dx > 0 ? n.scrollLeft > 0.5 : n.scrollLeft + n.clientWidth < n.scrollWidth - 1)) return true;
+  }
+  return false;
+}
+document.addEventListener("touchstart", (e) => { FIGE.d = e.touches.length === 1 ? null : "multi"; const t = e.touches[0]; if (t) { FIGE.x = t.clientX; FIGE.y = t.clientY; } }, { passive: true, capture: true });
+document.addEventListener("touchmove", (e) => {
+  if (e.touches.length !== 1 || FIGE.d === "multi" || FIGE.d === "ok") return;
+  if (FIGE.d === "no") { if (e.cancelable) e.preventDefault(); return; }
+  const t = e.touches[0], dx = t.clientX - FIGE.x, dy = t.clientY - FIGE.y; if (Math.abs(dx) < 2 && Math.abs(dy) < 2) return;
+  FIGE.d = figeCanScroll(e.target, dx, dy) ? "ok" : "no";
+  if (FIGE.d === "no" && e.cancelable) e.preventDefault();
+}, { passive: false });
 /* a finger that scrolled (or stopped a momentum scroll) must never "tap" what was under it: iOS can still send a click after such a gesture */
 document.addEventListener("click", (e) => {
   if (!SCRL.t0 || performance.now() - SCRL.t0 > 1500) return;
@@ -622,15 +647,16 @@ document.addEventListener("keydown", (e) => {
   if (e.shiftKey && a === first) { e.preventDefault(); last.focus(); }
   else if (!e.shiftKey && a === last) { e.preventDefault(); first.focus(); }
 });
-/* drag-to-dismiss on touch phones: pull the grab handle, or pull down while the sheet body is scrolled to the top */
+/* drag-to-dismiss on touch phones and tablets: only from the grab handle or the top band of the sheet (its title), never from the
+   form below it, and only downward. A sheet never follows the finger upward or sideways: the screen stays put (Marceau 2026-11-07). */
 (function sheetDrag() {
   const sh = $("#sheet"), scrim = $("#scrim"), body = $("#sheetBody");
   let y0 = null, x0 = 0, dy = 0, drag = false, lastY = 0, lastT = 0, vel = 0;
   const phone = () => window.matchMedia("(max-width:959px)").matches;
   sh.addEventListener("touchstart", (e) => {
     y0 = null; if (!sh.classList.contains("open") || e.touches.length > 1 || !phone()) return;
-    const onGrab = !!e.target.closest(".grab");
-    if (!onGrab && (body.scrollTop > 0 || e.target.closest("input,textarea,select,canvas,video,[data-nodrag]"))) return;
+    const onGrab = !!e.target.closest(".grab"), top = e.touches[0].clientY - sh.getBoundingClientRect().top;
+    if (!onGrab && (top > 72 || body.scrollTop > 0 || e.target.closest("input,textarea,select,canvas,video,button,a,[data-nodrag]"))) return;
     y0 = lastY = e.touches[0].clientY; x0 = e.touches[0].clientX; lastT = performance.now(); dy = 0; vel = 0; drag = false;
   }, { passive: true });
   sh.addEventListener("touchmove", (e) => {
@@ -640,7 +666,7 @@ document.addEventListener("keydown", (e) => {
       else { if (d < -6 || dx > 12) y0 = null; return; }
     }
     e.preventDefault();
-    const raw = y - y0; dy = raw > 0 ? raw : -Math.sqrt(-raw) * 2; /* rubber band when pulled upward */
+    dy = Math.max(0, y - y0); /* downward only: no rubber band upward */
     const now = performance.now(); vel = (y - lastY) / Math.max(1, now - lastT); lastY = y; lastT = now;
     sh.style.transform = `translateY(${dy}px)`;
     scrim.style.opacity = String(Math.max(0.15, 1 - Math.max(0, dy) / (sh.offsetHeight * 1.1)));

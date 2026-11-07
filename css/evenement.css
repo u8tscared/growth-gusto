@@ -119,7 +119,9 @@
 .ev-kpi span{font-size:12px;font-weight:750;color:var(--muted);display:flex;align-items:center;gap:5px}
 .ev-kpi .big span{color:rgba(255,255,255,.82)}
 .ev-kpi span .ico{width:15px;height:15px}
-@media (min-width:760px){.ev-kpi{grid-template-columns:1.6fr 1fr 1fr 1fr 1fr}.ev-kpi > div.big{grid-column:auto}}
+@media (min-width:600px){.ev-kpi{grid-template-columns:repeat(4,minmax(0,1fr))}}
+@media (min-width:1000px){.ev-kpi{grid-template-columns:1.6fr 1fr 1fr 1fr 1fr}.ev-kpi > div.big{grid-column:auto}}
+.ev-sheet .ev-kpi{grid-template-columns:repeat(2,minmax(0,1fr))!important}.ev-sheet .ev-kpi > div.big{grid-column:1/-1!important}
 .ev-bgrid{display:grid;grid-template-columns:1fr;gap:12px}
 @media (min-width:900px){.ev-bgrid{grid-template-columns:1.2fr 1fr}.ev-last{grid-column:1/-1}}
 .ev-sec{padding:14px;display:flex;flex-direction:column;gap:10px;min-width:0}
@@ -200,3 +202,59 @@
 @media (min-width:700px){html.gg-big .ev-tile{min-height:140px}}
 html.gg-big .ev-tn{font-size:19px}
 html.gg-big .ev-tf b{font-size:23px}
+
+/* ───────── the stand's till: full screen, nothing of the restaurant around it (html.ev-live, js/evenement.js) ───────── */
+html.ev-live .side,html.ev-live .tabbar,html.ev-live .gg-bigb,html.ev-live .ap-pill,html.ev-live .pu-ban,html.ev-live .top [data-act=back]{display:none!important}
+html.ev-live .view{padding-bottom:calc(max(12px,env(safe-area-inset-bottom,0px)) + 8px)}
+html.ev-live.kb .view{padding-bottom:12px}
+html.ev-live .inner.wide{max-width:1180px}
+.ev-tl{gap:10px}
+.ev-lhead{display:flex;align-items:center;gap:12px;padding:4px 2px 2px;flex-wrap:nowrap}
+.ev-lhead .ev-ht{min-width:0}
+.ev-lhead .ev-ht b{font-size:18px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ev-lhead .ev-ht em{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ev-lhead .ev-hk{flex:none}
+.ev-close{flex:none}
+@media (max-width:620px){
+  .ev-lhead{flex-wrap:wrap}
+  .ev-lhead .ev-ht{flex:1 1 0}
+  .ev-lhead .ev-hk{order:3;width:100%;padding-top:6px;border-top:1px solid var(--line);gap:22px}
+  .ev-lhead .ev-hk span{flex-direction:row;align-items:baseline;gap:6px}
+  .ev-lhead .ev-hk b{font-size:16px}
+  .ev-close span{display:none}.ev-close{width:42px;padding:0;justify-content:center}
+}
+/* phone till: the basket sits on the bottom edge (no tab bar under it) */
+@media (max-width:759px){
+  html.ev-live .ev-cart,html.ev-live.tabs .ev-cart{bottom:calc(max(8px,env(safe-area-inset-bottom,0px)) + 2px)}
+  html.ev-live .ev.kiosk .ev-cart{bottom:70px}
+  html.ev-live.kb .ev-cart{bottom:6px}
+}
+@media (min-width:760px){html.ev-live .ev-sell{grid-template-columns:1fr 360px}html.ev-live .ev-tiles{grid-template-columns:repeat(auto-fill,minmax(170px,1fr))}html.ev-live .ev-tile{min-height:128px}html.ev-live .ev-tn{font-size:17.5px}html.ev-live .ev-tf b{font-size:21px}}
+.ev-warn{display:flex;gap:8px;align-items:center;margin:0;padding:10px 12px;border-radius:16px;background:var(--tint-warn,#FFF3D6);color:var(--warn);font-weight:700;font-size:13.5px}
+.ev-warn .ico{width:18px;height:18px;flex:none}
+
+/* ───────── the section « Événements »: one card per event ───────── */
+.ev-lead{margin:-4px 2px 0}
+.ev-new{flex:none}
+@media (max-width:520px){.ev-new span{display:none}.ev-new{width:42px;padding:0;justify-content:center}}
+.ev-sum{display:flex;gap:22px;padding:14px 16px;flex-wrap:wrap}
+.ev-sum span{display:flex;flex-direction:column;font-size:12px;font-weight:750;color:var(--muted)}
+.ev-sum b{font-size:22px;color:var(--ink);letter-spacing:-.03em}
+.ev-cards{display:grid;grid-template-columns:1fr;gap:10px}
+@media (min-width:760px){.ev-cards{grid-template-columns:repeat(auto-fit,minmax(340px,1fr))}}
+.ev-card{padding:14px;display:flex;flex-direction:column;gap:12px;cursor:pointer;transition:transform .18s var(--ease);-webkit-tap-highlight-color:transparent}
+.ev-card:active{transform:scale(.985)}
+.ev-card:focus-visible{outline:2.5px solid var(--accent);outline-offset:2px}
+.ev-card.on{border-color:rgba(7,138,94,.3);box-shadow:0 0 0 2px rgba(7,138,94,.12),var(--sh)}
+.ev-card.done{opacity:.95}
+.ev-ct{display:flex;gap:12px;align-items:center}
+.ev-cn{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.ev-cn b{font-size:16px;font-weight:800;letter-spacing:-.02em}
+.ev-cn em{font-style:normal;font-size:12.5px;font-weight:650;color:var(--muted)}
+.ev-cfs{display:flex;gap:22px;flex-wrap:wrap}
+.ev-cf{display:flex;flex-direction:column;font-size:12px;font-weight:700;color:var(--muted)}
+.ev-cf b{font-size:21px;color:var(--ink);letter-spacing:-.03em}
+.ev-cf.soft{font-size:13px}
+.ev-golive{height:52px;font-size:15px}
+.ev-head .ev-st{flex:none}
+.ev-bars.days .ev-bar b{font-size:10.5px;font-weight:800;color:var(--muted);white-space:nowrap}

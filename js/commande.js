@@ -103,7 +103,7 @@ const cmLiveSt = (o) => ["nouvelle", "prep", "prete"].includes(o.status);
 function cmOrdersToday() { const k = dayKey(); return (CM.orders || []).filter((o) => o.src !== "salle").filter((o) => o.day === k || (cmLiveSt(o) && Date.now() - (o.at || 0) < 36 * 3600e3)); }
 function cmAlert(o) {
   CM.fresh.add(o.id);
-  try { SFX.init(); SFX.tone(1319, 0.28, "sine", 0.055); SFX.tone(1568, 0.3, "sine", 0.05, 0.16); SFX.tone(2093, 0.5, "sine", 0.04, 0.32); buzz([22, 50, 22, 50, 40]); } catch (e) {}
+  if (!(typeof window.evLiveOn === "function" && window.evLiveOn())) try { SFX.init(); SFX.tone(1319, 0.28, "sine", 0.055); SFX.tone(1568, 0.3, "sine", 0.05, 0.16); SFX.tone(2093, 0.5, "sine", 0.04, 0.32); buzz([22, 50, 22, 50, 40]); } catch (e) {}
   const where = o.mode === "table" ? `Table ${o.table}` : `À emporter ${o.slot || ""}`.trim();
   if (S.route !== "commandes" || CM.tab !== "live") toast(`${o.mode === "table" ? "Nouvelle commande QR" : `Nouvelle commande n° ${o.n}`} · ${where} · ${cmEur(o.total)}`, "info");
   try { if (window.ALERTES && typeof window.ALERTES.push === "function") window.ALERTES.push({ type: "commande", key: "cmd_" + o.id, level: "info", text: o.mode === "table" ? `Nouvelle commande QR · Table ${o.table}` : `Nouvelle commande à emporter n° ${o.n}`, sub: `${where} · ${cmEur(o.total)}${o.paid ? " · payée" : ""}`, day: o.day, route: "commandes" }); } catch (e) {}

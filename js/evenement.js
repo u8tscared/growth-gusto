@@ -1,11 +1,19 @@
-/* Growth Gusto — area: mode événement (route « evenement »). Prefix « ev ».
-   Un salon, une foire, un marché, un festival : le restaurateur tient un stand, souvent seul, dans le jus. L'app devient un
-   tableau de bord ultra simple, rien d'autre : pas de pointeuse, pas de stock du restaurant, pas de réglages.
+/* Growth Gusto — area: Événements (route « evenement »). Prefix « ev ».
+   Un salon, une foire, un marché, un festival : le restaurateur tient un stand, souvent seul, dans le jus.
+   Deux étages, et rien ne se mélange avec le service du restaurant (Marceau 2026-11-07) :
+   1) La section « Événements » (menu de l'app) : chaque événement a sa propre case, en cours, à venir ou terminé, avec ses chiffres.
+      Toucher un événement ouvre son bilan à lui (route evenement, params {id}) : tout l'événement ou jour par jour, par article,
+      par jour ou par heure, les ventes annulables, l'export CSV. C'est « l'après » : les chiffres arrivent là, et nulle part ailleurs.
+   2) La caisse du stand (« Ouvrir la caisse du stand ») : une mini-interface plein écran, sans menu, sans barre d'onglets, sans
+      bouton retour ni alerte du restaurant (tables, QR, cuisine se taisent : html.ev-live, evLiveOn()). Elle reste ouverte sur
+      cet appareil (localStorage gg-ev-live-{rid}) jusqu'à « Fermer la caisse », qui montre le récap du jour puis le bilan.
+   Les ventes du stand vivent dans leur propre collection (evSales) : jamais dans « à servir » de la salle, la cuisine, le coup de
+   feu, les commandes en ligne, la caisse ou les finances du restaurant. La caisse, en détail :
      Vendre     des tuiles géantes (les articles du stand) → le panier → « Encaisser » : carte sur le terminal (SumUp…), ou
                 espèces avec le rendu monnaie. Sur place ou à emporter (plateau), un prénom si on veut l'appeler.
-     À servir   les ventes à préparer, avec un grand numéro : « Prêt » (carillon), puis « Remis ». Désactivable pour un stand
+     Commandes  les ventes à préparer, avec un grand numéro : « Prêt » (carillon), puis « Remis ». Désactivable pour un stand
                 où tout part tout de suite.
-     Bilan      le chiffre du jour, les ventes, le panier moyen, carte et autres paiements, par article (et ce qu'il reste),
+     Ma journée le chiffre du jour, les ventes, le panier moyen, carte et autres paiements, par article (et ce qu'il reste),
                 par heure, les dernières ventes (annulables, jamais effacées), export CSV.
    Chaque article peut avoir une quantité apportée pour la journée : la tuile montre ce qu'il reste et passe « Épuisé » à zéro.
    Pas une caisse enregistreuse certifiée (NF525) : le montant se passe sur le terminal de paiement du restaurant, les espèces
@@ -23,16 +31,15 @@ TAB_OF.evenement = "more";
 (function evNav() {
   if (NAV.some((n) => n[0] === "evenement")) return;
   const i = ["bar", "cuisine", "salle"].map((r) => NAV.findIndex((n) => n[0] === r)).find((x) => x >= 0);
-  NAV.splice(i != null && i >= 0 ? i + 1 : NAV.length, 0, ["evenement", "evTent", "Mode événement"]);
+  NAV.splice(i != null && i >= 0 ? i + 1 : NAV.length, 0, ["evenement", "evTent", "Événements"]);
 })();
-try { if (typeof AB_GATE !== "undefined") AB_GATE.evenement = ["pro", "Mode événement"]; } catch (e) {}
-try { if (typeof BIG_ROUTES !== "undefined" && !BIG_ROUTES.includes("evenement")) BIG_ROUTES.push("evenement"); } catch (e) {}
+try { if (typeof AB_GATE !== "undefined") AB_GATE.evenement = ["pro", "Événements"]; } catch (e) {}
 if (typeof PC_LECONS === "object") PC_LECONS.evenement = {
-  t: "Mode événement", d: "Sur un salon, une foire ou un marché, l'app devient une caisse de stand toute simple : vendre, remettre les plateaux, voir le bilan.",
+  t: "Événements", d: "Sur un salon, une foire ou un marché, une caisse de stand à part, toute simple : vendre, remettre les plateaux, puis le bilan de l'événement dans sa propre case.",
   who: ["salle", "boss"],
-  steps: ["Touchez les articles vendus : ils s'ajoutent au panier", "Encaissez par carte sur votre terminal, ou en espèces avec le rendu monnaie", "Remettez la commande quand elle est prête : le bilan se fait tout seul"],
-  q: ["Où voir combien de croques il reste sur le stand ?", ["Sur la tuile de l'article, en direct", "Dans le stock du restaurant", "Il faut les compter"], 0],
-  tip: "Lancez le mode sur le téléphone du stand : il n'affiche que ça, et se déverrouille avec votre code.",
+  steps: ["Préparez l'événement : nom, dates, articles et prix", "Ouvrez la caisse du stand : touchez les articles, encaissez par carte ou en espèces", "Fermez la caisse le soir : les chiffres partent dans la case de l'événement, jamais dans le service du restaurant"],
+  q: ["Où retrouver le chiffre du salon une fois fini ?", ["Dans Événements, sur la case du salon", "Dans « à servir » de la salle", "Dans la caisse du restaurant"], 0],
+  tip: "Ouvrez la caisse sur le téléphone ou la tablette du stand : elle prend tout l'écran et n'affiche que ça.",
   sc: { k: "ticket", t: "Vente n° 42 · à emporter", lines: [["2 × Croque truffé", "18,00 €"], ["1 × Verre de côtes-du-rhône", "5,00 €"]], total: "23,00 €" },
 };
 Object.assign(IC, {
@@ -48,11 +55,11 @@ Object.assign(IC, {
 });
 
 /* ───────── vocabulary ───────── */
-const EV_TABS = [["vendre", "Vendre"], ["servir", "À servir"], ["bilan", "Bilan"]];
+const EV_TABS = [["vendre", "Caisse"], ["servir", "Commandes"], ["bilan", "Ma journée"]];
 const EV_VOID = ["Erreur de saisie", "Client parti", "Remboursé", "Doublon"];
 const EV_COLORS = ["#5B2BFF", "#E0582F", "#1E7F55", "#C2337A", "#3B6FD8", "#B97D0E", "#0E8C9E", "#8A4DFF"];
 
-const EV = { rid: null, stands: null, sales: null, sel: null, tab: "vendre", cart: [], mode: "place", day: null, pay: null, given: 0, fresh: new Set(), tick: null };
+const EV = { live: undefined, liveRid: null, rid: null, stands: null, sales: null, sel: null, tab: "vendre", cart: [], mode: "place", day: null, pay: null, given: 0, fresh: new Set(), tick: null };
 
 const evEur = (v) => { const x = Math.round((+v || 0) * 100) / 100; return x.toLocaleString("fr-FR", { minimumFractionDigits: x % 1 ? 2 : 0, maximumFractionDigits: 2 }) + " €"; };
 const evEur2 = (v) => (Math.round((+v || 0) * 100) / 100).toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €";
@@ -74,11 +81,24 @@ function evWatch() {
 }
 window.addEventListener("gg:ready", () => setTimeout(() => { try { if (S.route === "evenement") evWatch(); } catch (e) {} }, 300));
 /* the stand on today, else the one chosen, else the latest */
-function evCur() {
+function evPickCur() {
   const L = EV.stands || []; if (!L.length) return null;
   if (EV.sel) { const s = L.find((x) => x.id === EV.sel); if (s) return s; }
   const t = dayKey(); return L.find((s) => s.from <= t && (s.to || s.from) >= t) || L.slice().sort((a, b) => String(b.from || "").localeCompare(String(a.from || "")) || b.at - a.at)[0];
 }
+/* the till open on this device (kept across reloads until « Fermer la caisse »); a « Stand d'événement » kiosk is always on its till */
+const evLiveKey = () => "gg-ev-live-" + (S.rid || "");
+function evLiveGet() { if (EV.liveRid === S.rid && EV.live !== undefined) return EV.live; EV.liveRid = S.rid; try { EV.live = localStorage.getItem(evLiveKey()) || null; } catch (e) { EV.live = null; } return EV.live; }
+function evLiveSet(id) { EV.live = id || null; EV.liveRid = S.rid; try { if (id) localStorage.setItem(evLiveKey(), id); else localStorage.removeItem(evLiveKey()); } catch (e) {} }
+function evLiveStand() { if (!EV.stands) return null; if (evOnStand()) return evPickCur(); const id = evLiveGet(); return id ? EV.stands.find((x) => x.id === id) || null : null; }
+/* the stand being sold on (live till), else the one on today / chosen */
+const evCur = () => evLiveStand() || evPickCur();
+/* the event on screen: the till, else the one whose report is open, else the current one */
+const evShown = () => evLiveStand() || (S.route === "evenement" && S.params && S.params.id && (EV.stands || []).find((x) => x.id === S.params.id)) || evPickCur();
+/* true while the stand's till fills the screen: the restaurant's own calls, QR orders and kitchen bells stay quiet */
+window.evLiveOn = () => { try { return S.route === "evenement" && !!evLiveStand(); } catch (e) { return false; } };
+function evChrome() { try { document.documentElement.classList.toggle("ev-live", window.evLiveOn()); } catch (e) {} }
+const evState = (st, t = dayKey()) => (st.from <= t && (st.to || st.from) >= t ? "on" : st.from > t ? "soon" : "done");
 const evSalesOf = (st, day) => (EV.sales || []).filter((x) => x.ev === st.id && (!day || x.day === day));
 const evLive = (st, day = dayKey()) => evSalesOf(st, day).filter((x) => !x.void);
 function evSoldMap(st, day = dayKey()) { const m = {}; evLive(st, day).forEach((s) => (s.items || []).forEach((x) => { m[x.id] = (m[x.id] || 0) + (+x.q || 0); })); return m; }
@@ -172,51 +192,100 @@ function evServe(st) {
   return `<div class="ev-cols"><section><h3 class="lbl st" style="--i:2">À préparer · ${prep.length}</h3>${prep.map(evOrderCard).join("") || `<p class="sub ev-none">Tout est prêt.</p>`}</section>
     <section><h3 class="lbl st" style="--i:2">Prêt, à remettre · ${rdy.length}</h3>${rdy.map(evOrderCard).join("") || `<p class="sub ev-none">Rien n'attend sur le comptoir.</p>`}</section></div>`;
 }
-function evBilan(st) {
-  const days = [...new Set(evSalesOf(st).map((s) => s.day))].sort().reverse(); if (!days.includes(dayKey()) && (st.from || "") <= dayKey() && (st.to || st.from || "") >= dayKey()) days.unshift(dayKey());
-  const day = EV.day && days.includes(EV.day) ? EV.day : days[0] || dayKey(); const D = evStats(st, day), sold = evSoldMap(st, day);
-  const H = Object.keys(D.hours).map(Number); const h0 = H.length ? Math.min(...H) : 10, h1 = H.length ? Math.max(...H) : 18, mx = Math.max(1, ...Object.values(D.hours));
-  const bars = Array.from({ length: h1 - h0 + 1 }, (_, k) => { const h = h0 + k, v = D.hours[h] || 0; return `<div class="ev-bar" title="${h} h : ${evEur(v)}"><i style="--h:${Math.round((v / mx) * 100)}%"></i><span>${h}h</span></div>`; }).join("");
-  const art = D.per.map((r) => { const it = (st.items || []).find((x) => x.id === r.id); const left = it && num(it.n) > 0 ? Math.max(0, num(it.n) - (sold[r.id] || 0)) : null;
-    return `<tr><td>${esc(r.t)}</td><td class="mono">${r.q}</td><td class="mono">${evEur2(r.v)}</td><td class="mono${left === 0 ? " z" : ""}">${left == null ? "–" : left === 0 ? "épuisé" : left}</td></tr>`; }).join("");
-  const last = evSalesOf(st, day).slice(0, 12).map((s) => `<li class="${s.void ? "void" : ""}"><b class="mono">n° ${s.n}</b><span>${hm(s.at)} · ${(s.items || []).map((x) => `${x.q} ${esc(x.t)}`).join(", ")}${s.void ? ` <em>annulée · ${esc(s.void.why || "")}</em>` : ""}</span><b class="mono">${evEur2(s.total)}</b><i class="ev-pm">${s.pay === "carte" ? ico("evCard") : ico("evCoins")}</i>${s.void || evLocked() ? "" : `<button class="iconbtn sm" data-act="evVoid" data-id="${esc(s.id)}" aria-label="Annuler la vente n° ${s.n}">${ico("evUndo")}</button>`}</li>`).join("");
-  return `${days.length > 1 ? `<div class="chips ev-days st" style="--i:2">${days.map((k) => `<button class="chip${k === day ? " on" : ""}" data-act="evDay" data-v="${k}" aria-pressed="${k === day}">${evDayLbl(k)}</button>`).join("")}</div>` : ""}
-    <div class="ev-kpi st" style="--i:3"><div class="big"><b class="mono">${evEur2(D.tot)}</b><span>chiffre ${day === dayKey() ? "du jour" : "de la journée"}</span></div><div><b class="mono">${D.n}</b><span>ventes</span></div><div><b class="mono">${evEur2(D.avg)}</b><span>panier moyen</span></div><div><b class="mono">${evEur2(D.card)}</b><span>${ico("evCard")}carte</span></div><div><b class="mono">${evEur2(D.other)}</b><span>${ico("evCoins")}espèces, autres</span></div></div>
+/* the figures of one day (o.live: the stand's « Ma journée ») or of the whole event (section « Événements », EV.day "all") */
+function evBilan(st, o = {}) {
+  const days = [...new Set(evSalesOf(st).map((s) => s.day))].sort().reverse(); if (!days.includes(dayKey()) && evState(st) === "on") days.unshift(dayKey());
+  const all = !o.live && days.length > 1 && (EV.day == null || EV.day === "all");
+  const day = o.live ? dayKey() : all ? null : EV.day && days.includes(EV.day) ? EV.day : days[0] || dayKey();
+  const D = evStats(st, day), sold = evSoldMap(st, day || dayKey());
+  let bars;
+  if (all) { /* one bar per day of the event */
+    const per = {}; D.L.forEach((s) => { per[s.day] = (per[s.day] || 0) + (+s.total || 0); }); const ks = days.slice().reverse(), mx = Math.max(1, ...Object.values(per));
+    bars = ks.map((k) => { const v = per[k] || 0; return `<div class="ev-bar" title="${evDayLbl(k)} : ${evEur(v)}"><i style="--h:${Math.round((v / mx) * 100)}%"></i><b class="mono">${evEur(v)}</b><span>${evDayLbl(k)}</span></div>`; }).join("");
+  } else {
+    const H = Object.keys(D.hours).map(Number); const h0 = H.length ? Math.min(...H) : 10, h1 = H.length ? Math.max(...H) : 18, mx = Math.max(1, ...Object.values(D.hours));
+    bars = Array.from({ length: h1 - h0 + 1 }, (_, k) => { const h = h0 + k, v = D.hours[h] || 0; return `<div class="ev-bar" title="${h} h : ${evEur(v)}"><i style="--h:${Math.round((v / mx) * 100)}%"></i><span>${h}h</span></div>`; }).join("");
+  }
+  const art = D.per.map((r) => { const it = (st.items || []).find((x) => x.id === r.id); const left = !all && it && num(it.n) > 0 ? Math.max(0, num(it.n) - (sold[r.id] || 0)) : null;
+    return `<tr><td>${esc(r.t)}</td><td class="mono">${r.q}</td><td class="mono">${evEur2(r.v)}</td>${all ? "" : `<td class="mono${left === 0 ? " z" : ""}">${left == null ? "–" : left === 0 ? "épuisé" : left}</td>`}</tr>`; }).join("");
+  const last = all ? "" : evSalesOf(st, day).slice(0, o.live ? 20 : 12).map((s) => `<li class="${s.void ? "void" : ""}"><b class="mono">n° ${s.n}</b><span>${hm(s.at)} · ${(s.items || []).map((x) => `${x.q} ${esc(x.t)}`).join(", ")}${s.void ? ` <em>annulée · ${esc(s.void.why || "")}</em>` : ""}</span><b class="mono">${evEur2(s.total)}</b><i class="ev-pm">${s.pay === "carte" ? ico("evCard") : ico("evCoins")}</i>${s.void || evLocked() ? "" : `<button class="iconbtn sm" data-act="evVoid" data-id="${esc(s.id)}" aria-label="Annuler la vente n° ${s.n}">${ico("evUndo")}</button>`}</li>`).join("");
+  const lbl = all ? "chiffre de l'événement" : day === dayKey() ? "chiffre du jour" : "chiffre de la journée";
+  return `${!o.live && days.length > 1 ? `<div class="chips ev-days st" style="--i:2">${[["all", "Tout l'événement"], ...days.map((k) => [k, evDayLbl(k)])].map(([k, t]) => `<button class="chip${(all ? "all" : day) === k ? " on" : ""}" data-act="evDay" data-v="${k}" aria-pressed="${(all ? "all" : day) === k}">${t}</button>`).join("")}</div>` : ""}
+    <div class="ev-kpi st" style="--i:3"><div class="big"><b class="mono">${evEur2(D.tot)}</b><span>${lbl}</span></div><div><b class="mono">${D.n}</b><span>ventes</span></div><div><b class="mono">${evEur2(D.avg)}</b><span>panier moyen</span></div><div><b class="mono">${evEur2(D.card)}</b><span>${ico("evCard")}carte</span></div><div><b class="mono">${evEur2(D.other)}</b><span>${ico("evCoins")}espèces, autres</span></div></div>
     <div class="ev-bgrid">
-      <section class="glass ev-sec st" style="--i:4"><header><b class="h3">Par article</b><span class="sub">${D.out} à emporter</span></header>${art ? `<table class="ev-tab"><thead><tr><th>Article</th><th>Vendus</th><th>Montant</th><th>Reste</th></tr></thead><tbody>${art}</tbody></table>` : `<p class="sub">Pas encore de vente.</p>`}</section>
-      <section class="glass ev-sec st" style="--i:5"><header><b class="h3">Par heure</b></header><div class="ev-bars">${bars}</div></section>
-      <section class="glass ev-sec ev-last st" style="--i:6"><header><b class="h3">Dernières ventes</b>${D.voids ? `<span class="sub">${D.voids} annulée${D.voids > 1 ? "s" : ""}</span>` : ""}</header>${last ? `<ul>${last}</ul>` : `<p class="sub">Les ventes de la journée s'affichent ici.</p>`}</section>
+      <section class="glass ev-sec st" style="--i:4"><header><b class="h3">Par article</b><span class="sub">${D.out} à emporter</span></header>${art ? `<table class="ev-tab"><thead><tr><th>Article</th><th>Vendus</th><th>Montant</th>${all ? "" : "<th>Reste</th>"}</tr></thead><tbody>${art}</tbody></table>` : `<p class="sub">Pas encore de vente.</p>`}</section>
+      <section class="glass ev-sec st" style="--i:5"><header><b class="h3">${all ? "Par jour" : "Par heure"}</b></header><div class="ev-bars${all ? " days" : ""}">${bars}</div></section>
+      ${all ? "" : `<section class="glass ev-sec ev-last st" style="--i:6"><header><b class="h3">${o.live ? "Ventes du jour" : "Dernières ventes"}</b>${D.voids ? `<span class="sub">${D.voids} annulée${D.voids > 1 ? "s" : ""}</span>` : ""}</header>${last ? `<ul>${last}</ul>` : `<p class="sub">Les ventes de la journée s'affichent ici.</p>`}</section>`}
     </div>
-    <button class="btn soft block st" style="--i:7" data-act="evCsv" data-v="${day}">${ico("evExport")}Exporter les ventes (CSV)</button>
-    <p class="ev-fine st" style="--i:8">Le mode événement n'est pas une caisse enregistreuse : la carte passe sur votre terminal, les espèces se notent sur votre caisse ou votre carnet.</p>`;
+    ${o.live ? "" : `<button class="btn soft block st" style="--i:7" data-act="evCsv" data-v="${all ? "all" : day}">${ico("evExport")}Exporter les ventes ${all ? "de l'événement" : "de la journée"} (CSV)</button>`}
+    <p class="ev-fine st" style="--i:8">${o.live ? "Le bilan complet est dans Événements, sur la case de l'événement. " : ""}Pas une caisse enregistreuse : la carte passe sur votre terminal, les espèces se notent sur votre caisse ou votre carnet.</p>`;
 }
 function evIntro() {
   return `<section class="glass ev-hero st" style="--i:1">
     <span class="ev-hi">${ico("evTent")}</span>
     <h2 class="h2">Un salon, une foire, un marché ?</h2>
-    <p class="sub">L'app devient la caisse de votre stand, et rien d'autre : de grosses tuiles, le panier, le rendu monnaie, les plateaux à remettre et le bilan du soir.</p>
-    <ol class="ev-steps"><li><b>1</b>Nommez l'événement et ses dates</li><li><b>2</b>Choisissez ce que vous vendez, avec les prix</li><li><b>3</b>Lancez-le sur le téléphone du stand</li></ol>
+    <p class="sub">Une caisse de stand à part, plein écran : de grosses tuiles, le panier, le rendu monnaie, les plateaux à remettre. Rien ne se mélange avec le service du restaurant, et chaque événement garde son bilan dans sa propre case.</p>
+    <ol class="ev-steps"><li><b>1</b>Nommez l'événement et ses dates</li><li><b>2</b>Choisissez ce que vous vendez, avec les prix</li><li><b>3</b>Ouvrez la caisse sur le téléphone ou la tablette du stand</li></ol>
     <button class="btn acc block" data-act="evEdit">${ico("plus")}Préparer un événement</button>
   </section>`;
 }
 
-/* ───────── the screen ───────── */
+/* ───────── the section « Événements »: one card per event, each with its own figures ───────── */
+function evCard(st, i) {
+  const k = evState(st), A = evStats(st, null), T = evStats(st, dayKey()), nd = new Set(A.L.map((x) => x.day)).size;
+  const stl = k === "on" ? "En cours" : k === "soon" ? "À venir" : "Terminé";
+  const figs = k === "soon" && !A.n ? `<span class="ev-cf soft">${(st.items || []).length} article${(st.items || []).length > 1 ? "s" : ""} prêt${(st.items || []).length > 1 ? "s" : ""}</span>`
+    : `<span class="ev-cf"><b class="mono">${evEur(A.tot)}</b>${A.n} vente${A.n > 1 ? "s" : ""}${nd > 1 ? ` · ${nd} jours` : ""}</span>${k === "on" ? `<span class="ev-cf"><b class="mono">${evEur(T.tot)}</b>aujourd'hui</span>` : ""}`;
+  return `<article class="ev-card glass st ${k}" style="--i:${Math.min(i + 3, 12)}" data-act="evOpen" data-id="${esc(st.id)}" role="button" tabindex="0" aria-label="${esc(st.name)}, ${stl}">
+    <div class="ev-ct"><span class="ev-hi sm">${ico("evTent")}</span><span class="ev-cn"><b>${esc(st.name || "Événement")}</b><em>${[st.place, evRange(st)].filter(Boolean).map(esc).join(" · ")}</em></span><i class="ev-st ${k === "on" ? "on" : k === "soon" ? "soon" : ""}">${stl}</i></div>
+    <div class="ev-cfs">${figs}</div>
+    ${k !== "done" && !evLocked() ? `<button class="btn ${k === "on" ? "acc" : "soft"} block ev-golive" data-act="evGoLive" data-id="${esc(st.id)}">${ico("evPlay")}Ouvrir la caisse du stand</button>` : ""}
+  </article>`;
+}
+function evList() {
+  const L = (EV.stands || []).slice(), t = dayKey();
+  const on = L.filter((s) => evState(s, t) === "on").sort((a, b) => String(a.from).localeCompare(String(b.from)));
+  const soon = L.filter((s) => evState(s, t) === "soon").sort((a, b) => String(a.from).localeCompare(String(b.from)));
+  const done = L.filter((s) => evState(s, t) === "done").sort((a, b) => String(b.to || b.from).localeCompare(String(a.to || a.from)));
+  const yr = String(new Date().getFullYear()), ofYr = L.filter((s) => String(s.from || "").slice(0, 4) === yr), tot = ofYr.reduce((a, s) => a + evStats(s, null).tot, 0);
+  let i = 0; const grp = (t, A) => A.length ? `<h3 class="lbl st" style="--i:${Math.min(i + 2, 12)}">${t} · ${A.length}</h3><div class="ev-cards">${A.map((s) => evCard(s, i++)).join("")}</div>` : "";
+  return `<p class="sub ev-lead st" style="--i:1">Chaque événement a sa caisse à part et sa propre case : ses ventes ne passent jamais dans le service du restaurant.</p>
+    ${ofYr.length ? `<div class="ev-sum glass st" style="--i:2"><span><b class="mono">${evEur(tot)}</b>sur les événements de ${yr}</span><span><b class="mono">${ofYr.length}</b>événement${ofYr.length > 1 ? "s" : ""}</span></div>` : ""}
+    ${grp("En cours", on)}${grp("À venir", soon)}${grp("Terminés", done)}`;
+}
+/* one event's own report: whole event or day by day */
+function evDetail(st) {
+  const k = evState(st), stl = k === "on" ? "En cours" : k === "soon" ? "À venir" : "Terminé";
+  return `<header class="ev-head glass st" style="--i:1"><span class="ev-hi sm">${ico("evTent")}</span><div class="ev-ht"><b>${esc(st.name || "Événement")}</b><em>${[st.place, evRange(st)].filter(Boolean).map(esc).join(" · ")}</em></div><i class="ev-st ${k === "on" ? "on" : k === "soon" ? "soon" : ""}">${stl}</i>
+      ${evLocked() ? "" : `<div class="ev-ha">${k !== "done" ? `<button class="btn acc sm" data-act="evGoLive" data-id="${esc(st.id)}">${ico("evPlay")}Ouvrir la caisse</button>` : ""}<button class="btn soft sm" data-act="evEdit" data-id="${esc(st.id)}">Modifier</button>${k !== "done" && typeof esDevLaunch === "function" ? `<button class="btn ghost sm" data-act="evLaunch" data-id="${esc(st.id)}" title="Un téléphone ou une tablette qui ne montre que la caisse, verrouillé par votre code">Appareil du stand</button>` : ""}</div>`}</header>
+    ${evSalesOf(st).length ? evBilan(st) : `<div class="glass ev-calm st" style="--i:2">${ico("evCard")}<div><b>Pas encore de vente</b><em>Ouvrez la caisse du stand le jour J : chaque vente arrive ici, dans le bilan de cet événement.</em></div></div>`}`;
+}
+
+/* ───────── the stand's till: a full-screen mini-interface ───────── */
+function evTill(st, kiosk) {
+  const T = evStats(st), Q = evQueue(st), tabs0 = EV_TABS.filter(([k]) => k !== "servir" || st.queue), tab = tabs0.some((t) => t[0] === EV.tab) ? EV.tab : "vendre";
+  const head = `<header class="ev-lhead st" style="--i:0"><span class="ev-hi sm">${ico("evTent")}</span><div class="ev-ht"><b>${esc(st.name || "Événement")}</b><em><span class="mono" id="evClock">${hm(Date.now())}</span>${st.place ? ` · ${esc(st.place)}` : ""}</em></div>
+      <div class="ev-hk"><span><b class="mono">${evEur(T.tot)}</b>aujourd'hui</span><span><b class="mono">${T.n}</b>ventes</span></div>
+      ${kiosk ? "" : `<button class="btn soft sm ev-close" data-act="evLiveEnd">${ico("x")}<span>Fermer la caisse</span></button>`}</header>`;
+  const tabs = tabs0.length > 1 ? `<div class="seg ev-segs st" style="--i:1" role="tablist">${tabs0.map(([k, t]) => `<button role="tab" class="${tab === k ? "on" : ""}" data-act="evTab" data-v="${k}" aria-selected="${tab === k}">${t}${k === "servir" && Q.length ? ` <i class="ev-badge mono">${Q.length}</i>` : ""}</button>`).join("")}</div>` : "";
+  const body = tab === "vendre" ? `<div class="ev-sell">${evTiles(st)}${evCart(st)}</div>` : tab === "servir" ? evServe(st) : evBilan(st, { live: true });
+  return `<div class="inner wide ev ev-tl${kiosk ? " kiosk" : ""}">${head}${tabs}${body}</div>`;
+}
+
 VIEWS.evenement = {
   render() {
     evWatch();
-    const st = evCur(), kiosk = evOnStand();
-    const right = `<span class="ev-clock mono" id="evClock">${hm(Date.now())}</span>${!kiosk && st && typeof esDevLaunch === "function" ? `<button class="btn soft sm ev-launch" data-act="evLaunch">${ico("evPlay")}<span>Lancer sur cet appareil</span></button>` : ""}`;
-    if (EV.stands == null) return `<div class="inner wide ev">${topBar("Mode événement", { right })}<div class="glass ev-calm st" style="--i:1">${ico("evTent")}<div><b>Ouverture du stand…</b></div></div></div>`;
-    if (!st) return `<div class="inner wide ev">${topBar("Mode événement", { right })}${evIntro()}</div>`;
-    const T = evStats(st), Q = evQueue(st), tab = EV_TABS.some((t) => t[0] === EV.tab) ? EV.tab : "vendre", others = (EV.stands || []).length > 1;
-    const head = `<header class="ev-head glass st" style="--i:1"><span class="ev-hi sm">${ico("evTent")}</span><div class="ev-ht"><b>${esc(st.name || "Événement")}</b><em>${[st.place, evRange(st)].filter(Boolean).map(esc).join(" · ")}</em></div>
-      <div class="ev-hk"><span><b class="mono">${evEur(T.tot)}</b>aujourd'hui</span><span><b class="mono">${T.n}</b>ventes</span></div>
-      ${evLocked() ? "" : `<div class="ev-ha">${others ? `<button class="btn ghost sm" data-act="evPick">Changer</button>` : ""}<button class="btn soft sm" data-act="evEdit" data-id="${esc(st.id)}">Modifier</button></div>`}</header>`;
-    const tabs = `<div class="seg ev-segs st" style="--i:2" role="tablist">${EV_TABS.map(([k, t]) => `<button role="tab" class="${tab === k ? "on" : ""}" data-act="evTab" data-v="${k}" aria-selected="${tab === k}">${t}${k === "servir" && Q.length ? ` <i class="ev-badge mono">${Q.length}</i>` : ""}</button>`).join("")}</div>`;
-    const body = tab === "vendre" ? `<div class="ev-sell">${evTiles(st)}${evCart(st)}</div>` : tab === "servir" ? evServe(st) : evBilan(st);
-    return `<div class="inner wide ev${kiosk ? " kiosk" : ""}">${topBar("Mode événement", { right })}${head}${tabs}${body}</div>`;
+    const kiosk = evOnStand();
+    if (EV.stands == null) return `<div class="inner wide ev">${topBar("Événements")}<div class="glass ev-calm st" style="--i:1">${ico("evTent")}<div><b>Ouverture…</b></div></div></div>`;
+    const live = evLiveStand(); if (live) return evTill(live, kiosk);
+    if (EV.live) evLiveSet(null); /* its event was deleted */
+    const id = S.params && S.params.id, st = id && (EV.stands || []).find((x) => x.id === id);
+    if (st) return `<div class="inner wide ev">${topBar(esc(st.name || "Événement"), { noBig: true })}${evDetail(st)}</div>`;
+    const add = evLocked() ? "" : `<button class="btn acc sm ev-new" data-act="evEditNew">${ico("plus")}<span>Préparer un événement</span></button>`;
+    return `<div class="inner wide ev">${topBar("Événements", { right: (EV.stands || []).length ? add : "", noBig: true })}${(EV.stands || []).length ? evList() : evIntro()}</div>`;
   },
   after(v) {
+    evChrome();
     clearInterval(EV.tick);
     EV.tick = setInterval(() => {
       if (S.route !== "evenement") { clearInterval(EV.tick); EV.tick = null; return; }
@@ -226,6 +295,17 @@ VIEWS.evenement = {
     if (EV.fresh.size) setTimeout(() => EV.fresh.clear(), 2600);
   },
 };
+/* the till hides the app around it (menu, tab bar, back, grand écran, the restaurant's call pill); leaving the route gives it back */
+(function evChromeHook() {
+  const rc0 = window.renderChrome; if (typeof rc0 !== "function") return;
+  window.renderChrome = function () { rc0.apply(this, arguments); evChrome(); };
+})();
+/* while the till is open, the restaurant's own pop-ups (table calls, QR orders, plates ready in the dining room) stay quiet on it:
+   they still reach the alert bell and the other devices. The stand's own messages (default and error toasts) go through. */
+(function evQuietToasts() {
+  const t0 = window.toast; if (typeof t0 !== "function") return;
+  window.toast = function (msg, kind) { if (kind === "info" && window.evLiveOn() && !EV.say) return; return t0.apply(this, arguments); };
+})();
 
 /* ───────── sheets ───────── */
 function evPaySheet() {
@@ -322,10 +402,10 @@ Object.assign(ACT, {
   },
   evVoidGo: async (a, id, v) => { const o = (EV.sales || []).find((x) => x.id === id); if (!o) return; closeSheet(true); SFX.ok(); await safe(DB.update("evSales", id, { void: { at: Date.now(), by: S.me.id, why: v } })); logEvent("evenement", `Vente n° ${o.n} annulée (${evEur2(o.total)}) : ${v}`); toast(`Vente n° ${o.n} annulée`); rerender(); },
   evCsv: (a, id, v) => {
-    const st = evCur(); if (!st) return; const L = evSalesOf(st, v);
+    const st = evShown(); if (!st) return; const L = evSalesOf(st, v === "all" ? null : v);
     const q = (s) => `"${String(s == null ? "" : s).replace(/"/g, '""')}"`;
     const rows = [["Numéro", "Date", "Heure", "Articles", "Total TTC", "Paiement", "Mode", "Prénom", "Annulée"].join(";"), ...L.slice().reverse().map((s) => [s.n, s.day, hm(s.at), q((s.items || []).map((x) => `${x.q} × ${x.t}`).join(", ")), String((+s.total || 0).toFixed(2)).replace(".", ","), s.pay === "carte" ? "Carte" : "Espèces / autre", s.mode === "emporter" ? "À emporter" : "Sur place", q(s.name || ""), s.void ? q(s.void.why || "oui") : ""].join(";"))];
-    try { const b = new Blob(["﻿" + rows.join("\n")], { type: "text/csv;charset=utf-8" }); const u = URL.createObjectURL(b); const l = document.createElement("a"); l.href = u; l.download = `ventes-${String(st.name || "evenement").toLowerCase().normalize("NFD").replace(/[^\w]+/g, "-").replace(/^-|-$/g, "")}-${v}.csv`; document.body.appendChild(l); l.click(); l.remove(); setTimeout(() => URL.revokeObjectURL(u), 2000); SFX.ok(); toast(`${L.length} ventes exportées`); } catch (e) { SFX.err(); toast("Export impossible sur cet appareil", "err"); }
+    try { const b = new Blob(["﻿" + rows.join("\n")], { type: "text/csv;charset=utf-8" }); const u = URL.createObjectURL(b); const l = document.createElement("a"); l.href = u; l.download = `ventes-${String(st.name || "evenement").toLowerCase().normalize("NFD").replace(/[^\w]+/g, "-").replace(/^-|-$/g, "")}-${v === "all" ? "tout" : v}.csv`; document.body.appendChild(l); l.click(); l.remove(); setTimeout(() => URL.revokeObjectURL(u), 2000); SFX.ok(); toast(`${L.length} ventes exportées`); } catch (e) { SFX.err(); toast("Export impossible sur cet appareil", "err"); }
   },
   evPick: () => {
     const t = dayKey(), cur = evCur();
@@ -334,6 +414,29 @@ Object.assign(ACT, {
       <button class="btn soft block" data-act="evEditNew">${ico("plus")}Préparer un autre événement</button></div>`);
   },
   evPickGo: (a, id) => { EV.sel = id; EV.cart = []; EV.day = null; closeSheet(); SFX.ok(); rerender(); },
+  evOpen: (a, id) => { if (!(EV.stands || []).some((x) => x.id === id)) return; EV.day = null; SFX.tap ? SFX.tap() : SFX.tick(); go("evenement", { id }); },
+  /* open the stand's till on this device: full screen, nothing else */
+  evGoLive: (a, id) => {
+    const st = (EV.stands || []).find((x) => x.id === id); if (!st) return;
+    evLiveSet(id); EV.sel = id; EV.cart = []; EV.tab = "vendre"; S.evName = ""; SFX.ok(); buzz([8, 30, 8]);
+    go("evenement", {}, { replace: true }); S.history = (S.history || []).filter((h) => h.route !== "evenement");
+    setTimeout(() => toast(`Caisse ouverte : ${st.name}`), 350);
+  },
+  evLiveEnd: () => {
+    const st = evLiveStand(); if (!st) return; const T = evStats(st), Q = evQueue(st);
+    openSheet(`<div class="ev-sheet"><h2 class="h2">Fermer la caisse ?</h2>
+      <p class="sub">Les chiffres de la journée partent dans la case « ${esc(st.name)} » des Événements. Vous pourrez la rouvrir quand vous voulez.</p>
+      <div class="ev-kpi"><div class="big"><b class="mono">${evEur2(T.tot)}</b><span>aujourd'hui</span></div><div><b class="mono">${T.n}</b><span>ventes</span></div><div><b class="mono">${evEur2(T.card)}</b><span>${ico("evCard")}carte</span></div><div><b class="mono">${evEur2(T.other)}</b><span>${ico("evCoins")}espèces, autres</span></div></div>
+      ${Q.length ? `<p class="ev-warn">${ico("evBell")}${Q.length} commande${Q.length > 1 ? "s" : ""} pas encore remise${Q.length > 1 ? "s" : ""} : elle${Q.length > 1 ? "s" : ""} reste${Q.length > 1 ? "nt" : ""} dans Commandes à la réouverture.</p>` : ""}
+      ${EV.cart.length ? `<p class="ev-warn">${ico("evBag")}Le panier en cours (${evEur2(evTotal())}) sera vidé.</p>` : ""}
+      <button class="btn acc block" data-act="evLiveEndGo" data-id="${esc(st.id)}">${ico("check")}Fermer et voir le bilan</button>
+      <button class="btn ghost block" data-act="closeSheet">Rester sur la caisse</button></div>`);
+  },
+  evLiveEndGo: (a, id) => {
+    closeSheet(true); evLiveSet(null); EV.cart = []; S.evName = ""; EV.day = null; SFX.done(); buzz([10, 30, 10]);
+    logEvent("evenement", `Caisse du stand fermée : ${((EV.stands || []).find((x) => x.id === id) || {}).name || ""}`);
+    go("evenement", { id }, { replace: true }); evChrome();
+  },
   evEdit: (a, id) => { S.evF = null; evEditSheet(id || null); },
   evEditNew: () => { S.evF = null; evEditSheet(null); },
   evQueueTog: () => { S.evF.queue = !S.evF.queue; SFX.tick(); evRepaintEdit(); },
@@ -349,7 +452,8 @@ Object.assign(ACT, {
     const doc = { name: name.slice(0, 60), place: String(F.place || "").trim().slice(0, 60), from, to, queue: !!F.queue, items };
     closeSheet(true); SFX.ok(); buzz(8);
     if (F.id) { await safe(DB.update("evStands", F.id, doc)); toast("Événement enregistré"); }
-    else { const id = await safe(DB.add("evStands", { ...doc, at: Date.now(), uid: S.me.id, by: S.me.name || "" })); if (id) EV.sel = id; logEvent("evenement", `Événement préparé : ${doc.name}`); toast("Événement prêt : vous pouvez vendre"); EV.tab = "vendre"; }
+    else { const id = await safe(DB.add("evStands", { ...doc, at: Date.now(), uid: S.me.id, by: S.me.name || "" })); logEvent("evenement", `Événement préparé : ${doc.name}`); toast("Événement prêt : ouvrez sa caisse le jour J"); EV.tab = "vendre"; S.evF = null;
+      if (id && typeof id === "string" && !evLiveStand()) { EV.sel = id; EV.day = null; go("evenement", { id }); return; } }
     S.evF = null; rerender();
   },
   evDel: (a, id) => {
@@ -357,8 +461,8 @@ Object.assign(ACT, {
     openSheet(`<div class="ev-sheet"><h2 class="h2">Supprimer « ${esc(st.name)} » ?</h2><p class="sub">${n ? `Ses ${n} ventes restent dans l'historique, mais l'événement ne s'affichera plus.` : "Il n'a encore aucune vente."}</p>
       <button class="btn danger block" data-act="evDelGo" data-id="${esc(id)}">Supprimer</button><button class="btn ghost block" data-act="closeSheet">Garder</button></div>`);
   },
-  evDelGo: async (a, id) => { closeSheet(true); SFX.close(); EV.sel = null; S.evF = null; await safe(DB.del("evStands", id)); toast("Événement supprimé"); rerender(); },
-  evLaunch: (a, id, v, e) => { if (typeof esDevLaunch !== "function") return; ES.devDraft = { kind: "partage", station: "evenement" }; esDevLaunch(e); },
+  evDelGo: async (a, id) => { closeSheet(true); SFX.close(); EV.sel = null; S.evF = null; if (EV.live === id) evLiveSet(null); await safe(DB.del("evStands", id)); toast("Événement supprimé"); if (S.params && S.params.id === id) go("evenement", {}, { replace: true }); else rerender(); },
+  evLaunch: (a, id, v, e) => { if (typeof esDevLaunch !== "function") return; if (id) EV.sel = id; ES.devDraft = { kind: "partage", station: "evenement" }; esDevLaunch(e); },
 });
 
 /* ───────── the stand's device, in Vues & appareils (js/espaces.js) ───────── */
