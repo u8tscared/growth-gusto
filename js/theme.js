@@ -84,7 +84,7 @@
       const r = Math.hypot(Math.max(how.x, innerWidth - how.x), Math.max(how.y, innerHeight - how.y));
       html.style.setProperty("--thx", how.x + "px"); html.style.setProperty("--thy", how.y + "px"); html.style.setProperty("--thr", r + "px");
       html.classList.add("th-vt");
-      try { const vt = document.startViewTransition(flip); vt.finished.finally(() => html.classList.remove("th-vt")); } catch (e) { flip(); html.classList.remove("th-vt"); }
+      try { const vt = document.startViewTransition(flip); vt.ready.catch(() => {}); vt.finished.catch(() => {}).finally(() => html.classList.remove("th-vt")); } catch (e) { flip(); html.classList.remove("th-vt"); }
     } else if (how && how.soft && !reduce) {
       html.classList.add("th-soft"); flip(); setTimeout(() => html.classList.remove("th-soft"), 520);
     } else flip();

@@ -1,3 +1,4 @@
 node_modules/
 tools/out/
 tools/__pycache__/
+tools/sim/out/
