@@ -101,7 +101,7 @@ function pmNorm(m) {
   return { level: "staff", legacy: false, modules: mods, require: { ...PM_REQ0, ...(p.require || {}) }, caps, poste: m.poste || "" };
 }
 function pmIsAdminMe() {
-  if (DB.mode === "demo" || !S.resto) return true;
+  if ((DB.mode === "demo" && !S.demoAs) || !S.resto) return true; /* demo « Voir comme » (js/espaces.js) sets S.demoAs */
   if (typeof myRole === "function" && myRole() === "gerant") return true;
   return !pmMember(S.me.id) && !(S.members || []).length; /* members not loaded yet: never flash a refusal */
 }

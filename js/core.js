@@ -471,13 +471,13 @@ function renderChrome() {
   const tb = $("#tabbar"); const on = TAB_OF[S.route] || "more"; const tsig = TABS.map((t) => t.join(",")).join("|");
   if (tb.dataset.built !== tsig) {
     tb.dataset.built = tsig;
-    tb.innerHTML = `<span class="ind" id="ind"></span>` + TABS.map(([r, i, t]) => `<button class="tab" data-tab="${r}" aria-label="${esc(t || "Scanner")}">${r === "scan" ? `<span class="fab">${ico("scan")}</span>` : `${ico(i)}${esc(t)}`}</button>`).join("");
+    tb.innerHTML = `<span class="ind" id="ind"></span>` + TABS.map(([r, i, t], k) => `<button class="tab" data-tab="${r}" aria-label="${esc(t || "Scanner")}">${k === 2 ? `<span class="fab">${ico(i || "scan")}</span>` : `${ico(i)}${esc(t)}`}</button>`).join("");
   }
   $$(".tab", tb).forEach((b) => { const r = b.dataset.tab; b.style.display = r === "home" || r === "more" || permOk(r) ? "" : "none"; });
   $$(".tab", tb).forEach((b) => { const was = b.classList.contains("on"), now = b.dataset.tab === on; b.classList.toggle("on", now); if (now && !was && tb.dataset.on) { b.classList.remove("pop"); void b.offsetWidth; b.classList.add("pop"); } });
   tb.dataset.on = on;
   const vis = TABS.filter((t) => t[0] === "home" || t[0] === "more" || permOk(t[0])); const idx = vis.findIndex((t) => t[0] === on); const ind = $("#ind");
-  if (ind) { ind.style.opacity = on === "scan" ? 0 : 1; ind.style.transform = `translateX(calc(${idx} * (100% + 12px)))`; }
+  if (ind) { ind.style.opacity = on === TABS[2][0] ? 0 : 1; ind.style.transform = `translateX(calc(${idx} * (100% + 12px)))`; }
   const noTabs = ["onboarding", "reception", "note", "tzEdit"].includes(S.route) || !!(VIEWS[S.route] && VIEWS[S.route].hideTabs) || !S.resto;
   tb.classList.toggle("hide", noTabs); document.documentElement.classList.toggle("tabs", !noTabs);
   const sd = $("#side"); if (sd) sd.classList.toggle("off", !S.resto || S.route === "onboarding");
@@ -856,7 +856,7 @@ function registerSW() {
    to the foreground. A new v means the code running here is old: with nothing in progress the app reloads silently (caches dropped,
    so the reload is guaranteed fresh); otherwise a toast offers « Mettre à jour ». sessionStorage guards against reload loops:
    one reload attempt per version per session, after which the version is simply adopted. */
-const APP_V = "2026-11-07.2";
+const APP_V = "2026-11-07.3";
 /* logos of the tools Growth Gusto connects to (img/logos/<id>.svg|png): caisses, réservations, comptabilité, banque, paiement */
 const BRAND_LOGOS = { sumup: "svg", zelty: "png", lightspeed: "svg", tiller: "svg", square: "svg", innovorder: "svg", popina: "png", zenchef: "svg", thefork: "png", sevenrooms: "png", guestonline: "png", resy: "svg", opentable: "svg", formitable: "svg", google: "svg", pennylane: "svg", qonto: "svg", quickbooks: "svg", sage: "svg", odoo: "svg", stripe: "svg", zebra: "svg" };
 const brandLogo = (id) => BRAND_LOGOS[id] ? `<img class="brand-logo" src="img/logos/${id}.${BRAND_LOGOS[id]}" alt="" loading="lazy" decoding="async" draggable="false">` : "";

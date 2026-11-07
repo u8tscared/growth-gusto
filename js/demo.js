@@ -24,7 +24,12 @@ window.GG_DEMO = {
       ["demo-sarah", "Sarah Lemoine", "equipe", "#1F7AE0", "Serveur", "CDI", 35, 12.6, "salle"],
       ["demo-hugo", "Hugo Martin", "equipe", "#0E8C9E", "Plongeur", "Extra", 20, 12.1, "plonge"],
     ];
-    team.forEach(([mid, name, role, color, , , , , poste], i) => put("members", { name, role, color, poste, joinedAt: now - (400 - i * 40) * 864e5, email: mid === "demo-camille" ? "camille@bistrot-demo.fr" : "" }, mid));
+    /* each person's access, from their job (js/perms.js presets): « Voir comme » (js/espaces.js) shows the app exactly as they see it */
+    const demoPerms = (mid, poste) => { if (mid === "demo-camille" || typeof pmPreset !== "function") return null; const p = pmPreset(mid === "demo-thomas" || mid === "demo-ines" ? "second" : poste); if (mid === "demo-thomas") p.caps.seeMoney = true, p.modules.dashboard = true, p.modules.finance = true; return p; };
+    team.forEach(([mid, name, role, color, , , , , poste], i) => { const perms = demoPerms(mid, poste); put("members", { name, role, color, poste, joinedAt: now - (400 - i * 40) * 864e5, email: mid === "demo-camille" ? "camille@bistrot-demo.fr" : "", ...(perms ? { perms } : {}) }, mid); });
+    /* demandes de l'équipe (js/espaces.js « Mon espace » / « Demandes de l'équipe ») */
+    [["demo-sarah", "conge", 18, 21, "Mariage de ma sœur à Bordeaux", "attente", 1], ["demo-hugo", "dispo", 4, 4, "Libre tous les lundis midi ce mois-ci", "attente", 0], ["demo-lucas", "echange", 6, 6, "avec Inès Benali · je prends son soir, elle prend mon midi", "ok", 3], ["demo-sarah", "absence", -9, -9, "Rendez-vous médical le matin", "ok", 12]]
+      .forEach(([mid, kind, a, b, note, status, ago]) => { const t = team.find((x) => x[0] === mid); put("esRequests", { kind, from: addDays(today, a), to: addDays(today, b), note, memberId: mid, name: t[1], staffId: "s_" + mid, status, at: now - ago * 864e5 - 3 * 36e5, uid: mid, ...(status !== "attente" ? { answeredBy: "demo-camille", answeredByName: "Camille Laurent", answeredAt: now - ago * 864e5 } : {}) }); });
     const staffIds = {};
     team.forEach(([mid, name, , color, jobRole, contract, weeklyHours, hourlyGross, post], i) => {
       staffIds[mid] = put("staff", { memberId: mid, name, role: jobRole, color, contract, weeklyHours, hourlyGross: hourlyGross || 24, chargesPct: contract === "Extra" ? 30 : 42, active: true, start: addDays(today, -(400 - i * 40)), post }, "s_" + mid);
@@ -244,6 +249,15 @@ window.GG_DEMO = {
     /* ── audit trail ── */
     const EV = [[0, "reading", "a fait le relevé du midi", "demo-lucas"], [0, "move", "a mis 5 bourriches de fines de claire au frigo de service 1", "demo-lucas"], [1, "lot", "a fabriqué 60 croquettes de jambon", "demo-ines"], [1, "reception", "a réceptionné Primeurs Lucas", "demo-thomas"], [2, "reception", "a réceptionné Crèmerie Duval", "demo-thomas"], [3, "reading", "a signalé le frigo de service 1 à 7,6 °C (porte mal fermée)", "demo-sarah"], [3, "reception", "a réceptionné Maison Ripert", "demo-ines"], [4, "ticket", "a enregistré le ticket Z", "demo-camille"], [6, "obl", "a enregistré le passage des nuisibles", "demo-camille"], [8, "team", "a ajouté Hugo Martin à l'équipe", "demo-camille"]];
     EV.forEach(([ago, type, text, uid], i) => put("events", { type, text, at: at(addDays(today, -ago), 11 + (i % 6), 10 + i), uid }));
+    /* a fuller trail per person over two weeks, so « Mon activité » (js/espaces.js) has something true to show for each of them */
+    const PEV = {
+      "demo-sarah": [["salle", "a encaissé la table 4 (3 couverts)"], ["salle", "a ouvert la table 7"], ["reading", "a fait le relevé du soir"], ["chore", "a fait « Vitres de la salle »"], ["salle", "a encaissé la table 12 (6 couverts)"]],
+      "demo-lucas": [["reading", "a fait le relevé du midi"], ["lot", "a étiqueté 4 bacs de fond de veau"], ["move", "a mis en place le frigo de service 2"], ["chore", "a fait « Plans de travail »"], ["reception", "a réceptionné Primeur du Marché"]],
+      "demo-hugo": [["chore", "a fait « Plonge et lave-vaisselle »"], ["chore", "a fait « Sols de la cuisine »"], ["chore", "a fait « Poubelles et local »"], ["reading", "a fait le relevé du soir"]],
+      "demo-thomas": [["reception", "a réceptionné Marée Atlantique"], ["lot", "a fabriqué 3 kg de bourguignon"], ["reading", "a fait le relevé du matin"], ["note", "a mis à jour la fiche « Joue de bœuf braisée »"]],
+      "demo-ines": [["lot", "a fabriqué 40 tartelettes"], ["reading", "a fait le relevé du midi"], ["chore", "a fait « Chambre froide »"]],
+    };
+    Object.entries(PEV).forEach(([uid, L]) => { for (let d = 0; d < 14; d++) { if (rnd() < 0.3) continue; const k = 1 + Math.floor(rnd() * 3); for (let j = 0; j < k; j++) { const [type, text] = pick(L); put("events", { type, text, at: at(addDays(today, -d), d === 0 ? Math.min(hourNow, 10 + j) : 10 + j * 4, Math.floor(rnd() * 59)), uid }); } } });
 
     /* ── consignes & discussion (js/consignes.js) ── */
     {
