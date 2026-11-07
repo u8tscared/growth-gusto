@@ -155,7 +155,8 @@ function slOnRows(rows) {
 function slReady(o, recall) {
   if (slKRoute(true)) return;
   if (o.waiter !== S.me.id && S.route !== "salle" && !(S.route === "coupdefeu" && typeof cfRole === "function" && !["cuisine", "bar"].includes(cfRole()))) return;
-  try { SFX.init(); SFX.tone(784, 0.18, "triangle", 0.06); SFX.tone(1175, 0.2, "triangle", 0.055, 0.12); SFX.tone(1568, 0.5, "sine", 0.05, 0.24); buzz(recall ? [80, 60, 80, 60, 160] : [60, 40, 60, 40, 120]); } catch (e) {}
+  const evq = typeof window.evLiveOn === "function" && window.evLiveOn(); /* on an event till: no dining-room bell, the alert bell still gets the recall */
+  if (!evq) try { SFX.init(); SFX.tone(784, 0.18, "triangle", 0.06); SFX.tone(1175, 0.2, "triangle", 0.055, 0.12); SFX.tone(1568, 0.5, "sine", 0.05, 0.24); buzz(recall ? [80, 60, 80, 60, 160] : [60, 40, 60, 40, 120]); } catch (e) {}
   toast(`Table ${o.table} · ${o.courseT || "commande"} ${recall ? ": la cuisine vous appelle" : "prêt à servir"}`, "info");
   /* a recall also lands in the bell (Alertes) of the waiter who sent the ticket, so it is still there when the phone comes out of the pocket */
   if (recall && o.waiter === S.me.id) try { if (window.ALERTES && typeof window.ALERTES.push === "function") window.ALERTES.push({ type: "service", key: "slcall_" + o.id + "_" + o.call, level: "warn", text: `Table ${o.table} · ${o.courseT || "commande"} : la cuisine vous appelle`, sub: "Les assiettes attendent au passe", day: o.day, route: "salle" }); } catch (e) {}

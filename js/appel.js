@@ -86,7 +86,7 @@ const apLive = () => (AP.calls || []).filter((c) => ["new", "vu"].includes(c.sta
   .sort((a, b) => (a.status === "new" ? 0 : 1) - (b.status === "new" ? 0 : 1) || (a.at || 0) - (b.at || 0));
 const apLabel = (c) => { const k = AP_KIND[c.kind] || AP_KIND.serveur; return k[0] + (c.kind === "addition" && AP_PAY[c.pay] ? ` · ${AP_PAY[c.pay].toLowerCase()}` : ""); };
 /* quiet where it makes no sense: the customer screen, the kitchen screen, a kiosk */
-const apQuiet = () => S.route === "ecran" || S.route === "cuisine" || (typeof esKioskOn === "function" && esKioskOn());
+const apQuiet = () => S.route === "ecran" || S.route === "cuisine" || (typeof esKioskOn === "function" && esKioskOn()) || (typeof window.evLiveOn === "function" && window.evLiveOn()); /* the event till (js/evenement.js) never rings for the restaurant */
 function apOnCalls() {
   apLive().forEach((c) => {
     const k = c.status + "|" + (c.n || 1), p = AP.seen.get(c.id); AP.seen.set(c.id, k);
