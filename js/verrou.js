@@ -19,11 +19,11 @@ Object.assign(IC, {
 
 const VR = {
   demo: null, locked: false, mode: "main", code: "", first: "", err: "", busy: false, ok: false, confirm: null, abort: null,
-  last: Date.now(), hiddenAt: 0, soft: false, setup: null, sheetCode: "", sheetFirst: "", sheetStep: "new", sheetErr: "",
+  last: Date.now(), hiddenAt: 0, pickUntil: 0, inSys: false, beat: 0, setup: null, sheetCode: "", sheetFirst: "", sheetStep: "new", sheetErr: "",
   lockNow() { if (vrOn()) vrLock(false); },
 };
-const VR_DIGITS = 6, VR_GRACE = 10000;
-const VR_DELAYS = [[0, "Dès que je quitte l'app", "Quitter"], [1, "Après 1 minute", "1 min"], [5, "Après 5 minutes", "5 min"], [15, "Après 15 minutes", "15 min"], [60, "Après 1 heure", "1 h"]];
+const VR_DIGITS = 6;
+const VR_DELAYS = [[0, "Dès que je quitte l'app", "Dès la sortie"], [1, "Après 1 minute", "1 min"], [5, "Après 5 minutes", "5 min"], [15, "Après 15 minutes", "15 min"], [60, "Après 1 heure", "1 h"]];
 const vrDelayTx = (d) => (VR_DELAYS.find((x) => x[0] === d) || VR_DELAYS[2])[2];
 
 /* ── which sensor this device has (only for the words and the drawing: the system shows its own prompt) ── */
@@ -70,7 +70,8 @@ vrCheckAvail().then(() => { if (S.route === "verrou" || S.route === "reglages") 
 const vrUV = (ad) => { const a = new Uint8Array(ad); return a.length > 32 && (a[32] & 0x04) !== 0; };
 function vrClientOk(cdj, type, chal) { try { const c = JSON.parse(new TextDecoder().decode(cdj)); return c.type === type && c.challenge === vrB64(chal) && c.origin === location.origin; } catch (e) { return false; } }
 function vrErr(e) { const n = e && e.name; return n === "NotAllowedError" || n === "AbortError" ? "cancel" : n === "InvalidStateError" ? "exists" : n === "SecurityError" ? "security" : "other"; }
-async function vrCreate() {
+async function vrCreate() { VR.inSys = true; try { return await vrCreate0(); } finally { VR.inSys = false; VR.pickUntil = Date.now() + 1500; } }
+async function vrCreate0() {
   const chal = vrRand(32); const u = typeof authUser === "function" ? authUser() : null;
   const who = (u && u.email) || (S.me && S.me.name) || "Growth Gusto";
   const c = await navigator.credentials.create({ publicKey: {
@@ -84,7 +85,8 @@ async function vrCreate() {
   try { if (c.response.getAuthenticatorData && !vrUV(c.response.getAuthenticatorData())) throw Object.assign(new Error("uv"), { name: "NoUV" }); } catch (e) { if (e.name === "NoUV") throw e; }
   return vrB64(c.rawId);
 }
-async function vrGet(ids) {
+async function vrGet(ids) { VR.inSys = true; try { return await vrGet0(ids); } finally { VR.inSys = false; VR.pickUntil = Date.now() + 1500; } }
+async function vrGet0(ids) {
   try { if (VR.abort) VR.abort.abort(); } catch (e) {}
   const ac = typeof AbortController !== "undefined" ? new AbortController() : null; VR.abort = ac;
   const chal = vrRand(32);
@@ -214,36 +216,60 @@ function vrPinDone() {
 }
 
 /* ── when to lock ── */
+/* sessionStorage survives a reload (auto-update) but not an app killed and relaunched */
 const vrSeen = () => { try { sessionStorage.setItem("gg-vr-seen", String(Date.now())); } catch (e) {} };
 const vrSeenAt = () => { try { return +(sessionStorage.getItem("gg-vr-seen") || 0); } catch (e) { return 0; } };
-const vrDelayMs = () => { const c = vrCfg(); const d = c && c.delay != null ? +c.delay : 5; return d * 60000; };
+const vrDelayMs = () => { const c = vrCfg(); const d = c && c.delay != null ? +c.delay : 0; return d * 60000; };
 /* screens left on for the brigade (kitchen display, big screen, time clock kiosk): nobody touches them, so no « untouched » lock */
 const vrWatched = () => (typeof BIG !== "undefined" && BIG.on) || (typeof RH !== "undefined" && RH.kiosk) || ["cuisine", "service", "coupdefeu", "commandes", "salle"].includes(S.route);
 const vrBlocked = () => !!$("#au.on") || S.route === "onboarding";
+/* leaving on purpose for the app's own needs (photo from the camera or the gallery, Face ID sheet): not a « left the app » */
+const vrPicking = () => VR.inSys || Date.now() < (VR.pickUntil || 0);
+document.addEventListener("click", (e) => { const t = e.target; if (t && t.tagName === "INPUT" && t.type === "file") VR.pickUntil = Date.now() + 3 * 60000; }, true);
+document.addEventListener("change", (e) => { const t = e.target; if (t && t.tagName === "INPUT" && t.type === "file") VR.pickUntil = Date.now() + 1500; }, true);
 ["pointerdown", "keydown", "touchstart"].forEach((ev) => document.addEventListener(ev, () => { if (!VR.locked) { const n = Date.now(); if (n - VR.last > 20000) vrSeen(); VR.last = n; } }, { passive: true, capture: true }));
-document.addEventListener("visibilitychange", () => {
+/* the app left the screen: home button, swipe to another app, app switcher, screen off */
+function vrLeave() {
   if (!vrOn() || vrBlocked()) return;
-  if (document.visibilityState === "hidden") {
-    VR.hiddenAt = Date.now(); if (!VR.locked) vrSeen();
-    /* « Dès que je quitte »: locked now, so the app switcher shows the lock and not the accounts. A quick trip (camera, photo picker) is forgiven. */
-    if (!VR.locked && vrDelayMs() === 0) { VR.soft = true; vrLock(false); }
-    try { if (VR.abort && VR.locked) VR.abort.abort(); } catch (e) {}
-    return;
+  if (!VR.hiddenAt) VR.hiddenAt = Date.now();
+  if (VR.locked) { try { if (VR.abort && !VR.busy) VR.abort.abort(); } catch (e) {} return; }
+  /* « Dès que je quitte »: lock now, so the app switcher already shows the lock and not the accounts */
+  if (vrDelayMs() === 0 && !vrPicking()) vrLock(false);
+}
+/* back on screen. iOS does not always say it left (the page is just frozen): a gap in the heartbeat counts as « left » too */
+function vrBack(gap) {
+  if (!vrOn() || vrBlocked()) { VR.hiddenAt = 0; return; }
+  const away = VR.hiddenAt ? Date.now() - VR.hiddenAt : gap || 0; const left = !!VR.hiddenAt || (gap || 0) > 2500;
+  VR.hiddenAt = 0;
+  if (!VR.locked && left) {
+    if (vrPicking()) { if (!VR.inSys) VR.pickUntil = Date.now() + 1500; }
+    else if (vrDelayMs() === 0 || away > vrDelayMs()) vrLock(false);
   }
-  const away = Date.now() - (VR.hiddenAt || Date.now());
-  if (VR.soft && VR.locked && !VR.busy && away < VR_GRACE) { VR.soft = false; vrUnlock(true); return; }
-  VR.soft = false;
-  if (!VR.locked && VR.hiddenAt && away > Math.max(vrDelayMs(), VR_GRACE)) vrLock(false);
-  else if (VR.locked && VR.mode === "main" && !VR.busy && !VR.confirm) setTimeout(() => { if (VR.locked && VR.mode === "main" && !VR.busy) vrBioGo(true); }, 450);
-});
+  if (VR.locked && VR.mode === "main" && !VR.busy && !VR.confirm) setTimeout(() => { if (VR.locked && VR.mode === "main" && !VR.busy && document.visibilityState === "visible") vrBioGo(true); }, 450);
+}
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") vrLeave(); else vrBack(); });
+window.addEventListener("pagehide", vrLeave);
+window.addEventListener("pageshow", (e) => { if (e.persisted) { VR.hiddenAt = VR.hiddenAt || Date.now() - 60000; vrBack(); } });
+document.addEventListener("freeze", vrLeave);
+document.addEventListener("resume", () => vrBack());
+/* heartbeat: JavaScript stops while the app is in the background, so a jump of more than 2.5 s means it was away */
+VR.beat = Date.now();
+setInterval(() => {
+  const n = Date.now(), gap = n - VR.beat; VR.beat = n;
+  if (document.visibilityState !== "visible") return;
+  if (gap > 2500 && !VR.locked) vrBack(gap);
+  if (!VR.locked && vrOn() && n - vrSeenAt() > 4000) vrSeen();
+}, 1000);
 setInterval(() => {
   if (!vrOn() || VR.locked || vrBlocked() || document.visibilityState !== "visible" || vrWatched()) return;
   const lim = Math.max(vrDelayMs(), 5 * 60000); if (Date.now() - VR.last > lim) vrLock(false);
 }, 5000);
 const vrFinish0 = finishBoot;
 finishBoot = function () {
-  /* cold open (or a reload after a long time away): open behind the lock */
-  try { if (vrOn() && !vrBlocked() && Date.now() - vrSeenAt() > Math.max(vrDelayMs(), VR_GRACE)) vrLock(true); else if (vrOn()) vrSeen(); } catch (e) { console.warn(e); }
+  /* settings saved before « Dès que je quitte » became the default (2026-11-07) move to it */
+  try { const c = vrCfg(); if (c && c.pinSha && !c.v) { c.v = 2; if (c.delay === 5) c.delay = 0; vrSave(c); } } catch (e) {}
+  /* every opening is locked, except a reload of an app that was on screen a few seconds ago (automatic update) */
+  try { if (vrOn() && !vrBlocked() && Date.now() - vrSeenAt() > Math.max(vrDelayMs(), 8000)) vrLock(true); else if (vrOn()) vrSeen(); } catch (e) { console.warn(e); }
   return vrFinish0.apply(this, arguments);
 };
 /* tests */
@@ -284,7 +310,7 @@ function vrRow() {
     const on = !!vrCfg(); return `<div class="li tap" data-go="verrou"><span class="ic w-vi vr-rowic">${ico(k.ic)}</span><div class="tx"><b>${esc(k.t)}</b><em>${on ? "Votre profil s'ouvre sans code" : "Ouvrir votre profil sans taper de code"}</em></div>${on ? `<span class="pill acc">Activé</span>` : ico("chev")}</div>`;
   }
   const c = vrCfg(); const on = vrOn();
-  return `<div class="li tap" data-go="verrou"><span class="ic w-vi vr-rowic">${ico(k.ic)}</span><div class="tx"><b>Verrouiller avec ${esc(k.t)}</b><em>${on ? (vrBioOn() ? `${esc(k.t)} · ${VR_DELAYS.find((d) => d[0] === (c.delay ?? 5))?.[1].toLowerCase() || ""}` : "Avec un code") : "Personne n'ouvre l'app à votre place"}</em></div>${on ? `<span class="pill acc">${vrDelayTx(c.delay ?? 5)}</span>` : ico("chev")}</div>`;
+  return `<div class="li tap" data-go="verrou"><span class="ic w-vi vr-rowic">${ico(k.ic)}</span><div class="tx"><b>Verrouiller avec ${esc(k.t)}</b><em>${on ? (vrBioOn() ? `${esc(k.t)} · ${VR_DELAYS.find((d) => d[0] === (c.delay ?? 0))?.[1].toLowerCase() || ""}` : "Avec un code") : "Personne n'ouvre l'app à votre place"}</em></div>${on ? `<span class="pill acc">${vrDelayTx(c.delay ?? 0)}</span>` : ico("chev")}</div>`;
 }
 TAB_OF.verrou = "more";
 VIEWS.verrou = {
@@ -316,9 +342,9 @@ VIEWS.verrou = {
           <div><span class="vr-n">3</span><span>L'app se verrouille quand vous la quittez</span></div></div>
         <div class="ctabar st" style="--i:4">${canBio ? `<button class="btn acc block" data-act="vrEnable">${ico(k.ic)}Activer ${esc(k.t)}</button>` : `<button class="btn acc block" data-act="vrEnablePin" ${av === null ? "disabled" : ""}>${ico("lock")}Verrouiller avec un code</button>`}</div>`;
     } else {
-      const d = c.delay ?? 5;
+      const d = c.delay ?? 0;
       body = `<div class="lbl st cc-sec" style="--i:3">Verrouiller</div>
-        <div class="glass pad st vr-delays" style="--i:3">${VR_DELAYS.map(([v, t]) => `<button class="chip cc-opt-row ${d === v ? "on" : ""}" data-act="vrDelay" data-v="${v}">${t}${v === 5 ? `<span class="vr-adv">conseillé</span>` : ""}${d === v ? ico("check") : ""}</button>`).join("")}
+        <div class="glass pad st vr-delays" style="--i:3">${VR_DELAYS.map(([v, t]) => `<button class="chip cc-opt-row ${d === v ? "on" : ""}" data-act="vrDelay" data-v="${v}">${t}${v === 0 ? `<span class="vr-adv">conseillé</span>` : ""}${d === v ? ico("check") : ""}</button>`).join("")}
           <p class="note" style="margin:6px 2px 0">L'app est toujours verrouillée quand on la rouvre. Les écrans cuisine restent allumés tant qu'on ne quitte pas l'app.</p></div>
         <div class="lbl st cc-sec" style="--i:4">Déverrouillage</div>
         <div class="glass pad st" style="--i:4">
@@ -348,7 +374,7 @@ function vrOpenPinSheet(setup) { VR.setup = setup; VR.sheetCode = ""; VR.sheetFi
 function vrSetupDone() {
   const s = VR.setup || {}; const prev = vrCfg() || {}; const salt = typeof ccSalt === "function" ? ccSalt() : String(Math.random()).slice(2);
   const cfg = { ...prev, pinSalt: salt, pinSha: vrHash(salt, VR.sheetFirst), fails: 0, until: 0 };
-  if (!s.change) Object.assign(cfg, { cred: s.cred || null, sim: !!s.sim, delay: prev.delay ?? 5, at: Date.now(), dev: vrKind().dev });
+  if (!s.change) Object.assign(cfg, { cred: s.cred || null, sim: !!s.sim, delay: prev.delay ?? 0, v: 2, at: Date.now(), dev: vrKind().dev });
   vrSave(cfg); VR.setup = null; vrSeen(); VR.last = Date.now();
   $$(".vr-sheetpin .vr-dots").forEach((d) => d.classList.add("ok"));
   setTimeout(() => { closeSheet(true); SFX.done(); buzz([10, 30, 10]); if (!s.change) burst(); toast(s.change ? "Nouveau code enregistré" : `Verrouillage activé${cfg.cred || cfg.sim ? " · " + vrKind().t : ""}`); rerender(); }, 320);
