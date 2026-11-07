@@ -30,6 +30,8 @@ window.simApply = function simApply(D, P) {
     if (P.sansModules.length) r.modsOff = P.sansModules.slice();
     /* journée du restaurant (js/journee.js) : bar ouvert la nuit, hôtel au petit-déjeuner, cantine fermée le week-end */
     if (P.day) r.day = { ...P.day };
+    /* marques vendues depuis la même cuisine (js/marques.js) */
+    if (P.marques && P.marques.length) r.brands = P.marques.map((name, i) => ({ id: "sb" + i, name, color: ["#5B2BFF", "#EF5A3C", "#16A37B", "#E6A100", "#2F7BEA"][i % 5] })); else delete r.brands;
     if (P.closed) r.alertCfg = { ...(r.alertCfg || {}), closed: P.closed.slice() };
   });
   /* 3) équipe : les 7 personnes de la démo deviennent celles du profil (même rôle si possible), le reste est créé */
