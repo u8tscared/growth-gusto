@@ -170,7 +170,7 @@ html[data-theme=dark]{--tp-cb:#9D85FF;--tp-ligne:#3FC7D9;--tp-especes:#3DDC97}
 .tp-seg>button:active{transform:scale(.96)}
 .tp-seg.sm>button{min-height:38px;font-size:13.5px}
 .tp-seg + .tp-seg{margin-top:6px}
-.tp-date{position:relative;overflow:hidden}
+.tp-date,.tp-seg>label.tp-date{position:relative;overflow:hidden}
 .tp-date .ico{width:17px;height:17px}
 .tp-date input{position:absolute;inset:0;opacity:0;width:100%;height:100%;cursor:pointer;font-size:16px}
 .tp-warn-t{display:flex;gap:8px;align-items:center;margin:0;font-size:13.5px;color:var(--warn-ink)}
@@ -222,3 +222,20 @@ html[data-theme=dark]{--tp-cb:#9D85FF;--tp-ligne:#3FC7D9;--tp-especes:#3DDC97}
 :where(html[data-theme=dark]) .tp-hero .m-cb{background:#fff}:where(html[data-theme=dark]) .tp-hero .m-ligne{background:#7CE3F0}:where(html[data-theme=dark]) .tp-hero .m-especes{background:#9EF5C4}
 :where(html[data-theme=dark]) .tp-st.paid{background:#fff;color:#1E7F55}
 :where(html[data-theme=dark]) .tp-bar.on .tp-bc{box-shadow:0 0 0 2px #fff}
+
+/* the period: Jour / Mois / Année, arrows, and a picker under the label */
+.tp-ctl{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:10px 16px;margin:0 0 12px}
+.tp-per{flex:1 1 260px;max-width:380px}
+.tp-per button{min-height:24px}
+.tp-ctl .tp-mnav{margin:0;flex:0 1 auto}
+.tp-pick{position:relative;display:inline-flex;align-items:center;justify-content:center;gap:7px;min-width:170px;min-height:44px;padding:0 12px;border-radius:14px;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:background .2s}
+.tp-pick:hover{background:rgb(var(--w) / .45)}
+.tp-pick b{min-width:0!important;white-space:nowrap}
+.tp-pick .ico{width:17px;height:17px;color:var(--muted);flex:none}
+.tp-pick input,.tp-pick select{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;font-size:16px;border:0;margin:0;padding:0;-webkit-appearance:none;appearance:none}
+.tp-svs{display:flex;gap:8px;margin:2px 0 10px}
+.tp-svs span{flex:1;display:flex;align-items:baseline;justify-content:space-between;gap:8px;padding:9px 12px;border-radius:14px;background:rgba(255,255,255,.1)}
+.tp-svs em{font-style:normal;font-size:12.5px;font-weight:700;color:rgba(255,255,255,.72)}
+.tp-svs b{font-size:17px;font-weight:760;color:#fff}
+.tp-bars.yr{gap:6px}
+.tp-bars.yr .tp-bar em{font-size:11px}
