@@ -43,6 +43,21 @@ Object.assign(IC, {
   if (!NAV.some((n) => n[0] === "passation")) { const c = at("consignes"); const p = c >= 0 ? c + 1 : at("pointeuse"); NAV.splice(p >= 0 ? p : NAV.length, 0, ["passation", "paBaton", "Passation de service"]); }
   if (!NAV.some((n) => n[0] === "journal")) { const e = at("equipe"); NAV.splice(e >= 0 ? e + 1 : NAV.length, 0, ["journal", "jrLog", "Journal des actions"]); }
   Object.assign(TAB_OF, { passation: "more", journal: "more" });
+  /* « Prise en main » (js/lecons.js): one lesson per menu screen; run again once every script has loaded, whatever their order */
+  const lecons = () => { if (typeof PC_LECONS === "object" && !PC_LECONS.passation) {
+    PC_LECONS.passation = { t: "Passation de service", d: "En fin de service, un mot pour l'équipe suivante : ruptures, casse, client à rappeler. Elle le lit en arrivant et signe.", who: ["cuisine", "salle", "bar", "plonge", "boss"],
+      steps: ["En fin de service, touchez « Écrire la passation »", "Gardez ce que l'app a repris de la journée, ajoutez le reste", "En arrivant, lisez et touchez « J'ai lu, c'est parti »"],
+      q: ["Un client a oublié son écharpe et repasse demain. Où le noter pour l'équipe suivante ?", ["Dans la passation, en « Client à rappeler »", "Sur un post-it au passe", "Nulle part, elle s'en souviendra"], 0],
+      tip: "Rien à signaler ? Un seul geste : l'équipe suivante le sait aussi.",
+      sc: { k: "check", t: "Passation du midi", rows: [["Plus de bar de ligne", 1], ["Rappeler M. Bernard", 1], ["Fond de veau à refroidir", 0]] } };
+    PC_LECONS.journal = { t: "Journal des actions", d: "Qui a annulé, offert ou modifié quoi, et quand, avec le montant. Rien ne s'efface.", who: ["boss"],
+      steps: ["Choisissez la période : aujourd'hui, 7 jours, 30 jours", "Touchez « Gestes sensibles » pour voir annulations et offerts", "Touchez une ligne pour le détail, ou exportez"],
+      q: ["Un serveur annule un plat déjà envoyé. Que garde le journal ?", ["Qui, quand, le plat, le motif et le montant", "Rien, c'est annulé", "Seulement le total de la soirée"], 0],
+      tip: "« À regarder » n'accuse personne : c'est un repère pour en parler.",
+      sc: { k: "list", t: "Journal des actions", rows: [["jrUndo", "Sarah · annulé 1 joue de bœuf", "18 €", "warn"], ["jrGift", "Sarah · offert 1 café", "2 €", "acc"], ["check", "Lucas · relevé du midi", "11:10", "ok"]] } };
+  }
+  try { if (typeof PC_FAMILLES !== "undefined" && Array.isArray(PC_FAMILLES)) { const f = PC_FAMILLES.find((x) => x[0] === "consignes"); if (f && !f[4].includes("passation")) f[4].push("passation"); const g = PC_FAMILLES.find((x) => x[0] === "salaires"); if (g && !g[4].includes("journal")) g[4].push("journal"); } } catch (e) {} };
+  lecons(); document.addEventListener("DOMContentLoaded", lecons);
   /* « En service » and « Mon espace » (js/espaces.js) keep the handover in their « Équipe » corner */
   try { if (typeof ES_ALWAYS !== "undefined" && !ES_ALWAYS.includes("passation")) ES_ALWAYS.splice(1, 0, "passation"); } catch (e) {}
   try { if (typeof ES_MOI_SET !== "undefined" && !ES_MOI_SET.includes("passation")) ES_MOI_SET.push("passation"); } catch (e) {}
