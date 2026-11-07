@@ -4,7 +4,7 @@
 // Les écrans ajoutés plus tard par n'importe quel module ont donc leur mode sombre sans rien faire.
 //
 // Usage :
-//   node tools/sombre.js --write   réécrit css/*.css sur place (lancé par .github/workflows/deploy.yml juste avant la mise en ligne)
+//   node tools/sombre.js --write   réécrit css/*.css sur place (lancé par firebase.json « predeploy » juste avant la mise en ligne de l'app)
 //   node tools/sombre.js           affiche, par fichier, le nombre de règles jumelles (rien n'est écrit)
 // tools/run.js applique la même préparation à la volée, pour que les tests voient exactement ce qui est mis en ligne.
 const fs = require('fs'); const path = require('path');

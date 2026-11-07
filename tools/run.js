@@ -5,7 +5,7 @@
 const {chromium}=require('playwright');const http=require('http');const fs=require('fs');const path=require('path');
 const ROOT=path.resolve(__dirname,'..');const OUT=path.resolve(process.env.OUT||path.join(__dirname,'out'));fs.mkdirSync(OUT,{recursive:true});
 const TYPES={'.html':'text/html','.js':'application/javascript','.css':'text/css','.svg':'image/svg+xml','.png':'image/png','.webmanifest':'application/manifest+json','.json':'application/json'};
-/* css/*.css are served as they go online: with their dark twins (tools/sombre.js, run by deploy.yml). RAW=1 serves the sources. */
+/* css/*.css are served as they go online: with their dark twins (tools/sombre.js, run by the firebase.json predeploy hook). RAW=1 serves the sources. */
 const SB=require('./sombre.js');const prep=(f)=>{const b=fs.readFileSync(f);if(process.env.RAW||path.dirname(f)!==path.join(ROOT,'css')||!f.endsWith('.css'))return b;
  const n=path.basename(f);if(n==='sombre.css')return b.toString()+'\n'+SB.BUILT;return SB.SKIP_FILES.has(n)?b:SB.transform(b.toString()).css;};
 const srv=http.createServer((q,r)=>{let u=decodeURIComponent(q.url.split('?')[0]);if(u.endsWith('/'))u+='index.html';const f=path.join(ROOT,u);

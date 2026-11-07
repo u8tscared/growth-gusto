@@ -45,6 +45,9 @@
             }
           ]
         }
+      ],
+      "predeploy": [
+        "node tools/sombre.js --write"
       ]
     },
     {
